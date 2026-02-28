@@ -1,0 +1,401 @@
+import os
+import json
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
+from messages import TRANSLATIONS
+
+from datetime import datetime
+
+app = Flask(__name__)
+app.secret_key = 'filament-manager-secret'
+APP_VERSION = '1.4.0'
+
+# Setup databaze
+db_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data')
+os.makedirs(db_dir, exist_ok=True)
+db_path = os.path.join(db_dir, 'filament.db')
+
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
+
+# --- Modely databaze ---
+class Brand(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+
+class Color(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    hex_value = db.Column(db.String(20), nullable=True)
+
+class Material(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+
+class Filament(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    brand_id = db.Column(db.Integer, db.ForeignKey('brand.id'), nullable=False)
+    color_id = db.Column(db.Integer, db.ForeignKey('color.id'), nullable=False)
+    material_id = db.Column(db.Integer, db.ForeignKey('material.id'), nullable=False)
+    
+    weight_total = db.Column(db.Float, nullable=False)
+    weight_remaining = db.Column(db.Float, nullable=False)
+    price = db.Column(db.Float, nullable=False)
+    quantity = db.Column(db.Integer, nullable=False, default=1)
+
+    brand = db.relationship('Brand', backref=db.backref('filaments', lazy=True))
+    color = db.relationship('Color', backref=db.backref('filaments', lazy=True))
+    material = db.relationship('Material', backref=db.backref('filaments', lazy=True))
+
+class AppSetting(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    lang = db.Column(db.String(10), default='cs')
+    kwh_price = db.Column(db.Float, default=5.0)
+    printer_power = db.Column(db.Integer, default=150)
+
+class PrintHistory(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    filament_name = db.Column(db.String(200), nullable=False)
+    weight = db.Column(db.Float, nullable=False)
+    total_cost = db.Column(db.Float, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+def get_current_lang():
+    setting = AppSetting.query.first()
+    return setting.lang if setting else 'cs'
+
+def get_settings():
+    return AppSetting.query.first()
+
+@app.context_processor
+def inject_translations():
+    lang = get_current_lang()
+    def t(key):
+        return TRANSLATIONS.get(lang, TRANSLATIONS['cs']).get(key, key)
+    return dict(t=t, current_lang=lang, app_version=APP_VERSION)
+
+def setup_database():
+    with app.app_context():
+        db.create_all()
+        # Inicializace vychozich zaznamu, pokud je DB prazdna
+        if not Brand.query.first():
+            default_brands = ['Prusament', 'Hatchbox', 'eSUN', 'Sunlu', 'Polymaker', 'Overture', 'Spectrum', 'Fiberlogy']
+            for b in default_brands:
+                db.session.add(Brand(name=b))
+            
+            default_materials = ['PLA', 'PETG', 'ABS', 'ASA', 'TPU', 'PC', 'Nylon']
+            for m in default_materials:
+                db.session.add(Material(name=m))
+            
+            default_colors = [
+                ('Černá', '#000000'), ('Bílá', '#FFFFFF'), ('Šedá', '#808080'),
+                ('Červená', '#FF0000'), ('Modrá', '#0000FF'), ('Zelená', '#00FF00'),
+                ('Žlutá', '#FFFF00'), ('Oranžová', '#FFA500'), ('Fialová', '#800080'),
+                ('Průhledná', '#edf2f7'), ('Stříbrná', '#C0C0C0'), ('Zlatá', '#FFD700')
+            ]
+            for name, hx in default_colors:
+                db.session.add(Color(name=name, hex_value=hx))
+            
+            db.session.commit()
+
+        # Pridani sloupce quantity do stare DB
+        try:
+            db.session.execute(text('ALTER TABLE filament ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1'))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            
+        try:
+            db.session.execute(text('ALTER TABLE app_setting ADD COLUMN kwh_price FLOAT NOT NULL DEFAULT 5.0'))
+            db.session.execute(text('ALTER TABLE app_setting ADD COLUMN printer_power INTEGER NOT NULL DEFAULT 150'))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+        if not AppSetting.query.first():
+            db.session.add(AppSetting(lang='cs', kwh_price=5.0, printer_power=150))
+            db.session.commit()
+
+# --- Routy (Logika) ---
+@app.route('/')
+def index():
+    filaments = Filament.query.all()
+    total_spools = sum(f.quantity for f in filaments)
+    total_remaining_g = sum(f.weight_remaining for f in filaments)
+    return render_template('index.html', filaments=filaments, stats={"spools": total_spools, "remaining": total_remaining_g})
+
+@app.route('/add', methods=['GET', 'POST'])
+def add():
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        brand_id = request.form['brand_id']
+        color_id = request.form['color_id']
+        material_id = request.form['material_id']
+        weight_total = float(request.form['weight_total'])
+        quantity = int(request.form['quantity'])
+        # Vaha zustatku je prumerne plna
+        weight_remaining = float(request.form.get('weight_remaining', weight_total * quantity))
+        price = float(request.form['price'])
+
+        if not name:
+            brand = Brand.query.get(brand_id)
+            material = Material.query.get(material_id)
+            color = Color.query.get(color_id)
+            name = f"{brand.name} {material.name} {color.name}"
+        
+        new_fil = Filament(name=name, brand_id=brand_id, color_id=color_id, material_id=material_id,
+                           weight_total=weight_total, weight_remaining=weight_remaining, price=price, quantity=quantity)
+        db.session.add(new_fil)
+        db.session.commit()
+        return redirect(url_for('index'))
+        
+    brands = Brand.query.order_by(Brand.name).all()
+    colors = Color.query.order_by(Color.name).all()
+    materials = Material.query.order_by(Material.name).all()
+    return render_template('add.html', brands=brands, colors=colors, materials=materials)
+
+@app.route('/edit/<int:id>', methods=['GET', 'POST'])
+def edit(id):
+    filament = Filament.query.get_or_404(id)
+    if request.method == 'POST':
+        filament.name = request.form['name']
+        filament.weight_remaining = float(request.form['weight_remaining'])
+        filament.price = float(request.form['price'])
+        filament.quantity = int(request.form['quantity'])
+        db.session.commit()
+        return redirect(url_for('index'))
+    return render_template('edit.html', filament=filament)
+    
+@app.route('/use/<int:id>', methods=['POST'])
+def use_filament(id):
+    import math
+    amount = float(request.form['amount'])
+    filament = Filament.query.get_or_404(id)
+    filament.weight_remaining -= amount
+    if filament.weight_remaining < 0:
+        filament.weight_remaining = 0
+        
+    if filament.weight_total > 0:
+        expected_quantity = math.ceil(filament.weight_remaining / filament.weight_total)
+        if expected_quantity < filament.quantity:
+            filament.quantity = expected_quantity
+            
+    db.session.commit()
+    return redirect(url_for('index'))
+
+@app.route('/add_spool/<int:id>', methods=['POST'])
+def add_spool(id):
+    filament = Filament.query.get_or_404(id)
+    filament.quantity += 1
+    filament.weight_remaining += filament.weight_total
+    db.session.commit()
+    return redirect(url_for('index'))
+
+@app.route('/remove_spool/<int:id>', methods=['POST'])
+def remove_spool(id):
+    filament = Filament.query.get_or_404(id)
+    if filament.quantity > 0:
+        filament.quantity -= 1
+        filament.weight_remaining -= filament.weight_total
+        if filament.weight_remaining < 0:
+            filament.weight_remaining = 0
+    db.session.commit()
+    return redirect(url_for('index'))
+
+@app.route('/delete/<int:id>', methods=['POST'])
+def delete(id):
+    filament = Filament.query.get_or_404(id)
+    db.session.delete(filament)
+    db.session.commit()
+    return redirect(url_for('index'))
+
+@app.route('/calculator', methods=['GET', 'POST'])
+def calculator():
+    filaments = Filament.query.all()
+    setting = get_settings()
+    result = None
+    if request.method == 'POST':
+        filament_id = request.form.get('filament_id')
+        weight = float(request.form.get('weight', 0))
+        print_time = float(request.form.get('print_time', 0))
+        kwh_price = float(request.form.get('kwh_price', 0))
+        printer_power = int(request.form.get('printer_power', 0))
+        
+        # Ulozeni nastaveni elektriny pro priste
+        if setting:
+            setting.kwh_price = kwh_price
+            setting.printer_power = printer_power
+            db.session.commit()
+            
+        if filament_id and weight > 0:
+            filament = Filament.query.get(filament_id)
+            if filament.weight_total > 0:
+                cost_per_gram = filament.price / filament.weight_total
+                material_cost = cost_per_gram * weight
+                
+                # Vypocet elektriny: cas_h * (W / 1000) * cena_kwh
+                electricity_cost = print_time * (printer_power / 1000.0) * kwh_price
+                total_cost = material_cost + electricity_cost
+                
+                lang = get_current_lang()
+                currency = "Kč" if lang == 'cs' else "CZK"
+                result = {
+                    'filament': filament,
+                    'weight': weight,
+                    'print_time': print_time,
+                    'material_cost': material_cost,
+                    'electricity_cost': electricity_cost,
+                    'total_cost': total_cost,
+                    'cost_per_gram': cost_per_gram,
+                    'currency': currency
+                }
+                
+                # Ulozeni do historie
+                history_record = PrintHistory(
+                    filament_name=f"{filament.name} | {filament.brand.name} {filament.material.name}",
+                    weight=weight,
+                    total_cost=total_cost
+                )
+                db.session.add(history_record)
+                db.session.commit()
+                
+    # Nacteni historie pro zobrazeni
+    histories = PrintHistory.query.order_by(PrintHistory.created_at.desc()).all()
+    return render_template('calculator.html', filaments=filaments, result=result, setting=setting, histories=histories)
+
+@app.route('/calculator/history/<int:id>/delete', methods=['POST'])
+def delete_history(id):
+    record = PrintHistory.query.get_or_404(id)
+    db.session.delete(record)
+    db.session.commit()
+    return redirect(url_for('calculator'))
+
+@app.route('/settings', methods=['GET', 'POST'])
+def settings():
+    if request.method == 'POST':
+        action = request.form.get('action')
+        try:
+            if action == 'brand':
+                db.session.add(Brand(name=request.form['name']))
+            elif action == 'color':
+                db.session.add(Color(name=request.form['name'], hex_value=request.form['hex_value']))
+            elif action == 'material':
+                db.session.add(Material(name=request.form['name']))
+            elif action == 'language':
+                setting = AppSetting.query.first()
+                setting.lang = request.form['lang']
+            
+            # Edit actions
+            elif action == 'edit_brand':
+                brand = Brand.query.get(request.form['id'])
+                if brand: brand.name = request.form['name']
+            elif action == 'edit_material':
+                mat = Material.query.get(request.form['id'])
+                if mat: mat.name = request.form['name']
+            elif action == 'edit_color':
+                col = Color.query.get(request.form['id'])
+                if col: 
+                    col.name = request.form['name']
+                    col.hex_value = request.form['hex_value']
+            
+            # Delete actions
+            elif action == 'delete_brand':
+                brand = Brand.query.get(request.form['id'])
+                if brand and len(brand.filaments) == 0:
+                    db.session.delete(brand)
+            elif action == 'delete_material':
+                mat = Material.query.get(request.form['id'])
+                if mat and len(mat.filaments) == 0:
+                    db.session.delete(mat)
+            elif action == 'delete_color':
+                col = Color.query.get(request.form['id'])
+                if col and len(col.filaments) == 0:
+                    db.session.delete(col)
+                    
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+        return redirect(url_for('settings'))
+    
+    brands = Brand.query.order_by(Brand.name).all()
+    colors = Color.query.order_by(Color.name).all()
+    materials = Material.query.order_by(Material.name).all()
+    return render_template('settings.html', brands=brands, colors=colors, materials=materials)
+
+@app.route('/export')
+def export_data():
+    data = {
+        'brands': [b.name for b in Brand.query.all()],
+        'materials': [m.name for m in Material.query.all()],
+        'colors': [{'name': c.name, 'hex_value': c.hex_value} for c in Color.query.all()],
+        'filaments': [{
+            'name': f.name,
+            'brand': f.brand.name if f.brand else '',
+            'material': f.material.name if f.material else '',
+            'color': f.color.name if f.color else '',
+            'weight_total': f.weight_total,
+            'weight_remaining': f.weight_remaining,
+            'price': f.price,
+            'quantity': f.quantity
+        } for f in Filament.query.all()]
+    }
+    response = jsonify(data)
+    response.headers['Content-Disposition'] = 'attachment; filename=filament_backup.json'
+    return response
+
+@app.route('/import', methods=['POST'])
+def import_data():
+    file = request.files.get('file')
+    if not file or file.filename == '':
+        return redirect(url_for('settings'))
+        
+    try:
+        data = json.load(file)
+        
+        # Osetreni a import znacek
+        for b_name in data.get('brands', []):
+            if not Brand.query.filter_by(name=b_name).first():
+                db.session.add(Brand(name=b_name))
+        
+        # Osetreni a import materialu
+        for m_name in data.get('materials', []):
+            if not Material.query.filter_by(name=m_name).first():
+                db.session.add(Material(name=m_name))
+                
+        # Osetreni a import barev
+        for c in data.get('colors', []):
+            if not Color.query.filter_by(name=c.get('name')).first():
+                db.session.add(Color(name=c.get('name'), hex_value=c.get('hex_value', '')))
+                
+        db.session.commit()
+        
+        # Import filamentu (vzdy se pridaji jako nove)
+        for f in data.get('filaments', []):
+            b = Brand.query.filter_by(name=f.get('brand')).first()
+            m = Material.query.filter_by(name=f.get('material')).first()
+            c = Color.query.filter_by(name=f.get('color')).first()
+            
+            if b and m and c:
+                db.session.add(Filament(
+                    name=f.get('name'),
+                    brand_id=b.id,
+                    material_id=m.id,
+                    color_id=c.id,
+                    weight_total=f.get('weight_total', 1000),
+                    weight_remaining=f.get('weight_remaining', 1000),
+                    price=f.get('price', 0),
+                    quantity=f.get('quantity', 1)
+                ))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        
+    return redirect(url_for('settings'))
+
+if __name__ == '__main__':
+    setup_database()
+    app.run(host='0.0.0.0', port=5000)

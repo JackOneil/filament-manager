@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+    <h1 class="text-3xl font-bold">{{ t('my_inventory') }}</h1>
+    <div class="flex gap-4 items-center">
+        <div class="bg-white px-4 py-2 rounded shadow text-sm">
+            <span class="text-gray-500">{{ t('total_spools') }}:</span> <strong>{{ stats.spools }}</strong> | 
+            <span class="text-gray-500">{{ t('total_remaining') }}:</span> <strong>{{ '%0.1f'| format(stats.remaining / 1000) }} kg</strong>
+        </div>
+        <a href="{{ url_for('add') }}" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded shadow font-bold transition-colors">
+            <i class="fa-solid fa-plus"></i> {{ t('new') }}
+        </a>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for fil in filaments %}
+    <div class="bg-white rounded-lg shadow-md border border-gray-100 overflow-hidden relative">
+        <div class="h-2 w-full absolute top-0 left-0" style="background-color: {{ fil.color.hex_value }};"></div>
+        <div class="p-6">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800 truncate" title="{{ fil.name }}">{{ fil.name }}</h2>
+                    <p class="text-sm font-semibold text-gray-500 mt-1">
+                        {{ fil.brand.name }} &bull; {{ fil.material.name }} &bull; {{ fil.color.name }}
+                        <span class="ml-2 text-blue-600">({{ fil.quantity }} {{ t('pieces') }})</span>
+                    </p>
+                </div>
+                {% set capacity_all = fil.quantity * fil.weight_total %}
+                {% if capacity_all > 0 %}
+                    {% set pct = (fil.weight_remaining / capacity_all * 100) | round | int %}
+                {% else %}
+                    {% set pct = 0 %}
+                {% endif %}
+                <span class="px-2 py-1 text-xs font-bold rounded shadow-sm
+                    {% if pct > 50 %}bg-green-100 text-green-800
+                    {% elif pct > 20 %}bg-yellow-100 text-yellow-800
+                    {% else %}bg-red-100 text-red-800{% endif %}">
+                    {{ pct }} %
+                </span>
+            </div>
+            
+            <div class="mt-5">
+                <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden shadow-inner">
+                  <div class="h-3 rounded-full transition-all duration-500
+                    {% if pct > 50 %}bg-green-500{% elif pct > 20 %}bg-yellow-500{% else %}bg-red-500{% endif %}" 
+                    style="width: {{ pct }}%"></div>
+                </div>
+                <div class="flex justify-between text-sm mt-2 text-gray-600 font-medium">
+                    <span>{{ t('remaining') }}: {{ fil.weight_remaining | int }} g</span>
+                    <span>{{ t('capacity') }}: {{ capacity_all | int }} g</span>
+                </div>
+                <div class="text-xs text-center text-gray-400 mt-1">{{ t('spool_price').format(price='{:0.2f}'.format(fil.price), weight=fil.weight_total | int) }}</div>
+            </div>
+
+            <div class="mt-6 flex flex-col xl:flex-row justify-between items-center gap-3 border-t pt-4 border-gray-100">
+                <form action="{{ url_for('use_filament', id=fil.id) }}" method="POST" class="flex items-center gap-2 w-full xl:w-auto">
+                    <input type="number" name="amount" min="1" max="{{ fil.weight_remaining }}" step="0.1" placeholder="g" class="w-20 border rounded px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
+                    <button type="submit" class="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-200 transition-colors text-xs px-3 py-1.5 rounded whitespace-nowrap font-semibold">{{ t('subtract_usage') }}</button>
+                </form>
+                
+                <div class="flex gap-4 pt-2 xl:pt-0">
+                    <form action="{{ url_for('add_spool', id=fil.id) }}" method="POST">
+                        <button type="submit" title="{{ t('add_spool') }}" class="text-green-500 hover:text-green-700 transition-colors"><i class="fa-solid fa-plus-circle"></i></button>
+                    </form>
+                    <form action="{{ url_for('remove_spool', id=fil.id) }}" method="POST">
+                        <button type="submit" title="{{ t('remove_spool') }}" class="text-yellow-500 hover:text-yellow-700 transition-colors"><i class="fa-solid fa-minus-circle"></i></button>
+                    </form>
+                    <a href="{{ url_for('edit', id=fil.id) }}" title="{{ t('edit') }}" class="text-gray-400 hover:text-blue-500 transition-colors"><i class="fa-solid fa-edit"></i></a>
+                    <form action="{{ url_for('delete', id=fil.id) }}" method="POST" onsubmit="return confirm('{{ t('delete_confirm') }}');">
+                        <button type="submit" class="text-gray-400 hover:text-red-500 transition-colors"><i class="fa-solid fa-trash"></i></button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-span-full text-center text-gray-500 py-16 bg-white rounded-lg border border-dashed border-gray-300">
+        <i class="fa-solid fa-box-open text-4xl mb-4 text-gray-300"></i>
+        <p class="text-lg">{{ t('no_filaments') }}</p>
+        <p class="text-sm mt-2"><a href="{{ url_for('add') }}" class="text-blue-500 hover:underline">{{ t('add_first') }}</a></p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
