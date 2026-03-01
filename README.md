@@ -1,5 +1,5 @@
 # Filament Manager 🧵
-*Current version: **v1.8.4***
+*Current version: **v1.9.0***
 
 A minimalist and modern web application for tracking and managing 3D printer filaments.
 The application allows detailed tracking of weight balances, material costs, and also includes a calculator for a precise print cost estimation of a given model (in grams relative to the spool's total weight).

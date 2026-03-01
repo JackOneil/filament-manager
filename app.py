@@ -13,7 +13,7 @@ app = Flask(__name__)
 # Nastaveni pro ziskani skutecne IP adresy pres reverse proxy (napr. z Traefiku)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.secret_key = 'filament-manager-secret'
-APP_VERSION = '1.8.4'
+APP_VERSION = '1.9.0'
 
 # Setup databaze
 db_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data')
@@ -250,6 +250,7 @@ def edit(id):
     filament = Filament.query.get_or_404(id)
     if request.method == 'POST':
         old_weight = filament.weight_remaining
+        old_name = filament.name
         
         filament.name = request.form['name']
         filament.weight_remaining = float(request.form['weight_remaining'])
@@ -261,7 +262,8 @@ def edit(id):
             log_movement(filament, 'add', weight_diff)
         elif weight_diff < 0:
             log_movement(filament, 'remove', abs(weight_diff))
-            
+        
+        app.logger.debug(f"Edited filament: {old_name} -> {filament.name} (weight: {old_weight}g -> {filament.weight_remaining}g, price: {filament.price})")
         db.session.commit()
         return redirect(url_for('index'))
     return render_template('edit.html', filament=filament)
@@ -281,7 +283,8 @@ def use_filament(id):
         expected_quantity = math.ceil(filament.weight_remaining / filament.weight_total)
         if expected_quantity < filament.quantity:
             filament.quantity = expected_quantity
-            
+    
+    app.logger.debug(f"Used {actual_amount}g of {filament.name} (remaining: {filament.weight_remaining}g)")
     log_movement(filament, 'remove', actual_amount)
     db.session.commit()
     return redirect(url_for('index'))
@@ -291,6 +294,7 @@ def add_spool(id):
     filament = Filament.query.get_or_404(id)
     filament.quantity += 1
     filament.weight_remaining += filament.weight_total
+    app.logger.debug(f"Added spool to {filament.name} (quantity: {filament.quantity}, total weight: {filament.weight_remaining}g)")
     log_movement(filament, 'add', filament.weight_total)
     db.session.commit()
     return redirect(url_for('index'))
@@ -305,6 +309,7 @@ def remove_spool(id):
         if filament.weight_remaining < 0:
             filament.weight_remaining = 0
         actual_amount = old_weight - filament.weight_remaining
+        app.logger.debug(f"Removed spool from {filament.name} (quantity: {filament.quantity}, weight removed: {actual_amount}g)")
         log_movement(filament, 'remove', actual_amount)
     db.session.commit()
     return redirect(url_for('index'))
@@ -312,6 +317,7 @@ def remove_spool(id):
 @app.route('/delete/<int:id>', methods=['POST'])
 def delete(id):
     filament = Filament.query.get_or_404(id)
+    app.logger.debug(f"Deleted filament: {filament.name} ({filament.weight_remaining}g remaining)")
     log_movement(filament, 'remove', filament.weight_remaining)
     db.session.delete(filament)
     db.session.commit()
@@ -364,6 +370,7 @@ def calculator():
                     total_cost=total_cost
                 )
                 db.session.add(history_record)
+                app.logger.debug(f"Print calculated: {filament.name}, weight: {weight}g, material cost: {material_cost}, electricity cost: {electricity_cost}, total: {total_cost}")
                 db.session.commit()
                 
     # Strankovani pro historii
@@ -379,6 +386,7 @@ def calculator():
 @app.route('/calculator/history/<int:id>/delete', methods=['POST'])
 def delete_history(id):
     record = PrintHistory.query.get_or_404(id)
+    app.logger.debug(f"Deleted print history: {record.filament_name}, weight: {record.weight}g, cost: {record.total_cost}")
     db.session.delete(record)
     db.session.commit()
     return redirect(url_for('calculator'))
@@ -400,20 +408,33 @@ def settings():
         action = request.form.get('action')
         try:
             if action == 'brand':
-                db.session.add(Brand(name=request.form['name']))
+                brand_name = request.form['name']
+                db.session.add(Brand(name=brand_name))
+                app.logger.debug(f"Added brand: {brand_name}")
             elif action == 'color':
-                db.session.add(Color(name=request.form['name'], hex_value=request.form['hex_value']))
+                color_name = request.form['name']
+                color_hex = request.form['hex_value']
+                db.session.add(Color(name=color_name, hex_value=color_hex))
+                app.logger.debug(f"Added color: {color_name} ({color_hex})")
             elif action == 'material':
-                db.session.add(Material(name=request.form['name']))
+                material_name = request.form['name']
+                db.session.add(Material(name=material_name))
+                app.logger.debug(f"Added material: {material_name}")
             elif action == 'language':
                 setting = AppSetting.query.first()
+                old_lang = setting.lang
                 setting.lang = request.form['lang']
+                app.logger.debug(f"Language changed: {old_lang} -> {setting.lang}")
             elif action == 'currency':
                 setting = AppSetting.query.first()
+                old_currency = setting.currency
                 setting.currency = request.form['currency']
+                app.logger.debug(f"Currency changed: {old_currency} -> {setting.currency}")
             elif action == 'debug_logging':
                 setting = AppSetting.query.first()
+                old_debug = setting.debug_logging
                 setting.debug_logging = request.form.get('debug_logging') == 'on'
+                app.logger.debug(f"Debug logging toggled: {old_debug} -> {setting.debug_logging}")
                 if setting.debug_logging:
                     app.logger.setLevel(logging.DEBUG)
                     app.logger.debug("Debug logging mode enabled by user.")
@@ -423,33 +444,46 @@ def settings():
             # Edit actions
             elif action == 'edit_brand':
                 brand = Brand.query.get(request.form['id'])
-                if brand: brand.name = request.form['name']
+                if brand:
+                    old_name = brand.name
+                    brand.name = request.form['name']
+                    app.logger.debug(f"Brand edited: {old_name} -> {brand.name}")
             elif action == 'edit_material':
                 mat = Material.query.get(request.form['id'])
-                if mat: mat.name = request.form['name']
+                if mat:
+                    old_name = mat.name
+                    mat.name = request.form['name']
+                    app.logger.debug(f"Material edited: {old_name} -> {mat.name}")
             elif action == 'edit_color':
                 col = Color.query.get(request.form['id'])
-                if col: 
+                if col:
+                    old_name = col.name
+                    old_hex = col.hex_value
                     col.name = request.form['name']
                     col.hex_value = request.form['hex_value']
+                    app.logger.debug(f"Color edited: {old_name} #{old_hex} -> {col.name} #{col.hex_value}")
             
             # Delete actions
             elif action == 'delete_brand':
                 brand = Brand.query.get(request.form['id'])
                 if brand and len(brand.filaments) == 0:
+                    app.logger.debug(f"Brand deleted: {brand.name}")
                     db.session.delete(brand)
             elif action == 'delete_material':
                 mat = Material.query.get(request.form['id'])
                 if mat and len(mat.filaments) == 0:
+                    app.logger.debug(f"Material deleted: {mat.name}")
                     db.session.delete(mat)
             elif action == 'delete_color':
                 col = Color.query.get(request.form['id'])
                 if col and len(col.filaments) == 0:
+                    app.logger.debug(f"Color deleted: {col.name} #{col.hex_value}")
                     db.session.delete(col)
                     
             db.session.commit()
         except Exception as e:
             db.session.rollback()
+            app.logger.debug(f"Settings action error: {str(e)}")
         return redirect(url_for('settings'))
     
     brands = Brand.query.order_by(Brand.name).all()
@@ -475,37 +509,45 @@ def export_data():
             'quantity': f.quantity
         } for f in Filament.query.all()]
     }
+    app.logger.debug(f"Export started: brands={len(data['brands'])}, materials={len(data['materials'])}, colors={len(data['colors'])}, filaments={len(data['filaments'])}")
     response = jsonify(data)
     response.headers['Content-Disposition'] = 'attachment; filename=filament_backup.json'
+    app.logger.debug("Export finished successfully")
     return response
 
 @app.route('/import', methods=['POST'])
 def import_data():
     file = request.files.get('file')
     if not file or file.filename == '':
+        app.logger.debug("Import failed: no file provided")
         return redirect(url_for('settings'))
         
     try:
         data = json.load(file)
+        app.logger.debug(f"Import started: brands={len(data.get('brands', []))}, materials={len(data.get('materials', []))}, colors={len(data.get('colors', []))}, filaments={len(data.get('filaments', []))}")
         
         # Osetreni a import znacek
         for b_name in data.get('brands', []):
             if not Brand.query.filter_by(name=b_name).first():
                 db.session.add(Brand(name=b_name))
+                app.logger.debug(f"Brand imported: {b_name}")
         
         # Osetreni a import materialu
         for m_name in data.get('materials', []):
             if not Material.query.filter_by(name=m_name).first():
                 db.session.add(Material(name=m_name))
+                app.logger.debug(f"Material imported: {m_name}")
                 
         # Osetreni a import barev
         for c in data.get('colors', []):
             if not Color.query.filter_by(name=c.get('name')).first():
                 db.session.add(Color(name=c.get('name'), hex_value=c.get('hex_value', '')))
+                app.logger.debug(f"Color imported: {c.get('name')} ({c.get('hex_value', '')})")
                 
         db.session.commit()
         
         # Import filamentu (vzdy se pridaji jako nove)
+        imported_count = 0
         for f in data.get('filaments', []):
             b = Brand.query.filter_by(name=f.get('brand')).first()
             m = Material.query.filter_by(name=f.get('material')).first()
@@ -522,9 +564,13 @@ def import_data():
                     price=f.get('price', 0),
                     quantity=f.get('quantity', 1)
                 ))
+                app.logger.debug(f"Filament imported: {f.get('name')}")
+                imported_count += 1
         db.session.commit()
+        app.logger.debug(f"Import finished: {imported_count} filaments imported")
     except Exception as e:
         db.session.rollback()
+        app.logger.debug(f"Import failed: {str(e)}")
         
     return redirect(url_for('settings'))
 
