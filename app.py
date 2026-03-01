@@ -3,13 +3,16 @@ import json
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
+from werkzeug.middleware.proxy_fix import ProxyFix
 from messages import TRANSLATIONS
 
 from datetime import datetime
 
 app = Flask(__name__)
+# Nastaveni pro ziskani skutecne IP adresy pres reverse proxy (napr. z Traefiku)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.secret_key = 'filament-manager-secret'
-APP_VERSION = '1.4.0'
+APP_VERSION = '1.8.2'
 
 # Setup databaze
 db_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data')
@@ -51,11 +54,21 @@ class Filament(db.Model):
     color = db.relationship('Color', backref=db.backref('filaments', lazy=True))
     material = db.relationship('Material', backref=db.backref('filaments', lazy=True))
 
+class MovementHistory(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    filament_name = db.Column(db.String(255), nullable=False)
+    action_type = db.Column(db.String(50), nullable=False)
+    weight = db.Column(db.Float, nullable=False)
+    cost = db.Column(db.Float, nullable=False)
+    currency = db.Column(db.String(10), nullable=False)
+
 class AppSetting(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     lang = db.Column(db.String(10), default='cs')
     kwh_price = db.Column(db.Float, default=5.0)
     printer_power = db.Column(db.Integer, default=150)
+    currency = db.Column(db.String(10), default='CZK')
 
 class PrintHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -68,15 +81,20 @@ def get_current_lang():
     setting = AppSetting.query.first()
     return setting.lang if setting else 'cs'
 
+def get_current_currency():
+    setting = AppSetting.query.first()
+    return setting.currency if setting and setting.currency else 'CZK'
+
 def get_settings():
     return AppSetting.query.first()
 
 @app.context_processor
 def inject_translations():
     lang = get_current_lang()
+    currency = get_current_currency()
     def t(key):
         return TRANSLATIONS.get(lang, TRANSLATIONS['cs']).get(key, key)
-    return dict(t=t, current_lang=lang, app_version=APP_VERSION)
+    return dict(t=t, current_lang=lang, current_currency=currency, app_version=APP_VERSION)
 
 def setup_database():
     with app.app_context():
@@ -115,18 +133,68 @@ def setup_database():
             db.session.commit()
         except Exception:
             db.session.rollback()
+            
+        try:
+            db.session.execute(text("ALTER TABLE app_setting ADD COLUMN currency VARCHAR(10) NOT NULL DEFAULT 'CZK'"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
         if not AppSetting.query.first():
-            db.session.add(AppSetting(lang='cs', kwh_price=5.0, printer_power=150))
+            db.session.add(AppSetting(lang='cs', kwh_price=5.0, printer_power=150, currency='CZK'))
             db.session.commit()
 
 # --- Routy (Logika) ---
+
+def log_movement(filament, action_type, weight):
+    if weight <= 0: return
+    cost_per_gram = filament.price / filament.weight_total if filament.weight_total > 0 else 0
+    total_cost = cost_per_gram * weight
+    currency = get_current_currency()
+    
+    brand_name = filament.brand.name if filament.brand else ""
+    mat_name = filament.material.name if filament.material else ""
+    filament_name = f"{filament.name} | {brand_name} {mat_name}".strip(" | ")
+    
+    movement = MovementHistory(
+        filament_name=filament_name,
+        action_type=action_type,
+        weight=weight,
+        cost=total_cost,
+        currency=currency
+    )
+    db.session.add(movement)
+
+
 @app.route('/')
 def index():
-    filaments = Filament.query.all()
+    filaments_query = Filament.query
+    
+    # Filtr - Ziskavani argumentu
+    f_brand = request.args.get('brand', '')
+    f_material = request.args.get('material', '')
+    f_color = request.args.get('color', '')
+    
+    if f_brand:
+        filaments_query = filaments_query.filter(Filament.brand_id == f_brand)
+    if f_material:
+        filaments_query = filaments_query.filter(Filament.material_id == f_material)
+    if f_color:
+        filaments_query = filaments_query.filter(Filament.color_id == f_color)
+
+    filaments = filaments_query.all()
     total_spools = sum(f.quantity for f in filaments)
     total_remaining_g = sum(f.weight_remaining for f in filaments)
-    return render_template('index.html', filaments=filaments, stats={"spools": total_spools, "remaining": total_remaining_g})
+    total_value = sum((f.price / f.weight_total * f.weight_remaining) if f.weight_total > 0 else 0 for f in filaments)
+    
+    # Pro vyber filtru
+    brands = Brand.query.order_by(Brand.name).all()
+    materials = Material.query.order_by(Material.name).all()
+    colors = Color.query.order_by(Color.name).all()
+    
+    return render_template('index.html', filaments=filaments, stats={"spools": total_spools, "remaining": total_remaining_g, "value": total_value},
+                           brands=brands, materials=materials, colors=colors,
+                           f_brand=f_brand, f_material=f_material, f_color=f_color)
 
 @app.route('/add', methods=['GET', 'POST'])
 def add():
@@ -150,9 +218,9 @@ def add():
         new_fil = Filament(name=name, brand_id=brand_id, color_id=color_id, material_id=material_id,
                            weight_total=weight_total, weight_remaining=weight_remaining, price=price, quantity=quantity)
         db.session.add(new_fil)
-        db.session.commit()
-        return redirect(url_for('index'))
+        db.session.flush() # for new_fil to get relationships correctly mapped
         
+        log_movement(new_fil, 'add', weight_remaining)
     brands = Brand.query.order_by(Brand.name).all()
     colors = Color.query.order_by(Color.name).all()
     materials = Material.query.order_by(Material.name).all()
@@ -162,10 +230,19 @@ def add():
 def edit(id):
     filament = Filament.query.get_or_404(id)
     if request.method == 'POST':
+        old_weight = filament.weight_remaining
+        
         filament.name = request.form['name']
         filament.weight_remaining = float(request.form['weight_remaining'])
         filament.price = float(request.form['price'])
         filament.quantity = int(request.form['quantity'])
+        
+        weight_diff = filament.weight_remaining - old_weight
+        if weight_diff > 0:
+            log_movement(filament, 'add', weight_diff)
+        elif weight_diff < 0:
+            log_movement(filament, 'remove', abs(weight_diff))
+            
         db.session.commit()
         return redirect(url_for('index'))
     return render_template('edit.html', filament=filament)
@@ -175,15 +252,18 @@ def use_filament(id):
     import math
     amount = float(request.form['amount'])
     filament = Filament.query.get_or_404(id)
+    old_weight = filament.weight_remaining
     filament.weight_remaining -= amount
     if filament.weight_remaining < 0:
         filament.weight_remaining = 0
+    actual_amount = old_weight - filament.weight_remaining
         
     if filament.weight_total > 0:
         expected_quantity = math.ceil(filament.weight_remaining / filament.weight_total)
         if expected_quantity < filament.quantity:
             filament.quantity = expected_quantity
             
+    log_movement(filament, 'remove', actual_amount)
     db.session.commit()
     return redirect(url_for('index'))
 
@@ -192,6 +272,7 @@ def add_spool(id):
     filament = Filament.query.get_or_404(id)
     filament.quantity += 1
     filament.weight_remaining += filament.weight_total
+    log_movement(filament, 'add', filament.weight_total)
     db.session.commit()
     return redirect(url_for('index'))
 
@@ -200,15 +281,19 @@ def remove_spool(id):
     filament = Filament.query.get_or_404(id)
     if filament.quantity > 0:
         filament.quantity -= 1
+        old_weight = filament.weight_remaining
         filament.weight_remaining -= filament.weight_total
         if filament.weight_remaining < 0:
             filament.weight_remaining = 0
+        actual_amount = old_weight - filament.weight_remaining
+        log_movement(filament, 'remove', actual_amount)
     db.session.commit()
     return redirect(url_for('index'))
 
 @app.route('/delete/<int:id>', methods=['POST'])
 def delete(id):
     filament = Filament.query.get_or_404(id)
+    log_movement(filament, 'remove', filament.weight_remaining)
     db.session.delete(filament)
     db.session.commit()
     return redirect(url_for('index'))
@@ -241,8 +326,7 @@ def calculator():
                 electricity_cost = print_time * (printer_power / 1000.0) * kwh_price
                 total_cost = material_cost + electricity_cost
                 
-                lang = get_current_lang()
-                currency = "Kč" if lang == 'cs' else "CZK"
+                currency = get_current_currency()
                 result = {
                     'filament': filament,
                     'weight': weight,
@@ -263,9 +347,15 @@ def calculator():
                 db.session.add(history_record)
                 db.session.commit()
                 
-    # Nacteni historie pro zobrazeni
-    histories = PrintHistory.query.order_by(PrintHistory.created_at.desc()).all()
-    return render_template('calculator.html', filaments=filaments, result=result, setting=setting, histories=histories)
+    # Strankovani pro historii
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    if per_page not in [10, 20, 50, 100]:
+        per_page = 10
+
+    histories_paginated = db.paginate(PrintHistory.query.order_by(PrintHistory.created_at.desc()), page=page, per_page=per_page, error_out=False)
+
+    return render_template('calculator.html', filaments=filaments, result=result, setting=setting, histories=histories_paginated, per_page=per_page)
 
 @app.route('/calculator/history/<int:id>/delete', methods=['POST'])
 def delete_history(id):
@@ -273,6 +363,17 @@ def delete_history(id):
     db.session.delete(record)
     db.session.commit()
     return redirect(url_for('calculator'))
+
+@app.route('/history')
+def history():
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    if per_page not in [10, 20, 50, 100]:
+        per_page = 10
+
+    movements_paginated = db.paginate(MovementHistory.query.order_by(MovementHistory.created_at.desc()), page=page, per_page=per_page, error_out=False)
+    
+    return render_template('history.html', movements=movements_paginated, per_page=per_page)
 
 @app.route('/settings', methods=['GET', 'POST'])
 def settings():
@@ -288,6 +389,9 @@ def settings():
             elif action == 'language':
                 setting = AppSetting.query.first()
                 setting.lang = request.form['lang']
+            elif action == 'currency':
+                setting = AppSetting.query.first()
+                setting.currency = request.form['currency']
             
             # Edit actions
             elif action == 'edit_brand':

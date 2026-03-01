@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.2] - 2026-03-01
+### Added
+- Added total inventory monetary value calculation to the main dashboard overview, displaying active capital tied in filaments.
+
+## [1.8.1] - 2026-03-01
+### Fixed
+- Fixed the visual sign logic representing the operational cost of filament movements in History (Added filament now renders as a visually positive value, deleted filament renders as negative value).
+
+## [1.8.0] - 2026-03-01
+### Added
+- Created a new Filament Movement History page that tracks precisely when and how much material was added or removed.
+- Implemented automatic logging for stock operations (e.g. subtracting material, adding spools, making adjustments).
+- Fully paginated logging system using 10/20/50/100 records selection.
+
+## [1.7.0] - 2026-03-01
+### Added
+- Added combinatorial filters to the main dashboard. Users can now filter their filament spools by Brand, Material, and Color simultaneously.
+
+## [1.6.0] - 2026-03-01
+### Added
+- Upgraded the Print Calculator's simple filament dropdown into an interactive, live full-text search input component. Uses fast JS DOM manipulation to filter filaments by name, brand, or material instantly.
+
+## [1.5.0] - 2026-03-01
+### Added
+- Added global Currency Selection setting (CZK, USD, EUR) to the Settings page. This directly modifies how strings and costs are displayed natively everywhere in the main index list and in the precise printing calculator view.
+### Fixed
+- Fixed currency formatting order on the dashboard index page (e.g., from `Cena 230.00 za 1000 g CZK` to `Cena 230.00 CZK za 1000 g`).
+
 ## [1.4.0] - 2026-03-01
 ### Added
 - Added Database Import & Export functionalities (via JSON structure). Users can now natively download and upload back their complete settings/filaments/dictionaries list.

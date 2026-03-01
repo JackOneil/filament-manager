@@ -8,16 +8,28 @@
     
     <div class="bg-white rounded-xl shadow-md p-6 lg:p-10 border border-gray-100">
         <form method="POST">
-            <div class="mb-5">
+            <div class="mb-5 relative" id="filament-select-container">
                 <label class="block text-gray-700 text-sm font-bold mb-2">{{ t('select_filament') }}</label>
-                <select name="filament_id" class="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 text-lg" required>
-                    <option value="" disabled selected>{{ t('choose_filament') }}</option>
+                
+                <input type="hidden" name="filament_id" id="filament_id_input" required>
+                
+                <div class="relative">
+                    <input type="text" id="filament_search" placeholder="{{ t('search_filament') }}" class="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 text-lg pr-10 cursor-pointer" autocomplete="off">
+                    <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-400">
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </div>
+                </div>
+
+                <!-- Dropdown s vysledky fulltextu -->
+                <div id="filament_dropdown" class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto hidden">
                     {% for f in filaments %}
-                        <option value="{{ f.id }}">
-                            {{ f.name }} | {{ f.brand.name }} {{ f.material.name }}
-                        </option>
+                        <div class="filament-option px-4 py-3 hover:bg-green-50 cursor-pointer border-b border-gray-50 last:border-b-0" data-value="{{ f.id }}" data-search="{{ (f.name ~ ' ' ~ f.brand.name ~ ' ' ~ f.material.name)|lower }}">
+                            <div class="font-bold text-gray-800">{{ f.name }}</div>
+                            <div class="text-sm text-gray-500">{{ f.brand.name }} {{ f.material.name }}</div>
+                        </div>
                     {% endfor %}
-                </select>
+                    <div id="no_results" class="px-4 py-3 text-gray-500 italic hidden">Nenalezeno (No results found)</div>
+                </div>
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8 items-end">
@@ -96,11 +108,28 @@
 
         <!-- Historie -->
         <div class="mt-12">
-            <h3 class="text-xl font-bold text-gray-800 border-b pb-2 mb-4">{{ t('history_title') }}</h3>
-            {% if histories and histories|length > 0 %}
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-2 mb-4 gap-4">
+                <h3 class="text-xl font-bold text-gray-800">{{ t('history_title') }}</h3>
+                
+                {% if histories.items and histories.items|length > 0 %}
+                <div class="flex items-center gap-2 text-sm bg-white px-3 py-1.5 rounded shadow-sm border border-gray-200">
+                    <label for="per_page" class="text-gray-600 font-semibold">{{ t('per_page') }}</label>
+                    <select id="per_page" class="bg-transparent border-none focus:ring-0 outline-none cursor-pointer text-gray-800 font-bold" onchange="window.location.href='{{ url_for('calculator') }}?per_page='+this.value">
+                        <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                        <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+                        <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                        <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                    </select>
+                </div>
+                {% endif %}
+            </div>
+
+            {% if histories.items and histories.items|length > 0 %}
+                <div class="-mx-4 sm:mx-0 overflow-x-auto">
+                    <div class="inline-block min-w-full align-middle">
+                        <div class="overflow-hidden shadow-sm sm:rounded-lg border border-gray-200">
+                            <table class="min-w-full text-left border-collapse">
+                                <thead>
                             <tr class="bg-gray-100 text-gray-600 text-sm uppercase">
                                 <th class="py-3 px-4 rounded-tl-lg">{{ t('date') }}</th>
                                 <th class="py-3 px-4">Filament</th>
@@ -110,7 +139,7 @@
                             </tr>
                         </thead>
                         <tbody class="text-gray-700 text-sm">
-                            {% for h in histories %}
+                            {% for h in histories.items %}
                             <tr class="border-b hover:bg-gray-50 transition-colors">
                                 <td class="py-3 px-4">{{ h.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
                                 <td class="py-3 px-4 font-semibold">{{ h.filament_name }}</td>
@@ -127,7 +156,42 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- Strankovani komponenta -->
+                {% if histories.pages > 1 %}
+                <div class="flex justify-center mt-6">
+                    <nav class="flex items-center gap-1 bg-white rounded-lg shadow-sm border border-gray-200 px-2 py-1">
+                        <!-- Zpet -->
+                        <a href="{{ url_for('calculator', page=histories.prev_num, per_page=per_page) if histories.has_prev else '#' }}" 
+                           class="px-3 py-1 rounded {{ 'text-blue-600 hover:bg-blue-50' if histories.has_prev else 'text-gray-300 cursor-not-allowed' }}">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </a>
+
+                        <!-- Stranky -->
+                        {% for p in histories.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                            {% if p %}
+                                {% if p == histories.page %}
+                                    <span class="px-3 py-1 rounded bg-blue-600 text-white font-bold">{{ p }}</span>
+                                {% else %}
+                                    <a href="{{ url_for('calculator', page=p, per_page=per_page) }}" class="px-3 py-1 rounded text-gray-700 hover:bg-gray-100 transition-colors">{{ p }}</a>
+                                {% endif %}
+                            {% else %}
+                                <span class="px-2 text-gray-400">...</span>
+                            {% endif %}
+                        {% endfor %}
+
+                        <!-- Vpred -->
+                        <a href="{{ url_for('calculator', page=histories.next_num, per_page=per_page) if histories.has_next else '#' }}" 
+                           class="px-3 py-1 rounded {{ 'text-blue-600 hover:bg-blue-50' if histories.has_next else 'text-gray-300 cursor-not-allowed' }}">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </a>
+                    </nav>
+                </div>
+                {% endif %}
+
             {% else %}
                 <p class="text-gray-500 text-center py-6 bg-gray-50 rounded-lg italic">
                     {{ t('history_empty') }}
@@ -136,4 +200,82 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const searchInput = document.getElementById('filament_search');
+        const dropdown = document.getElementById('filament_dropdown');
+        const hiddenInput = document.getElementById('filament_id_input');
+        const options = document.querySelectorAll('.filament-option');
+        const noResults = document.getElementById('no_results');
+
+        // Toggle dropdown on click
+        searchInput.addEventListener('click', function(e) {
+            dropdown.classList.remove('hidden');
+            e.stopPropagation();
+        });
+
+        // Filter elements locally via Fulltext script
+        searchInput.addEventListener('input', function(e) {
+            dropdown.classList.remove('hidden');
+            const searchTerm = e.target.value.toLowerCase().trim();
+            let hasVisible = false;
+
+            options.forEach(option => {
+                // Remove the "selected" UI state when typing changes
+                option.classList.remove('bg-green-100');
+                
+                const searchData = option.getAttribute('data-search');
+                if (searchData.includes(searchTerm)) {
+                    option.classList.remove('hidden');
+                    hasVisible = true;
+                } else {
+                    option.classList.add('hidden');
+                }
+            });
+
+            if (hasVisible) {
+                noResults.classList.add('hidden');
+            } else {
+                noResults.classList.remove('hidden');
+            }
+        });
+
+        // Select item
+        options.forEach(option => {
+            option.addEventListener('click', function(e) {
+                const val = this.getAttribute('data-value');
+                const name = this.querySelector('.font-bold').textContent;
+                const details = this.querySelector('.text-sm').textContent;
+                
+                // Set values
+                hiddenInput.value = val;
+                searchInput.value = `${name} | ${details}`;
+                
+                // Clear all previous active states
+                options.forEach(opt => opt.classList.remove('bg-green-100', 'border-l-4', 'border-green-500'));
+                // Highlight the newly selected item
+                this.classList.add('bg-green-100', 'border-l-4', 'border-green-500');
+
+                // Close and clear search
+                dropdown.classList.add('hidden');
+                
+                // Reset display status for all items for next open
+                options.forEach(opt => opt.classList.remove('hidden'));
+                noResults.classList.add('hidden');
+            });
+        });
+
+        // Close when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!document.getElementById('filament-select-container').contains(e.target)) {
+                dropdown.classList.add('hidden');
+                // Auto-clear input visually if not legitimately selected
+                if (!hiddenInput.value) {
+                    searchInput.value = '';
+                }
+            }
+        });
+    });
+</script>
 {% endblock %}

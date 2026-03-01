@@ -1,17 +1,59 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-    <h1 class="text-3xl font-bold">{{ t('my_inventory') }}</h1>
-    <div class="flex gap-4 items-center">
-        <div class="bg-white px-4 py-2 rounded shadow text-sm">
-            <span class="text-gray-500">{{ t('total_spools') }}:</span> <strong>{{ stats.spools }}</strong> | 
-            <span class="text-gray-500">{{ t('total_remaining') }}:</span> <strong>{{ '%0.1f'| format(stats.remaining / 1000) }} kg</strong>
+<div class="flex flex-col md:flex-row justify-between items-center md:items-end mb-6 gap-4">
+    <h1 class="text-2xl sm:text-3xl font-bold w-full md:w-auto text-center md:text-left">{{ t('my_inventory') }}</h1>
+    <div class="flex flex-col sm:flex-row gap-4 w-full md:w-auto items-center">
+        <div class="bg-white px-4 py-2 rounded shadow text-sm w-full sm:w-auto text-center">
+            <span class="text-gray-500">{{ t('total_spools') }}:</span> <strong>{{ stats.spools }}</strong> <span class="hidden sm:inline">|</span><br class="sm:hidden">
+            <span class="text-gray-500">{{ t('total_remaining') }}:</span> <strong>{{ '%0.1f'| format(stats.remaining / 1000) }} kg</strong> <span class="hidden sm:inline">|</span><br class="sm:hidden">
+            <span class="text-gray-500">{{ t('total_value') }}:</span> <strong>{{ '{:0.2f}'.format(stats.value) }} {{ current_currency }}</strong>
         </div>
-        <a href="{{ url_for('add') }}" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded shadow font-bold transition-colors">
+        <a href="{{ url_for('add') }}" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded shadow font-bold transition-colors w-full sm:w-auto text-center whitespace-nowrap">
             <i class="fa-solid fa-plus"></i> {{ t('new') }}
         </a>
     </div>
 </div>
+
+<!-- Filtry -->
+<form method="GET" action="{{ url_for('index') }}" class="bg-white p-3 sm:p-4 rounded-lg shadow-sm border border-gray-100 mb-6 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 items-stretch sm:items-end">
+    <div class="flex-1 min-w-[150px]">
+        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">{{ t('brand') }}</label>
+        <select name="brand" class="w-full border-gray-300 rounded px-3 py-2 text-sm focus:ring-blue-500 outline-none border">
+            <option value="">-- {{ t('filter_all') }} --</option>
+            {% for b in brands %}
+                <option value="{{ b.id }}" {% if f_brand == b.id|string %}selected{% endif %}>{{ b.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="flex-1 min-w-[150px]">
+        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">{{ t('material') }}</label>
+        <select name="material" class="w-full border-gray-300 rounded px-3 py-2 text-sm focus:ring-blue-500 outline-none border">
+            <option value="">-- {{ t('filter_all') }} --</option>
+            {% for m in materials %}
+                <option value="{{ m.id }}" {% if f_material == m.id|string %}selected{% endif %}>{{ m.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="flex-1 min-w-[150px]">
+        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">{{ t('color') }}</label>
+        <select name="color" class="w-full border-gray-300 rounded px-3 py-2 text-sm focus:ring-blue-500 outline-none border">
+            <option value="">-- {{ t('filter_all') }} --</option>
+            {% for c in colors %}
+                <option value="{{ c.id }}" {% if f_color == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="flex gap-2">
+        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow font-semibold transition-colors text-sm">
+            <i class="fa-solid fa-filter"></i> {{ t('filter_btn') }}
+        </button>
+        {% if f_brand or f_material or f_color %}
+            <a href="{{ url_for('index') }}" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded shadow font-semibold transition-colors text-sm" title="{{ t('filter_reset') }}">
+                <i class="fa-solid fa-times"></i>
+            </a>
+        {% endif %}
+    </div>
+</form>
 
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
     {% for fil in filaments %}
@@ -50,7 +92,7 @@
                     <span>{{ t('remaining') }}: {{ fil.weight_remaining | int }} g</span>
                     <span>{{ t('capacity') }}: {{ capacity_all | int }} g</span>
                 </div>
-                <div class="text-xs text-center text-gray-400 mt-1">{{ t('spool_price').format(price='{:0.2f}'.format(fil.price), weight=fil.weight_total | int) }}</div>
+                <div class="text-xs text-center text-gray-400 mt-1">{{ t('spool_price').format(price='{:0.2f}'.format(fil.price), weight=fil.weight_total | int, currency=current_currency) }}</div>
             </div>
 
             <div class="mt-6 flex flex-col xl:flex-row justify-between items-center gap-3 border-t pt-4 border-gray-100">

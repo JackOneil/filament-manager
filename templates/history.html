@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 pb-4 border-b border-gray-200 gap-4">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid fa-clock-rotate-left text-3xl text-gray-400"></i>
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800">{{ t('movement_history') }}</h1>
+            </div>
+        </div>
+        
+        {% if movements.items and movements.items|length > 0 %}
+        <div class="flex items-center gap-2 text-sm bg-white px-3 py-1.5 rounded shadow-sm border border-gray-200">
+            <label for="per_page" class="text-gray-600 font-semibold">{{ t('per_page') }}</label>
+            <select id="per_page" class="bg-transparent border-none focus:ring-0 outline-none cursor-pointer text-gray-800 font-bold" onchange="window.location.href='{{ url_for('history') }}?per_page='+this.value">
+                <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+                <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+            </select>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if movements.items and movements.items|length > 0 %}
+        <div class="-mx-4 sm:mx-0 overflow-x-auto">
+            <div class="inline-block min-w-full align-middle">
+                <div class="overflow-hidden shadow-sm sm:rounded-lg border border-gray-200">
+                    <table class="min-w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-600 text-sm uppercase">
+                                <th class="py-3 px-4">{{ t('datetime') }}</th>
+                                <th class="py-3 px-4">{{ t('movement_filament') }}</th>
+                                <th class="py-3 px-4">{{ t('movement_action') }}</th>
+                                <th class="py-3 px-4 text-right">{{ t('movement_amount') }}</th>
+                                <th class="py-3 px-4 text-right">{{ t('movement_cost') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-700 text-sm bg-white">
+                            {% for m in movements.items %}
+                            <tr class="border-b hover:bg-gray-50 transition-colors">
+                                <td class="py-3 px-4">{{ m.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                                <td class="py-3 px-4 font-semibold">{{ m.filament_name }}</td>
+                                <td class="py-3 px-4">
+                                    {% if m.action_type == 'add' %}
+                                        <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold"><i class="fa-solid fa-plus"></i> {{ t('movement_added') }}</span>
+                                    {% else %}
+                                        <span class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-bold"><i class="fa-solid fa-minus"></i> {{ t('movement_removed') }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="py-3 px-4 text-right font-medium">
+                                    {{ '{:0.1f}'.format(m.weight) }} g
+                                </td>
+                                <td class="py-3 px-4 text-right font-bold {% if m.action_type == 'add' %}text-green-600{% else %}text-red-600{% endif %}">
+                                    {% if m.action_type == 'add' %}+{% else %}-{% endif %}{{ '{:0.2f}'.format(m.cost) }} {{ m.currency }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!--Strankovanikomponenta-->
+        {% if movements.pages > 1 %}
+        <div class="flex justify-center mt-6">
+            <nav class="flex items-center gap-1 bg-white rounded-lg shadow-sm border border-gray-200 px-2 py-1">
+                <!--Zpet-->
+                <a href="{{ url_for('history', page=movements.prev_num, per_page=per_page) if movements.has_prev else '#' }}" 
+                   class="px-3 py-1 rounded {{ 'text-blue-600 hover:bg-blue-50' if movements.has_prev else 'text-gray-300 cursor-not-allowed' }}">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </a>
+
+                <!--Stranky-->
+                {% for p in movements.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                    {% if p %}
+                        {% if p == movements.page %}
+                            <span class="px-3 py-1 rounded bg-blue-600 text-white font-bold">{{ p }}</span>
+                        {% else %}
+                            <a href="{{ url_for('history', page=p, per_page=per_page) }}" class="px-3 py-1 rounded text-gray-700 hover:bg-gray-100 transition-colors">{{ p }}</a>
+                        {% endif %}
+                    {% else %}
+                        <span class="px-2 text-gray-400">...</span>
+                    {% endif %}
+                {% endfor %}
+
+                <!--Vpred-->
+                <a href="{{ url_for('history', page=movements.next_num, per_page=per_page) if movements.has_next else '#' }}" 
+                   class="px-3 py-1 rounded {{ 'text-blue-600 hover:bg-blue-50' if movements.has_next else 'text-gray-300 cursor-not-allowed' }}">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </a>
+            </nav>
+        </div>
+        {% endif %}
+
+    {% else %}
+        <p class="text-gray-500 text-center py-6 bg-gray-50 rounded-lg italic">
+            {{ t('no_movements') }}
+        </p>
+    {% endif %}
+</div>
+{% endblock %}
