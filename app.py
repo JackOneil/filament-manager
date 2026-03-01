@@ -13,7 +13,7 @@ app = Flask(__name__)
 # Nastaveni pro ziskani skutecne IP adresy pres reverse proxy (napr. z Traefiku)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.secret_key = 'filament-manager-secret'
-APP_VERSION = '1.8.3'
+APP_VERSION = '1.8.4'
 
 # Setup databaze
 db_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data')
@@ -528,6 +528,8 @@ def import_data():
         
     return redirect(url_for('settings'))
 
+# Initialize DB structures automatically for WSGI environments like Gunicorn
+setup_database()
+
 if __name__ == '__main__':
-    setup_database()
     app.run(host='0.0.0.0', port=5000)

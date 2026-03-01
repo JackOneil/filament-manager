@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.4] - 2026-03-01
+### Changed
+- Switched from Flask's built-in development server to Gunicorn (production WSGI server) in the Docker container to ensure true production readiness and fix security/performance warnings.
+
 ## [1.8.3] - 2026-03-01
 ### Fixed
 - Fixed bug in filament addition where `db.session.commit()` and redirection were missing, causing the new filament not to appear in the overview.
