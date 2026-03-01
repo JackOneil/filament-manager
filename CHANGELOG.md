@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2026-03-02
+### Added
+- Added header row to list view in the overview page with column labels (Name, Brand, Quantity, Remaining, Capacity, Percentage, Actions).
+- Added persistence for view mode preference (card/list): user's chosen view is now automatically saved and restored when returning to the overview page.
+### Changed
+- Improved list view layout with more compact grid system and reorganized columns for better readability.
+- First column in list view (Name) now has expanded width to accommodate longer filament names without truncation.
+- Action buttons are now positioned at the far right of each row for consistent and easy access.
+- Header row is sticky on desktop views for easier navigation through large lists.
+
+## [1.11.1] - 2026-03-01
+### Changed
+- Improved list view layout on the overview page: Information is now organized into distinct columns (Name, Material, Quantity, Remaining, Capacity, Percentage) instead of being grouped together, providing better readability and data organization.
+- List view is now more compact and uses a responsive grid layout with hidden columns on mobile devices (Material and Capacity columns are hidden on small screens for better mobile experience).
+- Action buttons remain fixed on the right side of each row for consistent access.
+
+## [1.11.0] - 2026-03-01
+### Added
+- Added view toggle on the overview page to switch between card view (grid layout with detailed cards) and list view (minimalist row-based layout).
+- Added pagination to the overview page, allowing users to browse large filament inventories in manageable chunks (default: 12 items per page).
+- View toggle preference and pagination controls preserve applied filters when switching between views or pages.
+- New card view displays filament details with progress bars, capacity information, and action buttons in a visual grid layout (3 columns on desktop).
+- New list view displays each filament in a compact row format with the color indicator, name, material, quantity, remaining weight, capacity, and action buttons.
+
+## [1.10.0] - 2026-03-01
+### Added
+- Added light/dark theme toggle available on all pages (in the navigation bar).
+- Users can now switch between light mode and dark mode at any time while browsing the application.
+- Theme preference is persisted in the database, automatically loading the user's chosen theme on every visit.
+- Comprehensive dark mode styling with improved contrast and readability for reduced eye strain.
+### Fixed
+- Fixed theme toggle button behavior: users now remain on the same page after changing theme instead of being redirected to settings.
+- Fixed dark mode input visibility: all input fields now have proper dark backgrounds and light text in dark mode for full readability.
+
 ## [1.9.0] - 2026-03-01
 ### Added
 - Added comprehensive debug logging to all major application actions, including filament CRUD operations, settings modifications, calculator functions, and import/export operations.
