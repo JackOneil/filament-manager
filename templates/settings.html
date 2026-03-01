@@ -28,6 +28,14 @@
                     <option value="en" {% if current_lang == 'en' %}selected{% endif %}>English (EN)</option>
                 </select>
             </form>
+            <form method="POST" class="bg-white p-3 rounded-lg shadow-sm border border-gray-100 flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
+                <input type="hidden" name="action" value="debug_logging">
+                <label class="font-semibold text-gray-600 text-sm"><i class="fa-solid fa-bug"></i> {{ t('debug_logging') }}:</label>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" name="debug_logging" onchange="this.form.submit()" class="sr-only peer" {% if app_settings.debug_logging %}checked{% endif %}>
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+            </form>
         </div>
     </div>
 

@@ -1,5 +1,6 @@
 import os
 import json
+import logging
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
@@ -12,7 +13,7 @@ app = Flask(__name__)
 # Nastaveni pro ziskani skutecne IP adresy pres reverse proxy (napr. z Traefiku)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.secret_key = 'filament-manager-secret'
-APP_VERSION = '1.8.2'
+APP_VERSION = '1.8.3'
 
 # Setup databaze
 db_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data')
@@ -69,6 +70,7 @@ class AppSetting(db.Model):
     kwh_price = db.Column(db.Float, default=5.0)
     printer_power = db.Column(db.Integer, default=150)
     currency = db.Column(db.String(10), default='CZK')
+    debug_logging = db.Column(db.Boolean, default=False)
 
 class PrintHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -140,9 +142,23 @@ def setup_database():
         except Exception:
             db.session.rollback()
 
-        if not AppSetting.query.first():
-            db.session.add(AppSetting(lang='cs', kwh_price=5.0, printer_power=150, currency='CZK'))
+        try:
+            db.session.execute(text("ALTER TABLE app_setting ADD COLUMN debug_logging BOOLEAN NOT NULL DEFAULT 0"))
             db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+        if not AppSetting.query.first():
+            db.session.add(AppSetting(lang='cs', kwh_price=5.0, printer_power=150, currency='CZK', debug_logging=False))
+            db.session.commit()
+            
+        # Apply logging based on setting
+        setting = AppSetting.query.first()
+        if setting and setting.debug_logging:
+            app.logger.setLevel(logging.DEBUG)
+            app.logger.debug("Debug logging enabled via settings.")
+        else:
+            app.logger.setLevel(logging.INFO)
 
 # --- Routy (Logika) ---
 
@@ -221,6 +237,9 @@ def add():
         db.session.flush() # for new_fil to get relationships correctly mapped
         
         log_movement(new_fil, 'add', weight_remaining)
+        db.session.commit()
+        app.logger.debug(f"Added new filament: {name} (Brand ID: {brand_id}, Material ID: {material_id})")
+        return redirect(url_for('index'))
     brands = Brand.query.order_by(Brand.name).all()
     colors = Color.query.order_by(Color.name).all()
     materials = Material.query.order_by(Material.name).all()
@@ -392,6 +411,14 @@ def settings():
             elif action == 'currency':
                 setting = AppSetting.query.first()
                 setting.currency = request.form['currency']
+            elif action == 'debug_logging':
+                setting = AppSetting.query.first()
+                setting.debug_logging = request.form.get('debug_logging') == 'on'
+                if setting.debug_logging:
+                    app.logger.setLevel(logging.DEBUG)
+                    app.logger.debug("Debug logging mode enabled by user.")
+                else:
+                    app.logger.setLevel(logging.INFO)
             
             # Edit actions
             elif action == 'edit_brand':
@@ -428,7 +455,8 @@ def settings():
     brands = Brand.query.order_by(Brand.name).all()
     colors = Color.query.order_by(Color.name).all()
     materials = Material.query.order_by(Material.name).all()
-    return render_template('settings.html', brands=brands, colors=colors, materials=materials)
+    app_settings = AppSetting.query.first()
+    return render_template('settings.html', brands=brands, colors=colors, materials=materials, app_settings=app_settings)
 
 @app.route('/export')
 def export_data():
