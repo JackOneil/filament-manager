@@ -13,7 +13,7 @@ app = Flask(__name__)
 # Nastaveni pro ziskani skutecne IP adresy pres reverse proxy (napr. z Traefiku)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.secret_key = 'filament-manager-secret'
-APP_VERSION = '1.9.0'
+APP_VERSION = '1.12.0'
 
 # Setup databaze
 db_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data')
@@ -71,6 +71,8 @@ class AppSetting(db.Model):
     printer_power = db.Column(db.Integer, default=150)
     currency = db.Column(db.String(10), default='CZK')
     debug_logging = db.Column(db.Boolean, default=False)
+    theme = db.Column(db.String(10), default='light')
+    view_mode = db.Column(db.String(10), default='card')
 
 class PrintHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -87,6 +89,10 @@ def get_current_currency():
     setting = AppSetting.query.first()
     return setting.currency if setting and setting.currency else 'CZK'
 
+def get_current_theme():
+    setting = AppSetting.query.first()
+    return setting.theme if setting and setting.theme else 'light'
+
 def get_settings():
     return AppSetting.query.first()
 
@@ -94,9 +100,10 @@ def get_settings():
 def inject_translations():
     lang = get_current_lang()
     currency = get_current_currency()
+    theme = get_current_theme()
     def t(key):
         return TRANSLATIONS.get(lang, TRANSLATIONS['cs']).get(key, key)
-    return dict(t=t, current_lang=lang, current_currency=currency, app_version=APP_VERSION)
+    return dict(t=t, current_lang=lang, current_currency=currency, theme=theme, app_version=APP_VERSION)
 
 def setup_database():
     with app.app_context():
@@ -148,8 +155,20 @@ def setup_database():
         except Exception:
             db.session.rollback()
 
+        try:
+            db.session.execute(text("ALTER TABLE app_setting ADD COLUMN theme VARCHAR(10) NOT NULL DEFAULT 'light'"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+        try:
+            db.session.execute(text("ALTER TABLE app_setting ADD COLUMN view_mode VARCHAR(10) NOT NULL DEFAULT 'card'"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
         if not AppSetting.query.first():
-            db.session.add(AppSetting(lang='cs', kwh_price=5.0, printer_power=150, currency='CZK', debug_logging=False))
+            db.session.add(AppSetting(lang='cs', kwh_price=5.0, printer_power=150, currency='CZK', debug_logging=False, theme='light', view_mode='card'))
             db.session.commit()
             
         # Apply logging based on setting
@@ -191,6 +210,21 @@ def index():
     f_material = request.args.get('material', '')
     f_color = request.args.get('color', '')
     
+    # View mode - load from DB if not in URL, otherwise save to DB
+    setting = AppSetting.query.first()
+    if not setting:
+        setting = AppSetting()
+        db.session.add(setting)
+        db.session.commit()
+    
+    view_mode_param = request.args.get('view', None)
+    if view_mode_param and view_mode_param in ['card', 'list']:
+        setting.view_mode = view_mode_param
+        db.session.commit()
+        app.logger.debug(f"View mode changed to: {view_mode_param}")
+    
+    view_mode = setting.view_mode
+    
     if f_brand:
         filaments_query = filaments_query.filter(Filament.brand_id == f_brand)
     if f_material:
@@ -198,19 +232,29 @@ def index():
     if f_color:
         filaments_query = filaments_query.filter(Filament.color_id == f_color)
 
-    filaments = filaments_query.all()
-    total_spools = sum(f.quantity for f in filaments)
-    total_remaining_g = sum(f.weight_remaining for f in filaments)
-    total_value = sum((f.price / f.weight_total * f.weight_remaining) if f.weight_total > 0 else 0 for f in filaments)
+    # Strankovani
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 12, type=int)
+    if per_page not in [12, 24, 48]:
+        per_page = 12
+    
+    filaments_paginated = db.paginate(filaments_query, page=page, per_page=per_page, error_out=False)
+    
+    # Statistiky - vypocet z filtrovanych filamentu
+    total_spools = sum(f.quantity for f in filaments_paginated.items)
+    total_remaining_g = sum(f.weight_remaining for f in filaments_paginated.items)
+    total_value = sum((f.price / f.weight_total * f.weight_remaining) if f.weight_total > 0 else 0 for f in filaments_paginated.items)
     
     # Pro vyber filtru
     brands = Brand.query.order_by(Brand.name).all()
     materials = Material.query.order_by(Material.name).all()
     colors = Color.query.order_by(Color.name).all()
     
-    return render_template('index.html', filaments=filaments, stats={"spools": total_spools, "remaining": total_remaining_g, "value": total_value},
+    app.logger.debug(f"Index viewed: view_mode={view_mode}, page={page}, per_page={per_page}, filters: brand={f_brand}, material={f_material}, color={f_color}")
+    
+    return render_template('index.html', filaments=filaments_paginated, stats={"spools": total_spools, "remaining": total_remaining_g, "value": total_value},
                            brands=brands, materials=materials, colors=colors,
-                           f_brand=f_brand, f_material=f_material, f_color=f_color)
+                           f_brand=f_brand, f_material=f_material, f_color=f_color, view_mode=view_mode, per_page=per_page)
 
 @app.route('/add', methods=['GET', 'POST'])
 def add():
@@ -440,6 +484,11 @@ def settings():
                     app.logger.debug("Debug logging mode enabled by user.")
                 else:
                     app.logger.setLevel(logging.INFO)
+            elif action == 'theme':
+                setting = AppSetting.query.first()
+                old_theme = setting.theme
+                setting.theme = request.form['theme']
+                app.logger.debug(f"Theme changed: {old_theme} -> {setting.theme}")
             
             # Edit actions
             elif action == 'edit_brand':
@@ -573,6 +622,16 @@ def import_data():
         app.logger.debug(f"Import failed: {str(e)}")
         
     return redirect(url_for('settings'))
+
+@app.route('/toggle-theme', methods=['POST'])
+def toggle_theme():
+    setting = AppSetting.query.first()
+    if setting:
+        new_theme = 'light' if setting.theme == 'dark' else 'dark'
+        setting.theme = new_theme
+        db.session.commit()
+        app.logger.debug(f"Theme changed to: {new_theme}")
+    return redirect(request.referrer or url_for('index'))
 
 # Initialize DB structures automatically for WSGI environments like Gunicorn
 setup_database()

@@ -93,6 +93,9 @@ TRANSLATIONS = {
         'filter_all': 'Vše',
         'filter_btn': 'Filtrovat',
         'filter_reset': 'Zrušit filtry',
+        'theme': 'Motiv',
+        'light_theme': 'Světlý motiv',
+        'dark_theme': 'Tmavý motiv',
     },
     'en': {
         'title': 'Filament Manager',
@@ -188,5 +191,8 @@ TRANSLATIONS = {
         'filter_all': 'All',
         'filter_btn': 'Filter',
         'filter_reset': 'Clear filters',
+        'theme': 'Theme',
+        'light_theme': 'Light Theme',
+        'dark_theme': 'Dark Theme',
     }
 }

@@ -1,11 +1,121 @@
 <!DOCTYPE html>
-<html lang="{{ current_lang }}">
+<html lang="{{ current_lang }}" {% if theme == 'dark' %}class="dark"{% endif %}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ t('title') }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        html.dark body {
+            background-color: #111827;
+            color: #f3f4f6;
+        }
+        html.dark .bg-white { background-color: #1f2937; }
+        html.dark .bg-gray-100 { background-color: #111827; }
+        html.dark .bg-gray-50 { background-color: #1f2937; }
+        html.dark .bg-gray-800 { background-color: #111827; }
+        html.dark .border-gray-100 { border-color: #374151; }
+        html.dark .border-gray-200 { border-color: #374151; }
+        html.dark .text-gray-800 { color: #f3f4f6; }
+        html.dark .text-gray-700 { color: #e5e7eb; }
+        html.dark .text-gray-600 { color: #d1d5db; }
+        html.dark .text-gray-500 { color: #9ca3af; }
+        html.dark .text-gray-400 { color: #9ca3af; }
+        html.dark .bg-blue-600 { background-color: #1e40af; }
+        html.dark .hover\:bg-blue-700:hover { background-color: #1e3a8a; }
+        
+        /* Dark mode input styling */
+        html.dark input[type="text"],
+        html.dark input[type="number"],
+        html.dark input[type="email"],
+        html.dark input[type="password"],
+        html.dark input[type="search"],
+        html.dark textarea,
+        html.dark select {
+            background-color: #1f2937;
+            color: #f3f4f6;
+            border-color: #374151;
+        }
+        
+        html.dark input[type="text"]:focus,
+        html.dark input[type="number"]:focus,
+        html.dark input[type="email"]:focus,
+        html.dark input[type="password"]:focus,
+        html.dark input[type="search"]:focus,
+        html.dark textarea:focus,
+        html.dark select:focus {
+            background-color: #1f2937;
+            color: #f3f4f6;
+            border-color: #4b5563;
+        }
+        
+        html.dark input::placeholder {
+            color: #9ca3af;
+        }
+        
+        html.dark option {
+            background-color: #1f2937;
+            color: #f3f4f6;
+        }
+        
+        /* Dark mode for Tailwind hover classes used in calculator */
+        html.dark .hover\:bg-gray-50:hover { background-color: #374151; }
+        html.dark .hover\:bg-gray-100:hover { background-color: #374151; }
+        html.dark .hover\:bg-green-50:hover { background-color: #374151; }
+        html.dark .hover\:bg-red-50:hover { background-color: #7f1d1d; }
+        html.dark .hover\:bg-red-100:hover { background-color: #7f1d1d; }
+        html.dark .hover\:bg-blue-50:hover { background-color: #1e3a8a; }
+        html.dark .hover\:bg-blue-100:hover { background-color: #1e3a8a; }
+        
+        /* Dark mode for calculator fulltext search */
+        html.dark #filament_search {
+            background-color: #1f2937;
+            color: #f3f4f6;
+            border-color: #374151;
+        }
+        html.dark #filament_search:focus {
+            background-color: #1f2937;
+            color: #f3f4f6;
+            border-color: #4b5563;
+        }
+        html.dark #filament_dropdown {
+            background-color: #1f2937;
+            border-color: #374151;
+        }
+        html.dark .filament-option {
+            border-color: #374151;
+            color: #f3f4f6;
+        }
+        html.dark .filament-option .text-gray-800 { color: #f3f4f6; }
+        html.dark .filament-option .text-gray-500 { color: #9ca3af; }
+        
+        /* Dark mode for pagination */
+        html.dark nav.flex.items-center.gap-1.bg-white {
+            background-color: #1f2937;
+            border-color: #374151;
+        }
+        html.dark .text-gray-700 { color: #e5e7eb; }
+        
+        /* Dark mode for overview list view */
+        html.dark .hover\:bg-gray-50:hover { background-color: #1f2937; }
+        html.dark .bg-gray-50 { background-color: #1f2937; }
+        html.dark .bg-gray-200 { background-color: #374151; }
+        html.dark .bg-gray-300:hover { background-color: #4b5563; }
+        html.dark .border-b.border-gray-200 { border-color: #374151; }
+        
+        /* Dark mode for list view header */
+        html.dark .bg-gray-100 { background-color: #1f2937; }
+        html.dark .border-b.border-gray-300 { border-color: #374151; }
+        
+        /* Dark mode for view toggle buttons */
+        html.dark .bg-gray-200 { background-color: #374151; }
+        html.dark .text-gray-600 { color: #d1d5db; }
+        html.dark .text-gray-600:hover { color: #e5e7eb; }
+        
+        /* Dark mode for text colors in forms */
+        html.dark .text-gray-800 { color: #f3f4f6; }
+    </style>
 </head>
 <body class="bg-gray-100 font-sans text-gray-800 flex flex-col min-h-screen">
     <nav class="bg-blue-600 text-white shadow-lg relative z-20">
@@ -26,6 +136,21 @@
                 <a href="{{ url_for('calculator') }}" class="block hover:text-blue-200 transition-colors py-1 md:py-0 border-b border-blue-500 md:border-0">{{ t('calculator') }}</a>
                 <a href="{{ url_for('history') }}" class="block hover:text-blue-200 transition-colors py-1 md:py-0 border-b border-blue-500 md:border-0">{{ t('movement_history') }}</a>
                 <a href="{{ url_for('settings') }}" class="block hover:text-blue-200 transition-colors py-1 md:py-0"><i class="fa-solid fa-cog"></i> {{ t('settings') }}</a>
+                
+                <!-- Theme Toggle Button - Mobile -->
+                <form method="POST" action="{{ url_for('toggle_theme') }}" class="block md:hidden py-1">
+                    <button type="submit" class="w-full text-left py-1 px-2 hover:bg-blue-700 rounded transition" title="{{ t('theme') }}">
+                        <i class="fa-solid {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
+                        {% if theme == 'dark' %}{{ t('light_theme') }}{% else %}{{ t('dark_theme') }}{% endif %}
+                    </button>
+                </form>
+                
+                <!-- Theme Toggle for Desktop -->
+                <form method="POST" action="{{ url_for('toggle_theme') }}" class="hidden md:block">
+                    <button type="submit" class="hover:text-blue-200 transition-colors" title="{{ t('theme') }}">
+                        <i class="fa-solid {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
+                    </button>
+                </form>
             </div>
         </div>
     </nav>
