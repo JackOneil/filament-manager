@@ -13,11 +13,11 @@
         </a>
         <!-- View toggle -->
         <div class="bg-gray-200 rounded shadow flex gap-1 p-1">
-            <a href="{{ url_for('index', brand=f_brand, material=f_material, color=f_color, view='card', page=1, per_page=per_page) }}" 
+            <a href="{{ url_for('index', brand=f_brand, material=f_material, color=f_color, view='card', page=1, per_page=per_page, sort_by=sort_by, sort_direction=sort_direction) }}" 
                class="px-3 py-1.5 rounded font-semibold text-sm transition-colors {{ 'bg-white text-blue-600 shadow-sm' if view_mode == 'card' else 'text-gray-600 hover:text-gray-800' }}">
                 <i class="fa-solid fa-th"></i> <span class="hidden sm:inline">Karty</span>
             </a>
-            <a href="{{ url_for('index', brand=f_brand, material=f_material, color=f_color, view='list', page=1, per_page=per_page) }}" 
+            <a href="{{ url_for('index', brand=f_brand, material=f_material, color=f_color, view='list', page=1, per_page=per_page, sort_by=sort_by, sort_direction=sort_direction) }}" 
                class="px-3 py-1.5 rounded font-semibold text-sm transition-colors {{ 'bg-white text-blue-600 shadow-sm' if view_mode == 'list' else 'text-gray-600 hover:text-gray-800' }}">
                 <i class="fa-solid fa-list"></i> <span class="hidden sm:inline">Seznam</span>
             </a>
@@ -26,9 +26,11 @@
 </div>
 
 <!-- Filtry -->
-<form method="GET" action="{{ url_for('index') }}" class="bg-white p-3 sm:p-4 rounded-lg shadow-sm border border-gray-100 mb-6 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 items-stretch sm:items-end">
+<form method="GET" action="{{ url_for('index') }}" class="bg-white p-3 sm:p-4 rounded-lg shadow-sm border border-gray-100 mb-4 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 items-stretch sm:items-end">
     <input type="hidden" name="view" value="{{ view_mode }}">
     <input type="hidden" name="per_page" value="{{ per_page }}">
+    <input type="hidden" name="sort_by" value="{{ sort_by }}">
+    <input type="hidden" name="sort_direction" value="{{ sort_direction }}">
     <div class="flex-1 min-w-[150px]">
         <label class="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">{{ t('brand') }}</label>
         <select name="brand" class="w-full border-gray-300 rounded px-3 py-2 text-sm focus:ring-blue-500 outline-none border">
@@ -61,14 +63,74 @@
             <i class="fa-solid fa-filter"></i> {{ t('filter_btn') }}
         </button>
         {% if f_brand or f_material or f_color %}
-            <a href="{{ url_for('index', view=view_mode, per_page=per_page) }}" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded shadow font-semibold transition-colors text-sm" title="{{ t('filter_reset') }}">
+            <a href="{{ url_for('index', view=view_mode, per_page=per_page, sort_by='name', sort_direction='asc') }}" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded shadow font-semibold transition-colors text-sm" title="{{ t('filter_reset') }}">
                 <i class="fa-solid fa-times"></i>
             </a>
         {% endif %}
     </div>
 </form>
 
-<div class="{% if view_mode == 'card' %}grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6{% else %}space-y-0{% endif %}">
+{% if view_mode != 'list' %}
+<!-- Řazení - Quick Sort Buttons (POUZE V CARD VIEW) -->
+<div class="bg-white p-3 sm:p-4 rounded-lg shadow-sm border border-gray-100 mb-6">
+    <label class="block text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide">{{ t('sort_by') }}</label>
+    <div class="flex flex-wrap gap-2">
+        <!-- NÁZEV -->
+        <button type="button" onclick="sortCards('name')"
+           class="px-3 py-1.5 rounded text-xs font-semibold transition-all {{ 'bg-blue-600 text-white shadow-md' if sort_by == 'name' else 'bg-gray-200 text-gray-700 hover:bg-gray-300' }}"
+           data-sort-by="name">
+            <i class="fa-solid {% if sort_by == 'name' and sort_direction == 'asc' %}fa-arrow-up{% elif sort_by == 'name' %}fa-arrow-down{% else %}fa-arrow-up-arrow-down{% endif %}"></i>
+            {{ t('sort_name') }}
+        </button>
+        
+        <!-- VÝROBCE -->
+        <button type="button" onclick="sortCards('brand')"
+           class="px-3 py-1.5 rounded text-xs font-semibold transition-all {{ 'bg-blue-600 text-white shadow-md' if sort_by == 'brand' else 'bg-gray-200 text-gray-700 hover:bg-gray-300' }}"
+           data-sort-by="brand">
+            <i class="fa-solid {% if sort_by == 'brand' and sort_direction == 'asc' %}fa-arrow-up{% elif sort_by == 'brand' %}fa-arrow-down{% else %}fa-arrow-up-arrow-down{% endif %}"></i>
+            {{ t('sort_brand') }}
+        </button>
+        
+        <!-- KUSY -->
+        <button type="button" onclick="sortCards('pieces')"
+           class="px-3 py-1.5 rounded text-xs font-semibold transition-all {{ 'bg-blue-600 text-white shadow-md' if sort_by == 'pieces' else 'bg-gray-200 text-gray-700 hover:bg-gray-300' }}"
+           data-sort-by="pieces">
+            <i class="fa-solid {% if sort_by == 'pieces' and sort_direction == 'asc' %}fa-arrow-up{% elif sort_by == 'pieces' %}fa-arrow-down{% else %}fa-arrow-up-arrow-down{% endif %}"></i>
+            {{ t('sort_pieces') }}
+        </button>
+        
+        <!-- ZBÝVAJÍCÍ -->
+        <button type="button" onclick="sortCards('remaining')"
+           class="px-3 py-1.5 rounded text-xs font-semibold transition-all {{ 'bg-blue-600 text-white shadow-md' if sort_by == 'remaining' else 'bg-gray-200 text-gray-700 hover:bg-gray-300' }}"
+           data-sort-by="remaining">
+            <i class="fa-solid {% if sort_by == 'remaining' and sort_direction == 'asc' %}fa-arrow-up{% elif sort_by == 'remaining' %}fa-arrow-down{% else %}fa-arrow-up-arrow-down{% endif %}"></i>
+            {{ t('sort_remaining') }}
+        </button>
+        
+        <!-- KAPACITA -->
+        <button type="button" onclick="sortCards('capacity')"
+           class="px-3 py-1.5 rounded text-xs font-semibold transition-all {{ 'bg-blue-600 text-white shadow-md' if sort_by == 'capacity' else 'bg-gray-200 text-gray-700 hover:bg-gray-300' }}"
+           data-sort-by="capacity">
+            <i class="fa-solid {% if sort_by == 'capacity' and sort_direction == 'asc' %}fa-arrow-up{% elif sort_by == 'capacity' %}fa-arrow-down{% else %}fa-arrow-up-arrow-down{% endif %}"></i>
+            {{ t('sort_capacity') }}
+        </button>
+        
+        <!-- PROCENTA -->
+        <button type="button" onclick="sortCards('percent')"
+           class="px-3 py-1.5 rounded text-xs font-semibold transition-all {{ 'bg-blue-600 text-white shadow-md' if sort_by == 'percent' else 'bg-gray-200 text-gray-700 hover:bg-gray-300' }}"
+           data-sort-by="percent">
+            <i class="fa-solid {% if sort_by == 'percent' and sort_direction == 'asc' %}fa-arrow-up{% elif sort_by == 'percent' %}fa-arrow-down{% else %}fa-arrow-up-arrow-down{% endif %}"></i>
+            {{ t('sort_percent') }}
+        </button>
+    </div>
+</div>
+{% endif %}
+
+{% if view_mode == 'card' %}
+<div id="filament-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+{% else %}
+<div class="space-y-0">
+{% endif %}
     {% for fil in filaments.items %}
         {% if view_mode == 'card' %}
         <!-- KARTY POHLED -->
@@ -135,16 +197,60 @@
         {% else %}
         <!-- SEZNAM POHLED - TABULÁRNÍ LAYOUT -->
         {% if loop.first %}
-        <!-- HEADER ŘÁDKU -->
+        <!-- HEADER ŘÁDKU - KLIKATELNÉ RAZENI -->
         <div class="hidden sm:grid grid-cols-12 gap-3 bg-gray-100 border-b border-gray-300 px-4 py-2 sticky top-0 z-10 rounded-t-lg mb-0">
-            <div class="col-span-4 font-bold text-gray-700 text-xs uppercase">{{ t('name') }}</div>
-            <div class="col-span-2 font-bold text-gray-700 text-xs uppercase text-center">{{ t('brand') }}</div>
-            <div class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center">{{ t('pieces') }}</div>
-            <div class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center">{{ t('remaining') }}</div>
-            <div class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center">{{ t('capacity') }}</div>
-            <div class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center">%</div>
+            <!-- NÁZEV -->
+            <button type="button" onclick="sortList('name')" data-sort-by="name" class="col-span-4 font-bold text-gray-700 text-xs uppercase hover:text-blue-600 hover:underline cursor-pointer flex items-center gap-1 group transition bg-transparent border-0 p-0 text-left">
+                {{ t('name') }}
+                {% if sort_by == 'name' %}
+                    <i class="fa-solid {% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600 group-hover:text-blue-700"></i>
+                {% endif %}
+            </button>
+            
+            <!-- ZNAČKA -->
+            <button type="button" onclick="sortList('brand')" data-sort-by="brand" class="col-span-2 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
+                {{ t('brand') }}
+                {% if sort_by == 'brand' %}
+                    <i class="fa-solid {% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600 group-hover:text-blue-700"></i>
+                {% endif %}
+            </button>
+            
+            <!-- KUSY -->
+            <button type="button" onclick="sortList('pieces')" data-sort-by="pieces" class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
+                {{ t('pieces') }}
+                {% if sort_by == 'pieces' %}
+                    <i class="fa-solid {% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600 group-hover:text-blue-700"></i>
+                {% endif %}
+            </button>
+            
+            <!-- ZBÝVAJÍCÍ -->
+            <button type="button" onclick="sortList('remaining')" data-sort-by="remaining" class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
+                {{ t('remaining') }}
+                {% if sort_by == 'remaining' %}
+                    <i class="fa-solid {% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600 group-hover:text-blue-700"></i>
+                {% endif %}
+            </button>
+            
+            <!-- KAPACITA -->
+            <button type="button" onclick="sortList('capacity')" data-sort-by="capacity" class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
+                {{ t('capacity') }}
+                {% if sort_by == 'capacity' %}
+                    <i class="fa-solid {% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600 group-hover:text-blue-700"></i>
+                {% endif %}
+            </button>
+            
+            <!-- PROCENTA -->
+            <button type="button" onclick="sortList('percent')" data-sort-by="percent" class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
+                %
+                {% if sort_by == 'percent' %}
+                    <i class="fa-solid {% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600 group-hover:text-blue-700"></i>
+                {% endif %}
+            </button>
+            
+            <!-- AKCE - NEKLIKATELNÉ -->
             <div class="col-span-2 font-bold text-gray-700 text-xs uppercase text-right pr-1">{{ t('action') }}</div>
         </div>
+        <div id="filament-list-container">
         {% endif %}
         
         {% set capacity_all = fil.quantity * fil.weight_total %}
@@ -196,6 +302,7 @@
             
             <!-- Akční tlačítka -->
             <div class="col-span-3 sm:col-span-2 flex gap-1 sm:gap-2 justify-end">
+                <button type="button" onclick="openUseFilamentModal({{ fil.id }}, '{{ fil.name }}', {{ fil.weight_remaining }})" title="{{ t('subtract_usage') }}" class="text-blue-400 hover:text-blue-600 transition-colors text-sm sm:text-base"><i class="fa-solid fa-droplet"></i></button>
                 <form action="{{ url_for('add_spool', id=fil.id) }}" method="POST">
                     <button type="submit" title="{{ t('add_spool') }}" class="text-green-500 hover:text-green-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-plus-circle"></i></button>
                 </form>
@@ -208,6 +315,7 @@
                 </form>
             </div>
         </div>
+        {% if loop.last %}</div>{% endif %}
         {% endif %}
 
     {% else %}
@@ -224,7 +332,7 @@
 <div class="flex justify-center mt-8">
     <nav class="flex items-center gap-1 bg-white rounded-lg shadow-sm border border-gray-200 px-2 py-1">
         <!-- Zpet -->
-        <a href="{{ url_for('index', page=filaments.prev_num, per_page=per_page, brand=f_brand, material=f_material, color=f_color, view=view_mode) if filaments.has_prev else '#' }}" 
+        <a href="{{ url_for('index', page=filaments.prev_num, per_page=per_page, brand=f_brand, material=f_material, color=f_color, view=view_mode, sort_by=sort_by, sort_direction=sort_direction) if filaments.has_prev else '#' }}" 
            class="px-3 py-1 rounded {{ 'text-blue-600 hover:bg-blue-50' if filaments.has_prev else 'text-gray-300 cursor-not-allowed' }}">
             <i class="fa-solid fa-chevron-left"></i>
         </a>
@@ -235,7 +343,7 @@
                 {% if p == filaments.page %}
                     <span class="px-3 py-1 rounded bg-blue-600 text-white font-bold">{{ p }}</span>
                 {% else %}
-                    <a href="{{ url_for('index', page=p, per_page=per_page, brand=f_brand, material=f_material, color=f_color, view=view_mode) }}" class="px-3 py-1 rounded text-gray-700 hover:bg-gray-100 transition-colors">{{ p }}</a>
+                    <a href="{{ url_for('index', page=p, per_page=per_page, brand=f_brand, material=f_material, color=f_color, view=view_mode, sort_by=sort_by, sort_direction=sort_direction) }}" class="px-3 py-1 rounded text-gray-700 hover:bg-gray-100 transition-colors">{{ p }}</a>
                 {% endif %}
             {% else %}
                 <span class="px-2 text-gray-400">...</span>
@@ -243,11 +351,170 @@
         {% endfor %}
 
         <!-- Vpred -->
-        <a href="{{ url_for('index', page=filaments.next_num, per_page=per_page, brand=f_brand, material=f_material, color=f_color, view=view_mode) if filaments.has_next else '#' }}" 
+        <a href="{{ url_for('index', page=filaments.next_num, per_page=per_page, brand=f_brand, material=f_material, color=f_color, view=view_mode, sort_by=sort_by, sort_direction=sort_direction) if filaments.has_next else '#' }}" 
            class="px-3 py-1 rounded {{ 'text-blue-600 hover:bg-blue-50' if filaments.has_next else 'text-gray-300 cursor-not-allowed' }}">
             <i class="fa-solid fa-chevron-right"></i>
         </a>
     </nav>
 </div>
 {% endif %}
+
+<!-- Use Filament Modal Dialog -->
+<div id="useFilamentModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-sm w-full">
+        <h3 class="text-lg font-semibold mb-4 dark:text-white" id="modalTitle">{{ t('subtract_usage') }}</h3>
+        <form id="useFilamentForm" method="POST">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{ t('weight') }} (g)</label>
+                <input type="number" id="useAmount" name="amount" min="1" step="0.1" required class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white" />
+            </div>
+            <div class="flex gap-3 justify-end">
+                <button type="button" onclick="closeUseFilamentModal()" class="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">{{ t('cancel') }}</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors">{{ t('subtract_usage') }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openUseFilamentModal(filamentId, filamentName, maxWeight) {
+    document.getElementById('modalTitle').textContent = '{{ t("subtract_usage") }} - ' + filamentName;
+    document.getElementById('useAmount').max = maxWeight;
+    document.getElementById('useAmount').value = '';
+    document.getElementById('useFilamentForm').action = '/use/' + filamentId;
+    document.getElementById('useFilamentModal').classList.remove('hidden');
+    document.getElementById('useAmount').focus();
+}
+
+function closeUseFilamentModal() {
+    document.getElementById('useFilamentModal').classList.add('hidden');
+}
+
+document.getElementById('useFilamentModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeUseFilamentModal();
+    }
+});
+
+// AJAX sorting bez page reload
+let currentSortBy = '{{ sort_by }}';
+let currentSortDirection = '{{ sort_direction }}';
+
+function sortList(sortBy) {
+    // Toggle direction pokud je stejné sorting pole
+    if (currentSortBy === sortBy) {
+        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSortBy = sortBy;
+        currentSortDirection = 'asc';
+    }
+    
+    // AJAX call
+    const params = new URLSearchParams({
+        sort_by: currentSortBy,
+        sort_direction: currentSortDirection,
+        brand: '{{ f_brand }}',
+        material: '{{ f_material }}',
+        color: '{{ f_color }}',
+        view: 'list',
+        page: 1,
+        per_page: '{{ per_page }}'
+    });
+    
+    fetch(`/api/filaments-list?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            // Update seznam řádky
+            const container = document.getElementById('filament-list-container');
+            if (container) {
+                container.innerHTML = data.html;
+            }
+            
+            // Update header ikony
+            updateHeaderArrows();
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+function updateHeaderArrows() {
+    // Skryj všechny šipky
+    document.querySelectorAll('[data-sort-by] i').forEach(icon => {
+        icon.style.display = 'none';
+    });
+    
+    // Ukaž šipku pro aktivní sorting
+    const activeButton = document.querySelector(`[data-sort-by="${currentSortBy}"]`);
+    if (activeButton) {
+        // Odeber staré ikony a přidej novou
+        const oldIcon = activeButton.querySelector('i');
+        if (oldIcon) {
+            oldIcon.remove();
+        }
+        
+        const newIcon = document.createElement('i');
+        newIcon.className = `fa-solid ${currentSortDirection === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down'} text-blue-600`;
+        activeButton.appendChild(newIcon);
+    }
+}
+
+// AJAX sorting pro card view bez page reload
+function sortCards(sortBy) {
+    // Toggle direction pokud je stejné sorting pole
+    if (currentSortBy === sortBy) {
+        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSortBy = sortBy;
+        currentSortDirection = 'asc';
+    }
+    
+    // AJAX call
+    const params = new URLSearchParams({
+        sort_by: currentSortBy,
+        sort_direction: currentSortDirection,
+        brand: '{{ f_brand }}',
+        material: '{{ f_material }}',
+        color: '{{ f_color }}',
+        view: 'card',
+        page: 1,
+        per_page: '{{ per_page }}'
+    });
+    
+    fetch(`/api/filaments-list?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            // Update card grid s novýmy kartami
+            const container = document.getElementById('filament-cards-container');
+            if (container) {
+                container.innerHTML = data.html;
+            }
+            
+            // Update sort buttons
+            updateCardSortButtons();
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+function updateCardSortButtons() {
+    // Update sort buttons styles pro aktivní sorting
+    document.querySelectorAll('[data-sort-by]').forEach(btn => {
+        if (btn.dataset.sortBy === currentSortBy) {
+            btn.className = 'px-3 py-1.5 rounded text-xs font-semibold transition-all bg-blue-600 text-white shadow-md';
+            
+            // Update ikonu
+            const icon = btn.querySelector('i');
+            if (icon) {
+                icon.className = `fa-solid ${currentSortDirection === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down'}`;
+            }
+        } else {
+            btn.className = 'px-3 py-1.5 rounded text-xs font-semibold transition-all bg-gray-200 text-gray-700 hover:bg-gray-300';
+            
+            // Update ikonu na default
+            const icon = btn.querySelector('i');
+            if (icon) {
+                icon.className = 'fa-solid fa-arrow-up-arrow-down';
+            }
+        }
+    });
+}
+</script>
 {% endblock %}

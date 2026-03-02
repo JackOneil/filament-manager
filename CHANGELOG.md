@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0] - 2026-03-04
+### Changed
+- **Card view sorting is now interactive (no page reload)**: Clicking sort buttons now updates the card grid dynamically via AJAX without reloading the page.
+- Added `/api/filaments-list` support for both card and list view modes — single endpoint handles both views.
+- Converted sort button links from `<a>` tags to `<button>` elements with `onclick` handlers for AJAX triggering.
+- Card view maintains same interactive experience as list view with smooth updates.
+
+## [1.17.0] - 2026-03-04
+### Changed
+- **List view sorting is now interactive (no page reload)**: Clicking column headers or using sort buttons now updates the list dynamically via AJAX without reloading the page.
+- Added `/api/filaments-list` endpoint for interactive sorting and filtering.
+- Converted header links from `<a>` tags to `<button>` elements with `onclick` handlers for AJAX triggering.
+### Fixed
+- **Mobile list view now properly handles narrow screens**: Sort buttons remain functional on devices where column headers are hidden (`sm:hidden`).
+- Improves UX on small screens by maintaining sorting functionality without page navigation.
+
+## [1.16.0] - 2026-03-04
+### Added
+- Added "Subtract usage" action button to list view with modal dialog for weight input: users can now subtract filament in list view just like in card view.
+- Modal dialog displays the selected filament name, accepts weight in grams with min/max constraints matching available weight, and has Cancel/Submit buttons.
+- Dark mode styling applied to the modal dialog for consistent appearance.
+
+## [1.15.1] - 2026-03-03
+### Changed
+- Removed duplicate sort buttons from list view: in list view, users now sort exclusively via clickable column headers (less visual clutter, prevents confusion).
+- Sort buttons remain visible in card view where they provide the primary way to sort.
+
+## [1.15.0] - 2026-03-03
+### Changed
+- Replaced sorting dropdown select with intuitive **quick sort buttons** — users now see all 6 sort options (Name, Brand, Pieces, Remaining, Capacity, Percent) as clickable chips.
+- Sorting buttons display directional arrows: **↑** for ascending, **↓** for descending, **↕** for un-sorted options.
+- Active sort button is highlighted in blue; inactive buttons are gray and hoverable.
+- One-click sorting: no need to open a dropdown first — click the button to apply or toggle direction.
+- Dramatically improved UX for both card and list views — sorting is now equally intuitive in both modes.
+
+## [1.14.1] - 2026-03-03
+### Changed
+- Enhanced list view with clickable column headers: clicking a header toggles sorting direction (ascending ↔︎ descending).
+- Column headers now display directional arrows (↑ / ↓) when that column is active.
+- Sorting direction preference is fully preserved across pagination, filters, and view mode changes.
+
+## [1.14.0] - 2026-03-03
+### Added
+- Added sorting feature on the overview page: users can now sort filaments by Name (A-Z), Brand (A-Z), Pieces (most), Remaining weight (most), Total capacity (most), and Percentage (most).
+- Sort preference is preserved across pagination and filters.
+### Fixed
+- Fixed calculator result box visibility in dark theme: "Výsledek Vašeho Výpočtu" heading and result boxes now have appropriate dark mode background colors.
+
 ## [1.13.0] - 2026-03-03
 ### Fixed
 - Fixed statistics on the overview page: total spools, remaining weight, and value are now calculated from **all filtered filaments**, not just the current page.

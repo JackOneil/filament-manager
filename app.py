@@ -13,7 +13,7 @@ app = Flask(__name__)
 # Nastaveni pro ziskani skutecne IP adresy pres reverse proxy (napr. z Traefiku)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.secret_key = 'filament-manager-secret'
-APP_VERSION = '1.13.0'
+APP_VERSION = '1.18.0'
 
 # Setup databaze
 db_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data')
@@ -210,6 +210,11 @@ def index():
     f_brand = request.args.get('brand', '')
     f_material = request.args.get('material', '')
     f_color = request.args.get('color', '')
+    sort_by = request.args.get('sort_by', 'name')
+    sort_direction = request.args.get('sort_direction', 'asc')
+    
+    if sort_direction not in ['asc', 'desc']:
+        sort_direction = 'asc'
     
     # View mode - load from DB if not in URL, otherwise save to DB
     setting = get_settings()
@@ -233,6 +238,25 @@ def index():
     if f_color:
         filaments_query = filaments_query.filter(Filament.color_id == f_color)
 
+    # Razeni
+    if sort_by == 'brand':
+        order_expr = Brand.name
+        filaments_query = filaments_query.join(Brand)
+    elif sort_by == 'pieces':
+        order_expr = Filament.quantity
+    elif sort_by == 'remaining':
+        order_expr = Filament.weight_remaining
+    elif sort_by == 'capacity':
+        order_expr = Filament.quantity * Filament.weight_total
+    else:  # 'name' je default
+        order_expr = Filament.name
+    
+    # Aplikuj sort direction
+    if sort_direction == 'desc':
+        filaments_query = filaments_query.order_by(order_expr.desc())
+    else:
+        filaments_query = filaments_query.order_by(order_expr.asc())
+
     # Strankovani
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 12, type=int)
@@ -247,16 +271,94 @@ def index():
     
     filaments_paginated = db.paginate(filaments_query, page=page, per_page=per_page, error_out=False)
     
+    # Razeni podle procenta - na Python straně pro aktuální stránku
+    if sort_by == 'percent':
+        filaments_paginated.items.sort(
+            key=lambda f: f.weight_remaining / (f.quantity * f.weight_total) if (f.quantity * f.weight_total) > 0 else 0,
+            reverse=(sort_direction == 'desc')
+        )
+    
     # Pro vyber filtru
     brands = Brand.query.order_by(Brand.name).all()
     materials = Material.query.order_by(Material.name).all()
     colors = Color.query.order_by(Color.name).all()
     
-    app.logger.debug(f"Index viewed: view_mode={view_mode}, page={page}, per_page={per_page}, filters: brand={f_brand}, material={f_material}, color={f_color}")
+    app.logger.debug(f"Index viewed: view_mode={view_mode}, page={page}, per_page={per_page}, sort_by={sort_by}, sort_direction={sort_direction}, filters: brand={f_brand}, material={f_material}, color={f_color}")
     
     return render_template('index.html', filaments=filaments_paginated, stats={"spools": total_spools, "remaining": total_remaining_g, "value": total_value},
                            brands=brands, materials=materials, colors=colors,
-                           f_brand=f_brand, f_material=f_material, f_color=f_color, view_mode=view_mode, per_page=per_page)
+                           f_brand=f_brand, f_material=f_material, f_color=f_color, view_mode=view_mode, per_page=per_page, sort_by=sort_by, sort_direction=sort_direction)
+
+@app.route('/api/filaments-list')
+def api_filaments_list():
+    """AJAX endpoint for interactive sorting/filtering without page reload"""
+    filaments_query = Filament.query
+    
+    # Filtr - Ziskavani argumentu
+    f_brand = request.args.get('brand', '')
+    f_material = request.args.get('material', '')
+    f_color = request.args.get('color', '')
+    sort_by = request.args.get('sort_by', 'name')
+    sort_direction = request.args.get('sort_direction', 'asc')
+    view_mode = request.args.get('view', 'card')
+    
+    if sort_direction not in ['asc', 'desc']:
+        sort_direction = 'asc'
+    
+    if f_brand:
+        filaments_query = filaments_query.filter(Filament.brand_id == f_brand)
+    if f_material:
+        filaments_query = filaments_query.filter(Filament.material_id == f_material)
+    if f_color:
+        filaments_query = filaments_query.filter(Filament.color_id == f_color)
+
+    # Razeni
+    if sort_by == 'brand':
+        order_expr = Brand.name
+        filaments_query = filaments_query.join(Brand)
+    elif sort_by == 'pieces':
+        order_expr = Filament.quantity
+    elif sort_by == 'remaining':
+        order_expr = Filament.weight_remaining
+    elif sort_by == 'capacity':
+        order_expr = Filament.quantity * Filament.weight_total
+    else:  # 'name' je default
+        order_expr = Filament.name
+    
+    # Aplikuj sort direction
+    if sort_direction == 'desc':
+        filaments_query = filaments_query.order_by(order_expr.desc())
+    else:
+        filaments_query = filaments_query.order_by(order_expr.asc())
+
+    # Strankovani
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 12, type=int)
+    if per_page not in [12, 24, 48]:
+        per_page = 12
+
+    filaments_paginated = db.paginate(filaments_query, page=page, per_page=per_page, error_out=False)
+    
+    # Razeni podle procenta
+    if sort_by == 'percent':
+        filaments_paginated.items.sort(
+            key=lambda f: f.weight_remaining / (f.quantity * f.weight_total) if (f.quantity * f.weight_total) > 0 else 0,
+            reverse=(sort_direction == 'desc')
+        )
+    
+    # Render správný template Based on view mode
+    if view_mode == 'card':
+        html = render_template('_filament_cards.html', filaments=filaments_paginated.items)
+    else:
+        html = render_template('_filament_list_rows.html', filaments=filaments_paginated.items)
+    
+    return jsonify({
+        'html': html,
+        'total_pages': filaments_paginated.pages,
+        'current_page': page,
+        'has_next': filaments_paginated.has_next,
+        'has_prev': filaments_paginated.has_prev
+    })
 
 @app.route('/add', methods=['GET', 'POST'])
 def add():

@@ -1,0 +1,64 @@
+{% for fil in filaments %}
+    {% set capacity_all = fil.quantity * fil.weight_total %}
+    {% if capacity_all > 0 %}
+        {% set pct = (fil.weight_remaining / capacity_all * 100) | round | int %}
+    {% else %}
+        {% set pct = 0 %}
+    {% endif %}
+    <div class="bg-white border-b border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors grid grid-cols-12 gap-3 items-center" data-fil-id="{{ fil.id }}">
+        <!-- Barva a název (ZVĚTŠENO) -->
+        <div class="col-span-3 sm:col-span-4 flex items-start gap-2">
+            <div class="w-3 h-10 rounded-full flex-shrink-0" style="background-color: {{ fil.color.hex_value }};"></div>
+            <div class="flex-1 min-w-0">
+                <h3 class="font-bold text-gray-800 truncate text-sm" title="{{ fil.name }}">{{ fil.name }}</h3>
+            </div>
+        </div>
+        
+        <!-- Značka a materiál (skryto na malých obrazovkách) -->
+        <div class="col-span-0 sm:col-span-2 hidden sm:block text-xs text-gray-600 truncate text-center">
+            <div class="font-medium">{{ fil.brand.name }}</div>
+        </div>
+        
+        <!-- Počet kusů -->
+        <div class="col-span-2 sm:col-span-1 text-center">
+            <div class="text-xs text-gray-500 sm:hidden">{{ t('pieces') }}</div>
+            <div class="font-bold text-gray-800 text-sm">{{ fil.quantity }}</div>
+        </div>
+        
+        <!-- Zbývající váha -->
+        <div class="col-span-2 sm:col-span-1 text-center">
+            <div class="text-xs text-gray-500 sm:hidden">{{ t('remaining') }}</div>
+            <div class="font-bold text-gray-800 text-sm">{{ fil.weight_remaining | int }}g</div>
+        </div>
+        
+        <!-- Kapacita (skryto na malých obrazovkách) -->
+        <div class="col-span-0 sm:col-span-1 hidden sm:block text-center">
+            <div class="font-bold text-gray-800 text-sm">{{ capacity_all | int }}g</div>
+        </div>
+        
+        <!-- Procenta -->
+        <div class="col-span-2 sm:col-span-1 text-center">
+            <span class="px-2 py-1 text-xs font-bold rounded
+                {% if pct > 50 %}bg-green-100 text-green-800
+                {% elif pct > 20 %}bg-yellow-100 text-yellow-800
+                {% else %}bg-red-100 text-red-800{% endif %}">
+                {{ pct }}%
+            </span>
+        </div>
+        
+        <!-- Akční tlačítka -->
+        <div class="col-span-3 sm:col-span-2 flex gap-1 sm:gap-2 justify-end">
+            <button type="button" onclick="openUseFilamentModal({{ fil.id }}, '{{ fil.name }}', {{ fil.weight_remaining }})" title="{{ t('subtract_usage') }}" class="text-blue-400 hover:text-blue-600 transition-colors text-sm sm:text-base"><i class="fa-solid fa-droplet"></i></button>
+            <form action="{{ url_for('add_spool', id=fil.id) }}" method="POST">
+                <button type="submit" title="{{ t('add_spool') }}" class="text-green-500 hover:text-green-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-plus-circle"></i></button>
+            </form>
+            <form action="{{ url_for('remove_spool', id=fil.id) }}" method="POST">
+                <button type="submit" title="{{ t('remove_spool') }}" class="text-yellow-500 hover:text-yellow-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-minus-circle"></i></button>
+            </form>
+            <a href="{{ url_for('edit', id=fil.id) }}" title="{{ t('edit') }}" class="text-gray-400 hover:text-blue-500 transition-colors text-sm sm:text-base"><i class="fa-solid fa-edit"></i></a>
+            <form action="{{ url_for('delete', id=fil.id) }}" method="POST" onsubmit="return confirm('{{ t('delete_confirm') }}');">
+                <button type="submit" title="{{ t('delete') }}" class="text-gray-400 hover:text-red-500 transition-colors text-sm sm:text-base"><i class="fa-solid fa-trash"></i></button>
+            </form>
+        </div>
+    </div>
+{% endfor %}
