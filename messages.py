@@ -1,7 +1,7 @@
 TRANSLATIONS = {
     'cs': {
         'title': 'Správa Filamentů',
-                'movement_history': 'Historie pohybů',
+        'movement_history': 'Historie pohybů',
         'datetime': 'Datum a čas',
         'movement_filament': 'Filament',
         'movement_action': 'Akce',
@@ -34,6 +34,7 @@ TRANSLATIONS = {
         'custom_name_placeholder': 'Např. Prusament PETG (Lze ponechat prázdné)',
         'custom_name_hint': 'Pokud nevyplníte, název se vygeneruje automaticky: Výrobce Materiál Barva',
         'brand': 'Výrobce',
+        'name': 'Název',
         'material': 'Materiál',
         'color': 'Barva',
         'weight_total': 'Kapacita 1 cívky (g)',
@@ -99,7 +100,7 @@ TRANSLATIONS = {
     },
     'en': {
         'title': 'Filament Manager',
-                'movement_history': 'Movement History',
+        'movement_history': 'Movement History',
         'datetime': 'Date & Time',
         'movement_filament': 'Filament',
         'movement_action': 'Action',
@@ -132,6 +133,7 @@ TRANSLATIONS = {
         'custom_name_placeholder': 'e.g. Prusament PETG (Can be left empty)',
         'custom_name_hint': 'If left empty, name is auto-generated: Brand Material Color',
         'brand': 'Brand',
+        'name': 'Name',
         'material': 'Material',
         'color': 'Color',
         'weight_total': 'Capacity per 1 spool (g)',

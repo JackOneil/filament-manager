@@ -1,19 +1,19 @@
 import os
 import json
+import math
 import logging
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from datetime import datetime
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 from werkzeug.middleware.proxy_fix import ProxyFix
 from messages import TRANSLATIONS
 
-from datetime import datetime
-
 app = Flask(__name__)
 # Nastaveni pro ziskani skutecne IP adresy pres reverse proxy (napr. z Traefiku)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.secret_key = 'filament-manager-secret'
-APP_VERSION = '1.12.0'
+APP_VERSION = '1.13.0'
 
 # Setup databaze
 db_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data')
@@ -81,26 +81,27 @@ class PrintHistory(db.Model):
     total_cost = db.Column(db.Float, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-def get_current_lang():
-    setting = AppSetting.query.first()
-    return setting.lang if setting else 'cs'
-
-def get_current_currency():
-    setting = AppSetting.query.first()
-    return setting.currency if setting and setting.currency else 'CZK'
-
-def get_current_theme():
-    setting = AppSetting.query.first()
-    return setting.theme if setting and setting.theme else 'light'
-
 def get_settings():
     return AppSetting.query.first()
 
+def get_current_lang():
+    setting = get_settings()
+    return setting.lang if setting else 'cs'
+
+def get_current_currency():
+    setting = get_settings()
+    return setting.currency if setting and setting.currency else 'CZK'
+
+def get_current_theme():
+    setting = get_settings()
+    return setting.theme if setting and setting.theme else 'light'
+
 @app.context_processor
 def inject_translations():
-    lang = get_current_lang()
-    currency = get_current_currency()
-    theme = get_current_theme()
+    setting = get_settings()
+    lang = setting.lang if setting else 'cs'
+    currency = setting.currency if setting and setting.currency else 'CZK'
+    theme = setting.theme if setting and setting.theme else 'light'
     def t(key):
         return TRANSLATIONS.get(lang, TRANSLATIONS['cs']).get(key, key)
     return dict(t=t, current_lang=lang, current_currency=currency, theme=theme, app_version=APP_VERSION)
@@ -211,7 +212,7 @@ def index():
     f_color = request.args.get('color', '')
     
     # View mode - load from DB if not in URL, otherwise save to DB
-    setting = AppSetting.query.first()
+    setting = get_settings()
     if not setting:
         setting = AppSetting()
         db.session.add(setting)
@@ -237,13 +238,14 @@ def index():
     per_page = request.args.get('per_page', 12, type=int)
     if per_page not in [12, 24, 48]:
         per_page = 12
+
+    # Statistiky - vypocet ze vsech filtrovanych filamentu (ne jen aktualni stranky)
+    all_filtered = filaments_query.all()
+    total_spools = sum(f.quantity for f in all_filtered)
+    total_remaining_g = sum(f.weight_remaining for f in all_filtered)
+    total_value = sum((f.price / f.weight_total * f.weight_remaining) if f.weight_total > 0 else 0 for f in all_filtered)
     
     filaments_paginated = db.paginate(filaments_query, page=page, per_page=per_page, error_out=False)
-    
-    # Statistiky - vypocet z filtrovanych filamentu
-    total_spools = sum(f.quantity for f in filaments_paginated.items)
-    total_remaining_g = sum(f.weight_remaining for f in filaments_paginated.items)
-    total_value = sum((f.price / f.weight_total * f.weight_remaining) if f.weight_total > 0 else 0 for f in filaments_paginated.items)
     
     # Pro vyber filtru
     brands = Brand.query.order_by(Brand.name).all()
@@ -270,15 +272,15 @@ def add():
         price = float(request.form['price'])
 
         if not name:
-            brand = Brand.query.get(brand_id)
-            material = Material.query.get(material_id)
-            color = Color.query.get(color_id)
+            brand = db.session.get(Brand, brand_id)
+            material = db.session.get(Material, material_id)
+            color = db.session.get(Color, color_id)
             name = f"{brand.name} {material.name} {color.name}"
         
         new_fil = Filament(name=name, brand_id=brand_id, color_id=color_id, material_id=material_id,
                            weight_total=weight_total, weight_remaining=weight_remaining, price=price, quantity=quantity)
         db.session.add(new_fil)
-        db.session.flush() # for new_fil to get relationships correctly mapped
+        db.session.flush()  # aby new_fil mel spravne namapovane vztahy
         
         log_movement(new_fil, 'add', weight_remaining)
         db.session.commit()
@@ -291,7 +293,7 @@ def add():
 
 @app.route('/edit/<int:id>', methods=['GET', 'POST'])
 def edit(id):
-    filament = Filament.query.get_or_404(id)
+    filament = db.get_or_404(Filament, id)
     if request.method == 'POST':
         old_weight = filament.weight_remaining
         old_name = filament.name
@@ -314,9 +316,8 @@ def edit(id):
     
 @app.route('/use/<int:id>', methods=['POST'])
 def use_filament(id):
-    import math
     amount = float(request.form['amount'])
-    filament = Filament.query.get_or_404(id)
+    filament = db.get_or_404(Filament, id)
     old_weight = filament.weight_remaining
     filament.weight_remaining -= amount
     if filament.weight_remaining < 0:
@@ -335,7 +336,7 @@ def use_filament(id):
 
 @app.route('/add_spool/<int:id>', methods=['POST'])
 def add_spool(id):
-    filament = Filament.query.get_or_404(id)
+    filament = db.get_or_404(Filament, id)
     filament.quantity += 1
     filament.weight_remaining += filament.weight_total
     app.logger.debug(f"Added spool to {filament.name} (quantity: {filament.quantity}, total weight: {filament.weight_remaining}g)")
@@ -345,7 +346,7 @@ def add_spool(id):
 
 @app.route('/remove_spool/<int:id>', methods=['POST'])
 def remove_spool(id):
-    filament = Filament.query.get_or_404(id)
+    filament = db.get_or_404(Filament, id)
     if filament.quantity > 0:
         filament.quantity -= 1
         old_weight = filament.weight_remaining
@@ -360,7 +361,7 @@ def remove_spool(id):
 
 @app.route('/delete/<int:id>', methods=['POST'])
 def delete(id):
-    filament = Filament.query.get_or_404(id)
+    filament = db.get_or_404(Filament, id)
     app.logger.debug(f"Deleted filament: {filament.name} ({filament.weight_remaining}g remaining)")
     log_movement(filament, 'remove', filament.weight_remaining)
     db.session.delete(filament)
@@ -386,7 +387,7 @@ def calculator():
             db.session.commit()
             
         if filament_id and weight > 0:
-            filament = Filament.query.get(filament_id)
+            filament = db.session.get(Filament, filament_id)
             if filament.weight_total > 0:
                 cost_per_gram = filament.price / filament.weight_total
                 material_cost = cost_per_gram * weight
@@ -429,7 +430,7 @@ def calculator():
 
 @app.route('/calculator/history/<int:id>/delete', methods=['POST'])
 def delete_history(id):
-    record = PrintHistory.query.get_or_404(id)
+    record = db.get_or_404(PrintHistory, id)
     app.logger.debug(f"Deleted print history: {record.filament_name}, weight: {record.weight}g, cost: {record.total_cost}")
     db.session.delete(record)
     db.session.commit()
@@ -484,27 +485,21 @@ def settings():
                     app.logger.debug("Debug logging mode enabled by user.")
                 else:
                     app.logger.setLevel(logging.INFO)
-            elif action == 'theme':
-                setting = AppSetting.query.first()
-                old_theme = setting.theme
-                setting.theme = request.form['theme']
-                app.logger.debug(f"Theme changed: {old_theme} -> {setting.theme}")
-            
             # Edit actions
             elif action == 'edit_brand':
-                brand = Brand.query.get(request.form['id'])
+                brand = db.session.get(Brand, request.form['id'])
                 if brand:
                     old_name = brand.name
                     brand.name = request.form['name']
                     app.logger.debug(f"Brand edited: {old_name} -> {brand.name}")
             elif action == 'edit_material':
-                mat = Material.query.get(request.form['id'])
+                mat = db.session.get(Material, request.form['id'])
                 if mat:
                     old_name = mat.name
                     mat.name = request.form['name']
                     app.logger.debug(f"Material edited: {old_name} -> {mat.name}")
             elif action == 'edit_color':
-                col = Color.query.get(request.form['id'])
+                col = db.session.get(Color, request.form['id'])
                 if col:
                     old_name = col.name
                     old_hex = col.hex_value
@@ -514,17 +509,17 @@ def settings():
             
             # Delete actions
             elif action == 'delete_brand':
-                brand = Brand.query.get(request.form['id'])
+                brand = db.session.get(Brand, request.form['id'])
                 if brand and len(brand.filaments) == 0:
                     app.logger.debug(f"Brand deleted: {brand.name}")
                     db.session.delete(brand)
             elif action == 'delete_material':
-                mat = Material.query.get(request.form['id'])
+                mat = db.session.get(Material, request.form['id'])
                 if mat and len(mat.filaments) == 0:
                     app.logger.debug(f"Material deleted: {mat.name}")
                     db.session.delete(mat)
             elif action == 'delete_color':
-                col = Color.query.get(request.form['id'])
+                col = db.session.get(Color, request.form['id'])
                 if col and len(col.filaments) == 0:
                     app.logger.debug(f"Color deleted: {col.name} #{col.hex_value}")
                     db.session.delete(col)

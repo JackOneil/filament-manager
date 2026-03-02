@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] - 2026-03-03
+### Fixed
+- Fixed statistics on the overview page: total spools, remaining weight, and value are now calculated from **all filtered filaments**, not just the current page.
+- Fixed missing translation key `'name'` (used in list view header) — added to both `cs` and `en` language dicts.
+### Changed
+- Replaced all deprecated `Model.query.get(id)` calls with `db.session.get(Model, id)` throughout the codebase.
+- Replaced all deprecated `Model.query.get_or_404(id)` calls with `db.get_or_404(Model, id)`.
+- Refactored `inject_translations()` context processor to call `get_settings()` once per request instead of issuing three separate DB queries.
+- Moved `import math` from inside `use_filament()` function body to the top-level imports.
+- Removed unused `session` import from Flask imports.
+- Removed legacy `action == 'theme'` handler from the settings route (theme changes are handled exclusively by the `/toggle-theme` endpoint).
+- Fixed indentation inconsistency on the `'title'` key in both language dicts in `messages.py`.
+- Translated remaining English code comment in add route to Czech.
+
 ## [1.12.0] - 2026-03-02
 ### Added
 - Added header row to list view in the overview page with column labels (Name, Brand, Quantity, Remaining, Capacity, Percentage, Actions).
