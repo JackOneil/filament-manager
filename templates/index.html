@@ -13,27 +13,23 @@
         </a>
         <!-- View toggle -->
         <div class="bg-gray-200 rounded shadow flex gap-1 p-1">
-            <a href="{{ url_for('index', brand=f_brand, material=f_material, color=f_color, view='card', page=1, per_page=per_page, sort_by=sort_by, sort_direction=sort_direction) }}" 
-               class="px-3 py-1.5 rounded font-semibold text-sm transition-colors {{ 'bg-white text-blue-600 shadow-sm' if view_mode == 'card' else 'text-gray-600 hover:text-gray-800' }}">
+            <button type="button" onclick="toggleViewMode('card')" 
+               class="px-3 py-1.5 rounded font-semibold text-sm transition-colors {{ 'bg-white text-blue-600 shadow-sm' if view_mode == 'card' else 'text-gray-600 hover:text-gray-800' }} bg-transparent border-0 cursor-pointer">
                 <i class="fa-solid fa-th"></i> <span class="hidden sm:inline">Karty</span>
-            </a>
-            <a href="{{ url_for('index', brand=f_brand, material=f_material, color=f_color, view='list', page=1, per_page=per_page, sort_by=sort_by, sort_direction=sort_direction) }}" 
-               class="px-3 py-1.5 rounded font-semibold text-sm transition-colors {{ 'bg-white text-blue-600 shadow-sm' if view_mode == 'list' else 'text-gray-600 hover:text-gray-800' }}">
+            </button>
+            <button type="button" onclick="toggleViewMode('list')" 
+               class="px-3 py-1.5 rounded font-semibold text-sm transition-colors {{ 'bg-white text-blue-600 shadow-sm' if view_mode == 'list' else 'text-gray-600 hover:text-gray-800' }} bg-transparent border-0 cursor-pointer">
                 <i class="fa-solid fa-list"></i> <span class="hidden sm:inline">Seznam</span>
-            </a>
+            </button>
         </div>
     </div>
 </div>
 
 <!-- Filtry -->
-<form method="GET" action="{{ url_for('index') }}" class="bg-white p-3 sm:p-4 rounded-lg shadow-sm border border-gray-100 mb-4 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 items-stretch sm:items-end">
-    <input type="hidden" name="view" value="{{ view_mode }}">
-    <input type="hidden" name="per_page" value="{{ per_page }}">
-    <input type="hidden" name="sort_by" value="{{ sort_by }}">
-    <input type="hidden" name="sort_direction" value="{{ sort_direction }}">
+<div id="filter-section" class="bg-white p-3 sm:p-4 rounded-lg shadow-sm border border-gray-100 mb-4 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 items-stretch sm:items-end">
     <div class="flex-1 min-w-[150px]">
         <label class="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">{{ t('brand') }}</label>
-        <select name="brand" class="w-full border-gray-300 rounded px-3 py-2 text-sm focus:ring-blue-500 outline-none border">
+        <select id="filter-brand" class="w-full border-gray-300 rounded px-3 py-2 text-sm focus:ring-blue-500 outline-none border">
             <option value="">-- {{ t('filter_all') }} --</option>
             {% for b in brands %}
                 <option value="{{ b.id }}" {% if f_brand == b.id|string %}selected{% endif %}>{{ b.name }}</option>
@@ -42,7 +38,7 @@
     </div>
     <div class="flex-1 min-w-[150px]">
         <label class="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">{{ t('material') }}</label>
-        <select name="material" class="w-full border-gray-300 rounded px-3 py-2 text-sm focus:ring-blue-500 outline-none border">
+        <select id="filter-material" class="w-full border-gray-300 rounded px-3 py-2 text-sm focus:ring-blue-500 outline-none border">
             <option value="">-- {{ t('filter_all') }} --</option>
             {% for m in materials %}
                 <option value="{{ m.id }}" {% if f_material == m.id|string %}selected{% endif %}>{{ m.name }}</option>
@@ -51,7 +47,7 @@
     </div>
     <div class="flex-1 min-w-[150px]">
         <label class="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">{{ t('color') }}</label>
-        <select name="color" class="w-full border-gray-300 rounded px-3 py-2 text-sm focus:ring-blue-500 outline-none border">
+        <select id="filter-color" class="w-full border-gray-300 rounded px-3 py-2 text-sm focus:ring-blue-500 outline-none border">
             <option value="">-- {{ t('filter_all') }} --</option>
             {% for c in colors %}
                 <option value="{{ c.id }}" {% if f_color == c.id|string %}selected{% endif %}>{{ c.name }}</option>
@@ -59,20 +55,15 @@
         </select>
     </div>
     <div class="flex gap-2">
-        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow font-semibold transition-colors text-sm">
-            <i class="fa-solid fa-filter"></i> {{ t('filter_btn') }}
+        <button id="reset-filters-btn" type="button" onclick="resetFilters()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed px-4 py-2 rounded shadow font-semibold transition-colors text-sm" title="{{ t('filter_reset') }}" {% if not (f_brand or f_material or f_color) %}disabled{% endif %}>
+            <i class="fa-solid fa-times"></i>
         </button>
-        {% if f_brand or f_material or f_color %}
-            <a href="{{ url_for('index', view=view_mode, per_page=per_page, sort_by='name', sort_direction='asc') }}" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded shadow font-semibold transition-colors text-sm" title="{{ t('filter_reset') }}">
-                <i class="fa-solid fa-times"></i>
-            </a>
-        {% endif %}
     </div>
-</form>
+</div>
 
 {% if view_mode != 'list' %}
 <!-- Řazení - Quick Sort Buttons (POUZE V CARD VIEW) -->
-<div class="bg-white p-3 sm:p-4 rounded-lg shadow-sm border border-gray-100 mb-6">
+<div id="sort-by-section" class="bg-white p-3 sm:p-4 rounded-lg shadow-sm border border-gray-100 mb-6">
     <label class="block text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide">{{ t('sort_by') }}</label>
     <div class="flex flex-wrap gap-2">
         <!-- NÁZEV -->
@@ -126,13 +117,9 @@
 </div>
 {% endif %}
 
+<div id="filament-content-wrapper" class="{% if view_mode == 'card' %}grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6{% else %}space-y-0{% endif %}">
 {% if view_mode == 'card' %}
-<div id="filament-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-{% else %}
-<div class="space-y-0">
-{% endif %}
     {% for fil in filaments.items %}
-        {% if view_mode == 'card' %}
         <!-- KARTY POHLED -->
         <div class="bg-white rounded-lg shadow-md border border-gray-100 overflow-hidden relative">
             <div class="h-2 w-full absolute top-0 left-0" style="background-color: {{ fil.color.hex_value }};"></div>
@@ -193,67 +180,68 @@
                 </div>
             </div>
         </div>
-
-        {% else %}
-        <!-- SEZNAM POHLED - TABULÁRNÍ LAYOUT -->
-        {% if loop.first %}
-        <!-- HEADER ŘÁDKU - KLIKATELNÉ RAZENI -->
-        <div class="hidden sm:grid grid-cols-12 gap-3 bg-gray-100 border-b border-gray-300 px-4 py-2 sticky top-0 z-10 rounded-t-lg mb-0">
-            <!-- NÁZEV -->
-            <button type="button" onclick="sortList('name')" data-sort-by="name" class="col-span-4 font-bold text-gray-700 text-xs uppercase hover:text-blue-600 hover:underline cursor-pointer flex items-center gap-1 group transition bg-transparent border-0 p-0 text-left">
-                {{ t('name') }}
-                {% if sort_by == 'name' %}
-                    <i class="fa-solid {% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600 group-hover:text-blue-700"></i>
-                {% endif %}
-            </button>
-            
-            <!-- ZNAČKA -->
-            <button type="button" onclick="sortList('brand')" data-sort-by="brand" class="col-span-2 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
-                {{ t('brand') }}
-                {% if sort_by == 'brand' %}
-                    <i class="fa-solid {% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600 group-hover:text-blue-700"></i>
-                {% endif %}
-            </button>
-            
-            <!-- KUSY -->
-            <button type="button" onclick="sortList('pieces')" data-sort-by="pieces" class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
-                {{ t('pieces') }}
-                {% if sort_by == 'pieces' %}
-                    <i class="fa-solid {% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600 group-hover:text-blue-700"></i>
-                {% endif %}
-            </button>
-            
-            <!-- ZBÝVAJÍCÍ -->
-            <button type="button" onclick="sortList('remaining')" data-sort-by="remaining" class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
-                {{ t('remaining') }}
-                {% if sort_by == 'remaining' %}
-                    <i class="fa-solid {% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600 group-hover:text-blue-700"></i>
-                {% endif %}
-            </button>
-            
-            <!-- KAPACITA -->
-            <button type="button" onclick="sortList('capacity')" data-sort-by="capacity" class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
-                {{ t('capacity') }}
-                {% if sort_by == 'capacity' %}
-                    <i class="fa-solid {% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600 group-hover:text-blue-700"></i>
-                {% endif %}
-            </button>
-            
-            <!-- PROCENTA -->
-            <button type="button" onclick="sortList('percent')" data-sort-by="percent" class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
-                %
-                {% if sort_by == 'percent' %}
-                    <i class="fa-solid {% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600 group-hover:text-blue-700"></i>
-                {% endif %}
-            </button>
-            
-            <!-- AKCE - NEKLIKATELNÉ -->
-            <div class="col-span-2 font-bold text-gray-700 text-xs uppercase text-right pr-1">{{ t('action') }}</div>
-        </div>
-        <div id="filament-list-container">
-        {% endif %}
+    {% else %}
+    <div class="col-span-full text-center text-gray-500 py-16 bg-white rounded-lg border border-dashed border-gray-300">
+        <i class="fa-solid fa-box-open text-4xl mb-4 text-gray-300"></i>
+        <p class="text-lg">{{ t('no_filaments') }}</p>
+        <p class="text-sm mt-2"><a href="{{ url_for('add') }}" class="text-blue-500 hover:underline">{{ t('add_first') }}</a></p>
+    </div>
+    {% endfor %}
+{% else %}
+    <!-- SEZNAM POHLED - HEADER -->
+    <div class="hidden sm:grid grid-cols-12 gap-3 bg-gray-100 border-b border-gray-300 px-4 py-2 sticky top-0 z-10 rounded-t-lg mb-0">
+        <!-- NÁZEV -->
+        <button type="button" onclick="sortList('name')" data-sort-by="name" class="col-span-4 font-bold text-gray-700 text-xs uppercase hover:text-blue-600 hover:underline cursor-pointer flex items-center gap-1 group transition bg-transparent border-0 p-0 text-left">
+            {{ t('name') }}
+            {% if sort_by == 'name' %}
+                <i class="fa-solid {% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600 group-hover:text-blue-700"></i>
+            {% endif %}
+        </button>
         
-        {% set capacity_all = fil.quantity * fil.weight_total %}
+        <!-- ZNAČKA -->
+        <button type="button" onclick="sortList('brand')" data-sort-by="brand" class="col-span-2 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
+            {{ t('brand') }}
+            {% if sort_by == 'brand' %}
+                <i class="fa-solid {% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600 group-hover:text-blue-700"></i>
+            {% endif %}
+        </button>
+        
+        <!-- KUSY -->
+        <button type="button" onclick="sortList('pieces')" data-sort-by="pieces" class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
+            {{ t('pieces') }}
+            {% if sort_by == 'pieces' %}
+                <i class="fa-solid {% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600 group-hover:text-blue-700"></i>
+            {% endif %}
+        </button>
+        
+        <!-- ZBÝVAJÍCÍ -->
+        <button type="button" onclick="sortList('remaining')" data-sort-by="remaining" class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
+            {{ t('remaining') }}
+            {% if sort_by == 'remaining' %}
+                <i class="fa-solid {% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600 group-hover:text-blue-700"></i>
+            {% endif %}
+        </button>
+        
+        <!-- KAPACITA -->
+        <button type="button" onclick="sortList('capacity')" data-sort-by="capacity" class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
+            {{ t('capacity') }}
+            {% if sort_by == 'capacity' %}
+                <i class="fa-solid {% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600 group-hover:text-blue-700"></i>
+            {% endif %}
+        </button>
+        
+        <!-- PROCENTA -->
+        <button type="button" onclick="sortList('percent')" data-sort-by="percent" class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
+            %
+            {% if sort_by == 'percent' %}
+                <i class="fa-solid {% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600 group-hover:text-blue-700"></i>
+            {% endif %}
+        </button>
+        
+        <!-- AKCE - NEKLIKATELNÉ -->
+        <div class="col-span-2 font-bold text-gray-700 text-xs uppercase text-right pr-1">{{ t('action') }}</div>
+    </div>
+    {% for fil in filaments.items %}
         {% if capacity_all > 0 %}
             {% set pct = (fil.weight_remaining / capacity_all * 100) | round | int %}
         {% else %}
@@ -313,11 +301,7 @@
                 <form action="{{ url_for('delete', id=fil.id) }}" method="POST" onsubmit="return confirm('{{ t('delete_confirm') }}');">
                     <button type="submit" title="{{ t('delete') }}" class="text-gray-400 hover:text-red-500 transition-colors text-sm sm:text-base"><i class="fa-solid fa-trash"></i></button>
                 </form>
-            </div>
         </div>
-        {% if loop.last %}</div>{% endif %}
-        {% endif %}
-
     {% else %}
     <div class="col-span-full text-center text-gray-500 py-16 bg-white rounded-lg border border-dashed border-gray-300">
         <i class="fa-solid fa-box-open text-4xl mb-4 text-gray-300"></i>
@@ -325,7 +309,9 @@
         <p class="text-sm mt-2"><a href="{{ url_for('add') }}" class="text-blue-500 hover:underline">{{ t('add_first') }}</a></p>
     </div>
     {% endfor %}
+{% endif %}
 </div>
+
 
 <!-- STRANKOVANI -->
 {% if filaments.pages > 1 %}
@@ -396,9 +382,124 @@ document.getElementById('useFilamentModal').addEventListener('click', function(e
     }
 });
 
-// AJAX sorting bez page reload
+// AJAX sorting a filtrování bez page reload
 let currentSortBy = '{{ sort_by }}';
 let currentSortDirection = '{{ sort_direction }}';
+let currentBrandFilter = '{{ f_brand }}';
+let currentMaterialFilter = '{{ f_material }}';
+let currentColorFilter = '{{ f_color }}';
+
+// Initialize filter event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    const filterBrand = document.getElementById('filter-brand');
+    const filterMaterial = document.getElementById('filter-material');
+    const filterColor = document.getElementById('filter-color');
+    
+    if (filterBrand) filterBrand.addEventListener('change', applyFilters);
+    if (filterMaterial) filterMaterial.addEventListener('change', applyFilters);
+    if (filterColor) filterColor.addEventListener('change', applyFilters);
+});
+
+function applyFilters() {
+    // Get current filter values
+    currentBrandFilter = document.getElementById('filter-brand').value;
+    currentMaterialFilter = document.getElementById('filter-material').value;
+    currentColorFilter = document.getElementById('filter-color').value;
+    
+    // Determine current view mode from dom
+    const wrapper = document.getElementById('filament-content-wrapper');
+    const currentView = wrapper.className.includes('grid') ? 'card' : 'list';
+    
+    // Build AJAX request
+    const params = new URLSearchParams({
+        brand: currentBrandFilter,
+        material: currentMaterialFilter,
+        color: currentColorFilter,
+        sort_by: currentSortBy,
+        sort_direction: currentSortDirection,
+        view: currentView,
+        page: 1,
+        per_page: '{{ per_page }}'
+    });
+    
+    fetch(`/api/filaments-list?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            if (currentView === 'list') {
+                wrapper.innerHTML = buildListHeaderHtml() + data.html;
+            } else {
+                wrapper.innerHTML = data.html;
+            }
+            
+            // Show/hide reset button
+            updateResetButtonVisibility();
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+function resetFilters() {
+    // Clear all filter selects
+    document.getElementById('filter-brand').value = '';
+    document.getElementById('filter-material').value = '';
+    document.getElementById('filter-color').value = '';
+    
+    // Apply filters
+    applyFilters();
+}
+
+function updateResetButtonVisibility() {
+    const isBrand = currentBrandFilter !== '';
+    const isMaterial = currentMaterialFilter !== '';
+    const isColor = currentColorFilter !== '';
+    const hasFilters = isBrand || isMaterial || isColor;
+    
+    const resetBtn = document.getElementById('reset-filters-btn');
+    if (resetBtn) {
+        resetBtn.disabled = !hasFilters;
+    }
+}
+
+// Translations for list view headers
+const listHeaderLabels = {
+    name: '{{ t("name") }}',
+    brand: '{{ t("brand") }}',
+    pieces: '{{ t("pieces") }}',
+    remaining: '{{ t("remaining") }}',
+    capacity: '{{ t("capacity") }}',
+    action: '{{ t("action") }}'
+};
+
+function buildListHeaderHtml() {
+    return `
+        <div class="hidden sm:grid grid-cols-12 gap-3 bg-gray-100 border-b border-gray-300 px-4 py-2 sticky top-0 z-10 rounded-t-lg mb-0">
+            <button type="button" onclick="sortList('name')" data-sort-by="name" class="col-span-4 font-bold text-gray-700 text-xs uppercase hover:text-blue-600 hover:underline cursor-pointer flex items-center gap-1 group transition bg-transparent border-0 p-0 text-left">
+                ${listHeaderLabels.name}
+                <i class="fa-solid ${currentSortBy === 'name' ? (currentSortDirection === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down') : ''} ${currentSortBy === 'name' ? 'text-blue-600' : ''}" style="${currentSortBy === 'name' ? '' : 'display:none;'}"></i>
+            </button>
+            <button type="button" onclick="sortList('brand')" data-sort-by="brand" class="col-span-2 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
+                ${listHeaderLabels.brand}
+                <i class="fa-solid ${currentSortBy === 'brand' ? (currentSortDirection === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down') : ''} ${currentSortBy === 'brand' ? 'text-blue-600' : ''}" style="${currentSortBy === 'brand' ? '' : 'display:none;'}"></i>
+            </button>
+            <button type="button" onclick="sortList('pieces')" data-sort-by="pieces" class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
+                ${listHeaderLabels.pieces}
+                <i class="fa-solid ${currentSortBy === 'pieces' ? (currentSortDirection === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down') : ''} ${currentSortBy === 'pieces' ? 'text-blue-600' : ''}" style="${currentSortBy === 'pieces' ? '' : 'display:none;'}"></i>
+            </button>
+            <button type="button" onclick="sortList('remaining')" data-sort-by="remaining" class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
+                ${listHeaderLabels.remaining}
+                <i class="fa-solid ${currentSortBy === 'remaining' ? (currentSortDirection === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down') : ''} ${currentSortBy === 'remaining' ? 'text-blue-600' : ''}" style="${currentSortBy === 'remaining' ? '' : 'display:none;'}"></i>
+            </button>
+            <button type="button" onclick="sortList('capacity')" data-sort-by="capacity" class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
+                ${listHeaderLabels.capacity}
+                <i class="fa-solid ${currentSortBy === 'capacity' ? (currentSortDirection === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down') : ''} ${currentSortBy === 'capacity' ? 'text-blue-600' : ''}" style="${currentSortBy === 'capacity' ? '' : 'display:none;'}"></i>
+            </button>
+            <button type="button" onclick="sortList('percent')" data-sort-by="percent" class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
+                %
+                <i class="fa-solid ${currentSortBy === 'percent' ? (currentSortDirection === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down') : ''} ${currentSortBy === 'percent' ? 'text-blue-600' : ''}" style="${currentSortBy === 'percent' ? '' : 'display:none;'}"></i>
+            </button>
+            <div class="col-span-2 font-bold text-gray-700 text-xs uppercase text-right pr-1">${listHeaderLabels.action}</div>
+        </div>
+    `;
+}
 
 function sortList(sortBy) {
     // Toggle direction pokud je stejné sorting pole
@@ -413,9 +514,9 @@ function sortList(sortBy) {
     const params = new URLSearchParams({
         sort_by: currentSortBy,
         sort_direction: currentSortDirection,
-        brand: '{{ f_brand }}',
-        material: '{{ f_material }}',
-        color: '{{ f_color }}',
+        brand: currentBrandFilter,
+        material: currentMaterialFilter,
+        color: currentColorFilter,
         view: 'list',
         page: 1,
         per_page: '{{ per_page }}'
@@ -425,9 +526,9 @@ function sortList(sortBy) {
         .then(response => response.json())
         .then(data => {
             // Update seznam řádky
-            const container = document.getElementById('filament-list-container');
-            if (container) {
-                container.innerHTML = data.html;
+            const wrapper = document.getElementById('filament-content-wrapper');
+            if (wrapper) {
+                wrapper.innerHTML = buildListHeaderHtml() + data.html;
             }
             
             // Update header ikony
@@ -471,9 +572,9 @@ function sortCards(sortBy) {
     const params = new URLSearchParams({
         sort_by: currentSortBy,
         sort_direction: currentSortDirection,
-        brand: '{{ f_brand }}',
-        material: '{{ f_material }}',
-        color: '{{ f_color }}',
+        brand: currentBrandFilter,
+        material: currentMaterialFilter,
+        color: currentColorFilter,
         view: 'card',
         page: 1,
         per_page: '{{ per_page }}'
@@ -483,9 +584,9 @@ function sortCards(sortBy) {
         .then(response => response.json())
         .then(data => {
             // Update card grid s novýmy kartami
-            const container = document.getElementById('filament-cards-container');
-            if (container) {
-                container.innerHTML = data.html;
+            const wrapper = document.getElementById('filament-content-wrapper');
+            if (wrapper) {
+                wrapper.innerHTML = data.html;
             }
             
             // Update sort buttons
@@ -515,6 +616,76 @@ function updateCardSortButtons() {
             }
         }
     });
+}
+
+// AJAX view mode toggle (card <-> list) bez page reload
+function toggleViewMode(newViewMode) {
+    // AJAX call
+    const params = new URLSearchParams({
+        view: newViewMode,
+        sort_by: currentSortBy,
+        sort_direction: currentSortDirection,
+        brand: currentBrandFilter,
+        material: currentMaterialFilter,
+        color: currentColorFilter,
+        page: 1,
+        per_page: '{{ per_page }}'
+    });
+    
+    fetch(`/api/filaments-list?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            // Get the wrapper
+            const wrapper = document.getElementById('filament-content-wrapper');
+            if (wrapper) {
+                // Update wrapper class based on view mode
+                if (newViewMode === 'card') {
+                    wrapper.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+                    // For card view, just update the content
+                    wrapper.innerHTML = data.html;
+                } else {
+                    // For list view, include the header
+                    wrapper.className = 'space-y-0';
+                    wrapper.innerHTML = buildListHeaderHtml() + data.html;
+                }
+            }
+            
+            // Update view toggle buttons
+            updateViewToggleButtons(newViewMode);
+            
+            // Reset sort state
+            currentSortBy = currentSortBy;
+            currentSortDirection = currentSortDirection;
+        })
+        .catch(error => console.error('Error toggling view:', error));
+}
+
+function updateViewToggleButtons(activeView) {
+    // Get both view toggle buttons
+    const buttons = document.querySelectorAll('[onclick*="toggleViewMode"]');
+    buttons.forEach(btn => {
+        if ((activeView === 'card' && btn.textContent.includes('Karty')) ||
+            (activeView === 'list' && btn.textContent.includes('Seznam'))) {
+            // Active button
+            btn.className = 'px-3 py-1.5 rounded font-semibold text-sm transition-colors bg-white text-blue-600 shadow-sm border-0 cursor-pointer bg-transparent';
+        } else {
+            // Inactive button
+            btn.className = 'px-3 py-1.5 rounded font-semibold text-sm transition-colors text-gray-600 hover:text-gray-800 border-0 cursor-pointer bg-transparent';
+        }
+    });
+    
+    // Show/hide Sort by section based on view mode
+    const sortBySection = document.getElementById('sort-by-section');
+    if (sortBySection) {
+        if (activeView === 'card') {
+            sortBySection.style.display = 'block';
+        } else {
+            sortBySection.style.display = 'none';
+        }
+    }
+    
+    // Update reset button visibility based on current filters
+    updateResetButtonVisibility();
 }
 </script>
 {% endblock %}

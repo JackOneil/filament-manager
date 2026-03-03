@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.20.1] - 2026-03-05
+### Fixed
+- **Reset/Clear filter button is now always visible**: Button no longer disappears when no filters are active. Instead, it displays with a disabled state (grayed out) when no filters are selected, and becomes enabled when filters are applied.
+- Button properly toggles between enabled and disabled states via JavaScript when filters are applied or cleared without page reload.
+
+## [1.20.0] - 2026-03-05
+### Changed
+- **Filtering is now fully interactive (AJAX-based) without page reload**: Brand, Material, and Color filters now update the inventory list instantly as you change selections.
+- **Filter apply button is no longer needed** and has been removed. Filters are applied automatically on selection change.
+- **Reset/Clear filter button now uses AJAX** instead of page navigation, preserving current sorting and view mode.
+- **Filter state is maintained during view mode and sort changes** to provide seamless user experience.
+
+## [1.19.2] - 2026-03-05
+### Fixed
+- **"Sort by" quick button section is now hidden in list view**: The "Sort by" quick action buttons no longer appear when switching to list view mode, as users can sort directly by clicking on column headers instead.
+- Hide/show of sort-by-section is managed via JavaScript visibility toggle when view mode changes.
+
+## [1.19.1] - 2026-03-02
+### Fixed
+- **List view header now displays translated column names**: Column headers in list view now properly show translated text (e.g., "Název", "Značka", "Kusy") instead of template tags.
+- **Sort direction arrows now properly display in AJAX responses**: Arrow icons correctly update when switching views or sorting in list view.
+- **Improved internationalization (i18n) for dynamic content**: Created global translation object (`listHeaderLabels`) to ensure proper translations in AJAX-generated content.
+
+## [1.19.0] - 2026-03-04
+### Changed
+- **View mode toggle (card ↔ list) is now interactive (no page reload)**: Clicking the view toggle buttons now switches between card and list views dynamically via AJAX without reloading the page.
+- Converted view toggle links from `<a>` tags to `<button>` elements with `onclick` handlers for AJAX triggering.
+- View mode switches instantly while preserving current sort, filters, and page state.
+
 ## [1.18.0] - 2026-03-04
 ### Changed
 - **Card view sorting is now interactive (no page reload)**: Clicking sort buttons now updates the card grid dynamically via AJAX without reloading the page.
