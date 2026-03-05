@@ -1,7 +1,8 @@
 """Movement history route."""
-from flask import render_template, request
+from flask import render_template, request, redirect, url_for
 from database import db
 from models import MovementHistory
+from utils import log_movement
 
 
 def register(app):
@@ -19,3 +20,15 @@ def register(app):
         )
 
         return render_template('history.html', movements=movements_paginated, per_page=per_page)
+
+    @app.route('/history/clear', methods=['POST'])
+    def clear_history():
+        """Delete all movement history records."""
+        try:
+            db.session.query(MovementHistory).delete()
+            db.session.commit()
+            app.logger.info("All movement history was cleared.")
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error clearing movement history: {e}")
+        return redirect(url_for('history'))

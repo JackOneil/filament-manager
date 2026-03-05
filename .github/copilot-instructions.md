@@ -106,3 +106,38 @@ When a user asks for modifications to the project, you must follow and automatic
       wrapper.innerHTML = ...;
       ```
     - Never rely solely on Alpine `:class` reactive binding to set layout classes on an AJAX content wrapper. Always mirror the class update imperatively in the function that changes `innerHTML`.
+
+12. **Fulltext Filter Dropdown Pattern**
+    - Inventory page filters (brand, material, color) are implemented as custom Alpine.js fulltext search dropdowns, NOT native `<select>` elements.
+    - Option data is embedded as JS arrays in the `inventoryApp()` component via Jinja2 at render time: `brandOptions: [{% for b in brands %}{"id":{{ b.id }},"name":{{ b.name|tojson }}}...{% endfor %}]`. Use `|tojson` for string values to handle quotes/special chars automatically.
+    - Each filter has: `<field>Q` (search text input), `<field>Open` (dropdown open state), `filtered<Field>s` (computed getter that filters by `Q`), `select<Field>(id, name)` method.
+    - Pre-population when page loads with active filters (e.g., `?brand=2`) is handled by the Alpine `init()` method, which looks up the name from the options array using loose equality (`==`) since IDs from `this.brand` are strings (from URL params) while option IDs are numbers.
+    - The actual filter IDs (`this.brand`, `this.material`, `this.color`) fed to `fetchContent()` remain unchanged — only the display text (`brandQ` etc.) is a separate state variable.
+    - Color filter options include `"hex"` field for rendering colored swatches (`:style="'background-color:' + opt.hex"`).
+    - `resetFilters()` must clear **both** the ID (`this.brand = ''`) and the text (`this.brandQ = ''`) for all three filters.
+    - Use `@click.outside="brandOpen = false"` (Alpine magic) on the wrapper `<div>` to close the dropdown when clicking elsewhere. Dropdowns use `x-show` + `x-cloak`.
+
+13. **Low-Stock Indicators Rule**
+    - When a filament has **0 quantity** (out of stock) or **< 20% remaining weight**, display a visual warning indicator in both card and list views.
+    - **Card view** (`_filament_cards.html` and server card in `index.html`): absolute-positioned badge in top-right corner with:
+      - Red background (`bg-red-600`) for out of stock (`fil.quantity == 0`)
+      - Orange background (`bg-orange-500`) for low stock (`pct < 20`)
+      - Text: `{{ t('out_of_stock') }}` or `{{ t('low_stock') }}`
+    - **List view** (`_filament_list_rows.html` and server list in `index.html`): small icon badge next to the filament name with:
+      - Red circle badge with `fa-exclamation-circle` icon for out of stock
+      - Orange badge with `fa-triangle-exclamation` icon for low stock
+    - **Important**: Define `pct` variable **before** the low-stock check. In server-rendered views, calculate `capacity_all` and `pct` before the outer card/row div. In partials, set them at the top of the loop.
+    - I18n keys required: `'out_of_stock'` and `'low_stock'` (both in Czech and English).
+
+---
+
+## Post-Implementation Versioning Checklist
+
+**After every set of feature additions or structural UI fixes:**
+
+1. ✅ Verify that all changes are complete and Docker builds successfully
+2. ✅ Check `app.py` – is `APP_VERSION = 'X.Y.Z'` set correctly?
+3. ✅ **Bump version** in `app.py` (semantic versioning: major.minor.patch)
+4. ✅ **Update changelog** in `CHANGELOG.md` under the new version section
+5. ✅ **Update README.md** – change the version tag in the first line
+6. ✅ `docker compose up -d --build` → verify HTTP 200

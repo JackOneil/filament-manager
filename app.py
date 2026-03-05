@@ -26,7 +26,7 @@ from utils import get_settings
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.21.0'
+APP_VERSION = '1.23.0'
 
 
 def create_app() -> Flask:

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<div x-data="inventoryApp()" x-init="window.__inv = $data">
+<div x-data="inventoryApp()">
 <div class="flex flex-col md:flex-row justify-between items-center md:items-end mb-6 gap-4">
     <h1 class="text-2xl sm:text-3xl font-bold w-full md:w-auto text-center md:text-left">{{ t('my_inventory') }}</h1>
     <div class="flex flex-col sm:flex-row gap-4 w-full md:w-auto items-center">
@@ -30,32 +30,95 @@
 
 <!-- Filtry -->
 <div id="filter-section" class="bg-white p-3 sm:p-4 rounded-lg shadow-sm border border-gray-100 mb-4 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 items-stretch sm:items-end">
-    <div class="flex-1 min-w-[150px]">
+    <!-- Brand fulltext filter -->
+    <div class="flex-1 min-w-[150px] relative" @click.outside="brandOpen = false">
         <label class="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">{{ t('brand') }}</label>
-        <select x-model="brand" x-on:change="applyFilters()" id="filter-brand" class="w-full border-gray-300 rounded px-3 py-2 text-sm focus:ring-blue-500 outline-none border">
-            <option value="">-- {{ t('filter_all') }} --</option>
-            {% for b in brands %}
-                <option value="{{ b.id }}">{{ b.name }}</option>
-            {% endfor %}
-        </select>
+        <div class="relative">
+            <input type="text" x-model="brandQ" @focus="brandOpen = true" @input="brandOpen = true"
+                placeholder="{{ t('filter_search') }}" autocomplete="off"
+                :class="brand ? 'border-blue-400 bg-blue-50' : 'border-gray-300'"
+                class="w-full rounded px-3 py-2 text-sm focus:ring-blue-500 outline-none border pr-8">
+            <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-gray-400">
+                <i class="fa-solid fa-chevron-down text-xs transition-transform duration-150" :class="brandOpen ? 'rotate-180' : ''"></i>
+            </div>
+        </div>
+        <div x-show="brandOpen" x-cloak class="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+            <div @click="selectBrand('', ''); brandOpen = false"
+                class="px-3 py-2 cursor-pointer text-sm italic border-b border-gray-100"
+                :class="brand === '' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-400 hover:bg-gray-50'">
+                — {{ t('filter_all') }} —
+            </div>
+            <template x-for="opt in filteredBrands" :key="opt.id">
+                <div @click="selectBrand(opt.id, opt.name); brandOpen = false"
+                    class="px-3 py-2 cursor-pointer text-sm border-b border-gray-50 last:border-b-0 flex items-center justify-between"
+                    :class="brand == opt.id ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-800 hover:bg-blue-50'">
+                    <span x-text="opt.name"></span>
+                    <i x-show="brand == opt.id" class="fa-solid fa-check text-blue-500 text-xs"></i>
+                </div>
+            </template>
+            <div x-show="filteredBrands.length === 0" class="px-3 py-2 text-gray-400 italic text-xs text-center">–</div>
+        </div>
     </div>
-    <div class="flex-1 min-w-[150px]">
+
+    <!-- Material fulltext filter -->
+    <div class="flex-1 min-w-[150px] relative" @click.outside="materialOpen = false">
         <label class="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">{{ t('material') }}</label>
-        <select x-model="material" x-on:change="applyFilters()" id="filter-material" class="w-full border-gray-300 rounded px-3 py-2 text-sm focus:ring-blue-500 outline-none border">
-            <option value="">-- {{ t('filter_all') }} --</option>
-            {% for m in materials %}
-                <option value="{{ m.id }}">{{ m.name }}</option>
-            {% endfor %}
-        </select>
+        <div class="relative">
+            <input type="text" x-model="materialQ" @focus="materialOpen = true" @input="materialOpen = true"
+                placeholder="{{ t('filter_search') }}" autocomplete="off"
+                :class="material ? 'border-blue-400 bg-blue-50' : 'border-gray-300'"
+                class="w-full rounded px-3 py-2 text-sm focus:ring-blue-500 outline-none border pr-8">
+            <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-gray-400">
+                <i class="fa-solid fa-chevron-down text-xs transition-transform duration-150" :class="materialOpen ? 'rotate-180' : ''"></i>
+            </div>
+        </div>
+        <div x-show="materialOpen" x-cloak class="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+            <div @click="selectMaterial('', ''); materialOpen = false"
+                class="px-3 py-2 cursor-pointer text-sm italic border-b border-gray-100"
+                :class="material === '' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-400 hover:bg-gray-50'">
+                — {{ t('filter_all') }} —
+            </div>
+            <template x-for="opt in filteredMaterials" :key="opt.id">
+                <div @click="selectMaterial(opt.id, opt.name); materialOpen = false"
+                    class="px-3 py-2 cursor-pointer text-sm border-b border-gray-50 last:border-b-0 flex items-center justify-between"
+                    :class="material == opt.id ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-800 hover:bg-blue-50'">
+                    <span x-text="opt.name"></span>
+                    <i x-show="material == opt.id" class="fa-solid fa-check text-blue-500 text-xs"></i>
+                </div>
+            </template>
+            <div x-show="filteredMaterials.length === 0" class="px-3 py-2 text-gray-400 italic text-xs text-center">–</div>
+        </div>
     </div>
-    <div class="flex-1 min-w-[150px]">
+
+    <!-- Color fulltext filter (with colour swatches) -->
+    <div class="flex-1 min-w-[150px] relative" @click.outside="colorOpen = false">
         <label class="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">{{ t('color') }}</label>
-        <select x-model="color" x-on:change="applyFilters()" id="filter-color" class="w-full border-gray-300 rounded px-3 py-2 text-sm focus:ring-blue-500 outline-none border">
-            <option value="">-- {{ t('filter_all') }} --</option>
-            {% for c in colors %}
-                <option value="{{ c.id }}">{{ c.name }}</option>
-            {% endfor %}
-        </select>
+        <div class="relative">
+            <input type="text" x-model="colorQ" @focus="colorOpen = true" @input="colorOpen = true"
+                placeholder="{{ t('filter_search') }}" autocomplete="off"
+                :class="color ? 'border-blue-400 bg-blue-50' : 'border-gray-300'"
+                class="w-full rounded px-3 py-2 text-sm focus:ring-blue-500 outline-none border pr-8">
+            <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-gray-400">
+                <i class="fa-solid fa-chevron-down text-xs transition-transform duration-150" :class="colorOpen ? 'rotate-180' : ''"></i>
+            </div>
+        </div>
+        <div x-show="colorOpen" x-cloak class="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+            <div @click="selectColor('', ''); colorOpen = false"
+                class="px-3 py-2 cursor-pointer text-sm italic border-b border-gray-100"
+                :class="color === '' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-400 hover:bg-gray-50'">
+                — {{ t('filter_all') }} —
+            </div>
+            <template x-for="opt in filteredColors" :key="opt.id">
+                <div @click="selectColor(opt.id, opt.name); colorOpen = false"
+                    class="px-3 py-2 cursor-pointer text-sm border-b border-gray-50 last:border-b-0 flex items-center gap-2"
+                    :class="color == opt.id ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-800 hover:bg-blue-50'">
+                    <div class="w-3 h-3 rounded-full flex-shrink-0 border border-gray-200" :style="'background-color:' + opt.hex"></div>
+                    <span x-text="opt.name" class="flex-1"></span>
+                    <i x-show="color == opt.id" class="fa-solid fa-check text-blue-500 text-xs"></i>
+                </div>
+            </template>
+            <div x-show="filteredColors.length === 0" class="px-3 py-2 text-gray-400 italic text-xs text-center">–</div>
+        </div>
     </div>
     <div class="flex gap-2">
         <button type="button" x-on:click="resetFilters()" :disabled="!hasFilters"
@@ -116,6 +179,17 @@
         <!-- KARTY POHLED -->
         <div class="bg-white rounded-lg shadow-md border border-gray-100 overflow-hidden relative">
             <div class="h-2 w-full absolute top-0 left-0" style="background-color: {{ fil.color.hex_value }};"></div>
+            {% set capacity_all = fil.quantity * fil.weight_total %}
+            {% if capacity_all > 0 %}
+                {% set pct = (fil.weight_remaining / capacity_all * 100) | round | int %}
+            {% else %}
+                {% set pct = 0 %}
+            {% endif %}
+            {% if fil.quantity == 0 or pct < 20 %}
+            <div class="absolute top-2 right-2 text-xs font-bold px-2 py-1 rounded shadow-md {% if fil.quantity == 0 %}bg-red-600 text-white{% else %}bg-orange-500 text-white{% endif %}">
+                {% if fil.quantity == 0 %}{{ t('out_of_stock') }}{% else %}{{ t('low_stock') }}{% endif %}
+            </div>
+            {% endif %}
             <div class="p-6">
                 <div class="flex justify-between items-start">
                     <div>
@@ -125,12 +199,6 @@
                             <span class="ml-2 text-blue-600">({{ fil.quantity }} {{ t('pieces') }})</span>
                         </p>
                     </div>
-                    {% set capacity_all = fil.quantity * fil.weight_total %}
-                    {% if capacity_all > 0 %}
-                        {% set pct = (fil.weight_remaining / capacity_all * 100) | round | int %}
-                    {% else %}
-                        {% set pct = 0 %}
-                    {% endif %}
                     <span class="px-2 py-1 text-xs font-bold rounded shadow-sm
                         {% if pct > 50 %}bg-green-100 text-green-800
                         {% elif pct > 20 %}bg-yellow-100 text-yellow-800
@@ -221,7 +289,14 @@
             <div class="col-span-3 sm:col-span-4 flex items-start gap-2">
                 <div class="w-3 h-10 rounded-full flex-shrink-0" style="background-color: {{ fil.color.hex_value }};"></div>
                 <div class="flex-1 min-w-0">
-                    <h3 class="font-bold text-gray-800 truncate text-sm" title="{{ fil.name }}">{{ fil.name }}</h3>
+                    <div class="flex items-center gap-1.5">
+                        {% if fil.quantity == 0 or pct < 20 %}
+                        <span class="text-xs font-bold px-1.5 py-0.5 rounded flex-shrink-0 {% if fil.quantity == 0 %}bg-red-600 text-white{% else %}bg-orange-500 text-white{% endif %}">
+                            {% if fil.quantity == 0 %}<i class="fa-solid fa-exclamation-circle"></i>{% else %}<i class="fa-solid fa-triangle-exclamation"></i>{% endif %}
+                        </span>
+                        {% endif %}
+                        <h3 class="font-bold text-gray-800 truncate text-sm" title="{{ fil.name }}">{{ fil.name }}</h3>
+                    </div>
                 </div>
             </div>
             
@@ -346,8 +421,42 @@ function inventoryApp() {
         viewMode: '{{ view_mode }}',
         perPage: {{ per_page }},
 
+        // Fulltext filter option lists (embedded from server at render time)
+        brandOptions: [{% for b in brands %}{"id":{{ b.id }},"name":{{ b.name|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}],
+        materialOptions: [{% for m in materials %}{"id":{{ m.id }},"name":{{ m.name|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}],
+        colorOptions: [{% for c in colors %}{"id":{{ c.id }},"name":{{ c.name|tojson }},"hex":{{ c.hex_value|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}],
+        brandQ: '',
+        materialQ: '',
+        colorQ: '',
+        brandOpen: false,
+        materialOpen: false,
+        colorOpen: false,
+
+        init() {
+            window.__inv = this;
+            const bm = this.brandOptions.find(o => o.id == this.brand);
+            if (bm) this.brandQ = bm.name;
+            const mm = this.materialOptions.find(o => o.id == this.material);
+            if (mm) this.materialQ = mm.name;
+            const cm = this.colorOptions.find(o => o.id == this.color);
+            if (cm) this.colorQ = cm.name;
+        },
+
         get hasFilters() {
             return this.brand !== '' || this.material !== '' || this.color !== '';
+        },
+
+        get filteredBrands() {
+            const q = (this.brandQ || '').toLowerCase();
+            return q ? this.brandOptions.filter(o => o.name.toLowerCase().includes(q)) : this.brandOptions;
+        },
+        get filteredMaterials() {
+            const q = (this.materialQ || '').toLowerCase();
+            return q ? this.materialOptions.filter(o => o.name.toLowerCase().includes(q)) : this.materialOptions;
+        },
+        get filteredColors() {
+            const q = (this.colorQ || '').toLowerCase();
+            return q ? this.colorOptions.filter(o => o.name.toLowerCase().includes(q)) : this.colorOptions;
         },
 
         async fetchContent(page = 1) {
@@ -403,12 +512,19 @@ function inventoryApp() {
             this.fetchContent();
         },
 
+        selectBrand(id, name)   { this.brand = id;    this.brandQ = name;    this.applyFilters(); },
+        selectMaterial(id, name) { this.material = id; this.materialQ = name; this.applyFilters(); },
+        selectColor(id, name)    { this.color = id;    this.colorQ = name;    this.applyFilters(); },
+
         applyFilters() { this.fetchContent(); },
 
         resetFilters() {
             this.brand = '';
             this.material = '';
             this.color = '';
+            this.brandQ = '';
+            this.materialQ = '';
+            this.colorQ = '';
             this.fetchContent();
         }
     };

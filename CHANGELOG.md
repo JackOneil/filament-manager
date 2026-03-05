@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.23.0] - 2026-03-05
+### Added
+- **Clear all movement history button**: New red button on the Movement History page allows users to delete the entire movement history at once. Button requires confirmation dialog before proceeding ("Are you absolutely sure you want to delete the ENTIRE movement history? This action cannot be undone.") to prevent accidental data loss.
+- Button is positioned next to the per-page selector with trash icon for visual consistency.
+
+## [1.22.0] - 2026-03-05
+### Added
+- **Fulltext search filters on inventory page**: Brand, Material, and Color filters now support real-time text search (typing instantly narrows options), matching the behavior of the calculator's filament picker. Displays matching options in a dropdown with visual feedback and checkmarks for active selections.
+- **Color filter visual enhancement**: Color filter dropdown now shows colored swatches next to each color name for quick visual identification.
+- **Low-stock warning indicators**: New visual alerts for filaments:
+  - Red "Out of Stock" badge (card view top-right; list view icon) when quantity reaches 0.
+  - Orange "Low Stock" badge/icon when remaining weight drops below 20% of total capacity.
+  - Applied consistently across both card and list view modes.
+
+### Fixed
+- **Critical HTML structure bug in list view**: Fixed missing closing `</div>` for the row wrapper in the list view loop, which caused DOM nesting and catastrophic layout collapse (items appearing on top of each other). This also resolved the modal null error (`Cannot set properties of null`) when interacting with list view items.
+- **Alpine reactive flush timing race condition**: Added explicit `classList` synchronization in `fetchContent()` before `innerHTML` insertion, ensuring layout classes are correct immediately when switching between card and list views via AJAX (fixes 3-column grid appearing briefly in list mode after card view).
+- **Alpine.js x-cloak visibility flash**: Added missing `[x-cloak] { display: none !important; }` CSS rule in base.html, preventing filter sections from briefly appearing before Alpine.js initializes.
+
 ## [1.20.1] - 2026-03-05
 ### Fixed
 - **Reset/Clear filter button is now always visible**: Button no longer disappears when no filters are active. Instead, it displays with a disabled state (grayed out) when no filters are selected, and becomes enabled when filters are applied.

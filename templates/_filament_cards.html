@@ -1,7 +1,18 @@
 {% for fil in filaments %}
     <!-- KARTY POHLED -->
+    {% set capacity_all = fil.quantity * fil.weight_total %}
+    {% if capacity_all > 0 %}
+        {% set pct = (fil.weight_remaining / capacity_all * 100) | round | int %}
+    {% else %}
+        {% set pct = 0 %}
+    {% endif %}
     <div class="bg-white rounded-lg shadow-md border border-gray-100 overflow-hidden relative">
         <div class="h-2 w-full absolute top-0 left-0" style="background-color: {{ fil.color.hex_value }};"></div>
+        {% if fil.quantity == 0 or pct < 20 %}
+        <div class="absolute top-2 right-2 text-xs font-bold px-2 py-1 rounded shadow-md {% if fil.quantity == 0 %}bg-red-600 text-white{% else %}bg-orange-500 text-white{% endif %}">
+            {% if fil.quantity == 0 %}{{ t('out_of_stock') }}{% else %}{{ t('low_stock') }}{% endif %}
+        </div>
+        {% endif %}
         <div class="p-6">
             <div class="flex justify-between items-start">
                 <div>
@@ -11,12 +22,6 @@
                         <span class="ml-2 text-blue-600">({{ fil.quantity }} {{ t('pieces') }})</span>
                     </p>
                 </div>
-                {% set capacity_all = fil.quantity * fil.weight_total %}
-                {% if capacity_all > 0 %}
-                    {% set pct = (fil.weight_remaining / capacity_all * 100) | round | int %}
-                {% else %}
-                    {% set pct = 0 %}
-                {% endif %}
                 <span class="px-2 py-1 text-xs font-bold rounded shadow-sm
                     {% if pct > 50 %}bg-green-100 text-green-800
                     {% elif pct > 20 %}bg-yellow-100 text-yellow-800
