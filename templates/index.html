@@ -358,37 +358,38 @@
 </div>
 
 
-<!-- STRANKOVANI -->
-{% if filaments.pages > 1 %}
-<div class="flex justify-center mt-8">
+<!-- STRANKOVANI (Alpine zprostředkované) -->
+<div class="flex justify-center mt-8" x-show="totalPages > 1" x-cloak>
     <nav class="flex items-center gap-1 bg-white rounded-lg shadow-sm border border-gray-200 px-2 py-1">
         <!-- Zpet -->
-        <a href="{{ url_for('index', page=filaments.prev_num, per_page=per_page, brand=f_brand, material=f_material, color=f_color, view=view_mode, sort_by=sort_by, sort_direction=sort_direction) if filaments.has_prev else '#' }}" 
-           class="px-3 py-1 rounded {{ 'text-blue-600 hover:bg-blue-50' if filaments.has_prev else 'text-gray-300 cursor-not-allowed' }}">
+        <a href="#" @click.prevent="if (currentPage > 1) fetchContent(currentPage - 1)" 
+           class="px-3 py-1 rounded transition-colors"
+           :class="currentPage > 1 ? 'text-blue-600 hover:bg-blue-50' : 'text-gray-300 cursor-not-allowed'">
             <i class="fa-solid fa-chevron-left"></i>
         </a>
 
         <!-- Stranky -->
-        {% for p in filaments.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-            {% if p %}
-                {% if p == filaments.page %}
-                    <span class="px-3 py-1 rounded bg-blue-600 text-white font-bold">{{ p }}</span>
-                {% else %}
-                    <a href="{{ url_for('index', page=p, per_page=per_page, brand=f_brand, material=f_material, color=f_color, view=view_mode, sort_by=sort_by, sort_direction=sort_direction) }}" class="px-3 py-1 rounded text-gray-700 hover:bg-gray-100 transition-colors">{{ p }}</a>
-                {% endif %}
-            {% else %}
-                <span class="px-2 text-gray-400">...</span>
-            {% endif %}
-        {% endfor %}
+        <template x-for="(p, index) in paginationPages" :key="index">
+            <a href="#" 
+               @click.prevent="if (p !== '...') fetchContent(p)"
+               class="px-3 py-1 rounded transition-colors block text-center"
+               :class="{
+                   'text-gray-400 pointer-events-none cursor-default': p === '...',
+                   'bg-blue-600 text-white font-bold shadow-sm': p === currentPage,
+                   'text-gray-700 hover:bg-gray-100 hover:text-blue-600': p !== '...' && p !== currentPage
+               }">
+                <span x-text="p"></span>
+            </a>
+        </template>
 
         <!-- Vpred -->
-        <a href="{{ url_for('index', page=filaments.next_num, per_page=per_page, brand=f_brand, material=f_material, color=f_color, view=view_mode, sort_by=sort_by, sort_direction=sort_direction) if filaments.has_next else '#' }}" 
-           class="px-3 py-1 rounded {{ 'text-blue-600 hover:bg-blue-50' if filaments.has_next else 'text-gray-300 cursor-not-allowed' }}">
+        <a href="#" @click.prevent="if (currentPage < totalPages) fetchContent(currentPage + 1)" 
+           class="px-3 py-1 rounded transition-colors"
+           :class="currentPage < totalPages ? 'text-blue-600 hover:bg-blue-50' : 'text-gray-300 cursor-not-allowed'">
             <i class="fa-solid fa-chevron-right"></i>
         </a>
     </nav>
 </div>
-{% endif %}
 
 <!-- Use Filament Modal Dialog -->
 <div id="useFilamentModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -420,6 +421,8 @@ function inventoryApp() {
         color: '{{ f_color }}',
         viewMode: '{{ view_mode }}',
         perPage: {{ per_page }},
+        currentPage: {{ filaments.page }},
+        totalPages: {{ filaments.pages }},
 
         // Fulltext filter option lists (embedded from server at render time)
         brandOptions: [{% for b in brands %}{"id":{{ b.id }},"name":{{ b.name|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}],
@@ -444,6 +447,37 @@ function inventoryApp() {
 
         get hasFilters() {
             return this.brand !== '' || this.material !== '' || this.color !== '';
+        },
+
+        get paginationPages() {
+            const current = this.currentPage;
+            const last = this.totalPages;
+            const delta = 2;
+            const left = current - delta;
+            const right = current + delta;
+            const range = [];
+            const rangeWithDots = [];
+            let l;
+
+            for (let i = 1; i <= last; i++) {
+                if (i === 1 || i === last || (i >= left && i <= right)) {
+                    range.push(i);
+                }
+            }
+
+            for (let i of range) {
+                if (l) {
+                    if (i - l === 2) {
+                        rangeWithDots.push(l + 1);
+                    } else if (i - l !== 1) {
+                        rangeWithDots.push('...');
+                    }
+                }
+                rangeWithDots.push(i);
+                l = i;
+            }
+
+            return rangeWithDots;
         },
 
         get filteredBrands() {
@@ -473,6 +507,10 @@ function inventoryApp() {
             try {
                 const resp = await fetch(`/api/filaments-list?${params}`);
                 const data = await resp.json();
+                
+                this.currentPage = data.current_page || 1;
+                this.totalPages = data.total_pages || 1;
+
                 const wrapper = document.getElementById('filament-content-wrapper');
                 if (wrapper) {
                     // Explicitly sync layout classes before inserting HTML so the

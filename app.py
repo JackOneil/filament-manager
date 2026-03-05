@@ -26,7 +26,7 @@ from utils import get_settings
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.23.0'
+APP_VERSION = '1.25.1'
 
 
 def create_app() -> Flask:
@@ -84,12 +84,11 @@ def _setup_database(app: Flask) -> None:
         _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN debug_logging BOOLEAN NOT NULL DEFAULT 0')
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN theme VARCHAR(10) NOT NULL DEFAULT 'light'")
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN view_mode VARCHAR(10) NOT NULL DEFAULT 'card'")
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN items_per_page INTEGER NOT NULL DEFAULT 12")
 
         if not AppSetting.query.first():
             db.session.add(AppSetting(lang='cs', kwh_price=5.0, printer_power=150,
-                                      currency='CZK', debug_logging=False, theme='light', view_mode='card'))
-            db.session.commit()
-
+                                      currency='CZK', debug_logging=False, theme='light', view_mode='card', items_per_page=12))
         setting = AppSetting.query.first()
         if setting and setting.debug_logging:
             app.logger.setLevel(logging.DEBUG)

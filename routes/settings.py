@@ -38,6 +38,11 @@ def register(app):
                     setting.currency = request.form['currency']
                     app.logger.debug(f"Currency changed: {old} -> {setting.currency}")
 
+                elif action == 'items_per_page':
+                    setting = AppSetting.query.first()
+                    setting.items_per_page = int(request.form['items_per_page'])
+                    app.logger.debug(f"Items per page changed to: {setting.items_per_page}")
+
                 elif action == 'debug_logging':
                     setting = AppSetting.query.first()
                     setting.debug_logging = request.form.get('debug_logging') == 'on'

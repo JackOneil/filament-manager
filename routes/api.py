@@ -1,7 +1,7 @@
 """AJAX API routes for dynamic filtering/sorting without page reload."""
 from flask import request, render_template, jsonify
 from database import db
-from models import Filament, Brand
+from models import Filament, Brand, AppSetting
 
 
 def register(app):
@@ -45,9 +45,12 @@ def register(app):
             filaments_query = filaments_query.order_by(order_expr.asc())
 
         page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 12, type=int)
-        if per_page not in [12, 24, 48]:
-            per_page = 12
+
+        setting = AppSetting.query.first()
+        default_per_page = setting.items_per_page if setting else 12
+        per_page = request.args.get('per_page', default_per_page, type=int)
+        if per_page not in [12, 24, 48, 96]:
+            per_page = default_per_page
 
         filaments_paginated = db.paginate(filaments_query, page=page, per_page=per_page, error_out=False)
 

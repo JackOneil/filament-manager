@@ -60,9 +60,12 @@ def register(app):
             filaments_query = filaments_query.order_by(order_expr.asc())
 
         page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 12, type=int)
-        if per_page not in [12, 24, 48]:
-            per_page = 12
+        
+        setting = AppSetting.query.first()
+        default_per_page = setting.items_per_page if setting else 12
+        per_page = request.args.get('per_page', default_per_page, type=int)
+        if per_page not in [12, 24, 48, 96]:
+            per_page = default_per_page
 
         all_filtered = filaments_query.all()
         total_spools = sum(f.quantity for f in all_filtered)

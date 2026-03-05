@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.25.1] - 2026-03-05
+### Changed
+- **Settings page UI/UX redesign**: Rearranged the global application settings (Currency, Language, Items per page, Debug Mode) into a dedicated vertical card ("General Settings") inline with the other sub-dictionaries to improve visual cleanliness and reduce header clutter.
+
+### Fixed
+- **API module missing dependency**: Fixed a 500 fatal backend error originating from missing `AppSetting` import inside the `api.py` router logic when applying the new items per page limitation. The AJAX endpoints are fully stable again.
+
+## [1.25.0] - 2026-03-05
+### Added
+- **Pagination user settings**: The number of items displayed per page on the overview is now customizable from the settings page (choices: 12, 24, 48, 96).
+
+### Fixed
+- **Pagination display enhancement**: Corrected the visual structure of the pagination component so page numbers are actively displayed and highlighted. Users will now see direct page numbers (e.g., `< 1, 2, ... 4 >`) instead of just left and right navigational arrows. Database structure properly adapts with the updated schema upgrade loop logic.
+
+## [1.24.0] - 2026-03-05
+### Fixed
+- **Dynamic Alpine.js Pagination**: The manual pagination block on the inventory overview page now accurately responds to fulltext search filtering without requiring a full page refresh. Users no longer get disconnected pagination controls when manipulating filters.
+- Clarified expected pagination constraints on page loading thresholds (limit is set securely at 12 items).
+
 ## [1.23.0] - 2026-03-05
 ### Added
 - **Clear all movement history button**: New red button on the Movement History page allows users to delete the entire movement history at once. Button requires confirmation dialog before proceeding ("Are you absolutely sure you want to delete the ENTIRE movement history? This action cannot be undone.") to prevent accidental data loss.

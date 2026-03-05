@@ -54,6 +54,7 @@ class AppSetting(db.Model):
     debug_logging = db.Column(db.Boolean, default=False)
     theme = db.Column(db.String(10), default='light')
     view_mode = db.Column(db.String(10), default='card')
+    items_per_page = db.Column(db.Integer, default=12)
 
 
 class PrintHistory(db.Model):
