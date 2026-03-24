@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.27.1] - 2026-03-24
+### Added
+- **Project Configuration**: Added a comprehensive `.gitignore` file to prevent tracking of temporary files, virtual environments, and local data.
+
+## [1.27.0] - 2026-03-22
+### Added
+- **Image Lightbox**: Added a fullscreen Alpine.js powered lightbox to view project images intuitively without leaving the page.
+- **Rich Link Previews**: Integrated OpenGraph metadata scraping so external project links automatically generate rich preview cards with thumbnails and descriptions.
+
+## [1.26.0] - 2026-03-22
+### Added
+- **Print Projects Feature**: Added a comprehensive 3D printing job management system accessible via the main navigation menu. It allows tracking of client projects, due dates, descriptions, statuses (NEW, PRINTING, DONE), and estimated print times.
+- **Image Gallery**: Interactive drag and drop area for multiple concurrent image uploads on the project detail, complete with an image gallery and preview thumbnails.
+- **Print Cost Calculator**: Dynamic project cost calculation based on assigned filaments.
+- **Project File Attachments**: Users can now securely upload model/slice files (e.g., `.3mf`) and embed dynamic external URLs.
+- **Filament Planning Integration**: Projects seamlessly connect to the core inventory database. Users can pre-plan required filaments per project and deduct the planned amounts from stock smoothly with a single click.
+### Fixed
+- **I18n Language Bug**: Fixed a bug where several texts on project views remained hardcoded in Czech instead of fully switching to English.
+- **Delete Confirmation Dialog**: Corrected the terminology used in the delete project confirmation modal from "filament" to "project".
+- **Project inputs visibility**: Fixed an issue where input fields on the project creation and edit screens were incorrectly styled with a dark background even when the light theme was active.
+
+## [1.25.2] - 2026-03-07
+### Changed
+- **Optimized Database Aggregations**: Replaced in-memory Python aggregations for total spools, remaining weight, and value calculations with optimized SQL aggregations, drastically reducing memory usage for large inventories.
+- **Eager Loading for Filament Queries**: Implemented `joinedload` to eliminate the N+1 query problem when fetching filament lists, significantly improving dashboard load times.
+
+### Fixed
+- **Percent Sort Bug**: Fixed the sorting algorithm for the "Percent" metric. It now properly sorts across all dataset pages using a SQL-native formula (including division-by-zero protection) instead of sorting only the current active paginated chunk in Python.
+- **Exception Logging**: Improved error visibility by securely adding `app.logger.error` traces in `_safe_alter` database migration loops and backup import routines.
+
 ## [1.25.1] - 2026-03-05
 ### Changed
 - **Settings page UI/UX redesign**: Rearranged the global application settings (Currency, Language, Items per page, Debug Mode) into a dedicated vertical card ("General Settings") inline with the other sub-dictionaries to improve visual cleanliness and reduce header clutter.

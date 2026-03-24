@@ -1,10 +1,11 @@
 # Filament Manager 🧵
-*Current version: **v1.25.1***
+*Current version: **v1.26.0***
 
 A minimalist and modern web application for tracking and managing 3D printer filaments.
 The application allows detailed tracking of weight balances, material costs, and also includes a calculator for a precise print cost estimation of a given model (in grams relative to the spool's total weight).
 
 ## Key Features
+- **Projects System:** Plan and track ongoing 3D prints as unified "Projects". Store details, client names, due dates, and attached files (e.g., `.3mf`) directly. Connect allocated materials via the Print Planning module to gracefully deduct them from the inventory stock when printed.
 - **Clear Dashboard:** View all your filaments (brand, color, material) in one place. Includes a visual progress bar indicating how much filament is left on the spools.
 - **1-Click Tracking Deduction:** A quick subtraction input makes it easy to deduct explicitly weighed amounts of grams from a spool once your print finishes. It automatically deducts empty spools from the overall stock inventory.
 - **Print Calculator:** Before starting a print, simply enter the model's weight from your Slicer and the estimated print time. You will instantly see how much the specific part will cost (including calculated electricity consumption). The page automatically saves a **history of your precise previous calculations**.

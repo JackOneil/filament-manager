@@ -1,6 +1,8 @@
 """Inventory routes: listing, CRUD, spool management."""
 import math
 from flask import render_template, request, redirect, url_for
+from sqlalchemy.orm import joinedload
+from sqlalchemy import func
 from database import db
 from models import Filament, Brand, Color, Material, AppSetting
 from utils import log_movement
@@ -10,7 +12,11 @@ def register(app):
 
     @app.route('/')
     def index():
-        filaments_query = Filament.query
+        filaments_query = Filament.query.options(
+            joinedload(Filament.brand),
+            joinedload(Filament.material),
+            joinedload(Filament.color)
+        )
 
         f_brand = request.args.get('brand', '')
         f_material = request.args.get('material', '')
@@ -51,6 +57,12 @@ def register(app):
             order_expr = Filament.weight_remaining
         elif sort_by == 'capacity':
             order_expr = Filament.quantity * Filament.weight_total
+        elif sort_by == 'percent':
+            order_expr = db.case(
+                (Filament.quantity * Filament.weight_total > 0, 
+                 Filament.weight_remaining / (Filament.quantity * Filament.weight_total)),
+                else_=0
+            )
         else:
             order_expr = Filament.name
 
@@ -67,22 +79,30 @@ def register(app):
         if per_page not in [12, 24, 48, 96]:
             per_page = default_per_page
 
-        all_filtered = filaments_query.all()
-        total_spools = sum(f.quantity for f in all_filtered)
-        total_remaining_g = sum(f.weight_remaining for f in all_filtered)
-        total_value = sum(
-            (f.price / f.weight_total * f.weight_remaining) if f.weight_total > 0 else 0
-            for f in all_filtered
+        agg_query = db.session.query(
+            func.sum(Filament.quantity).label('spools'),
+            func.sum(Filament.weight_remaining).label('remaining'),
+            func.sum(
+                db.case(
+                    (Filament.weight_total > 0, (Filament.price / Filament.weight_total) * Filament.weight_remaining),
+                    else_=0
+                )
+            ).label('value')
         )
 
-        filaments_paginated = db.paginate(filaments_query, page=page, per_page=per_page, error_out=False)
+        if f_brand:
+            agg_query = agg_query.filter(Filament.brand_id == f_brand)
+        if f_material:
+            agg_query = agg_query.filter(Filament.material_id == f_material)
+        if f_color:
+            agg_query = agg_query.filter(Filament.color_id == f_color)
 
-        if sort_by == 'percent':
-            filaments_paginated.items.sort(
-                key=lambda f: f.weight_remaining / (f.quantity * f.weight_total)
-                if (f.quantity * f.weight_total) > 0 else 0,
-                reverse=(sort_direction == 'desc')
-            )
+        agg_result = agg_query.first()
+        total_spools = agg_result.spools or 0
+        total_remaining_g = agg_result.remaining or 0
+        total_value = agg_result.value or 0
+
+        filaments_paginated = db.paginate(filaments_query, page=page, per_page=per_page, error_out=False)
 
         brands = Brand.query.order_by(Brand.name).all()
         materials = Material.query.order_by(Material.name).all()

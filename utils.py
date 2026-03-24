@@ -41,3 +41,55 @@ def log_movement(filament, action_type, weight):
         currency=currency,
     )
     db.session.add(movement)
+
+def fetch_link_metadata(url):
+    import requests
+    from bs4 import BeautifulSoup
+    from urllib.parse import urlparse
+
+    meta = {
+        'og_title': None,
+        'og_image': None,
+        'og_description': None,
+        'domain': None
+    }
+    
+    try:
+        parsed_uri = urlparse(url)
+        meta['domain'] = '{uri.netloc}'.format(uri=parsed_uri)
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        response = requests.get(url, headers=headers, timeout=3)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            og_title = soup.find('meta', property='og:title')
+            if og_title:
+                meta['og_title'] = og_title.get('content')
+            else:
+                title_tag = soup.find('title')
+                meta['og_title'] = title_tag.text if title_tag else None
+                
+            og_image = soup.find('meta', property='og:image')
+            if og_image:
+                meta['og_image'] = og_image.get('content')
+                
+            og_desc = soup.find('meta', property='og:description')
+            if og_desc:
+                meta['og_description'] = og_desc.get('content')
+            else:
+                desc_tag = soup.find('meta', attrs={'name': 'description'})
+                if desc_tag:
+                    meta['og_description'] = desc_tag.get('content')
+                    
+    except Exception:
+        pass
+        
+    if meta['og_title'] and len(meta['og_title']) > 250:
+        meta['og_title'] = meta['og_title'][:250] + "..."
+    if meta['og_image'] and len(meta['og_image']) > 490:
+        meta['og_image'] = meta['og_image'][:490] + "..."
+        
+    return meta

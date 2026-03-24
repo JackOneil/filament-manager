@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <h1 class="text-3xl font-bold text-gray-800"><i class="fa-solid fa-layer-group text-blue-600"></i> {{ t('projects') }}</h1>
+    <a href="{{ url_for('project_create') }}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow transition flex items-center gap-2">
+        <i class="fa-solid fa-plus"></i> {{ t('project_create') }}
+    </a>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="bg-gray-100 border-b border-gray-300 text-sm">
+                    <th class="p-3 font-semibold text-gray-700">
+                        <a href="{{ url_for('projects_index', sort_by='name') }}" class="hover:text-blue-600 flex items-center gap-1">{{ t('project_name') }}</a>
+                    </th>
+                    <th class="p-3 font-semibold text-gray-700">
+                        <a href="{{ url_for('projects_index', sort_by='client') }}" class="hover:text-blue-600 flex items-center gap-1">{{ t('project_client') }}</a>
+                    </th>
+                    <th class="p-3 font-semibold text-gray-700">
+                        <a href="{{ url_for('projects_index', sort_by='due_date') }}" class="hover:text-blue-600 flex items-center gap-1">{{ t('project_due_date') }}</a>
+                    </th>
+                    <th class="p-3 font-semibold text-gray-700">
+                        <a href="{{ url_for('projects_index', sort_by='status') }}" class="hover:text-blue-600 flex items-center gap-1">{{ t('project_status') }}</a>
+                    </th>
+                    <th class="p-3 font-semibold text-gray-700 text-right">{{ t('action') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in projects %}
+                <tr class="border-b border-gray-200 hover:bg-gray-50 transition">
+                    <td class="p-3 font-medium text-gray-800">
+                        <a href="{{ url_for('project_detail', id=p.id) }}" class="text-blue-600 hover:underline">{{ p.name }}</a>
+                    </td>
+                    <td class="p-3 text-gray-600">{{ p.client_name or '-' }}</td>
+                    <td class="p-3 text-gray-600">
+                        {% if p.due_date %}
+                            {{ p.due_date.strftime('%d.%m.%Y') }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td class="p-3">
+                        {% if p.status == 'NEW' %}
+                            <span class="bg-gray-100 text-gray-800 text-xs font-semibold px-2.5 py-0.5 rounded border border-gray-300">{{ t('status_new') }}</span>
+                        {% elif p.status == 'PRINTING' %}
+                            <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded border border-blue-300">{{ t('status_printing') }}</span>
+                        {% elif p.status == 'DONE' %}
+                            <span class="bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded border border-green-300">{{ t('status_done') }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="p-3 text-right">
+                        <a href="{{ url_for('project_detail', id=p.id) }}" class="text-blue-600 hover:text-blue-800" title="{{ t('project_detail') }}">
+                            <i class="fa-solid fa-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="p-8 text-center text-gray-500">{{ t('project_no_projects') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

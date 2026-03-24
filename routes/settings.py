@@ -94,7 +94,7 @@ def register(app):
                 db.session.commit()
             except Exception as e:
                 db.session.rollback()
-                app.logger.debug(f"Settings action error: {str(e)}")
+                app.logger.error(f"Settings action error: {str(e)}")
             return redirect(url_for('settings'))
 
         brands = Brand.query.order_by(Brand.name).all()
@@ -170,7 +170,7 @@ def register(app):
             app.logger.debug(f"Import finished: {imported} filaments")
         except Exception as e:
             db.session.rollback()
-            app.logger.debug(f"Import failed: {str(e)}")
+            app.logger.error(f"Import failed: {str(e)}")
 
         return redirect(url_for('settings'))
 

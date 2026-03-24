@@ -21,12 +21,16 @@ from sqlalchemy import text
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from database import db
-from models import Brand, Color, Material, AppSetting, Filament, MovementHistory, PrintHistory  # noqa: F401
+from models import (
+    Brand, Color, Material, AppSetting, Filament, 
+    MovementHistory, PrintHistory, Project, ProjectFile, 
+    ProjectLink, ProjectFilament
+)  # noqa: F401
 from utils import get_settings
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.25.1'
+APP_VERSION = '1.26.0'
 
 
 def create_app() -> Flask:
@@ -86,6 +90,11 @@ def _setup_database(app: Flask) -> None:
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN view_mode VARCHAR(10) NOT NULL DEFAULT 'card'")
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN items_per_page INTEGER NOT NULL DEFAULT 12")
 
+        _safe_alter(app, "ALTER TABLE project_link ADD COLUMN og_title VARCHAR(255) DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE project_link ADD COLUMN og_image VARCHAR(500) DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE project_link ADD COLUMN og_description TEXT DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE project_link ADD COLUMN domain VARCHAR(100) DEFAULT NULL")
+
         if not AppSetting.query.first():
             db.session.add(AppSetting(lang='cs', kwh_price=5.0, printer_power=150,
                                       currency='CZK', debug_logging=False, theme='light', view_mode='card', items_per_page=12))
@@ -101,8 +110,9 @@ def _safe_alter(app: Flask, sql: str) -> None:
         try:
             db.session.execute(text(sql))
             db.session.commit()
-        except Exception:
+        except Exception as e:
             db.session.rollback()
+            app.logger.error(f"Error in _safe_alter executing '{sql}': {e}")
 
 
 # WSGI entry point (Gunicorn) and dev server

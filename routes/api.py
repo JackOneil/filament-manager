@@ -1,5 +1,6 @@
 """AJAX API routes for dynamic filtering/sorting without page reload."""
 from flask import request, render_template, jsonify
+from sqlalchemy.orm import joinedload
 from database import db
 from models import Filament, Brand, AppSetting
 
@@ -8,7 +9,11 @@ def register(app):
 
     @app.route('/api/filaments-list')
     def api_filaments_list():
-        filaments_query = Filament.query
+        filaments_query = Filament.query.options(
+            joinedload(Filament.brand),
+            joinedload(Filament.material),
+            joinedload(Filament.color)
+        )
 
         f_brand = request.args.get('brand', '')
         f_material = request.args.get('material', '')
@@ -36,6 +41,12 @@ def register(app):
             order_expr = Filament.weight_remaining
         elif sort_by == 'capacity':
             order_expr = Filament.quantity * Filament.weight_total
+        elif sort_by == 'percent':
+            order_expr = db.case(
+                (Filament.quantity * Filament.weight_total > 0, 
+                 Filament.weight_remaining / (Filament.quantity * Filament.weight_total)),
+                else_=0
+            )
         else:
             order_expr = Filament.name
 
@@ -53,13 +64,6 @@ def register(app):
             per_page = default_per_page
 
         filaments_paginated = db.paginate(filaments_query, page=page, per_page=per_page, error_out=False)
-
-        if sort_by == 'percent':
-            filaments_paginated.items.sort(
-                key=lambda f: f.weight_remaining / (f.quantity * f.weight_total)
-                if (f.quantity * f.weight_total) > 0 else 0,
-                reverse=(sort_direction == 'desc')
-            )
 
         if view_mode == 'card':
             html = render_template('_filament_cards.html', filaments=filaments_paginated.items)
