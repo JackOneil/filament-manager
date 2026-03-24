@@ -1,3 +1,10 @@
+import ipaddress
+import socket
+from urllib.parse import urljoin, urlparse
+
+import requests
+from bs4 import BeautifulSoup
+
 from database import db
 from models import AppSetting, MovementHistory
 
@@ -42,54 +49,176 @@ def log_movement(filament, action_type, weight):
     )
     db.session.add(movement)
 
-def fetch_link_metadata(url):
-    import requests
-    from bs4 import BeautifulSoup
-    from urllib.parse import urlparse
 
+def _is_public_ip(address):
+    ip_obj = ipaddress.ip_address(address)
+    return not (
+        ip_obj.is_private
+        or ip_obj.is_loopback
+        or ip_obj.is_link_local
+        or ip_obj.is_multicast
+        or ip_obj.is_reserved
+        or ip_obj.is_unspecified
+    )
+
+
+def is_safe_external_url(url):
+    parsed = urlparse(url)
+    if parsed.scheme not in {'http', 'https'}:
+        return False
+
+    hostname = parsed.hostname
+    if not hostname:
+        return False
+
+    lowered = hostname.lower()
+    if lowered in {'localhost', 'localhost.localdomain'} or lowered.endswith('.localhost'):
+        return False
+
+    try:
+        ip_obj = ipaddress.ip_address(hostname)
+        return _is_public_ip(ip_obj)
+    except ValueError:
+        pass
+
+    try:
+        addrinfos = socket.getaddrinfo(hostname, parsed.port or None, type=socket.SOCK_STREAM)
+    except socket.gaierror:
+        return False
+
+    resolved = {item[4][0] for item in addrinfos}
+    if not resolved:
+        return False
+
+    try:
+        return all(_is_public_ip(address) for address in resolved)
+    except ValueError:
+        return False
+
+
+def _follow_safe_redirects(url, headers, timeout, max_redirects=5):
+    current_url = url
+
+    for _ in range(max_redirects + 1):
+        if not is_safe_external_url(current_url):
+            raise ValueError('Unsafe redirect target')
+
+        response = requests.get(
+            current_url,
+            headers=headers,
+            timeout=timeout,
+            allow_redirects=False,
+            stream=False,
+        )
+
+        if 300 <= response.status_code < 400:
+            location = response.headers.get('Location')
+            if not location:
+                return response, current_url
+            current_url = urljoin(current_url, location)
+            continue
+
+        return response, current_url
+
+    raise ValueError('Too many redirects')
+
+
+def _extract_meta_content(soup, key, attr='property'):
+    tag = soup.find('meta', attrs={attr: key})
+    if tag:
+        return tag.get('content')
+    return None
+
+
+def _pick_preview_image(soup, base_url):
+    candidates = [
+        _extract_meta_content(soup, 'og:image'),
+        _extract_meta_content(soup, 'og:image:url'),
+        _extract_meta_content(soup, 'twitter:image', attr='name'),
+        _extract_meta_content(soup, 'twitter:image:src', attr='name'),
+    ]
+
+    link_tag = soup.find('link', rel=lambda value: value and 'image_src' in value)
+    if link_tag:
+        candidates.append(link_tag.get('href'))
+
+    itemprop_image = soup.find(attrs={'itemprop': 'image'})
+    if itemprop_image:
+        candidates.append(itemprop_image.get('content') or itemprop_image.get('src'))
+
+    for image in soup.find_all('img'):
+        src = image.get('src')
+        if not src:
+            continue
+        width = image.get('width')
+        height = image.get('height')
+        if width and height:
+            try:
+                if int(width) < 120 or int(height) < 120:
+                    continue
+            except ValueError:
+                pass
+        candidates.append(src)
+
+    for candidate in candidates:
+        if not candidate:
+            continue
+        absolute = urljoin(base_url, candidate.strip())
+        if is_safe_external_url(absolute):
+            return absolute
+    return None
+
+
+def fetch_link_metadata(url):
     meta = {
         'og_title': None,
         'og_image': None,
         'og_description': None,
-        'domain': None
+        'domain': None,
     }
-    
+
+    if not is_safe_external_url(url):
+        return meta
+
     try:
         parsed_uri = urlparse(url)
-        meta['domain'] = '{uri.netloc}'.format(uri=parsed_uri)
-        
+        meta['domain'] = parsed_uri.netloc
+
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': (
+                'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 '
+                '(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+            ),
+            'Accept': 'text/html,application/xhtml+xml',
         }
-        response = requests.get(url, headers=headers, timeout=3)
-        if response.status_code == 200:
+        response, final_url = _follow_safe_redirects(url, headers=headers, timeout=5)
+        if response.status_code == 200 and 'text/html' in response.headers.get('Content-Type', ''):
             soup = BeautifulSoup(response.text, 'html.parser')
-            
-            og_title = soup.find('meta', property='og:title')
-            if og_title:
-                meta['og_title'] = og_title.get('content')
-            else:
+
+            meta['domain'] = urlparse(final_url).netloc
+            meta['og_title'] = (
+                _extract_meta_content(soup, 'og:title')
+                or _extract_meta_content(soup, 'twitter:title', attr='name')
+            )
+            if not meta['og_title']:
                 title_tag = soup.find('title')
-                meta['og_title'] = title_tag.text if title_tag else None
-                
-            og_image = soup.find('meta', property='og:image')
-            if og_image:
-                meta['og_image'] = og_image.get('content')
-                
-            og_desc = soup.find('meta', property='og:description')
-            if og_desc:
-                meta['og_description'] = og_desc.get('content')
-            else:
-                desc_tag = soup.find('meta', attrs={'name': 'description'})
-                if desc_tag:
-                    meta['og_description'] = desc_tag.get('content')
-                    
+                meta['og_title'] = title_tag.get_text(strip=True) if title_tag else None
+
+            meta['og_description'] = (
+                _extract_meta_content(soup, 'og:description')
+                or _extract_meta_content(soup, 'twitter:description', attr='name')
+                or _extract_meta_content(soup, 'description', attr='name')
+            )
+            meta['og_image'] = _pick_preview_image(soup, final_url)
+
     except Exception:
-        pass
-        
+        return meta
+
     if meta['og_title'] and len(meta['og_title']) > 250:
-        meta['og_title'] = meta['og_title'][:250] + "..."
+        meta['og_title'] = meta['og_title'][:250] + '...'
+    if meta['og_description'] and len(meta['og_description']) > 400:
+        meta['og_description'] = meta['og_description'][:400] + '...'
     if meta['og_image'] and len(meta['og_image']) > 490:
-        meta['og_image'] = meta['og_image'][:490] + "..."
-        
+        meta['og_image'] = meta['og_image'][:490] + '...'
+
     return meta

@@ -145,6 +145,9 @@ TRANSLATIONS = {
         'estimated_project_cost': 'Odhadovaná cena tisku',
         'download_image': 'Stáhnout obrázek',
         'close_viewer': 'Zavřít',
+        'project_file_type_not_allowed': 'Nepodporovaný typ souboru. Povolené jsou obrázky a běžné 3D tiskové formáty jako 3MF, STL, OBJ, STEP nebo G-code.',
+        'project_status_invalid': 'Neplatný stav projektu',
+        'project_link_invalid': 'Odkaz míří na nepovolenou nebo neveřejnou adresu.',
     },
     'en': {
         'title': 'Filament Manager',
@@ -290,5 +293,10 @@ TRANSLATIONS = {
         'browse': 'Browse',
         'other_files': 'Other files',
         'estimated_project_cost': 'Estimated Project Cost',
+        'download_image': 'Download image',
+        'close_viewer': 'Close',
+        'project_file_type_not_allowed': 'Unsupported file type. Allowed uploads are images and common 3D printing formats such as 3MF, STL, OBJ, STEP, or G-code.',
+        'project_status_invalid': 'Invalid project status',
+        'project_link_invalid': 'The link points to a disallowed or non-public address.',
     }
 }

@@ -1,4 +1,5 @@
 import os
+import uuid
 from datetime import datetime
 from flask import render_template, request, redirect, url_for, send_from_directory, flash
 from werkzeug.utils import secure_filename
@@ -6,8 +7,34 @@ from sqlalchemy.orm import joinedload
 from database import db
 from models import Project, ProjectFile, ProjectLink, ProjectFilament, Filament
 
+
+ALLOWED_PROJECT_FILE_EXTENSIONS = {
+    '3mf', 'stl', 'obj', 'amf', 'step', 'stp', 'gcode', 'gc', 'bgcode',
+    'jpg', 'jpeg', 'png', 'gif', 'webp'
+}
+IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
+ALLOWED_PROJECT_STATUSES = {'NEW', 'PRINTING', 'DONE'}
+
+
+def _get_extension(filename):
+    return filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+
+
+def _is_allowed_project_file(filename):
+    return _get_extension(filename) in ALLOWED_PROJECT_FILE_EXTENSIONS
+
+
+def _build_storage_name(project_id, filename):
+    safe_name = secure_filename(filename)
+    unique_id = uuid.uuid4().hex[:12]
+    return f"{project_id}_{unique_id}_{safe_name}"
+
+
 def register(app):
-    UPLOAD_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'uploads')
+    UPLOAD_FOLDER = app.config.get(
+        'PROJECT_UPLOAD_FOLDER',
+        os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'uploads')
+    )
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
     @app.route('/projects')
@@ -56,8 +83,14 @@ def register(app):
 
     @app.route('/projects/<int:id>', methods=['GET'])
     def project_detail(id):
-        project = db.get_or_404(Project, id)
-        filaments = Filament.query.all()
+        project = Project.query.options(
+            joinedload(Project.files),
+            joinedload(Project.links),
+            joinedload(Project.filaments)
+            .joinedload(ProjectFilament.filament)
+            .joinedload(Filament.color),
+        ).filter(Project.id == id).first_or_404()
+        filaments = Filament.query.order_by(Filament.name.asc()).all()
         
         return render_template('project_detail.html', project=project, all_filaments=filaments)
 
@@ -100,18 +133,32 @@ def register(app):
             return redirect(url_for('project_detail', id=id))
         
         files = request.files.getlist('file')
+        uploaded_any = False
         for file in files:
             if file.filename == '':
                 continue
 
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(UPLOAD_FOLDER, f"{project.id}_{filename}")
+            if not _is_allowed_project_file(file.filename):
+                flash('project_file_type_not_allowed', 'error')
+                continue
+
+            original_filename = secure_filename(file.filename)
+            if not original_filename:
+                flash('project_file_type_not_allowed', 'error')
+                continue
+
+            stored_filename = _build_storage_name(project.id, original_filename)
+            filepath = os.path.join(UPLOAD_FOLDER, stored_filename)
             file.save(filepath)
 
-            pf = ProjectFile(project_id=project.id, filename=filename, filepath=filepath)
+            pf = ProjectFile(project_id=project.id, filename=original_filename, filepath=filepath)
             db.session.add(pf)
+            uploaded_any = True
         
-        db.session.commit()
+        if uploaded_any:
+            db.session.commit()
+        else:
+            db.session.rollback()
         return redirect(url_for('project_detail', id=id))
 
     @app.route('/projects/<int:id>/download/<int:file_id>')
@@ -122,6 +169,15 @@ def register(app):
         directory = os.path.dirname(pf.filepath)
         filename = os.path.basename(pf.filepath)
         return send_from_directory(directory, filename, as_attachment=True, download_name=pf.filename)
+
+    @app.route('/projects/<int:id>/image/<int:file_id>')
+    def project_image_file(id, file_id):
+        pf = db.get_or_404(ProjectFile, file_id)
+        if pf.project_id != id or _get_extension(pf.filename) not in IMAGE_EXTENSIONS:
+            return "Unauthorized", 401
+        directory = os.path.dirname(pf.filepath)
+        filename = os.path.basename(pf.filepath)
+        return send_from_directory(directory, filename, as_attachment=False)
 
     @app.route('/projects/<int:id>/delete_file/<int:file_id>', methods=['POST'])
     def project_delete_file(id, file_id):
@@ -137,11 +193,14 @@ def register(app):
 
     @app.route('/projects/<int:id>/add_link', methods=['POST'])
     def project_add_link(id):
-        from utils import fetch_link_metadata
+        from utils import fetch_link_metadata, is_safe_external_url
         project = db.get_or_404(Project, id)
         url = request.form.get('url', '').strip()
         name = request.form.get('name', '').strip()
         if url:
+            if not is_safe_external_url(url):
+                flash('project_link_invalid', 'error')
+                return redirect(url_for('project_detail', id=id))
             meta = fetch_link_metadata(url)
             link = ProjectLink(
                 project_id=project.id, 
@@ -192,6 +251,9 @@ def register(app):
     def project_status(id):
         project = db.get_or_404(Project, id)
         new_status = request.form.get('status', project.status)
+        if new_status not in ALLOWED_PROJECT_STATUSES:
+            flash('project_status_invalid', 'error')
+            return redirect(url_for('project_detail', id=id))
         project.status = new_status
         db.session.commit()
         return redirect(url_for('project_detail', id=id))

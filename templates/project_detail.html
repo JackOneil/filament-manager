@@ -146,7 +146,7 @@
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2"><i class="fa-solid fa-file-invoice text-blue-500"></i> {{ t('other_files') }}</h2>
                 <form method="POST" action="{{ url_for('project_upload_file', id=project.id) }}" enctype="multipart/form-data" class="flex gap-2 mb-4">
-                    <input type="file" name="file" multiple required class="flex-grow text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+                    <input type="file" name="file" multiple required accept=".3mf,.stl,.obj,.amf,.step,.stp,.gcode,.gc,.bgcode,.jpg,.jpeg,.png,.gif,.webp" class="flex-grow text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
                     <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg transition" title="{{ t('upload_file') }}"><i class="fa-solid fa-upload"></i></button>
                 </form>
                 <ul class="space-y-2">
@@ -235,8 +235,8 @@
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {% for img in images %}
                 <div class="relative group aspect-square rounded-lg border border-gray-200 overflow-hidden bg-gray-100 flex items-center justify-center cursor-pointer"
-                     @click="lightboxOpen = true; lightboxImg = '{{ url_for('project_download_file', id=project.id, file_id=img.id) }}'; lightboxTitle = '{{ img.filename | escape }}'; lightboxDownload = '{{ url_for('project_download_file', id=project.id, file_id=img.id) }}'">
-                    <img src="{{ url_for('project_download_file', id=project.id, file_id=img.id) }}" alt="{{ img.filename }}" class="object-cover w-full h-full">
+                     @click="lightboxOpen = true; lightboxImg = '{{ url_for('project_image_file', id=project.id, file_id=img.id) }}'; lightboxTitle = '{{ img.filename | escape }}'; lightboxDownload = '{{ url_for('project_download_file', id=project.id, file_id=img.id) }}'">
+                    <img src="{{ url_for('project_image_file', id=project.id, file_id=img.id) }}" alt="{{ img.filename }}" class="object-cover w-full h-full">
                     <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
                         <div class="text-white hover:text-blue-300 transition" title="{{ img.filename }}"><i class="fa-solid fa-expand text-2xl"></i></div>
                         <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=img.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');" @click.stop>

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.0] - 2026-03-24
+### Added
+- **Upload Validation & Collision Safety**: Project uploads now accept only supported image and common 3D printing file formats, and stored filenames include a generated identifier so same-named uploads never overwrite each other.
+- **Automated Tests**: Added regression coverage for link preview security/metadata extraction and project upload validation.
+
+### Changed
+- **Version Consistency**: Synchronized the runtime app version and README with the changelog.
+
+### Fixed
+- **SSRF Protection for Link Previews**: Link preview fetching now rejects localhost, loopback, and non-public targets before any request is made, including redirect targets.
+- **Richer Link Preview Metadata**: Preview generation now resolves redirected URLs, supports OpenGraph/Twitter/basic metadata fallbacks, and converts relative image URLs to absolute ones for card rendering.
+- **Inline Project Images**: Project gallery images are now served inline instead of download-only so previews and the lightbox render correctly.
+
 ## [1.27.1] - 2026-03-24
 ### Added
 - **Project Configuration**: Added a comprehensive `.gitignore` file to prevent tracking of temporary files, virtual environments, and local data.

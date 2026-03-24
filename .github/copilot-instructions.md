@@ -129,6 +129,20 @@ When a user asks for modifications to the project, you must follow and automatic
     - **Important**: Define `pct` variable **before** the low-stock check. In server-rendered views, calculate `capacity_all` and `pct` before the outer card/row div. In partials, set them at the top of the loop.
     - I18n keys required: `'out_of_stock'` and `'low_stock'` (both in Czech and English).
 
+14. **External Link Preview Security Rule**
+    - Any server-side URL fetch used for link previews must allow only `http`/`https` URLs and must reject `localhost`, loopback addresses (`127.0.0.0/8`, `::1`), and non-public/private address ranges before making the request.
+    - Redirect targets must be validated with the same rules before they are followed.
+    - Preview extraction should prefer OpenGraph metadata, then Twitter cards, then standard HTML metadata (`<title>`, `<meta name="description">`) and resolve relative image URLs to absolute URLs.
+
+15. **Project Upload Rule**
+    - Project file uploads must be validated against an allowlist of supported image and 3D printing file extensions.
+    - Stored filenames must always include a generated unique identifier so uploading the same filename twice never overwrites an existing file.
+    - Image previews/lightboxes must use an inline-serving route; generic downloads may still use `as_attachment=True`.
+
+16. **Testing Rule**
+    - Security-sensitive helpers (URL validation, metadata fetching, upload validation) require automated regression tests under `tests/`.
+    - Prefer `unittest` with `unittest.mock` for HTTP mocking unless the repository already standardizes on another framework.
+
 ---
 
 ## Post-Implementation Versioning Checklist

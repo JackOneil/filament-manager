@@ -30,10 +30,10 @@ from utils import get_settings
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.26.0'
+APP_VERSION = '1.28.0'
 
 
-def create_app() -> Flask:
+def create_app(test_config=None) -> Flask:
     app = Flask(__name__)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
     app.secret_key = 'filament-manager-secret'
@@ -42,6 +42,11 @@ def create_app() -> Flask:
     os.makedirs(db_dir, exist_ok=True)
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(db_dir, "filament.db")}'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024
+    app.config['PROJECT_UPLOAD_FOLDER'] = os.path.join(db_dir, 'uploads')
+
+    if test_config:
+        app.config.update(test_config)
 
     db.init_app(app)
     register_all(app)
