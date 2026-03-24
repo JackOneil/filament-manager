@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.28.2] - 2026-03-24
+### Fixed
+- **MakerWorld Link Previews**: Added a fragment-safe reader fallback for pages protected by Cloudflare so MakerWorld model links can still generate title, description, and image previews on the project detail page.
+
+## [1.28.1] - 2026-03-24
+### Fixed
+- **Hydrated Link Previews**: Link preview extraction now falls back to JSON-LD and embedded JSON script payloads, improving support for SPA pages such as MakerWorld model detail links that do not expose complete OpenGraph metadata.
+
 ## [1.28.0] - 2026-03-24
 ### Added
 - **Upload Validation & Collision Safety**: Project uploads now accept only supported image and common 3D printing file formats, and stored filenames include a generated identifier so same-named uploads never overwrite each other.

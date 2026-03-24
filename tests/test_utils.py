@@ -54,3 +54,58 @@ class LinkPreviewTests(unittest.TestCase):
         self.assertIsNone(meta['og_title'])
         self.assertIsNone(meta['og_image'])
         self.assertEqual(mock_get.call_count, 1)
+
+    @patch('utils.requests.get')
+    @patch('utils.socket.getaddrinfo')
+    def test_fetch_link_metadata_reads_json_ld_preview_data(self, mock_getaddrinfo, mock_get):
+        mock_getaddrinfo.return_value = [(None, None, None, None, ('93.184.216.34', 443))]
+        mock_get.return_value = Mock(
+            status_code=200,
+            headers={'Content-Type': 'text/html; charset=utf-8'},
+            text=(
+                '<html><head>'
+                '<script type="application/ld+json">'
+                '{"@context":"https://schema.org","name":"MakerWorld Axolotl",'
+                '"description":"Articulated axolotl model",'
+                '"image":["/assets/axolotl-cover.webp"]}'
+                '</script>'
+                '</head><body></body></html>'
+            ),
+        )
+
+        meta = fetch_link_metadata('https://makerworld.com/en/models/989796-articulated-axolotl-multicolor')
+
+        self.assertEqual(meta['og_title'], 'MakerWorld Axolotl')
+        self.assertEqual(meta['og_description'], 'Articulated axolotl model')
+        self.assertEqual(meta['og_image'], 'https://makerworld.com/assets/axolotl-cover.webp')
+
+    @patch('utils.requests.get')
+    @patch('utils.socket.getaddrinfo')
+    def test_fetch_link_metadata_uses_reader_fallback_for_blocked_makerworld(self, mock_getaddrinfo, mock_get):
+        mock_getaddrinfo.return_value = [(None, None, None, None, ('93.184.216.34', 443))]
+        mock_get.side_effect = [
+            Mock(
+                status_code=403,
+                headers={'Content-Type': 'text/html; charset=utf-8'},
+                text='<title>Just a moment...</title>',
+            ),
+            Mock(
+                status_code=200,
+                headers={'Content-Type': 'text/plain; charset=utf-8'},
+                text=(
+                    'Title: Articulated Axolotl (Multicolor) - Free 3D Print Model - MakerWorld\n\n'
+                    'URL Source: https://makerworld.com/en/models/989796-articulated-axolotl-multicolor\n\n'
+                    'Markdown Content:\n'
+                    '![Image 1](https://makerworld.bblmw.com/makerworld/model/sample/design/cover.png)\n\n'
+                    'Articulated axolotl multicolor by Molodos'
+                ),
+            ),
+        ]
+
+        meta = fetch_link_metadata('https://makerworld.com/en/models/989796-articulated-axolotl-multicolor#profileId-1871919')
+
+        self.assertEqual(meta['og_title'], 'Articulated Axolotl (Multicolor) - Free 3D Print Model - MakerWorld')
+        self.assertEqual(meta['og_image'], 'https://makerworld.bblmw.com/makerworld/model/sample/design/cover.png')
+        self.assertEqual(meta['og_description'], 'Articulated axolotl multicolor by Molodos')
+        reader_call_url = mock_get.call_args_list[1].args[0]
+        self.assertNotIn('#profileId-1871919', reader_call_url)
