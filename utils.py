@@ -140,7 +140,9 @@ def _extract_meta_content(soup, key, attr='property'):
 def _pick_preview_image(soup, base_url):
     candidates = [
         _extract_meta_content(soup, 'og:image'),
+        _extract_meta_content(soup, 'og:image', attr='name'),   # Printables & sites using name= instead of property=
         _extract_meta_content(soup, 'og:image:url'),
+        _extract_meta_content(soup, 'og:image:url', attr='name'),
         _extract_meta_content(soup, 'twitter:image', attr='name'),
         _extract_meta_content(soup, 'twitter:image:src', attr='name'),
     ]

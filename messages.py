@@ -215,6 +215,8 @@ TRANSLATIONS = {
         'actual_cost_no_data': 'Žádné odečtené tiskové úlohy Bambu',
         'energy_cost_label': 'Cena energie',
         'filament_cost_label': 'Cena filamentu',
+        'total': 'Celkem',
+        'refresh_preview': 'Obnovit náhled',
     },
     'en': {
         'title': 'Filament Manager',
@@ -432,5 +434,7 @@ TRANSLATIONS = {
         'actual_cost_no_data': 'No deducted Bambu print jobs',
         'energy_cost_label': 'Energy cost',
         'filament_cost_label': 'Filament cost',
+        'total': 'Total',
+        'refresh_preview': 'Refresh preview',
     }
 }

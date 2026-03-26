@@ -243,6 +243,19 @@ def register(app):
             db.session.commit()
         return redirect(url_for('project_detail', id=id))
 
+    @app.route('/projects/<int:id>/refresh_link/<int:link_id>', methods=['POST'])
+    def project_refresh_link(id, link_id):
+        from utils import fetch_link_metadata, is_safe_external_url
+        link = db.get_or_404(ProjectLink, link_id)
+        if link.project_id == id and is_safe_external_url(link.url):
+            meta = fetch_link_metadata(link.url)
+            link.og_title = meta['og_title']
+            link.og_image = meta['og_image']
+            link.og_description = meta['og_description']
+            link.domain = meta['domain']
+            db.session.commit()
+        return redirect(url_for('project_detail', id=id))
+
     @app.route('/projects/<int:id>/add_filament', methods=['POST'])
     def project_add_filament(id):
         project = db.get_or_404(Project, id)

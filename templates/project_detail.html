@@ -236,36 +236,106 @@
                 <p class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">
                     <i class="fa-solid fa-print mr-1"></i> {{ t('bambu_jobs_title') }}
                 </p>
-                <ul class="space-y-1.5">
+                {# ── pre-calculate totals across all jobs ── #}
+                {% set tot = namespace(mat=0.0, elec=0.0, time=0, has_any=false) %}
+                {% set kwh_g = setting.kwh_price if setting else 5.0 %}
+                {% set pw_g  = setting.printer_power if setting else 150 %}
+                {% for bj in project.bambu_jobs %}
+                    {% set tot.time = tot.time + (bj.cost_time or 0) %}
+                    {% set tot.elec = tot.elec + (bj.cost_time or 0) / 3600.0 * (pw_g / 1000.0) * kwh_g %}
+                    {% set tot_slot_ns = namespace(found=false) %}
+                    {% if bj.materials %}
+                        {% for slot in bj.materials %}
+                            {% if slot.filament and slot.filament.weight_total > 0 and slot.weight_grams %}
+                                {% set tot.mat = tot.mat + (slot.filament.price / slot.filament.weight_total) * slot.weight_grams %}
+                                {% set tot.has_any = true %}
+                                {% set tot_slot_ns.found = true %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                    {% if not tot_slot_ns.found and bj.filament and bj.filament.weight_total > 0 and bj.weight_grams %}
+                        {% set tot.mat = tot.mat + (bj.filament.price / bj.filament.weight_total) * bj.weight_grams %}
+                        {% set tot.has_any = true %}
+                    {% endif %}
+                {% endfor %}
+                {% set tot_h = (tot.time // 3600) | int %}
+                {% set tot_m = ((tot.time % 3600) // 60) | int %}
+                <ul class="space-y-2">
                     {% for bj in project.bambu_jobs %}
-                    <li class="flex items-center gap-3 text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-2">
-                        {% if bj.status == 'FINISH' %}
-                        <i class="fa-solid fa-check-circle text-green-500 flex-shrink-0"></i>
-                        {% elif bj.status == 'FAILED' %}
-                        <i class="fa-solid fa-times-circle text-red-500 flex-shrink-0"></i>
-                        {% else %}
-                        <i class="fa-solid fa-circle-dot text-blue-400 flex-shrink-0"></i>
-                        {% endif %}
-                        {% if bj.filament %}
-                        <div class="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0" style="background-color: {{ bj.filament.color.hex_value or '#ccc' }};"></div>
-                        <span class="font-medium flex-1 truncate">
-                            {{ bj.model_name or bj.external_id }}
-                            <span class="text-gray-400 font-normal">— {{ bj.filament.name }}</span>
-                        </span>
-                        {% else %}
-                        <span class="font-medium flex-1 truncate">{{ bj.model_name or bj.external_id }}</span>
-                        {% endif %}
-                        {% if bj.weight_grams %}
-                        <span class="text-xs text-gray-500 flex-shrink-0">{{ '%.1f'|format(bj.weight_grams) }} g</span>
-                        {% endif %}
-                        {% if bj.deducted %}
-                        <span class="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full flex-shrink-0">
-                            <i class="fa-solid fa-check-double"></i> {{ t('bambu_deducted') }}
-                        </span>
-                        {% endif %}
+                    {# ── per-job cost calculation ── #}
+                    {% set kwh = setting.kwh_price if setting else 5.0 %}
+                    {% set pw  = setting.printer_power if setting else 150 %}
+                    {% set elec_cost = (bj.cost_time or 0) / 3600.0 * (pw / 1000.0) * kwh %}
+                    {# material cost: sum per-slot if multi-material, fallback to job filament #}
+                    {% set bj_ns = namespace(mat_cost=0.0, has_cost=false) %}
+                    {% if bj.materials %}
+                        {% for slot in bj.materials %}
+                            {% if slot.filament and slot.filament.weight_total > 0 and slot.weight_grams %}
+                                {% set bj_ns.mat_cost = bj_ns.mat_cost + (slot.filament.price / slot.filament.weight_total) * slot.weight_grams %}
+                                {% set bj_ns.has_cost = true %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                    {% if not bj_ns.has_cost and bj.filament and bj.filament.weight_total > 0 and bj.weight_grams %}
+                        {% set bj_ns.mat_cost = (bj.filament.price / bj.filament.weight_total) * bj.weight_grams %}
+                        {% set bj_ns.has_cost = true %}
+                    {% endif %}
+                    {% set job_total = bj_ns.mat_cost + elec_cost %}
+                    {# ── duration ── #}
+                    {% set dur_h = ((bj.cost_time or 0) // 3600) | int %}
+                    {% set dur_m = (((bj.cost_time or 0) % 3600) // 60) | int %}
+                    <li class="flex flex-col gap-1 text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-2">
+                        <div class="flex items-center gap-3">
+                            {% if bj.status == 'FINISH' %}
+                            <i class="fa-solid fa-check-circle text-green-500 flex-shrink-0"></i>
+                            {% elif bj.status == 'FAILED' %}
+                            <i class="fa-solid fa-times-circle text-red-500 flex-shrink-0"></i>
+                            {% else %}
+                            <i class="fa-solid fa-circle-dot text-blue-400 flex-shrink-0"></i>
+                            {% endif %}
+                            {% if bj.filament %}
+                            <div class="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0" style="background-color: {{ bj.filament.color.hex_value or '#ccc' }};"></div>
+                            {% endif %}
+                            <span class="font-medium flex-1 truncate">
+                                {{ bj.model_name or bj.external_id }}
+                                {% if bj.filament %}<span class="text-gray-400 font-normal"> — {{ bj.filament.name }}</span>{% endif %}
+                            </span>
+                            {% if bj.deducted %}
+                            <span class="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full flex-shrink-0">
+                                <i class="fa-solid fa-check-double"></i> {{ t('bambu_deducted') }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 pl-7 text-xs text-gray-500">
+                            {% if bj.weight_grams %}
+                            <span><i class="fa-solid fa-weight-hanging mr-1 text-gray-400"></i>{{ '%.1f'|format(bj.weight_grams) }} g</span>
+                            {% endif %}
+                            {% if bj.cost_time %}
+                            <span><i class="fa-solid fa-clock mr-1 text-gray-400"></i>{% if dur_h %}{{ dur_h }}h {% endif %}{{ dur_m }}min</span>
+                            {% endif %}
+                            {% if bj_ns.has_cost or elec_cost > 0 %}
+                            <span class="font-semibold text-indigo-600">
+                                <i class="fa-solid fa-coins mr-1"></i>~{{ '%.2f'|format(job_total) }} {{ current_currency }}
+                                <span class="font-normal text-gray-400">({{ t('filament_cost_label') }}: {{ '%.2f'|format(bj_ns.mat_cost) }} + {{ t('energy_cost_label') }}: {{ '%.2f'|format(elec_cost) }})</span>
+                            </span>
+                            {% endif %}
+                        </div>
                     </li>
                     {% endfor %}
                 </ul>
+                {# ── totals bar ── #}
+                <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-sm">
+                    <span class="font-bold text-indigo-800"><i class="fa-solid fa-sigma mr-1"></i> {{ t('total') }}</span>
+                    {% if tot.time %}
+                    <span class="text-gray-600"><i class="fa-solid fa-clock mr-1 text-gray-400"></i>{% if tot_h %}{{ tot_h }}h {% endif %}{{ tot_m }}min</span>
+                    {% endif %}
+                    {% if tot.has_any or tot.elec > 0 %}
+                    <span class="font-bold text-indigo-700">
+                        <i class="fa-solid fa-coins mr-1"></i>~{{ '%.2f'|format(tot.mat + tot.elec) }} {{ current_currency }}
+                    </span>
+                    <span class="text-xs text-gray-500">({{ t('filament_cost_label') }}: {{ '%.2f'|format(tot.mat) }} + {{ t('energy_cost_label') }}: {{ '%.2f'|format(tot.elec) }})</span>
+                    {% endif %}
+                </div>
             </div>
             {% endif %}
         </div>
@@ -333,9 +403,11 @@
                                     {% if l.name %} &bull; {{ l.name }}{% endif %}
                                 </div>
                             </div>
-                            <form method="POST" action="{{ url_for('project_delete_link', id=project.id, link_id=l.id) }}" class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition">
+                            <form method="POST" action="{{ url_for('project_delete_link', id=project.id, link_id=l.id) }}" class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex gap-1">
+                                <button type="submit" form="refresh-{{ l.id }}" class="bg-white p-1.5 rounded-full text-blue-500 hover:text-blue-700 hover:bg-blue-50 shadow border border-gray-200 transition" title="{{ t('refresh_preview') }}"><i class="fa-solid fa-arrows-rotate text-sm"></i></button>
                                 <button type="submit" class="bg-white p-1.5 rounded-full text-red-500 hover:text-red-700 hover:bg-red-50 shadow border border-gray-200 transition"><i class="fa-solid fa-trash text-sm"></i></button>
                             </form>
+                            <form id="refresh-{{ l.id }}" method="POST" action="{{ url_for('project_refresh_link', id=project.id, link_id=l.id) }}"></form>
                         </li>
                         {% else %}
                         <li class="flex justify-between items-center bg-gray-50 p-2 border border-gray-200 rounded-lg group hover:shadow-sm transition">
@@ -343,10 +415,14 @@
                                 <div class="font-medium"><i class="fa-solid fa-link mr-1"></i> {{ l.name or l.url }}</div>
                                 {% if l.name and l.url != l.name %}<div class="text-xs text-gray-400 truncate mt-0.5">{{ l.url }}</div>{% endif %}
                             </a>
-                            <form method="POST" action="{{ url_for('project_delete_link', id=project.id, link_id=l.id) }}" class="opacity-0 group-hover:opacity-100 transition">
-                                <button type="submit" class="text-red-500 hover:text-red-700 p-2"><i class="fa-solid fa-trash"></i></button>
-                            </form>
-                        </li>
+                            <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                                <form method="POST" action="{{ url_for('project_refresh_link', id=project.id, link_id=l.id) }}">
+                                    <button type="submit" class="text-blue-500 hover:text-blue-700 p-2" title="{{ t('refresh_preview') }}"><i class="fa-solid fa-arrows-rotate"></i></button>
+                                </form>
+                                <form method="POST" action="{{ url_for('project_delete_link', id=project.id, link_id=l.id) }}">
+                                    <button type="submit" class="text-red-500 hover:text-red-700 p-2"><i class="fa-solid fa-trash"></i></button>
+                                </form>
+                            </div>
                         {% endif %}
                     {% else %}
                     <li class="text-gray-500 text-sm italic">{{ t('project_no_links') }}</li>
