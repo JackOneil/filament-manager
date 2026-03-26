@@ -17,13 +17,8 @@ def register(app):
             filament_id = request.form.get('filament_id')
             weight = float(request.form.get('weight', 0))
             print_time = float(request.form.get('print_time', 0))
-            kwh_price = float(request.form.get('kwh_price', 0))
-            printer_power = int(request.form.get('printer_power', 0))
-
-            if setting:
-                setting.kwh_price = kwh_price
-                setting.printer_power = printer_power
-                db.session.commit()
+            kwh_price = setting.kwh_price if setting else 5.0
+            printer_power = setting.printer_power if setting else 150
 
             if filament_id and weight > 0:
                 filament = db.session.get(Filament, filament_id)

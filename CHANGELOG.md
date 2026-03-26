@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.30.0] - 2026-03-27
+### Added
+- **Printer & Energy Settings section**: `kwh_price` (CZK/kWh) and `printer_power` (W) moved from the Calculator page to a dedicated *Printer & Energy Settings* section in `/settings#printer-energy`. Values are saved via new `printer_energy_settings` action and read by the Calculator automatically.
+- **Calculator simplified**: Removed `kwh_price` and `printer_power` input fields from the Calculator form. An info bar now shows the current values with a direct link to Settings.
+- **Actual print cost in project detail**: Project detail now shows an *Actual Cost* badge (blue) next to the Estimated Cost badge. The actual cost is computed from all deducted Bambu print jobs: `(filament_price / weight_total × weight_grams) + (printer_power_kW × duration_hours × kwh_price)`.
+- **Filament + color in Bambu jobs list**: Each Bambu print job in the project detail now shows a colored swatch and filament name next to the model name, making it clear which filament was consumed.
+
+## [1.29.1] - 2026-03-26
+### Fixed
+- **Bambu status mapping**: Corrected `_STATUS_MAP` — Bambu Cloud API uses `status=2` for successfully finished prints (not "Paused"). `4=PAUSED`, `6=SLICING` added. Existing stored jobs with incorrect `PAUSED` status (raw=2) auto-corrected in DB.
+- **Printer name missing**: Sync now reads `deviceName`/`deviceModel` (real Bambu Cloud API field names) instead of the non-existent `printerName`/`printerModel`. Backfills missing names from `raw_payload` on re-sync.
+- **Bogus printer entries**: Fixed deduplication — `instanceId` (often `0` or a small integer) is no longer used as a device identifier. `deviceId` (the real hardware serial) is the primary key. Database cleaned of 25 incorrect auto-registered "printers".
+- **Print duration**: `costTime` (seconds) is now stored in a new `cost_time` column on `BambuPrintJob` and displayed in human-readable format (e.g. `45min`, `1h 23min`) in the job list.
+- **Interactive filament/project search**: Replaced plain `<select>` dropdowns in the Bambu job mapping panel with Alpine.js fulltext-search dropdowns, consistent with the inventory page filter pattern.
+- **Per-slot AMS search dropdown**: The per-AMS-slot deduction form also uses a live-search filament picker.
+- **Status label for SLICING/PREPARE**: Added `bambu_status_slicing` i18n key (CS: "Zpracování", EN: "Slicing").
+- **Re-sync backfill**: `do_sync()` now also updates `printer_name` and `cost_time` on already-existing jobs when those fields were missing.
+
+## [1.29.0] - 2026-03-25
+### Added
+- **Bambu Lab Cloud Integration**: New integration layer for syncing real print jobs from Bambu Lab Cloud (global and China regions), completely separate from existing project and inventory routes.
+- **BambuPrintJob model**: Stores external job ID, printer name/model, model name, status, start/finish timestamps, consumed grams, project link (nullable), filament mapping, deduction flag, and raw API payload.
+- **BambuJobMaterial model**: Per-AMS-slot material consumption with AMS ID, tray ID, color hex, material name, weight, filament mapping, and deduction flag.
+- **BambuPrinter model**: Auto-discovered printers from sync, with device ID, friendly name, model, and notes.
+- **Idempotent sync**: `/bambu/sync` (POST, AJAX) checks `external_id` uniqueness before inserting — same job is never stored twice; changed status is updated instead.
+- **Manual sync button** on `/bambu` page with live AJAX feedback (added / updated / skipped counts).
+- **Bambu jobs page** (`/bambu`): Paginated list of print jobs with status badges, per-job filament/project mapping panel, per-AMS-slot deduction forms.
+- **Bambu Cloud settings section** in `/settings#bambu-cloud`: Token input, region selector (Global/China), connection status badge, detected printers list, disconnect button.
+- **Post-print deduction**: Mapping a filament and clicking "Deduct from stock" reduces `weight_remaining`, creates a `MovementHistory` entry (action `bambu_print`), and creates a `PrintHistory` record.
+- **Per-slot deduction**: Individual AMS slots can be mapped to different inventory filaments and deducted independently.
+- **Auto-deduplication**: `deducted` flag on both `BambuPrintJob` and `BambuJobMaterial` prevents double-deduction.
+- **Auto-register printers**: Printers encountered during sync are automatically added to `BambuPrinter`.
+- **Navigation link**: "Bambu Lab Jobs" added to the top navigation bar.
+- **ALTER TABLE migrations**: Safe fallback `ALTER TABLE` statements for `app_setting.bambu_token` and `app_setting.bambu_region`.
+- **i18n**: All Bambu UI strings translated in both Czech (`cs`) and English (`en`).
+- **Tests**: `tests/test_bambu.py` covers `_parse_ts`, `_resolve_status`, `do_sync` idempotency, status updates, per-material slot storage, weight derivation from AMS, printer auto-registration, API error handling, filament deduction route, double-deduction prevention, `PrintHistory`/`MovementHistory` creation, and the sync HTTP endpoint.
+
 ## [1.28.2] - 2026-03-24
 ### Fixed
 - **MakerWorld Link Previews**: Added a fragment-safe reader fallback for pages protected by Cloudflare so MakerWorld model links can still generate title, description, and image previews on the project detail page.

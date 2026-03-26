@@ -24,13 +24,13 @@ from database import db
 from models import (
     Brand, Color, Material, AppSetting, Filament, 
     MovementHistory, PrintHistory, Project, ProjectFile, 
-    ProjectLink, ProjectFilament
+    ProjectLink, ProjectFilament, BambuPrinter, BambuPrintJob, BambuJobMaterial
 )  # noqa: F401
 from utils import get_settings
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.28.2'
+APP_VERSION = '1.30.0'
 
 
 def create_app(test_config=None) -> Flask:
@@ -98,6 +98,11 @@ def _setup_database(app: Flask) -> None:
         _safe_alter(app, "ALTER TABLE project_link ADD COLUMN og_title VARCHAR(255) DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE project_link ADD COLUMN og_image VARCHAR(500) DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE project_link ADD COLUMN og_description TEXT DEFAULT NULL")
+
+        # Bambu Lab Cloud integration
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN bambu_token TEXT DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN bambu_region VARCHAR(10) NOT NULL DEFAULT 'global'")
+        _safe_alter(app, "ALTER TABLE bambu_print_job ADD COLUMN cost_time INTEGER DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE project_link ADD COLUMN domain VARCHAR(100) DEFAULT NULL")
 
         if not AppSetting.query.first():

@@ -55,6 +55,9 @@ class AppSetting(db.Model):
     theme = db.Column(db.String(10), default='light')
     view_mode = db.Column(db.String(10), default='card')
     items_per_page = db.Column(db.Integer, default=12)
+    # Bambu Lab Cloud integration
+    bambu_token = db.Column(db.Text, nullable=True)
+    bambu_region = db.Column(db.String(10), default='global')
 
 
 class PrintHistory(db.Model):
@@ -104,4 +107,53 @@ class ProjectFilament(db.Model):
     estimated_weight = db.Column(db.Float, nullable=False, default=0.0)
     is_used = db.Column(db.Boolean, default=False)
     project = db.relationship('Project', backref=db.backref('filaments', lazy=True, cascade="all, delete-orphan"))
+    filament = db.relationship('Filament')
+
+
+class BambuPrinter(db.Model):
+    """Known Bambu Lab printers, auto-discovered from sync or manually added."""
+    id = db.Column(db.Integer, primary_key=True)
+    device_id = db.Column(db.String(100), nullable=True)
+    name = db.Column(db.String(200), nullable=False)
+    printer_model = db.Column(db.String(50), nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class BambuPrintJob(db.Model):
+    """Real print job fetched from Bambu Lab Cloud."""
+    id = db.Column(db.Integer, primary_key=True)
+    external_id = db.Column(db.String(100), unique=True, nullable=False)
+    printer_name = db.Column(db.String(200), nullable=True)
+    printer_model = db.Column(db.String(100), nullable=True)
+    device_id = db.Column(db.String(100), nullable=True)
+    model_name = db.Column(db.String(300), nullable=True)
+    status = db.Column(db.String(50), nullable=True)
+    started_at = db.Column(db.DateTime, nullable=True)
+    finished_at = db.Column(db.DateTime, nullable=True)
+    weight_grams = db.Column(db.Float, nullable=True)
+    cost_time = db.Column(db.Integer, nullable=True)   # print duration in seconds
+    raw_payload = db.Column(db.Text, nullable=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
+    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id'), nullable=True)
+    deducted = db.Column(db.Boolean, default=False)
+    synced_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    project = db.relationship('Project', backref=db.backref('bambu_jobs', lazy=True))
+    filament = db.relationship('Filament', backref=db.backref('bambu_jobs', lazy=True))
+
+
+class BambuJobMaterial(db.Model):
+    """Per-AMS-slot material consumption for a Bambu print job."""
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.Integer, db.ForeignKey('bambu_print_job.id', ondelete='CASCADE'), nullable=False)
+    ams_id = db.Column(db.Integer, nullable=True)
+    tray_id = db.Column(db.Integer, nullable=True)
+    color_hex = db.Column(db.String(10), nullable=True)
+    material_name = db.Column(db.String(100), nullable=True)
+    weight_grams = db.Column(db.Float, nullable=True)
+    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id'), nullable=True)
+    deducted = db.Column(db.Boolean, default=False)
+
+    job = db.relationship('BambuPrintJob', backref=db.backref('materials', lazy=True, cascade='all, delete-orphan'))
     filament = db.relationship('Filament')

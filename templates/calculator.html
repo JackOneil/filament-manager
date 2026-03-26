@@ -32,7 +32,7 @@
                 </div>
             </div>
             
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8 items-end">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5 items-end">
                 <div>
                     <label class="block text-gray-700 text-sm font-bold mb-2">{{ t('print_weight') }}</label>
                     <div class="relative">
@@ -52,18 +52,18 @@
                         </div>
                     </div>
                 </div>
-                
-                <div>
-                    <label class="block text-gray-700 text-sm font-bold mb-2">{{ t('kwh_price') }}</label>
-                    <div class="relative">
-                        <input type="number" name="kwh_price" step="0.1" min="0" value="{{ setting.kwh_price if setting else 5.0 }}" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-yellow-500" required>
-                    </div>
-                </div>
             </div>
 
-            <div class="mb-8">
-                <label class="block text-gray-700 text-sm font-bold mb-2">{{ t('printer_power') }}</label>
-                <input type="number" name="printer_power" step="1" min="0" value="{{ setting.printer_power if setting else 150 }}" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-500" required>
+            <div class="mb-8 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center gap-2 text-sm text-yellow-800">
+                <i class="fa-solid fa-bolt text-yellow-500"></i>
+                <span>
+                    <span class="font-semibold">{{ t('kwh_price') }}:</span> {{ setting.kwh_price if setting else 5.0 }}
+                    &nbsp;|&nbsp;
+                    <span class="font-semibold">{{ t('printer_power') }}:</span> {{ setting.printer_power if setting else 150 }} W
+                </span>
+                <a href="{{ url_for('settings') }}#printer-energy" class="sm:ml-auto text-yellow-700 hover:text-yellow-900 underline whitespace-nowrap">
+                    <i class="fa-solid fa-gear"></i> {{ t('settings') }}
+                </a>
             </div>
 
             <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg text-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2">

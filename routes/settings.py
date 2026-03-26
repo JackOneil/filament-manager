@@ -3,7 +3,7 @@ import json
 import logging
 from flask import render_template, request, redirect, url_for, jsonify
 from database import db
-from models import Brand, Color, Material, AppSetting, Filament
+from models import Brand, Color, Material, AppSetting, Filament, BambuPrinter
 
 
 def register(app):
@@ -91,6 +91,31 @@ def register(app):
                         db.session.delete(col)
                         app.logger.debug(f"Color deleted: {col.name}")
 
+                elif action == 'bambu_cloud_settings':
+                    setting = AppSetting.query.first()
+                    token = request.form.get('bambu_token', '').strip()
+                    region = request.form.get('bambu_region', 'global')
+                    if region not in ('global', 'china'):
+                        region = 'global'
+                    if token:
+                        setting.bambu_token = token
+                    setting.bambu_region = region
+                    app.logger.debug('Bambu Cloud settings updated.')
+
+                elif action == 'bambu_cloud_disconnect':
+                    setting = AppSetting.query.first()
+                    setting.bambu_token = None
+                    app.logger.debug('Bambu Cloud token cleared.')
+
+                elif action == 'printer_energy_settings':
+                    setting = AppSetting.query.first()
+                    try:
+                        setting.kwh_price = float(request.form.get('kwh_price', setting.kwh_price))
+                        setting.printer_power = int(request.form.get('printer_power', setting.printer_power))
+                    except (ValueError, TypeError):
+                        pass
+                    app.logger.debug(f"Printer/energy settings updated: kwh={setting.kwh_price}, power={setting.printer_power}W")
+
                 db.session.commit()
             except Exception as e:
                 db.session.rollback()
@@ -101,9 +126,11 @@ def register(app):
         colors = Color.query.order_by(Color.name).all()
         materials = Material.query.order_by(Material.name).all()
         app_settings = AppSetting.query.first()
+        printers = BambuPrinter.query.order_by(BambuPrinter.name).all()
         return render_template(
             'settings.html',
-            brands=brands, colors=colors, materials=materials, app_settings=app_settings,
+            brands=brands, colors=colors, materials=materials,
+            app_settings=app_settings, printers=printers,
         )
 
     @app.route('/export')

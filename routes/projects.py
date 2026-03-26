@@ -91,8 +91,9 @@ def register(app):
             .joinedload(Filament.color),
         ).filter(Project.id == id).first_or_404()
         filaments = Filament.query.order_by(Filament.name.asc()).all()
-        
-        return render_template('project_detail.html', project=project, all_filaments=filaments)
+        from models import AppSetting
+        setting = AppSetting.query.first()
+        return render_template('project_detail.html', project=project, all_filaments=filaments, setting=setting)
 
     @app.route('/projects/<int:id>/edit', methods=['GET', 'POST'])
     def project_edit(id):

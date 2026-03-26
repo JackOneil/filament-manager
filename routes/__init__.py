@@ -9,6 +9,7 @@ from routes.calculator import register as register_calculator
 from routes.history import register as register_history
 from routes.settings import register as register_settings
 from routes.projects import register as register_projects
+from routes.bambu import register as register_bambu
 
 
 def register_all(app):
@@ -18,3 +19,4 @@ def register_all(app):
     register_history(app)
     register_settings(app)
     register_projects(app)
+    register_bambu(app)
