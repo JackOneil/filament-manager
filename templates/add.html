@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="max-w-2xl mx-auto">
+<div class="max-w-2xl mx-auto" x-data="addFilamentForm()">
     <h1 class="text-3xl font-bold mb-6 text-gray-800">{{ t('add_new_title') }}</h1>
     
     <form method="POST" class="bg-white rounded-xl shadow-md p-6 lg:p-8">
@@ -11,30 +11,82 @@
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5">
-            <div>
+
+            {# ── Brand dropdown ── #}
+            <div class="relative" @click.outside="brandOpen = false">
                 <label class="block text-gray-700 text-sm font-semibold mb-2">{{ t('brand') }}</label>
-                <select name="brand_id" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" required>
-                    {% for b in brands %}
-                    <option value="{{ b.id }}">{{ b.name }}</option>
-                    {% endfor %}
-                </select>
+                <input type="hidden" name="brand_id" :value="brandId">
+                <input type="text"
+                    x-model="brandQ"
+                    @focus="brandOpen = true"
+                    @input="brandOpen = true"
+                    placeholder="{{ t('brand') }}"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white">
+                <div x-show="brandOpen" x-cloak
+                    class="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                    <template x-for="b in filteredBrands" :key="b.id">
+                        <button type="button"
+                            @click="selectBrand(b)"
+                            class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0 font-medium text-gray-800"
+                            x-text="b.name"></button>
+                    </template>
+                    <div x-show="filteredBrands.length === 0" class="px-3 py-2 text-xs text-gray-400 italic">—</div>
+                </div>
             </div>
-            <div>
+
+            {# ── Material dropdown ── #}
+            <div class="relative" @click.outside="matOpen = false">
                 <label class="block text-gray-700 text-sm font-semibold mb-2">{{ t('material') }}</label>
-                <select name="material_id" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" required>
-                    {% for m in materials %}
-                    <option value="{{ m.id }}">{{ m.name }}</option>
-                    {% endfor %}
-                </select>
+                <input type="hidden" name="material_id" :value="matId">
+                <input type="text"
+                    x-model="matQ"
+                    @focus="matOpen = true"
+                    @input="matOpen = true"
+                    placeholder="{{ t('material') }}"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white">
+                <div x-show="matOpen" x-cloak
+                    class="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                    <template x-for="m in filteredMats" :key="m.id">
+                        <button type="button"
+                            @click="selectMat(m)"
+                            class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0 font-medium text-gray-800"
+                            x-text="m.name"></button>
+                    </template>
+                    <div x-show="filteredMats.length === 0" class="px-3 py-2 text-xs text-gray-400 italic">—</div>
+                </div>
             </div>
-            <div>
+
+            {# ── Color dropdown with swatches ── #}
+            <div class="relative" @click.outside="colorOpen = false">
                 <label class="block text-gray-700 text-sm font-semibold mb-2">{{ t('color') }}</label>
-                <select name="color_id" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" required>
-                    {% for c in colors %}
-                    <option value="{{ c.id }}">{{ c.name }}</option>
-                    {% endfor %}
-                </select>
+                <input type="hidden" name="color_id" :value="colorId">
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                        <div class="w-4 h-4 rounded-full border border-gray-300 transition-all"
+                             :style="colorHex ? 'background-color:' + colorHex : 'background-color:#e5e7eb'"></div>
+                    </div>
+                    <input type="text"
+                        x-model="colorQ"
+                        @focus="colorOpen = true"
+                        @input="colorOpen = true"
+                        placeholder="{{ t('color') }}"
+                        class="w-full border border-gray-300 rounded-lg pl-9 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white">
+                </div>
+                <div x-show="colorOpen" x-cloak
+                    class="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                    <template x-for="c in filteredColors" :key="c.id">
+                        <button type="button"
+                            @click="selectColor(c)"
+                            class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0 flex items-center gap-2">
+                            <span class="w-4 h-4 rounded-full border border-gray-200 flex-shrink-0"
+                                  :style="'background-color:' + c.hex"></span>
+                            <span class="font-medium text-gray-800" x-text="c.name"></span>
+                        </button>
+                    </template>
+                    <div x-show="filteredColors.length === 0" class="px-3 py-2 text-xs text-gray-400 italic">—</div>
+                </div>
             </div>
+
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
@@ -63,4 +115,38 @@
         </div>
     </form>
 </div>
+
+<script>
+const _ADD_BRANDS   = [{% for b in brands %}{"id":{{ b.id }},"name":{{ b.name|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];
+const _ADD_MATS     = [{% for m in materials %}{"id":{{ m.id }},"name":{{ m.name|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];
+const _ADD_COLORS   = [{% for c in colors %}{"id":{{ c.id }},"name":{{ c.name|tojson }},"hex":{{ c.hex_value|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];
+
+function addFilamentForm() {
+    return {
+        // Brand
+        brandQ: '', brandOpen: false, brandId: '',
+        get filteredBrands() {
+            const q = this.brandQ.toLowerCase();
+            return q ? _ADD_BRANDS.filter(b => b.name.toLowerCase().includes(q)) : _ADD_BRANDS;
+        },
+        selectBrand(b) { this.brandId = b.id; this.brandQ = b.name; this.brandOpen = false; },
+
+        // Material
+        matQ: '', matOpen: false, matId: '',
+        get filteredMats() {
+            const q = this.matQ.toLowerCase();
+            return q ? _ADD_MATS.filter(m => m.name.toLowerCase().includes(q)) : _ADD_MATS;
+        },
+        selectMat(m) { this.matId = m.id; this.matQ = m.name; this.matOpen = false; },
+
+        // Color
+        colorQ: '', colorOpen: false, colorId: '', colorHex: '',
+        get filteredColors() {
+            const q = this.colorQ.toLowerCase();
+            return q ? _ADD_COLORS.filter(c => c.name.toLowerCase().includes(q)) : _ADD_COLORS;
+        },
+        selectColor(c) { this.colorId = c.id; this.colorQ = c.name; this.colorHex = c.hex; this.colorOpen = false; },
+    };
+}
+</script>
 {% endblock %}

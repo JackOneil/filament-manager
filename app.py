@@ -30,7 +30,7 @@ from utils import get_settings
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.30.0'
+APP_VERSION = '1.31.1'
 
 
 def create_app(test_config=None) -> Flask:

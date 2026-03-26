@@ -14,7 +14,9 @@ The project uses a modular Flask app factory pattern — **no Flask Blueprints**
 ```
 app.py               # Thin orchestrator: create_app(), _setup_database(), _safe_alter()
 database.py          # Shared db = SQLAlchemy() instance
-models.py            # All 6 ORM models: Brand, Color, Material, Filament, MovementHistory, AppSetting, PrintHistory
+models.py            # All ORM models: Brand, Color, Material, Filament, MovementHistory,
+                     #   AppSetting, PrintHistory, Project, ProjectFile, ProjectLink,
+                     #   ProjectFilament, BambuPrinter, BambuPrintJob, BambuJobMaterial
 messages.py          # i18n translations (cs + en dictionaries)
 utils.py             # Shared helpers: get_settings(), get_current_lang(), get_current_currency(), get_current_theme(), log_movement()
 routes/
@@ -23,7 +25,15 @@ routes/
   api.py             # /api/filaments-list (AJAX endpoint for filtering/sorting)
   calculator.py      # /calculator, /calculator/history/<id>/delete
   history.py         # /history
-  settings.py        # /settings, /export, /import, /toggle-theme
+  projects.py        # /projects, /projects/create, /projects/<id>, /projects/<id>/edit,
+                     #   /projects/<id>/delete, /projects/<id>/add_filament,
+                     #   /projects/<id>/update_filament/<pf_id>, /projects/<id>/remove_filament/<pf_id>,
+                     #   /projects/<id>/upload, /projects/<id>/delete_file/<fid>,
+                     #   /projects/<id>/add_link, /projects/<id>/delete_link/<lid>,
+                     #   /projects/<id>/serve_file/<fid>, /projects/<id>/link_preview
+  bambu.py           # /bambu, /bambu/sync, /bambu/job/<id>/assign, /bambu/job/<id>/deduct,
+                     #   Bambu Cloud API integration (BambuPrinter, BambuPrintJob, BambuJobMaterial)
+  settings.py        # /settings, /export, /import, /toggle-theme, /edit_bambu_printer
 templates/
   base.html          # Layout with Alpine.js + TailwindCSS CDN
   index.html         # Inventory page (Alpine.js x-data="inventoryApp()")
@@ -44,6 +54,7 @@ When a user asks for modifications to the project, you must follow and automatic
      _safe_alter("ALTER TABLE tablename ADD COLUMN column_name type")
      ```
      This prevents crashes on existing databases without needing Alembic.
+   - **Whenever a feature adds, removes, or restructures any table or column, also update the backup schema** (see rule 17). The export and import functions in `routes/settings.py` must reflect the new or changed data so that backups remain complete.
 
 3. **Route / Modularization Rule**
    - **Never use Flask Blueprints.** Blueprints require `url_for("blueprint.route_name")` prefixes in all templates and have caused breakage in this project.
@@ -143,6 +154,23 @@ When a user asks for modifications to the project, you must follow and automatic
     - Security-sensitive helpers (URL validation, metadata fetching, upload validation) require automated regression tests under `tests/`.
     - Prefer `unittest` with `unittest.mock` for HTTP mocking unless the repository already standardizes on another framework.
 
+17. **Backup Schema Rule (Full-Application Export/Import)**
+    - The export (`/export`) and import (`/import`) functions in `routes/settings.py` must always cover the **entire persistent application state**. The canonical list of what must be included:
+
+      | Category | Tables / data |
+      |---|---|
+      | Enumerations | `Brand`, `Color` (with `hex_value`), `Material` |
+      | Inventory | `Filament` (all columns, resolved brand/color/material by name) |
+      | Movement history | `MovementHistory` (filament ref, change, reason, timestamp) |
+      | App settings | `AppSetting` (language, currency, theme, printer settings, energy cost, etc.) |
+      | Calculator records | `PrintHistory` (all columns) |
+      | Projects | `Project`, `ProjectFile` (filename + original name), `ProjectLink`, `ProjectFilament` |
+      | Bambu integration | `BambuPrinter` (serial, access code, alias), `BambuPrintJob`, `BambuJobMaterial` |
+
+    - **Referential integrity on import**: resolve foreign keys by name/serial (e.g. brand name → brand id) before inserting dependent rows. Commit enumerations before filaments; commit filaments before movement history etc.
+    - **Idempotency**: use a "skip if already exists" strategy (check by natural key) so that importing the same backup twice does not create duplicates.
+    - **Whenever a new model or column is added to the project, update both the export dict and the import handler in `routes/settings.py` in the same pull/commit.**
+
 ---
 
 ## Post-Implementation Versioning Checklist
@@ -155,3 +183,4 @@ When a user asks for modifications to the project, you must follow and automatic
 4. ✅ **Update changelog** in `CHANGELOG.md` under the new version section
 5. ✅ **Update README.md** – change the version tag in the first line
 6. ✅ `docker compose up -d --build` → verify HTTP 200
+7. ✅ If the feature touched any DB table or column — verify that `/export` and `/import` in `routes/settings.py` are updated to match (rule 17).

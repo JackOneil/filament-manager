@@ -139,14 +139,9 @@ def _sync_project_filament(project_id: int, filament_id: int, actual_weight: flo
     if pf:
         # Mark existing planned estimate as actually used — do NOT change estimated_weight
         pf.is_used = True
-    else:
-        # No existing estimate — create a new record for the actual consumption
-        db.session.add(ProjectFilament(
-            project_id=project_id,
-            filament_id=filament_id,
-            estimated_weight=actual_weight,
-            is_used=True,
-        ))
+    # If there is no existing estimate we intentionally do NOT create one here.
+    # The Bambu job itself already shows up in project_detail under "Bambu jobs",
+    # so creating a ProjectFilament entry would be a duplicate.
 
 
 
@@ -311,12 +306,26 @@ def register(app):
     def bambu_jobs():
         setting = AppSetting.query.first()
         page = request.args.get('page', 1, type=int)
+        job_filter = request.args.get('filter', '')
         per_page = 20
+
+        base_q = BambuPrintJob.query
+        if job_filter == 'unassigned':
+            base_q = base_q.filter(BambuPrintJob.filament_id.is_(None))
+        elif job_filter == 'not_deducted':
+            base_q = base_q.filter(BambuPrintJob.deducted.is_(False))
+
         jobs = (
-            BambuPrintJob.query
+            base_q
             .order_by(BambuPrintJob.started_at.desc().nullslast(), BambuPrintJob.synced_at.desc())
             .paginate(page=page, per_page=per_page, error_out=False)
         )
+
+        # Counts for filter bar badges
+        count_all = BambuPrintJob.query.count()
+        count_unassigned = BambuPrintJob.query.filter(BambuPrintJob.filament_id.is_(None)).count()
+        count_not_deducted = BambuPrintJob.query.filter(BambuPrintJob.deducted.is_(False)).count()
+
         filaments_orm = Filament.query.order_by(Filament.name).all()
         projects_orm = Project.query.order_by(Project.name).all()
         printers = BambuPrinter.query.order_by(BambuPrinter.name).all()
@@ -342,6 +351,10 @@ def register(app):
             printers=printers,
             has_token=has_token,
             setting=setting,
+            job_filter=job_filter,
+            count_all=count_all,
+            count_unassigned=count_unassigned,
+            count_not_deducted=count_not_deducted,
         )
 
     @app.route('/bambu/sync', methods=['POST'])

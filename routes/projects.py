@@ -62,6 +62,10 @@ def register(app):
             client_name = request.form.get('client_name', '').strip()
             due_date_str = request.form.get('due_date', '').strip()
             estimated_print_time = request.form.get('estimated_print_time', 0, type=int)
+            hours = request.form.get('print_hours', 0, type=int)
+            minutes = request.form.get('print_minutes', 0, type=int)
+            if hours > 0 or minutes > 0:
+                estimated_print_time = hours * 60 + minutes
 
             due_date = None
             if due_date_str:
@@ -93,7 +97,18 @@ def register(app):
         filaments = Filament.query.order_by(Filament.name.asc()).all()
         from models import AppSetting
         setting = AppSetting.query.first()
-        return render_template('project_detail.html', project=project, all_filaments=filaments, setting=setting)
+        filaments_json = [
+            {
+                'id': f.id,
+                'name': f.name,
+                'brand': f.brand.name if f.brand else '',
+                'material': f.material.name if f.material else '',
+                'color_hex': f.color.hex_value if f.color else '#cccccc',
+                'remaining': int(f.weight_remaining),
+            }
+            for f in filaments
+        ]
+        return render_template('project_detail.html', project=project, all_filaments=filaments, filaments_json=filaments_json, setting=setting)
 
     @app.route('/projects/<int:id>/edit', methods=['GET', 'POST'])
     def project_edit(id):
@@ -104,6 +119,10 @@ def register(app):
             project.client_name = request.form.get('client_name', '').strip()
             due_date_str = request.form.get('due_date', '').strip()
             project.estimated_print_time = request.form.get('estimated_print_time', 0, type=int)
+            hours = request.form.get('print_hours', 0, type=int)
+            minutes = request.form.get('print_minutes', 0, type=int)
+            if hours > 0 or minutes > 0:
+                project.estimated_print_time = hours * 60 + minutes
 
             if due_date_str:
                 project.due_date = datetime.strptime(due_date_str, '%Y-%m-%d')
@@ -239,13 +258,18 @@ def register(app):
     def project_remove_filament(id, pf_id):
         pf = db.get_or_404(ProjectFilament, pf_id)
         if pf.project_id == id:
-            if pf.is_used:
-                # We optionally could refund the filament, but for simplicity we just restrict deleting used filaments 
-                # or we just allow it. Let's just allow it without refunding automatically for safety, or actually we shouldn't allow deleting used.
-                if pf.is_used:
-                    return redirect(url_for('project_detail', id=id))
             db.session.delete(pf)
             db.session.commit()
+        return redirect(url_for('project_detail', id=id))
+
+    @app.route('/projects/<int:id>/update_filament/<int:pf_id>', methods=['POST'])
+    def project_update_filament(id, pf_id):
+        pf = db.get_or_404(ProjectFilament, pf_id)
+        if pf.project_id == id:
+            new_weight = request.form.get('estimated_weight', 0.0, type=float)
+            if new_weight > 0:
+                pf.estimated_weight = new_weight
+                db.session.commit()
         return redirect(url_for('project_detail', id=id))
 
     @app.route('/projects/<int:id>/status', methods=['POST'])

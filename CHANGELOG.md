@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.31.1] - 2026-03-26
+### Changed
+- **Full-application backup**: `/export` now includes the entire application state — enumerations (brands, materials, colors), app settings (language, currency, theme, printer/energy settings), filament inventory, movement history, calculator print records, projects (with links and filament estimates), and Bambu printers + print jobs with per-slot material data. Bambu token is intentionally excluded for security.
+- **Full-application restore**: `/import` handles all the above categories with referential-integrity ordering (enumerations → filaments → history → projects → Bambu) and idempotent "skip if exists" logic.
+- **Instructions update**: `copilot-instructions.md` updated with correct model list, full route list, new Backup Schema Rule (rule 17), a requirement to keep the backup schema in sync with any future DB changes, and a versioning checklist item for the backup schema check.
+
+## [1.31.0] - 2026-03-27
+### Added
+- **Interactive filament picker in project detail**: The filament add form now uses a fulltext search dropdown with a colored swatch showing the selected filament's color, matching the inventory filter style.
+- **Edit and delete for project filament estimates**: Each ProjectFilament row in project detail now has a pencil (edit weight) and trash (delete) button, available for all rows including already-used ones.
+- **Hours + minutes print time input**: Project create and edit forms now split the estimated print time into separate hours and minutes inputs for easier entry.
+- **Interactive dropdowns with color swatches on add filament page**: The brand, material, and color fields on the "Add filament" form are now fulltext Alpine.js dropdowns. Color options show a colored swatch dot next to the name; the selected color is also previewed in the input trigger.
+- **i18n**: Added `no_results` key (CS: "Žádné výsledky", EN: "No results").
+
+## [1.30.1] - 2026-03-26
+### Added
+- **Filter bar on Bambu jobs page**: Three filter pills — *All*, *Without filament* (unassigned), *Not deducted* — with live counts. The active filter is preserved across pagination.
+- **Unassigned visual highlight**: Bambu job cards with no filament assigned get an orange left border and an "Unassigned" badge, making the backlog immediately visible.
+- **Multi-material badge**: Jobs with more than one AMS slot automatically display a purple *Multi-material* badge. Per-slot deduction was already supported; the badge makes it obvious which jobs need per-slot assignment.
+- **Printer rename in Settings**: Each detected Bambu printer now has a *Rename* button in the Bambu section of Settings, with an inline form saved via the new `edit_bambu_printer` action.
+### Fixed
+- **Duplicate filament in project detail**: Deducting a Bambu job via "Deduct from stock" no longer auto-creates a `ProjectFilament` row when the filament wasn\'t previously added as an estimate. The Bambu jobs list at the bottom of project detail already shows this info; creating a redundant estimate row caused visual duplication.
+
 ## [1.30.0] - 2026-03-27
 ### Added
 - **Printer & Energy Settings section**: `kwh_price` (CZK/kWh) and `printer_power` (W) moved from the Calculator page to a dedicated *Printer & Energy Settings* section in `/settings#printer-energy`. Values are saved via new `printer_energy_settings` action and read by the Calculator automatically.
