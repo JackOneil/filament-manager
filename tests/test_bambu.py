@@ -362,6 +362,219 @@ class BambuDeductionRouteTests(unittest.TestCase):
             s = db.session.get(BambuJobMaterial, slot_id)
             self.assertTrue(s.deducted)
 
+    def test_deduct_updates_quantity_when_spool_count_drops(self):
+        with self.app.app_context():
+            filament = Filament(
+                name='MultiSpoolPLA',
+                brand_id=self.filament.brand_id,
+                color_id=self.filament.color_id,
+                material_id=self.filament.material_id,
+                weight_total=1000.0,
+                weight_remaining=1050.0,
+                price=500.0,
+                quantity=2,
+            )
+            job = BambuPrintJob(
+                external_id='TEST_JOB_002',
+                model_name='QtyDrop',
+                printer_name='P1P',
+                status='FINISH',
+                weight_grams=100.0,
+            )
+            db.session.add_all([filament, job])
+            db.session.commit()
+            filament_id = filament.id
+            job_id = job.id
+
+        self.client.post(
+            f'/bambu/job/{job_id}/map',
+            data={'filament_id': str(filament_id), 'deduct': '1'},
+            follow_redirects=False,
+        )
+
+        with self.app.app_context():
+            filament = db.session.get(Filament, filament_id)
+            self.assertAlmostEqual(filament.weight_remaining, 950.0)
+            self.assertEqual(filament.quantity, 1)
+
+    def test_slot_deduction_updates_quantity_when_spool_count_drops(self):
+        with self.app.app_context():
+            filament = Filament(
+                name='MultiSpoolSlotPLA',
+                brand_id=self.filament.brand_id,
+                color_id=self.filament.color_id,
+                material_id=self.filament.material_id,
+                weight_total=1000.0,
+                weight_remaining=1020.0,
+                price=500.0,
+                quantity=2,
+            )
+            job = BambuPrintJob(
+                external_id='TEST_JOB_003',
+                model_name='QtyDropSlot',
+                printer_name='P1P',
+                status='FINISH',
+                weight_grams=20.0,
+            )
+            db.session.add_all([filament, job])
+            db.session.flush()
+            slot = BambuJobMaterial(
+                job_id=job.id,
+                ams_id=0,
+                tray_id=0,
+                material_name='PLA',
+                weight_grams=30.0,
+            )
+            db.session.add(slot)
+            db.session.commit()
+            filament_id = filament.id
+            job_id = job.id
+            slot_id = slot.id
+
+        self.client.post(
+            f'/bambu/job/{job_id}/deduct-slot',
+            data={'slot_id': str(slot_id), 'filament_id': str(filament_id)},
+            follow_redirects=False,
+        )
+
+        with self.app.app_context():
+            filament = db.session.get(Filament, filament_id)
+            self.assertAlmostEqual(filament.weight_remaining, 990.0)
+            self.assertEqual(filament.quantity, 1)
+
+    def test_multimaterial_job_disappears_from_unassigned_filter_when_all_slots_are_mapped(self):
+        with self.app.app_context():
+            job = BambuPrintJob(
+                external_id='TEST_JOB_004',
+                model_name='FullyAssignedMulti',
+                printer_name='P1P',
+                status='FINISH',
+                weight_grams=20.0,
+            )
+            db.session.add(job)
+            db.session.flush()
+            slot_a = BambuJobMaterial(job_id=job.id, ams_id=0, tray_id=0, material_name='PLA', weight_grams=10.0)
+            slot_b = BambuJobMaterial(job_id=job.id, ams_id=0, tray_id=1, material_name='PLA', weight_grams=10.0)
+            db.session.add_all([slot_a, slot_b])
+            db.session.commit()
+            job_id = job.id
+            slot_ids = [slot_a.id, slot_b.id]
+
+        response = self.client.get('/bambu?filter=unassigned')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'FullyAssignedMulti', response.data)
+
+        for slot_id in slot_ids:
+            self.client.post(
+                f'/bambu/job/{job_id}/deduct-slot',
+                data={'slot_id': str(slot_id), 'filament_id': str(self.filament_id)},
+                follow_redirects=False,
+            )
+
+        response = self.client.get('/bambu?filter=unassigned')
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(b'FullyAssignedMulti', response.data)
+
+    def test_multimaterial_job_disappears_from_not_deducted_filter_when_all_slots_are_deducted(self):
+        with self.app.app_context():
+            job = BambuPrintJob(
+                external_id='TEST_JOB_005',
+                model_name='FullyDeductedMulti',
+                printer_name='P1P',
+                status='FINISH',
+                weight_grams=20.0,
+            )
+            db.session.add(job)
+            db.session.flush()
+            slot_a = BambuJobMaterial(job_id=job.id, ams_id=0, tray_id=0, material_name='PLA', weight_grams=10.0)
+            slot_b = BambuJobMaterial(job_id=job.id, ams_id=0, tray_id=1, material_name='PLA', weight_grams=10.0)
+            db.session.add_all([slot_a, slot_b])
+            db.session.commit()
+            job_id = job.id
+            slot_ids = [slot_a.id, slot_b.id]
+
+        response = self.client.get('/bambu?filter=not_deducted')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'FullyDeductedMulti', response.data)
+
+        for slot_id in slot_ids:
+            self.client.post(
+                f'/bambu/job/{job_id}/deduct-slot',
+                data={'slot_id': str(slot_id), 'filament_id': str(self.filament_id)},
+                follow_redirects=False,
+            )
+
+        response = self.client.get('/bambu?filter=not_deducted')
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(b'FullyDeductedMulti', response.data)
+
+    def test_single_slot_job_uses_single_material_logic(self):
+        with self.app.app_context():
+            job = BambuPrintJob(
+                external_id='TEST_JOB_006',
+                model_name='SingleSlotJob',
+                printer_name='P1P',
+                status='FINISH',
+                weight_grams=20.0,
+            )
+            db.session.add(job)
+            db.session.flush()
+            slot = BambuJobMaterial(
+                job_id=job.id,
+                ams_id=0,
+                tray_id=0,
+                material_name='PLA',
+                weight_grams=20.0,
+            )
+            db.session.add(slot)
+            db.session.commit()
+            job_id = job.id
+
+        response = self.client.get('/bambu?filter=unassigned')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'SingleSlotJob', response.data)
+        self.assertNotIn('Materiálové sloty'.encode('utf-8'), response.data)
+
+        self.client.post(
+            f'/bambu/job/{job_id}/map',
+            data={'filament_id': str(self.filament_id)},
+            follow_redirects=False,
+        )
+
+        response = self.client.get('/bambu?filter=unassigned')
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(b'SingleSlotJob', response.data)
+
+        response = self.client.get('/bambu')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'SingleSlotJob', response.data)
+        self.assertNotIn('Materiálové sloty'.encode('utf-8'), response.data)
+
+    def test_job_map_ajax_returns_updated_unassigned_state(self):
+        with self.app.app_context():
+            job = BambuPrintJob(
+                external_id='TEST_JOB_007',
+                model_name='AjaxAssign',
+                printer_name='P1P',
+                status='FINISH',
+                weight_grams=20.0,
+            )
+            db.session.add(job)
+            db.session.commit()
+            job_id = job.id
+
+        response = self.client.post(
+            f'/bambu/job/{job_id}/map?ajax=1',
+            data={'filament_id': str(self.filament_id)},
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data['ok'])
+        self.assertFalse(data['show_unassigned'])
+        self.assertEqual(data['filament_name'], 'TestPLA')
+
 
 # ─── Integration tests: sync endpoint ───────────────────────────────────────
 

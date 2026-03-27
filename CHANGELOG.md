@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.32.4] - 2026-03-27
+### Fixed
+- **Bambu filtered workflow without page reset**: saving filament mapping from the *Without filament* or *Not deducted* filtered views now updates the page via AJAX instead of a full refresh, so the active filter stays preserved while processing multiple jobs.
+- **Bambu filter badge refresh**: filter pill counters now update immediately after AJAX mapping changes, keeping the visible counts aligned with the remaining cards.
+- **Bambu AJAX mapping endpoint**: the job mapping route can now return JSON state for in-place UI updates, including the updated assignment/deduction state and fresh filter counts.
+
+## [1.32.3] - 2026-03-27
+### Fixed
+- **Single-color Bambu jobs**: jobs with only one material slot are no longer treated as multi-material. The “Material Slots” section stays hidden and the normal single-filament mapping flow is used instead.
+- **Single-slot assignment state**: for jobs with exactly one material slot, assigning a filament at the job level now also satisfies the unassigned state even without linking a project, and the job disappears from the *Without filament* filter as expected.
+- **Single-slot state sync**: for one-slot jobs, job-level assignment and deduction now synchronize the underlying slot record as well, keeping filters, badges, and stored data aligned.
+
+## [1.32.2] - 2026-03-27
+### Fixed
+- **Bambu filter consistency**: multi-material jobs now disappear from *Without filament* as soon as all material slots have an assigned filament, even when `job.filament_id` stays empty.
+- **Bambu deduction filter consistency**: multi-material jobs now disappear from *Not deducted* as soon as all material slots are deducted, based on per-slot deduction state instead of the unused job-level flag.
+- **Bambu badges and filters aligned**: the Bambu page now uses the same slot-aware logic for filter counts, filtered results, and on-card badges, preventing mismatched status between the pill filters and the visible job card.
+
+## [1.32.1] - 2026-03-27
+### Fixed
+- **Bambu stock consistency**: Bambu job deduction and per-slot AMS deduction now use the same stock-decrement rules as the core inventory workflow, so `weight_remaining` and `quantity` stay synchronized when a spool boundary is crossed.
+- **Atomic backup restore**: `/import` now runs inside a single database transaction. If any later stage of the restore fails, the whole import is rolled back instead of leaving partially restored data behind.
+- **Regression coverage**: Added automated tests for Bambu quantity recalculation and full rollback behavior during failed imports.
+
+## [1.32.0] - 2026-03-27
+### Changed
+- **Bambu — multi-material workflow**: for jobs with more than one AMS slot, the global single-filament dropdown is hidden in the mapping panel. Only the project and job name can be set at the job level; filament assignment is done exclusively per-slot.
+- **Bambu — per-slot AJAX assignment**: assigning a filament to an AMS slot no longer refreshes the entire page. The slot row updates reactively in-place (Alpine.js + JSON endpoint) — stock deduction and "Deducted" badge update immediately without losing panel state.
+- **Bambu — smart "Unassigned" badge**: for multi-material jobs the orange left border and "Unassigned" badge now reflect whether *all* AMS slots have a filament assigned (instead of checking the unused `job.filament_id` column). The "Deducted" badge for multi-material jobs appears only when every slot has been deducted.
+
 ## [1.31.1] - 2026-03-26
 ### Changed
 - **Full-application backup**: `/export` now includes the entire application state — enumerations (brands, materials, colors), app settings (language, currency, theme, printer/energy settings), filament inventory, movement history, calculator print records, projects (with links and filament estimates), and Bambu printers + print jobs with per-slot material data. Bambu token is intentionally excluded for security.

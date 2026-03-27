@@ -1,5 +1,6 @@
 import ipaddress
 import json
+import math
 import re
 import socket
 from urllib.parse import urljoin, urlparse, urlunparse
@@ -50,6 +51,26 @@ def log_movement(filament, action_type, weight):
         currency=currency,
     )
     db.session.add(movement)
+
+
+def deduct_filament_stock(filament, requested_weight):
+    """Deduct stock safely and keep weight/quantity consistent.
+
+    Returns the actually deducted weight after clamping to zero.
+    """
+    if not filament or requested_weight <= 0:
+        return 0.0
+
+    old_weight = filament.weight_remaining
+    filament.weight_remaining = max(0.0, filament.weight_remaining - requested_weight)
+    actual_amount = old_weight - filament.weight_remaining
+
+    if filament.weight_total > 0:
+        expected_quantity = math.ceil(filament.weight_remaining / filament.weight_total)
+        if expected_quantity < filament.quantity:
+            filament.quantity = expected_quantity
+
+    return actual_amount
 
 
 def _is_public_ip(address):

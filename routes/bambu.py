@@ -17,7 +17,8 @@ from models import (
     AppSetting, BambuPrinter, BambuPrintJob, BambuJobMaterial,
     Filament, PrintHistory, Project, ProjectFilament,
 )
-from utils import log_movement
+from sqlalchemy import and_, func, or_, select
+from utils import deduct_filament_stock, log_movement
 
 _LOG = logging.getLogger(__name__)
 
@@ -142,6 +143,70 @@ def _sync_project_filament(project_id: int, filament_id: int, actual_weight: flo
     # If there is no existing estimate we intentionally do NOT create one here.
     # The Bambu job itself already shows up in project_detail under "Bambu jobs",
     # so creating a ProjectFilament entry would be a duplicate.
+
+
+def _job_unassigned_filter():
+    material_count = (
+        select(func.count(BambuJobMaterial.id))
+        .where(BambuJobMaterial.job_id == BambuPrintJob.id)
+        .scalar_subquery()
+    )
+    has_assigned_single_slot = BambuPrintJob.materials.any(BambuJobMaterial.filament_id.is_not(None))
+
+    return or_(
+        and_(
+            material_count > 1,
+            BambuPrintJob.materials.any(BambuJobMaterial.filament_id.is_(None)),
+        ),
+        and_(
+            material_count <= 1,
+            BambuPrintJob.filament_id.is_(None),
+            ~has_assigned_single_slot,
+        ),
+    )
+
+
+def _job_not_deducted_filter():
+    material_count = (
+        select(func.count(BambuJobMaterial.id))
+        .where(BambuJobMaterial.job_id == BambuPrintJob.id)
+        .scalar_subquery()
+    )
+    has_deducted_single_slot = BambuPrintJob.materials.any(BambuJobMaterial.deducted.is_(True))
+
+    return or_(
+        and_(
+            material_count > 1,
+            BambuPrintJob.materials.any(BambuJobMaterial.deducted.is_(False)),
+        ),
+        and_(
+            material_count <= 1,
+            BambuPrintJob.deducted.is_(False),
+            ~has_deducted_single_slot,
+        ),
+    )
+
+
+def _job_display_state(job: BambuPrintJob) -> dict:
+    materials = list(job.materials)
+    is_mm = len(materials) > 1
+    single_slot = materials[0] if len(materials) == 1 else None
+    display_filament = job.filament or (single_slot.filament if single_slot and single_slot.filament else None)
+
+    if is_mm:
+        show_unassigned = any(mat.filament_id is None for mat in materials)
+        show_deducted = bool(materials) and all(mat.deducted for mat in materials)
+    else:
+        show_unassigned = display_filament is None
+        show_deducted = bool(job.deducted or (single_slot and single_slot.deducted))
+
+    return {
+        'is_multimaterial': is_mm,
+        'show_unassigned': show_unassigned,
+        'show_deducted': show_deducted,
+        'filament_name': display_filament.name if display_filament else None,
+        'project_name': job.project.name if job.project else None,
+    }
 
 
 
@@ -311,9 +376,9 @@ def register(app):
 
         base_q = BambuPrintJob.query
         if job_filter == 'unassigned':
-            base_q = base_q.filter(BambuPrintJob.filament_id.is_(None))
+            base_q = base_q.filter(_job_unassigned_filter())
         elif job_filter == 'not_deducted':
-            base_q = base_q.filter(BambuPrintJob.deducted.is_(False))
+            base_q = base_q.filter(_job_not_deducted_filter())
 
         jobs = (
             base_q
@@ -323,8 +388,8 @@ def register(app):
 
         # Counts for filter bar badges
         count_all = BambuPrintJob.query.count()
-        count_unassigned = BambuPrintJob.query.filter(BambuPrintJob.filament_id.is_(None)).count()
-        count_not_deducted = BambuPrintJob.query.filter(BambuPrintJob.deducted.is_(False)).count()
+        count_unassigned = BambuPrintJob.query.filter(_job_unassigned_filter()).count()
+        count_not_deducted = BambuPrintJob.query.filter(_job_not_deducted_filter()).count()
 
         filaments_orm = Filament.query.order_by(Filament.name).all()
         projects_orm = Project.query.order_by(Project.name).all()
@@ -368,8 +433,11 @@ def register(app):
     @app.route('/bambu/job/<int:job_id>/map', methods=['POST'])
     def bambu_job_map(job_id):
         """Manually map filament + project to a job; optionally deduct stock."""
+        is_ajax = request.args.get('ajax') == '1'
         job = db.session.get(BambuPrintJob, job_id)
         if not job:
+            if is_ajax:
+                return jsonify({'ok': False, 'error': 'not found'}), 404
             return redirect(url_for('bambu_jobs'))
 
         filament_id = request.form.get('filament_id', type=int)
@@ -380,8 +448,11 @@ def register(app):
         if model_name_input:
             job.model_name = model_name_input
 
+        single_slot = job.materials[0] if len(job.materials) == 1 else None
         if filament_id:
             job.filament_id = filament_id
+            if single_slot:
+                single_slot.filament_id = filament_id
         project_raw = request.form.get('project_id', '').strip()
         if project_raw == '':
             job.project_id = None
@@ -397,52 +468,88 @@ def register(app):
         ):
             filament = db.session.get(Filament, filament_id)
             if filament:
-                filament.weight_remaining = max(0.0, filament.weight_remaining - job.weight_grams)
-                log_movement(filament, 'bambu_print', job.weight_grams)
-                db.session.add(PrintHistory(
-                    filament_name=(
-                        f"{filament.name} | {filament.brand.name} {filament.material.name}"
-                        if filament.brand and filament.material
-                        else filament.name
-                    ),
-                    weight=job.weight_grams,
-                    total_cost=0.0,
-                ))
-                job.deducted = True
-                # If the job is linked to a project, mark that filament as
-                # actually consumed in the project (find or create the link).
-                effective_project_id = project_id or job.project_id
-                if effective_project_id:
-                    _sync_project_filament(effective_project_id, filament_id, job.weight_grams)
+                actual_amount = deduct_filament_stock(filament, job.weight_grams)
+                if actual_amount > 0:
+                    log_movement(filament, 'bambu_print', actual_amount)
+                    db.session.add(PrintHistory(
+                        filament_name=(
+                            f"{filament.name} | {filament.brand.name} {filament.material.name}"
+                            if filament.brand and filament.material
+                            else filament.name
+                        ),
+                        weight=actual_amount,
+                        total_cost=0.0,
+                    ))
+                    job.deducted = True
+                    if single_slot:
+                        single_slot.deducted = True
+                    # If the job is linked to a project, mark that filament as
+                    # actually consumed in the project (find or create the link).
+                    effective_project_id = project_id or job.project_id
+                    if effective_project_id:
+                        _sync_project_filament(effective_project_id, filament_id, actual_amount)
 
         db.session.commit()
+        if is_ajax:
+            state = _job_display_state(job)
+            return jsonify({
+                'ok': True,
+                'job_id': job.id,
+                **state,
+                'filter_counts': {
+                    'all': BambuPrintJob.query.count(),
+                    'unassigned': BambuPrintJob.query.filter(_job_unassigned_filter()).count(),
+                    'not_deducted': BambuPrintJob.query.filter(_job_not_deducted_filter()).count(),
+                },
+            })
         return redirect(url_for('bambu_jobs'))
 
     @app.route('/bambu/job/<int:job_id>/deduct-slot', methods=['POST'])
     def bambu_job_deduct_slot(job_id):
-        """Map a specific AMS slot to a filament and deduct from stock."""
+        """Map a specific AMS slot to a filament and deduct from stock.
+
+        Supports AJAX mode (returns JSON) when the query-string contains
+        ``ajax=1``.  The redirect branch is kept for the (legacy) HTML-form
+        fallback path.
+        """
+        is_ajax = request.args.get('ajax') == '1'
         job = db.session.get(BambuPrintJob, job_id)
         if not job:
+            if is_ajax:
+                return jsonify({'ok': False, 'error': 'not found'}), 404
             return redirect(url_for('bambu_jobs'))
 
         slot_id = request.form.get('slot_id', type=int)
         filament_id = request.form.get('filament_id', type=int)
         slot = db.session.get(BambuJobMaterial, slot_id) if slot_id else None
 
+        filament_name = None
+        actually_deducted = False
+
         if slot and slot.job_id == job_id and filament_id and not slot.deducted:
             slot.filament_id = filament_id
+            filament = db.session.get(Filament, filament_id)
+            filament_name = filament.name if filament else None
             weight = slot.weight_grams or 0.0
-            if weight > 0:
-                filament = db.session.get(Filament, filament_id)
-                if filament:
-                    filament.weight_remaining = max(0.0, filament.weight_remaining - weight)
-                    log_movement(filament, 'bambu_print', weight)
+            if weight > 0 and filament:
+                actual_amount = deduct_filament_stock(filament, weight)
+                if actual_amount > 0:
+                    log_movement(filament, 'bambu_print', actual_amount)
                     slot.deducted = True
+                    actually_deducted = True
                     # Propagate to the linked project if any
                     if job.project_id:
-                        _sync_project_filament(job.project_id, filament_id, weight)
+                        _sync_project_filament(job.project_id, filament_id, actual_amount)
 
         db.session.commit()
+
+        if is_ajax:
+            return jsonify({
+                'ok': True,
+                'filament_id': filament_id,
+                'filament_name': filament_name,
+                'deducted': actually_deducted,
+            })
         return redirect(url_for('bambu_jobs'))
 
     @app.route('/bambu/job/<int:job_id>/delete', methods=['POST'])

@@ -278,186 +278,179 @@ def register(app):
         if not file or file.filename == '':
             return redirect(url_for('settings'))
 
+        imported_filaments = 0
         try:
             data = json.load(file)
+            with db.session.begin():
+                # ── 1. Enumerations ────────────────────────────────────
+                for b_name in data.get('brands', []):
+                    if not Brand.query.filter_by(name=b_name).first():
+                        db.session.add(Brand(name=b_name))
 
-            # ── 1. Enumerations ────────────────────────────────────────
-            for b_name in data.get('brands', []):
-                if not Brand.query.filter_by(name=b_name).first():
-                    db.session.add(Brand(name=b_name))
+                for m_name in data.get('materials', []):
+                    if not Material.query.filter_by(name=m_name).first():
+                        db.session.add(Material(name=m_name))
 
-            for m_name in data.get('materials', []):
-                if not Material.query.filter_by(name=m_name).first():
-                    db.session.add(Material(name=m_name))
+                for c in data.get('colors', []):
+                    if not Color.query.filter_by(name=c.get('name')).first():
+                        db.session.add(Color(name=c.get('name'), hex_value=c.get('hex_value', '')))
 
-            for c in data.get('colors', []):
-                if not Color.query.filter_by(name=c.get('name')).first():
-                    db.session.add(Color(name=c.get('name'), hex_value=c.get('hex_value', '')))
-
-            db.session.commit()
-
-            # ── 2. App settings ────────────────────────────────────────
-            s = data.get('app_settings', {})
-            if s:
-                setting = AppSetting.query.first()
-                if setting:
-                    setting.lang = s.get('lang', setting.lang)
-                    setting.currency = s.get('currency', setting.currency)
-                    setting.theme = s.get('theme', setting.theme)
-                    setting.view_mode = s.get('view_mode', setting.view_mode)
-                    setting.items_per_page = s.get('items_per_page', setting.items_per_page)
-                    setting.kwh_price = s.get('kwh_price', setting.kwh_price)
-                    setting.printer_power = s.get('printer_power', setting.printer_power)
-                    setting.debug_logging = s.get('debug_logging', setting.debug_logging)
-                    setting.bambu_region = s.get('bambu_region', setting.bambu_region)
-            db.session.commit()
-
-            # ── 3. Filaments ───────────────────────────────────────────
-            imported_filaments = 0
-            for f in data.get('filaments', []):
-                b = Brand.query.filter_by(name=f.get('brand')).first()
-                m = Material.query.filter_by(name=f.get('material')).first()
-                c = Color.query.filter_by(name=f.get('color')).first()
-                if b and m and c:
-                    # skip if identical entry already exists
-                    exists = Filament.query.filter_by(
-                        name=f.get('name'), brand_id=b.id, material_id=m.id, color_id=c.id
-                    ).first()
-                    if not exists:
-                        db.session.add(Filament(
-                            name=f.get('name'),
-                            brand_id=b.id, material_id=m.id, color_id=c.id,
-                            weight_total=f.get('weight_total', 1000),
-                            weight_remaining=f.get('weight_remaining', 1000),
-                            price=f.get('price', 0),
-                            quantity=f.get('quantity', 1),
-                        ))
-                        imported_filaments += 1
-            db.session.commit()
-
-            # ── 4. Movement history ────────────────────────────────────
-            for m in data.get('movement_history', []):
-                ts = datetime.fromisoformat(m['created_at']) if m.get('created_at') else datetime.utcnow()
-                exists = MovementHistory.query.filter_by(
-                    filament_name=m.get('filament_name'),
-                    action_type=m.get('action_type'),
-                    created_at=ts,
-                ).first()
-                if not exists:
-                    db.session.add(MovementHistory(
-                        filament_name=m.get('filament_name'),
-                        action_type=m.get('action_type'),
-                        weight=m.get('weight', 0),
-                        cost=m.get('cost', 0),
-                        currency=m.get('currency', 'CZK'),
-                        created_at=ts,
-                    ))
-            db.session.commit()
-
-            # ── 5. Print history (calculator) ──────────────────────────
-            for p in data.get('print_history', []):
-                ts = datetime.fromisoformat(p['created_at']) if p.get('created_at') else datetime.utcnow()
-                exists = PrintHistory.query.filter_by(
-                    filament_name=p.get('filament_name'),
-                    created_at=ts,
-                ).first()
-                if not exists:
-                    db.session.add(PrintHistory(
-                        filament_name=p.get('filament_name'),
-                        weight=p.get('weight', 0),
-                        total_cost=p.get('total_cost', 0),
-                        created_at=ts,
-                    ))
-            db.session.commit()
-
-            # ── 6. Projects ────────────────────────────────────────────
-            for proj_data in data.get('projects', []):
-                proj = Project.query.filter_by(name=proj_data.get('name')).first()
-                if not proj:
-                    proj = Project(
-                        name=proj_data.get('name'),
-                        description=proj_data.get('description'),
-                        status=proj_data.get('status', 'NEW'),
-                        client_name=proj_data.get('client_name'),
-                        estimated_print_time=proj_data.get('estimated_print_time', 0),
-                        due_date=datetime.fromisoformat(proj_data['due_date']) if proj_data.get('due_date') else None,
-                        created_at=datetime.fromisoformat(proj_data['created_at']) if proj_data.get('created_at') else datetime.utcnow(),
-                    )
-                    db.session.add(proj)
-                    db.session.flush()  # get proj.id
-
-                    for link in proj_data.get('links', []):
-                        db.session.add(ProjectLink(
-                            project_id=proj.id,
-                            url=link.get('url', ''),
-                            name=link.get('name'),
-                            og_title=link.get('og_title'),
-                            og_image=link.get('og_image'),
-                            og_description=link.get('og_description'),
-                            domain=link.get('domain'),
-                        ))
-
-                    for pf_data in proj_data.get('filaments', []):
-                        fil = Filament.query.filter_by(name=pf_data.get('filament_name')).first()
-                        if fil:
-                            db.session.add(ProjectFilament(
-                                project_id=proj.id,
-                                filament_id=fil.id,
-                                estimated_weight=pf_data.get('estimated_weight', 0),
-                                is_used=pf_data.get('is_used', False),
-                            ))
-                    # ProjectFile rows reference uploaded files on disk; skip re-importing
-            db.session.commit()
-
-            # ── 7. Bambu printers ──────────────────────────────────────
-            for bp in data.get('bambu_printers', []):
-                if not BambuPrinter.query.filter_by(device_id=bp.get('device_id')).first():
-                    db.session.add(BambuPrinter(
-                        device_id=bp.get('device_id'),
-                        name=bp.get('name', ''),
-                        printer_model=bp.get('printer_model'),
-                        notes=bp.get('notes'),
-                    ))
-            db.session.commit()
-
-            # ── 8. Bambu jobs ──────────────────────────────────────────
-            for j in data.get('bambu_jobs', []):
-                if BambuPrintJob.query.filter_by(external_id=j.get('external_id')).first():
-                    continue
-                fil = Filament.query.filter_by(name=j.get('filament_name')).first() if j.get('filament_name') else None
-                proj = Project.query.filter_by(name=j.get('project_name')).first() if j.get('project_name') else None
-                job = BambuPrintJob(
-                    external_id=j.get('external_id'),
-                    printer_name=j.get('printer_name'),
-                    printer_model=j.get('printer_model'),
-                    device_id=j.get('device_id'),
-                    model_name=j.get('model_name'),
-                    status=j.get('status'),
-                    weight_grams=j.get('weight_grams'),
-                    cost_time=j.get('cost_time'),
-                    started_at=datetime.fromisoformat(j['started_at']) if j.get('started_at') else None,
-                    finished_at=datetime.fromisoformat(j['finished_at']) if j.get('finished_at') else None,
-                    synced_at=datetime.fromisoformat(j['synced_at']) if j.get('synced_at') else datetime.utcnow(),
-                    deducted=j.get('deducted', False),
-                    filament_id=fil.id if fil else None,
-                    project_id=proj.id if proj else None,
-                )
-                db.session.add(job)
                 db.session.flush()
 
-                for mat in j.get('materials', []):
-                    mat_fil = Filament.query.filter_by(name=mat.get('filament_name')).first() if mat.get('filament_name') else None
-                    db.session.add(BambuJobMaterial(
-                        job_id=job.id,
-                        ams_id=mat.get('ams_id'),
-                        tray_id=mat.get('tray_id'),
-                        color_hex=mat.get('color_hex'),
-                        material_name=mat.get('material_name'),
-                        weight_grams=mat.get('weight_grams'),
-                        filament_id=mat_fil.id if mat_fil else None,
-                        deducted=mat.get('deducted', False),
-                    ))
-            db.session.commit()
+                # ── 2. App settings ────────────────────────────────────
+                s = data.get('app_settings', {})
+                if s:
+                    setting = AppSetting.query.first()
+                    if setting:
+                        setting.lang = s.get('lang', setting.lang)
+                        setting.currency = s.get('currency', setting.currency)
+                        setting.theme = s.get('theme', setting.theme)
+                        setting.view_mode = s.get('view_mode', setting.view_mode)
+                        setting.items_per_page = s.get('items_per_page', setting.items_per_page)
+                        setting.kwh_price = s.get('kwh_price', setting.kwh_price)
+                        setting.printer_power = s.get('printer_power', setting.printer_power)
+                        setting.debug_logging = s.get('debug_logging', setting.debug_logging)
+                        setting.bambu_region = s.get('bambu_region', setting.bambu_region)
+
+                # ── 3. Filaments ───────────────────────────────────────
+                for f in data.get('filaments', []):
+                    b = Brand.query.filter_by(name=f.get('brand')).first()
+                    m = Material.query.filter_by(name=f.get('material')).first()
+                    c = Color.query.filter_by(name=f.get('color')).first()
+                    if b and m and c:
+                        exists = Filament.query.filter_by(
+                            name=f.get('name'), brand_id=b.id, material_id=m.id, color_id=c.id
+                        ).first()
+                        if not exists:
+                            db.session.add(Filament(
+                                name=f.get('name'),
+                                brand_id=b.id, material_id=m.id, color_id=c.id,
+                                weight_total=f.get('weight_total', 1000),
+                                weight_remaining=f.get('weight_remaining', 1000),
+                                price=f.get('price', 0),
+                                quantity=f.get('quantity', 1),
+                            ))
+                            imported_filaments += 1
+
+                db.session.flush()
+
+                # ── 4. Movement history ────────────────────────────────
+                for m in data.get('movement_history', []):
+                    ts = datetime.fromisoformat(m['created_at']) if m.get('created_at') else datetime.utcnow()
+                    exists = MovementHistory.query.filter_by(
+                        filament_name=m.get('filament_name'),
+                        action_type=m.get('action_type'),
+                        created_at=ts,
+                    ).first()
+                    if not exists:
+                        db.session.add(MovementHistory(
+                            filament_name=m.get('filament_name'),
+                            action_type=m.get('action_type'),
+                            weight=m.get('weight', 0),
+                            cost=m.get('cost', 0),
+                            currency=m.get('currency', 'CZK'),
+                            created_at=ts,
+                        ))
+
+                # ── 5. Print history (calculator) ─────────────────────
+                for p in data.get('print_history', []):
+                    ts = datetime.fromisoformat(p['created_at']) if p.get('created_at') else datetime.utcnow()
+                    exists = PrintHistory.query.filter_by(
+                        filament_name=p.get('filament_name'),
+                        created_at=ts,
+                    ).first()
+                    if not exists:
+                        db.session.add(PrintHistory(
+                            filament_name=p.get('filament_name'),
+                            weight=p.get('weight', 0),
+                            total_cost=p.get('total_cost', 0),
+                            created_at=ts,
+                        ))
+
+                # ── 6. Projects ───────────────────────────────────────
+                for proj_data in data.get('projects', []):
+                    proj = Project.query.filter_by(name=proj_data.get('name')).first()
+                    if not proj:
+                        proj = Project(
+                            name=proj_data.get('name'),
+                            description=proj_data.get('description'),
+                            status=proj_data.get('status', 'NEW'),
+                            client_name=proj_data.get('client_name'),
+                            estimated_print_time=proj_data.get('estimated_print_time', 0),
+                            due_date=datetime.fromisoformat(proj_data['due_date']) if proj_data.get('due_date') else None,
+                            created_at=datetime.fromisoformat(proj_data['created_at']) if proj_data.get('created_at') else datetime.utcnow(),
+                        )
+                        db.session.add(proj)
+                        db.session.flush()
+
+                        for link in proj_data.get('links', []):
+                            db.session.add(ProjectLink(
+                                project_id=proj.id,
+                                url=link.get('url', ''),
+                                name=link.get('name'),
+                                og_title=link.get('og_title'),
+                                og_image=link.get('og_image'),
+                                og_description=link.get('og_description'),
+                                domain=link.get('domain'),
+                            ))
+
+                        for pf_data in proj_data.get('filaments', []):
+                            fil = Filament.query.filter_by(name=pf_data.get('filament_name')).first()
+                            if fil:
+                                db.session.add(ProjectFilament(
+                                    project_id=proj.id,
+                                    filament_id=fil.id,
+                                    estimated_weight=pf_data.get('estimated_weight', 0),
+                                    is_used=pf_data.get('is_used', False),
+                                ))
+
+                # ── 7. Bambu printers ─────────────────────────────────
+                for bp in data.get('bambu_printers', []):
+                    if not BambuPrinter.query.filter_by(device_id=bp.get('device_id')).first():
+                        db.session.add(BambuPrinter(
+                            device_id=bp.get('device_id'),
+                            name=bp.get('name', ''),
+                            printer_model=bp.get('printer_model'),
+                            notes=bp.get('notes'),
+                        ))
+
+                # ── 8. Bambu jobs ─────────────────────────────────────
+                for j in data.get('bambu_jobs', []):
+                    if BambuPrintJob.query.filter_by(external_id=j.get('external_id')).first():
+                        continue
+                    fil = Filament.query.filter_by(name=j.get('filament_name')).first() if j.get('filament_name') else None
+                    proj = Project.query.filter_by(name=j.get('project_name')).first() if j.get('project_name') else None
+                    job = BambuPrintJob(
+                        external_id=j.get('external_id'),
+                        printer_name=j.get('printer_name'),
+                        printer_model=j.get('printer_model'),
+                        device_id=j.get('device_id'),
+                        model_name=j.get('model_name'),
+                        status=j.get('status'),
+                        weight_grams=j.get('weight_grams'),
+                        cost_time=j.get('cost_time'),
+                        started_at=datetime.fromisoformat(j['started_at']) if j.get('started_at') else None,
+                        finished_at=datetime.fromisoformat(j['finished_at']) if j.get('finished_at') else None,
+                        synced_at=datetime.fromisoformat(j['synced_at']) if j.get('synced_at') else datetime.utcnow(),
+                        deducted=j.get('deducted', False),
+                        filament_id=fil.id if fil else None,
+                        project_id=proj.id if proj else None,
+                    )
+                    db.session.add(job)
+                    db.session.flush()
+
+                    for mat in j.get('materials', []):
+                        mat_fil = Filament.query.filter_by(name=mat.get('filament_name')).first() if mat.get('filament_name') else None
+                        db.session.add(BambuJobMaterial(
+                            job_id=job.id,
+                            ams_id=mat.get('ams_id'),
+                            tray_id=mat.get('tray_id'),
+                            color_hex=mat.get('color_hex'),
+                            material_name=mat.get('material_name'),
+                            weight_grams=mat.get('weight_grams'),
+                            filament_id=mat_fil.id if mat_fil else None,
+                            deducted=mat.get('deducted', False),
+                        ))
 
             app.logger.debug(f"Import finished: {imported_filaments} filaments, projects and Bambu jobs processed.")
         except Exception as e:
