@@ -5,7 +5,7 @@ from flask import render_template, request, redirect, url_for, jsonify
 from database import db
 from models import (
     Brand, Color, Material, AppSetting, Filament, MovementHistory,
-    PrintHistory, Project, ProjectFile, ProjectLink, ProjectFilament,
+    PrintHistory, Project, ProjectFile, ProjectLink, ProjectFilament, ProjectQuote,
     BambuPrinter, BambuPrintJob, BambuJobMaterial,
 )
 
@@ -225,6 +225,19 @@ def register(app):
                     'estimated_weight': pf.estimated_weight,
                     'is_used': pf.is_used,
                 } for pf in proj.filaments],
+                'quotes': [{
+                    'filament_name': quote.filament_name,
+                    'weight': quote.weight,
+                    'print_time': quote.print_time,
+                    'material_cost': quote.material_cost,
+                    'electricity_cost': quote.electricity_cost,
+                    'base_cost': quote.base_cost,
+                    'margin_percent': quote.margin_percent,
+                    'margin_amount': quote.margin_amount,
+                    'final_price': quote.final_price,
+                    'currency': quote.currency,
+                    'created_at': quote.created_at.isoformat() if quote.created_at else None,
+                } for quote in proj.quotes],
             } for proj in Project.query.order_by(Project.created_at).all()],
 
             # ── Bambu integration ──────────────────────────────────────
@@ -383,7 +396,12 @@ def register(app):
                         db.session.add(proj)
                         db.session.flush()
 
-                        for link in proj_data.get('links', []):
+                    for link in proj_data.get('links', []):
+                        exists_link = ProjectLink.query.filter_by(
+                            project_id=proj.id,
+                            url=link.get('url', ''),
+                        ).first()
+                        if not exists_link:
                             db.session.add(ProjectLink(
                                 project_id=proj.id,
                                 url=link.get('url', ''),
@@ -394,15 +412,47 @@ def register(app):
                                 domain=link.get('domain'),
                             ))
 
-                        for pf_data in proj_data.get('filaments', []):
-                            fil = Filament.query.filter_by(name=pf_data.get('filament_name')).first()
-                            if fil:
-                                db.session.add(ProjectFilament(
-                                    project_id=proj.id,
-                                    filament_id=fil.id,
-                                    estimated_weight=pf_data.get('estimated_weight', 0),
-                                    is_used=pf_data.get('is_used', False),
-                                ))
+                    for pf_data in proj_data.get('filaments', []):
+                        fil = Filament.query.filter_by(name=pf_data.get('filament_name')).first()
+                        exists_pf = None
+                        if fil:
+                            exists_pf = ProjectFilament.query.filter_by(
+                                project_id=proj.id,
+                                filament_id=fil.id,
+                                estimated_weight=pf_data.get('estimated_weight', 0),
+                            ).first()
+                        if fil and not exists_pf:
+                            db.session.add(ProjectFilament(
+                                project_id=proj.id,
+                                filament_id=fil.id,
+                                estimated_weight=pf_data.get('estimated_weight', 0),
+                                is_used=pf_data.get('is_used', False),
+                            ))
+
+                    for quote_data in proj_data.get('quotes', []):
+                        quote_ts = datetime.fromisoformat(quote_data['created_at']) if quote_data.get('created_at') else datetime.utcnow()
+                        exists_quote = ProjectQuote.query.filter_by(
+                            project_id=proj.id,
+                            filament_name=quote_data.get('filament_name'),
+                            created_at=quote_ts,
+                        ).first()
+                        if not exists_quote:
+                            quote_fil = Filament.query.filter_by(name=quote_data.get('filament_name', '').split(' | ')[0]).first()
+                            db.session.add(ProjectQuote(
+                                project_id=proj.id,
+                                filament_id=quote_fil.id if quote_fil else None,
+                                filament_name=quote_data.get('filament_name', ''),
+                                weight=quote_data.get('weight', 0),
+                                print_time=quote_data.get('print_time', 0),
+                                material_cost=quote_data.get('material_cost', 0),
+                                electricity_cost=quote_data.get('electricity_cost', 0),
+                                base_cost=quote_data.get('base_cost', 0),
+                                margin_percent=quote_data.get('margin_percent', 0),
+                                margin_amount=quote_data.get('margin_amount', 0),
+                                final_price=quote_data.get('final_price', 0),
+                                currency=quote_data.get('currency', 'CZK'),
+                                created_at=quote_ts,
+                            ))
 
                 # ── 7. Bambu printers ─────────────────────────────────
                 for bp in data.get('bambu_printers', []):

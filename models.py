@@ -68,6 +68,26 @@ class PrintHistory(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class ProjectQuote(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='CASCADE'), nullable=False)
+    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id'), nullable=True)
+    filament_name = db.Column(db.String(255), nullable=False)
+    weight = db.Column(db.Float, nullable=False)
+    print_time = db.Column(db.Float, nullable=False)
+    material_cost = db.Column(db.Float, nullable=False, default=0.0)
+    electricity_cost = db.Column(db.Float, nullable=False, default=0.0)
+    base_cost = db.Column(db.Float, nullable=False, default=0.0)
+    margin_percent = db.Column(db.Float, nullable=False, default=0.0)
+    margin_amount = db.Column(db.Float, nullable=False, default=0.0)
+    final_price = db.Column(db.Float, nullable=False, default=0.0)
+    currency = db.Column(db.String(10), nullable=False, default='CZK')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    project = db.relationship('Project', backref=db.backref('quotes', lazy=True, cascade='all, delete-orphan'))
+    filament = db.relationship('Filament')
+
+
 class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)

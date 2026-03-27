@@ -340,6 +340,49 @@
             {% endif %}
         </div>
 
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 border-b pb-2 gap-2">
+                <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-file-signature text-indigo-500"></i> {{ t('quote_project_title') }}</h2>
+                <a href="{{ url_for('calculator') }}" class="text-sm text-indigo-600 hover:text-indigo-800 font-semibold">
+                    <i class="fa-solid fa-plus mr-1"></i>{{ t('quote_create_from_calculator') }}
+                </a>
+            </div>
+
+            {% if project.quotes %}
+            <div class="space-y-3">
+                {% for quote in project.quotes | sort(attribute='created_at', reverse=True) %}
+                <div class="bg-gray-50 border border-gray-100 rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div>
+                        <div class="font-semibold text-gray-800">{{ quote.filament_name }}</div>
+                        <div class="text-xs text-gray-500 mt-1">
+                            {{ quote.weight }} g · {{ quote.print_time }} {{ t('hours') }} · {{ t('quote_margin') }} {{ quote.margin_percent }} %
+                        </div>
+                        <div class="text-sm text-gray-600 mt-2">
+                            {{ t('quote_base_cost') }}: <span class="font-semibold">{{ quote.base_cost | round(2) }} {{ quote.currency }}</span>
+                            <span class="mx-2 text-gray-300">|</span>
+                            {{ t('quote_margin_amount') }}: <span class="font-semibold text-indigo-700">{{ quote.margin_amount | round(2) }} {{ quote.currency }}</span>
+                            <span class="mx-2 text-gray-300">|</span>
+                            {{ t('quote_final_price') }}: <span class="font-bold text-green-700">{{ quote.final_price | round(2) }} {{ quote.currency }}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <a href="{{ url_for('export_quote', id=quote.id) }}" target="_blank" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border border-indigo-300 px-3 py-2 rounded-lg text-sm transition">
+                            <i class="fa-solid fa-file-export"></i> {{ t('quote_export_btn') }}
+                        </a>
+                        <form method="POST" action="{{ url_for('delete_quote', id=quote.id) }}" onsubmit="return confirm('{{ t('quote_delete_confirm') }}');">
+                            <button type="submit" class="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition-colors" title="{{ t('delete') }}">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-sm italic">{{ t('quote_no_quotes') }}</p>
+            {% endif %}
+        </div>
+
         {% set images = [] %}
         {% set other_files = [] %}
         {% for f in project.files %}

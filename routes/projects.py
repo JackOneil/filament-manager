@@ -5,7 +5,7 @@ from flask import render_template, request, redirect, url_for, send_from_directo
 from werkzeug.utils import secure_filename
 from sqlalchemy.orm import joinedload
 from database import db
-from models import Project, ProjectFile, ProjectLink, ProjectFilament, Filament
+from models import Project, ProjectFile, ProjectLink, ProjectFilament, ProjectQuote, Filament
 
 
 ALLOWED_PROJECT_FILE_EXTENSIONS = {
@@ -90,6 +90,7 @@ def register(app):
         project = Project.query.options(
             joinedload(Project.files),
             joinedload(Project.links),
+            joinedload(Project.quotes),
             joinedload(Project.filaments)
             .joinedload(ProjectFilament.filament)
             .joinedload(Filament.color),

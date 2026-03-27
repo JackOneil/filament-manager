@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.34.0] - 2026-03-28
+### Added
+- **Customer pricing calculator**: the Calculator now supports customer-facing pricing with explicit base cost, margin percentage, margin amount, and final selling price.
+- **Project quote saving**: calculated offers can now be saved directly to a project as reusable quotes linked to the chosen filament and pricing snapshot.
+- **Quote export**: saved project quotes can be opened as a simple printable/exportable offer page suitable for PDF export or sharing with a customer.
+- **Backup support for quotes**: project quotes are now included in `/export` and restored by `/import`, keeping customer pricing data part of the full application backup.
+
 ## [1.33.2] - 2026-03-28
 ### Changed
 - **Navigation cleanup**: unified top-menu iconography so all primary sections use matching Font Awesome icons.
