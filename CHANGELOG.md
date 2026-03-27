@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.33.2] - 2026-03-28
+### Changed
+- **Navigation cleanup**: unified top-menu iconography so all primary sections use matching Font Awesome icons.
+- **Navigation simplification**: removed the duplicate *Add Filament* menu entry because the Overview page already provides a prominent *New* action for adding stock.
+
+## [1.33.1] - 2026-03-28
+### Fixed
+- **Statistics chart sizing**: fixed the new statistics dashboard charts so they render inside stable-height containers instead of stretching vertically without limit on page load.
+
+## [1.33.0] - 2026-03-27
+### Added
+- **Statistics dashboard**: Added a new `/stats` page with usage and stock-addition charts, top material and project summaries, a recent stock additions feed, and a stock depletion forecast to help time reorders before filament runs out.
+- **Inventory forecasting**: The dashboard now estimates days remaining for each filament based on the last 30 days of recorded consumption and highlights critical or soon-to-reorder stock.
+- **Project and material analytics**: Daily usage trends, top materials, and project consumption are now aggregated from movement history, Bambu print deductions, and project filament usage to give a clearer picture of what is being consumed and where.
+
 ## [1.32.4] - 2026-03-27
 ### Fixed
 - **Bambu filtered workflow without page reset**: saving filament mapping from the *Without filament* or *Not deducted* filtered views now updates the page via AJAX instead of a full refresh, so the active filter stays preserved while processing multiple jobs.

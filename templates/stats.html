@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<div class="max-w-7xl mx-auto space-y-6">
+    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800 flex items-center gap-3">
+                <i class="fa-solid fa-chart-line text-blue-600"></i> {{ t('stats_title') }}
+            </h1>
+            <p class="text-gray-500 mt-2">{{ t('stats_desc') }}</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            {% for option in [7, 30, 90, 180] %}
+            <a href="{{ url_for('stats', days=option) }}"
+               class="px-4 py-2 rounded-full text-sm font-semibold transition-colors {% if days == option %}bg-blue-600 text-white shadow{% else %}bg-white border border-gray-200 text-gray-600 hover:bg-gray-50{% endif %}">
+                {{ option }} {{ t('stats_days_suffix') }}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <p class="text-sm text-gray-500">{{ t('stats_usage_period') }}</p>
+            <p class="text-3xl font-bold text-gray-800 mt-2">{{ summary.usage_total_period }} g</p>
+            <p class="text-xs text-gray-400 mt-1">{{ t('stats_usage_period_hint') }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <p class="text-sm text-gray-500">{{ t('stats_purchase_period') }}</p>
+            <p class="text-3xl font-bold text-gray-800 mt-2">{{ summary.purchase_total_period }} g</p>
+            <p class="text-xs text-gray-400 mt-1">{{ t('stats_purchase_period_hint') }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <p class="text-sm text-gray-500">{{ t('stats_daily_average') }}</p>
+            <p class="text-3xl font-bold text-gray-800 mt-2">{{ summary.avg_daily_usage_period }} g</p>
+            <p class="text-xs text-gray-400 mt-1">{{ t('stats_daily_average_hint') }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <p class="text-sm text-gray-500">{{ t('stats_reorder_alerts') }}</p>
+            <p class="text-3xl font-bold text-gray-800 mt-2">{{ summary.critical_count + summary.warning_count }}</p>
+            <p class="text-xs mt-1">
+                <span class="text-red-500 font-semibold">{{ summary.critical_count }} {{ t('stats_critical') }}</span>
+                <span class="text-gray-300 mx-1">|</span>
+                <span class="text-amber-500 font-semibold">{{ summary.warning_count }} {{ t('stats_warning') }}</span>
+            </p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div class="xl:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-bold text-gray-800">{{ t('stats_usage_chart') }}</h2>
+                <span class="text-xs text-gray-400">{{ t('stats_usage_chart_hint') }}</span>
+            </div>
+            <div class="relative h-80">
+                <canvas id="usageChart"></canvas>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">{{ t('stats_material_mix') }}</h2>
+            {% if top_materials %}
+            <div class="space-y-3">
+                {% for item in top_materials %}
+                <div class="flex items-center justify-between text-sm">
+                    <span class="font-medium text-gray-700">{{ item.name }}</span>
+                    <span class="text-gray-500">{{ item.grams }} g</span>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="relative h-72 mt-5">
+                <canvas id="materialChart"></canvas>
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-400">{{ t('stats_no_usage_data') }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-bold text-gray-800">{{ t('stats_purchase_chart') }}</h2>
+                <span class="text-xs text-gray-400">{{ t('stats_purchase_chart_hint') }}</span>
+            </div>
+            <div class="relative h-72">
+                <canvas id="purchaseChart"></canvas>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-bold text-gray-800">{{ t('stats_project_chart') }}</h2>
+                <span class="text-xs text-gray-400">{{ t('stats_project_chart_hint') }}</span>
+            </div>
+            {% if project_rows %}
+            <div class="relative h-72">
+                <canvas id="projectChart"></canvas>
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-400">{{ t('stats_no_project_data') }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 overflow-hidden">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-bold text-gray-800">{{ t('stats_forecast_title') }}</h2>
+                <span class="text-xs text-gray-400">{{ t('stats_forecast_hint') }}</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="text-left text-gray-500 border-b border-gray-100">
+                        <tr>
+                            <th class="py-2 pr-4">{{ t('name') }}</th>
+                            <th class="py-2 pr-4">{{ t('remaining') }}</th>
+                            <th class="py-2 pr-4">{{ t('stats_daily_average') }}</th>
+                            <th class="py-2 pr-4">{{ t('stats_days_left') }}</th>
+                            <th class="py-2">{{ t('stats_reorder_status') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in forecast_rows %}
+                        <tr class="border-b border-gray-50 last:border-0">
+                            <td class="py-3 pr-4">
+                                <p class="font-semibold text-gray-800">{{ row.filament_name }}</p>
+                                <p class="text-xs text-gray-400">{{ row.material_name }}{% if row.color_name %} · {{ row.color_name }}{% endif %}</p>
+                            </td>
+                            <td class="py-3 pr-4 text-gray-600">{{ row.remaining }} g</td>
+                            <td class="py-3 pr-4 text-gray-600">{{ row.avg_daily_usage }} g</td>
+                            <td class="py-3 pr-4 text-gray-600">
+                                {% if row.days_left is not none %}
+                                    {{ row.days_left }}
+                                {% else %}
+                                    {{ t('stats_no_forecast') }}
+                                {% endif %}
+                            </td>
+                            <td class="py-3">
+                                {% if row.reorder_status == 'critical' %}
+                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">
+                                    <i class="fa-solid fa-triangle-exclamation"></i> {{ t('stats_reorder_now') }}
+                                </span>
+                                {% elif row.reorder_status == 'warning' %}
+                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">
+                                    <i class="fa-solid fa-bell"></i> {{ t('stats_reorder_soon') }}
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
+                                    <i class="fa-solid fa-check"></i> {{ t('stats_stock_ok') }}
+                                </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                <h2 class="text-lg font-bold text-gray-800 mb-4">{{ t('stats_project_usage_title') }}</h2>
+                {% if project_rows %}
+                <div class="space-y-3">
+                    {% for row in project_rows %}
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <p class="font-semibold text-gray-800">{{ row.project_name }}</p>
+                            <p class="text-xs text-gray-400">{{ row.jobs }} {{ t('stats_jobs_count') }} · {{ row.source }}</p>
+                        </div>
+                        <span class="text-sm font-semibold text-blue-600">{{ row.grams }} g</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-400">{{ t('stats_no_project_data') }}</p>
+                {% endif %}
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                <h2 class="text-lg font-bold text-gray-800 mb-4">{{ t('stats_purchase_log_title') }}</h2>
+                {% if purchase_rows %}
+                <div class="space-y-3">
+                    {% for row in purchase_rows %}
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <p class="font-semibold text-gray-800">{{ row.filament_name }}</p>
+                            <p class="text-xs text-gray-400">{{ row.date }}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-semibold text-emerald-600">+{{ row.weight }} g</p>
+                            <p class="text-xs text-gray-400">{{ row.cost }} {{ row.currency }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-400">{{ t('stats_no_purchase_data') }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const statsData = {{ chart_data|safe }};
+
+function baseChartOptions() {
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { labels: { boxWidth: 12 } }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: { callback: (value) => `${value} g` }
+            }
+        }
+    };
+}
+
+new Chart(document.getElementById('usageChart'), {
+    type: 'line',
+    data: {
+        labels: statsData.labels,
+        datasets: [
+            {
+                label: '{{ t("stats_usage_dataset") }}',
+                data: statsData.usageDaily,
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37, 99, 235, 0.18)',
+                fill: true,
+                tension: 0.3,
+            },
+            ...statsData.materialSeries.map(series => ({
+                ...series,
+                fill: false,
+                tension: 0.25,
+                borderDash: [5, 4],
+            })),
+        ],
+    },
+    options: baseChartOptions(),
+});
+
+new Chart(document.getElementById('purchaseChart'), {
+    type: 'bar',
+    data: {
+        labels: statsData.labels,
+        datasets: [{
+            label: '{{ t("stats_purchase_dataset") }}',
+            data: statsData.purchaseDaily,
+            backgroundColor: '#10b981',
+            borderRadius: 8,
+        }],
+    },
+    options: baseChartOptions(),
+});
+
+{% if top_materials %}
+new Chart(document.getElementById('materialChart'), {
+    type: 'doughnut',
+    data: {
+        labels: {{ top_materials|map(attribute='name')|list|tojson }},
+        datasets: [{
+            data: {{ top_materials|map(attribute='grams')|list|tojson }},
+            backgroundColor: ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
+            borderWidth: 0,
+        }],
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } },
+    },
+});
+{% endif %}
+
+{% if project_rows %}
+new Chart(document.getElementById('projectChart'), {
+    type: 'bar',
+    data: {
+        labels: statsData.projectLabels,
+        datasets: [{
+            label: '{{ t("stats_project_dataset") }}',
+            data: statsData.projectData,
+            backgroundColor: '#8b5cf6',
+            borderRadius: 8,
+        }],
+    },
+    options: {
+        ...baseChartOptions(),
+        indexAxis: 'y',
+    },
+});
+{% endif %}
+</script>
+{% endblock %}
