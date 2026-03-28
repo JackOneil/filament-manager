@@ -372,9 +372,16 @@ def register(app):
         setting = AppSetting.query.first()
         page = request.args.get('page', 1, type=int)
         job_filter = request.args.get('filter', '')
+        filament_id = request.args.get('filament_id', type=int)
         per_page = 20
 
         base_q = BambuPrintJob.query
+        active_filament = db.session.get(Filament, filament_id) if filament_id else None
+        if filament_id:
+            base_q = base_q.filter(or_(
+                BambuPrintJob.filament_id == filament_id,
+                BambuPrintJob.materials.any(BambuJobMaterial.filament_id == filament_id),
+            ))
         if job_filter == 'unassigned':
             base_q = base_q.filter(_job_unassigned_filter())
         elif job_filter == 'not_deducted':
@@ -387,9 +394,15 @@ def register(app):
         )
 
         # Counts for filter bar badges
-        count_all = BambuPrintJob.query.count()
-        count_unassigned = BambuPrintJob.query.filter(_job_unassigned_filter()).count()
-        count_not_deducted = BambuPrintJob.query.filter(_job_not_deducted_filter()).count()
+        count_base = BambuPrintJob.query
+        if filament_id:
+            count_base = count_base.filter(or_(
+                BambuPrintJob.filament_id == filament_id,
+                BambuPrintJob.materials.any(BambuJobMaterial.filament_id == filament_id),
+            ))
+        count_all = count_base.count()
+        count_unassigned = count_base.filter(_job_unassigned_filter()).count()
+        count_not_deducted = count_base.filter(_job_not_deducted_filter()).count()
 
         filaments_orm = Filament.query.order_by(Filament.name).all()
         projects_orm = Project.query.order_by(Project.name).all()
@@ -417,6 +430,8 @@ def register(app):
             has_token=has_token,
             setting=setting,
             job_filter=job_filter,
+            active_filament=active_filament,
+            active_filament_id=filament_id,
             count_all=count_all,
             count_unassigned=count_unassigned,
             count_not_deducted=count_not_deducted,
@@ -428,6 +443,16 @@ def register(app):
         if not setting or not setting.bambu_token:
             return jsonify({'ok': False, 'error': 'No Bambu token configured'}), 400
         result = do_sync(setting.bambu_token, setting.bambu_region or 'global')
+        setting.bambu_last_sync_at = datetime.utcnow()
+        if result.get('error'):
+            setting.bambu_last_sync_status = f"error: {result['error'][:220]}"
+        else:
+            setting.bambu_last_sync_status = json.dumps({
+                'added': result.get('added', 0),
+                'updated': result.get('updated', 0),
+                'skipped': result.get('skipped', 0),
+            })
+        db.session.commit()
         return jsonify({'ok': result['error'] is None, **result})
 
     @app.route('/bambu/job/<int:job_id>/map', methods=['POST'])
@@ -470,7 +495,14 @@ def register(app):
             if filament:
                 actual_amount = deduct_filament_stock(filament, job.weight_grams)
                 if actual_amount > 0:
-                    log_movement(filament, 'bambu_print', actual_amount)
+                    log_movement(
+                        filament,
+                        'bambu_print',
+                        actual_amount,
+                        project_id=project_id or job.project_id,
+                        bambu_job_id=job.id,
+                        note=f'Bambu job: {job.model_name or job.external_id}',
+                    )
                     db.session.add(PrintHistory(
                         filament_name=(
                             f"{filament.name} | {filament.brand.name} {filament.material.name}"
@@ -534,7 +566,14 @@ def register(app):
             if weight > 0 and filament:
                 actual_amount = deduct_filament_stock(filament, weight)
                 if actual_amount > 0:
-                    log_movement(filament, 'bambu_print', actual_amount)
+                    log_movement(
+                        filament,
+                        'bambu_print',
+                        actual_amount,
+                        project_id=job.project_id,
+                        bambu_job_id=job.id,
+                        note=f'Bambu slot: {job.model_name or job.external_id}',
+                    )
                     slot.deducted = True
                     actually_deducted = True
                     # Propagate to the linked project if any

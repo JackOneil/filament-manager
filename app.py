@@ -15,7 +15,11 @@ Structure:
   messages.py          — i18n translation dictionaries
 """
 import os
+import json
 import logging
+import threading
+import time
+from datetime import datetime, timedelta
 from flask import Flask
 from sqlalchemy import text
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -30,7 +34,7 @@ from utils import get_settings
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.34.0'
+APP_VERSION = '1.35.0'
 
 
 def create_app(test_config=None) -> Flask:
@@ -64,6 +68,7 @@ def create_app(test_config=None) -> Flask:
         return dict(t=t, current_lang=lang, current_currency=currency, theme=theme, app_version=APP_VERSION)
 
     _setup_database(app)
+    _start_bambu_sync_worker(app)
     return app
 
 
@@ -87,6 +92,16 @@ def _setup_database(app: Flask) -> None:
             db.session.commit()
 
         _safe_alter(app, 'ALTER TABLE filament ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1')
+        _safe_alter(app, 'ALTER TABLE filament ADD COLUMN min_stock_grams FLOAT NOT NULL DEFAULT 0')
+        _safe_alter(app, 'ALTER TABLE filament ADD COLUMN max_stock_grams FLOAT NOT NULL DEFAULT 0')
+        _safe_alter(app, 'ALTER TABLE filament ADD COLUMN tag_text TEXT DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE filament ADD COLUMN quality_stringing TEXT DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE filament ADD COLUMN quality_adhesion TEXT DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE filament ADD COLUMN quality_drying TEXT DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE filament ADD COLUMN quality_profile TEXT DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE filament ADD COLUMN quality_notes TEXT DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE filament ADD COLUMN recommended_nozzle_temp INTEGER DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE filament ADD COLUMN recommended_bed_temp INTEGER DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN kwh_price FLOAT NOT NULL DEFAULT 5.0')
         _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN printer_power INTEGER NOT NULL DEFAULT 150')
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN currency VARCHAR(10) NOT NULL DEFAULT 'CZK'")
@@ -94,10 +109,19 @@ def _setup_database(app: Flask) -> None:
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN theme VARCHAR(10) NOT NULL DEFAULT 'light'")
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN view_mode VARCHAR(10) NOT NULL DEFAULT 'card'")
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN items_per_page INTEGER NOT NULL DEFAULT 12")
+        _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN bambu_auto_sync_enabled BOOLEAN NOT NULL DEFAULT 0')
+        _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN bambu_auto_sync_interval_minutes INTEGER NOT NULL DEFAULT 60')
+        _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN bambu_last_sync_at DATETIME DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN bambu_last_sync_status VARCHAR(255) DEFAULT NULL')
 
         _safe_alter(app, "ALTER TABLE project_link ADD COLUMN og_title VARCHAR(255) DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE project_link ADD COLUMN og_image VARCHAR(500) DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE project_link ADD COLUMN og_description TEXT DEFAULT NULL")
+        _safe_alter(app, 'ALTER TABLE project ADD COLUMN tag_text TEXT DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE movement_history ADD COLUMN filament_id INTEGER DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE movement_history ADD COLUMN project_id INTEGER DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE movement_history ADD COLUMN bambu_job_id INTEGER DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE movement_history ADD COLUMN note TEXT DEFAULT NULL')
 
         # Bambu Lab Cloud integration
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN bambu_token TEXT DEFAULT NULL")
@@ -123,6 +147,53 @@ def _safe_alter(app: Flask, sql: str) -> None:
         except Exception as e:
             db.session.rollback()
             app.logger.error(f"Error in _safe_alter executing '{sql}': {e}")
+
+
+def _start_bambu_sync_worker(app: Flask) -> None:
+    if app.config.get('TESTING'):
+        return
+    if app.debug and os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+        return
+    if app.extensions.get('bambu_sync_worker_started'):
+        return
+
+    app.extensions['bambu_sync_worker_started'] = True
+
+    def worker():
+        from routes.bambu import do_sync
+
+        while True:
+            try:
+                with app.app_context():
+                    setting = AppSetting.query.first()
+                    if (
+                        setting
+                        and setting.bambu_token
+                        and setting.bambu_auto_sync_enabled
+                    ):
+                        interval = max(int(setting.bambu_auto_sync_interval_minutes or 60), 5)
+                        due = (
+                            not setting.bambu_last_sync_at
+                            or setting.bambu_last_sync_at <= datetime.utcnow() - timedelta(minutes=interval)
+                        )
+                        if due:
+                            result = do_sync(setting.bambu_token, setting.bambu_region or 'global')
+                            setting.bambu_last_sync_at = datetime.utcnow()
+                            if result.get('error'):
+                                setting.bambu_last_sync_status = f"error: {result['error'][:220]}"
+                            else:
+                                setting.bambu_last_sync_status = json.dumps({
+                                    'added': result.get('added', 0),
+                                    'updated': result.get('updated', 0),
+                                    'skipped': result.get('skipped', 0),
+                                })
+                            db.session.commit()
+            except Exception as exc:
+                app.logger.error("Background Bambu sync failed: %s", exc)
+            time.sleep(60)
+
+    thread = threading.Thread(target=worker, name='bambu-sync-worker', daemon=True)
+    thread.start()
 
 
 # WSGI entry point (Gunicorn) and dev server

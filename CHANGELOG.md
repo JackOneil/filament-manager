@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.35.0] - 2026-03-28
+### Added
+- **Automatic purchase recommendations**: the statistics dashboard now calculates what to order next from the last 30/90 days of real usage, including suggested grams and spool counts.
+- **Min/max stock guardrails**: filaments now support minimum and maximum stock thresholds, visual low-stock warnings, and reorder recommendations across inventory and stats views.
+- **Filament detail with spool timeline**: each filament now has its own detail page with a timeline of manual usage, project consumption, and Bambu deductions.
+- **Quality log per filament**: operators can store notes for stringing, adhesion, drying, print profiles, nozzle/bed temperatures, and general material experience directly on the filament.
+- **Tags for filaments and projects**: lightweight tags can now be stored on both inventory items and projects and are surfaced in overview screens and settings.
+- **Bulk inventory operations**: the inventory overview now supports selecting multiple filaments and applying shared actions such as spool changes, weight additions, tags, minimum stock updates, or deletion.
+- **Bambu background sync**: Bambu Cloud integration now supports automatic background synchronization with configurable interval and last-sync status tracking.
+
+### Changed
+- **Statistics dashboard widgets**: added quick widgets for low stock, fastest-turning filaments, and most profitable quoted projects.
+- **Backup schema expanded**: `/export` and `/import` now include stock thresholds, quality-log fields, tags, richer movement metadata, and Bambu auto-sync settings.
+- **Inventory cards and list rows**: overview items now expose tags, threshold hints, reorder context, selection checkboxes, and direct access to the filament timeline.
+
 ## [1.34.0] - 2026-03-28
 ### Added
 - **Customer pricing calculator**: the Calculator now supports customer-facing pricing with explicit base cost, margin percentage, margin amount, and final selling price.

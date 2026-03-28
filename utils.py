@@ -3,6 +3,8 @@ import json
 import math
 import re
 import socket
+from collections import Counter
+from datetime import datetime, timedelta
 from urllib.parse import urljoin, urlparse, urlunparse
 
 import requests
@@ -31,7 +33,122 @@ def get_current_theme():
     return setting.theme if setting and setting.theme else 'light'
 
 
-def log_movement(filament, action_type, weight):
+def build_filament_history_name(filament):
+    brand_name = filament.brand.name if filament.brand else ""
+    mat_name = filament.material.name if filament.material else ""
+    return f"{filament.name} | {brand_name} {mat_name}".strip(" | ")
+
+
+def parse_tags(raw_value):
+    if not raw_value:
+        return []
+    if isinstance(raw_value, list):
+        values = raw_value
+    else:
+        values = re.split(r'[,;\n]+', str(raw_value))
+    tags = []
+    seen = set()
+    for value in values:
+        tag = ' '.join(str(value).strip().split())
+        if not tag:
+            continue
+        lowered = tag.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        tags.append(tag)
+    return tags
+
+
+def format_tags(raw_value):
+    return ', '.join(parse_tags(raw_value))
+
+
+def get_filament_tags(filament):
+    return parse_tags(getattr(filament, 'tag_text', ''))
+
+
+def get_project_tags(project):
+    return parse_tags(getattr(project, 'tag_text', ''))
+
+
+def movement_action_label(action_type):
+    return {
+        'add': 'Add',
+        'remove': 'Use',
+        'bambu_print': 'Bambu print',
+        'bulk_add_weight': 'Bulk add weight',
+        'bulk_delete': 'Bulk delete',
+        'bulk_add_spool': 'Bulk add spool',
+        'bulk_remove_spool': 'Bulk remove spool',
+    }.get(action_type, action_type.replace('_', ' ').title())
+
+
+def compute_stock_status(filament, usage_30=0.0, usage_90=0.0):
+    min_stock = max(float(getattr(filament, 'min_stock_grams', 0.0) or 0.0), 0.0)
+    max_stock = max(float(getattr(filament, 'max_stock_grams', 0.0) or 0.0), 0.0)
+    remaining = max(float(getattr(filament, 'weight_remaining', 0.0) or 0.0), 0.0)
+    usage_30 = max(float(usage_30 or 0.0), 0.0)
+    usage_90 = max(float(usage_90 or 0.0), 0.0)
+
+    target_stock = max(min_stock, usage_30 * 1.15, (usage_90 / 3.0) * 1.10 if usage_90 > 0 else 0.0)
+    if max_stock > 0:
+        target_stock = min(target_stock, max_stock)
+    recommended_grams = max(0.0, target_stock - remaining)
+    spool_weight = float(getattr(filament, 'weight_total', 0.0) or 0.0)
+    recommended_spools = math.ceil(recommended_grams / spool_weight) if spool_weight > 0 and recommended_grams > 0 else 0
+
+    if remaining <= 0 or (min_stock > 0 and remaining < min_stock * 0.5):
+        status = 'critical'
+    elif min_stock > 0 and remaining < min_stock:
+        status = 'warning'
+    elif usage_30 > 0 and remaining < usage_30:
+        status = 'warning'
+    else:
+        status = 'stable'
+
+    return {
+        'remaining': round(remaining, 1),
+        'min_stock': round(min_stock, 1),
+        'max_stock': round(max_stock, 1),
+        'usage_30': round(usage_30, 1),
+        'usage_90': round(usage_90, 1),
+        'target_stock': round(target_stock, 1),
+        'recommended_grams': round(recommended_grams, 1),
+        'recommended_spools': recommended_spools,
+        'status': status,
+    }
+
+
+def collect_usage_windows(filaments, now=None):
+    now = now or datetime.utcnow()
+    by_id = {fil.id: {'usage_30': 0.0, 'usage_90': 0.0} for fil in filaments}
+    by_name = {build_filament_history_name(fil): fil.id for fil in filaments}
+    since_90 = now - timedelta(days=90)
+    rows = MovementHistory.query.filter(
+        MovementHistory.created_at >= since_90,
+        MovementHistory.action_type.in_(('remove', 'bambu_print')),
+    ).all()
+    for row in rows:
+        filament_id = row.filament_id
+        if filament_id not in by_id:
+            filament_id = by_name.get(row.filament_name)
+        if filament_id not in by_id:
+            continue
+        by_id[filament_id]['usage_90'] += row.weight or 0.0
+        if row.created_at and row.created_at >= now - timedelta(days=30):
+            by_id[filament_id]['usage_30'] += row.weight or 0.0
+    return by_id
+
+
+def top_tags(items, attr_name='tag_text', limit=10):
+    counter = Counter()
+    for item in items:
+        counter.update(parse_tags(getattr(item, attr_name, '')))
+    return counter.most_common(limit)
+
+
+def log_movement(filament, action_type, weight, project_id=None, bambu_job_id=None, note=None):
     """Record a filament weight movement with cost calculation."""
     if weight <= 0:
         return
@@ -39,16 +156,18 @@ def log_movement(filament, action_type, weight):
     total_cost = cost_per_gram * weight
     currency = get_current_currency()
 
-    brand_name = filament.brand.name if filament.brand else ""
-    mat_name = filament.material.name if filament.material else ""
-    filament_name = f"{filament.name} | {brand_name} {mat_name}".strip(" | ")
+    filament_name = build_filament_history_name(filament)
 
     movement = MovementHistory(
+        filament_id=filament.id if getattr(filament, 'id', None) else None,
+        project_id=project_id,
+        bambu_job_id=bambu_job_id,
         filament_name=filament_name,
         action_type=action_type,
         weight=weight,
         cost=total_cost,
         currency=currency,
+        note=note,
     )
     db.session.add(movement)
 

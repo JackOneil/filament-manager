@@ -33,6 +33,15 @@
                 <tr class="border-b border-gray-200 hover:bg-gray-50 transition">
                     <td class="p-3 font-medium text-gray-800">
                         <a href="{{ url_for('project_detail', id=p.id) }}" class="text-blue-600 hover:underline">{{ p.name }}</a>
+                        {% if p.tag_text %}
+                        <div class="flex flex-wrap gap-1 mt-1">
+                            {% for tag in p.tag_text.split(',')[:3] %}
+                            {% if tag.strip() %}
+                            <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-semibold">{{ tag.strip() }}</span>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
                     </td>
                     <td class="p-3 text-gray-600">{{ p.client_name or '-' }}</td>
                     <td class="p-3 text-gray-600">

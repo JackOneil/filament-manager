@@ -268,6 +268,24 @@
                             <option value="china" {% if app_settings and app_settings.bambu_region == 'china' %}selected{% endif %}>{{ t('bambu_region_china') }}</option>
                         </select>
                     </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                            <label class="text-sm font-medium text-gray-700">{{ t('bambu_auto_sync') }}</label>
+                            <input type="checkbox" name="bambu_auto_sync_enabled" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" {% if app_settings and app_settings.bambu_auto_sync_enabled %}checked{% endif %}>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('bambu_auto_sync_interval') }}</label>
+                            <input type="number" name="bambu_auto_sync_interval_minutes" min="5" step="5" value="{{ app_settings.bambu_auto_sync_interval_minutes if app_settings else 60 }}" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                    </div>
+                    {% if app_settings and app_settings.bambu_last_sync_at %}
+                    <div class="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                        {{ t('bambu_last_sync_at') }}: {{ app_settings.bambu_last_sync_at.strftime('%d.%m.%Y %H:%M') }}
+                        {% if app_settings.bambu_last_sync_status %}
+                        <span class="text-gray-400">|</span> {{ app_settings.bambu_last_sync_status }}
+                        {% endif %}
+                    </div>
+                    {% endif %}
                     <div class="flex gap-3">
                         <button type="submit"
                             class="bg-blue-600 hover:bg-blue-700 transition-colors text-white font-semibold py-2 px-5 rounded-lg text-sm shadow">
@@ -334,6 +352,35 @@
                 {% else %}
                 <p class="text-sm text-gray-400 italic">{{ t('bambu_no_printers') }}</p>
                 {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center gap-2 mb-4 border-b pb-3">
+            <i class="fa-solid fa-tags text-slate-500"></i>
+            <h2 class="text-xl font-bold text-gray-800">{{ t('tag_list') }}</h2>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">{{ t('filament_tags') }}</p>
+                <div class="flex flex-wrap gap-2">
+                    {% for tag, count in filament_tag_cloud %}
+                    <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-sm font-semibold">{{ tag }} <span class="text-xs text-slate-500">{{ count }}</span></span>
+                    {% else %}
+                    <span class="text-sm text-gray-400">{{ t('no_results') }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div>
+                <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">{{ t('project_tags') }}</p>
+                <div class="flex flex-wrap gap-2">
+                    {% for tag, count in project_tag_cloud %}
+                    <span class="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-semibold">{{ tag }} <span class="text-xs text-blue-400">{{ count }}</span></span>
+                    {% else %}
+                    <span class="text-sm text-gray-400">{{ t('no_results') }}</span>
+                    {% endfor %}
+                </div>
             </div>
         </div>
     </div>

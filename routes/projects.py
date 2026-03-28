@@ -6,6 +6,7 @@ from werkzeug.utils import secure_filename
 from sqlalchemy.orm import joinedload
 from database import db
 from models import Project, ProjectFile, ProjectLink, ProjectFilament, ProjectQuote, Filament
+from utils import format_tags
 
 
 ALLOWED_PROJECT_FILE_EXTENSIONS = {
@@ -76,7 +77,8 @@ def register(app):
                 description=description,
                 client_name=client_name,
                 due_date=due_date,
-                estimated_print_time=estimated_print_time
+                estimated_print_time=estimated_print_time,
+                tag_text=format_tags(request.form.get('tag_text', '')),
             )
             db.session.add(new_project)
             db.session.commit()
@@ -109,7 +111,14 @@ def register(app):
             }
             for f in filaments
         ]
-        return render_template('project_detail.html', project=project, all_filaments=filaments, filaments_json=filaments_json, setting=setting)
+        return render_template(
+            'project_detail.html',
+            project=project,
+            all_filaments=filaments,
+            filaments_json=filaments_json,
+            setting=setting,
+            project_tags=format_tags(project.tag_text),
+        )
 
     @app.route('/projects/<int:id>/edit', methods=['GET', 'POST'])
     def project_edit(id):
@@ -118,6 +127,7 @@ def register(app):
             project.name = request.form.get('name', '').strip()
             project.description = request.form.get('description', '').strip()
             project.client_name = request.form.get('client_name', '').strip()
+            project.tag_text = format_tags(request.form.get('tag_text', ''))
             due_date_str = request.form.get('due_date', '').strip()
             project.estimated_print_time = request.form.get('estimated_print_time', 0, type=int)
             hours = request.form.get('print_hours', 0, type=int)
@@ -133,7 +143,7 @@ def register(app):
             db.session.commit()
             return redirect(url_for('project_detail', id=project.id))
 
-        return render_template('project_edit.html', project=project)
+        return render_template('project_edit.html', project=project, project_tags=format_tags(project.tag_text))
 
     @app.route('/projects/<int:id>/delete', methods=['POST'])
     def project_delete(id):
@@ -318,7 +328,13 @@ def register(app):
                     filament.quantity = expected_quantity
                     
             pf.is_used = True
-            log_movement(filament, 'remove', actual_amount)
+            log_movement(
+                filament,
+                'remove',
+                actual_amount,
+                project_id=pf.project_id,
+                note=f'Project consume: {pf.project.name if pf.project else ""}'.strip(),
+            )
             db.session.commit()
             
         return redirect(url_for('project_detail', id=id))

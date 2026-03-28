@@ -29,6 +29,16 @@ class Filament(db.Model):
     weight_remaining = db.Column(db.Float, nullable=False)
     price = db.Column(db.Float, nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
+    min_stock_grams = db.Column(db.Float, nullable=False, default=0.0)
+    max_stock_grams = db.Column(db.Float, nullable=False, default=0.0)
+    tag_text = db.Column(db.Text, nullable=True)
+    quality_stringing = db.Column(db.Text, nullable=True)
+    quality_adhesion = db.Column(db.Text, nullable=True)
+    quality_drying = db.Column(db.Text, nullable=True)
+    quality_profile = db.Column(db.Text, nullable=True)
+    quality_notes = db.Column(db.Text, nullable=True)
+    recommended_nozzle_temp = db.Column(db.Integer, nullable=True)
+    recommended_bed_temp = db.Column(db.Integer, nullable=True)
 
     brand = db.relationship('Brand', backref=db.backref('filaments', lazy=True))
     color = db.relationship('Color', backref=db.backref('filaments', lazy=True))
@@ -38,11 +48,19 @@ class Filament(db.Model):
 class MovementHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id'), nullable=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
+    bambu_job_id = db.Column(db.Integer, db.ForeignKey('bambu_print_job.id'), nullable=True)
     filament_name = db.Column(db.String(255), nullable=False)
     action_type = db.Column(db.String(50), nullable=False)
     weight = db.Column(db.Float, nullable=False)
     cost = db.Column(db.Float, nullable=False)
     currency = db.Column(db.String(10), nullable=False)
+    note = db.Column(db.Text, nullable=True)
+
+    filament = db.relationship('Filament', backref=db.backref('movements', lazy=True))
+    project = db.relationship('Project', backref=db.backref('movements', lazy=True))
+    bambu_job = db.relationship('BambuPrintJob', backref=db.backref('movements', lazy=True))
 
 
 class AppSetting(db.Model):
@@ -58,6 +76,10 @@ class AppSetting(db.Model):
     # Bambu Lab Cloud integration
     bambu_token = db.Column(db.Text, nullable=True)
     bambu_region = db.Column(db.String(10), default='global')
+    bambu_auto_sync_enabled = db.Column(db.Boolean, default=False)
+    bambu_auto_sync_interval_minutes = db.Column(db.Integer, default=60)
+    bambu_last_sync_at = db.Column(db.DateTime, nullable=True)
+    bambu_last_sync_status = db.Column(db.String(255), nullable=True)
 
 
 class PrintHistory(db.Model):
@@ -97,6 +119,7 @@ class Project(db.Model):
     client_name = db.Column(db.String(100), nullable=True)
     estimated_print_time = db.Column(db.Integer, default=0) # in minutes
     status = db.Column(db.String(20), default='NEW') # NEW, PRINTING, DONE
+    tag_text = db.Column(db.Text, nullable=True)
 
 
 class ProjectFile(db.Model):

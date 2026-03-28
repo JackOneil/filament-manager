@@ -7,7 +7,8 @@ from flask import render_template, request
 from sqlalchemy.orm import joinedload
 
 from database import db
-from models import BambuPrintJob, Filament, MovementHistory, Project, ProjectFilament
+from models import AppSetting, BambuPrintJob, Filament, MovementHistory, Project, ProjectFilament, ProjectQuote
+from utils import collect_usage_windows, compute_stock_status
 
 
 CHART_PALETTE = [
@@ -151,30 +152,18 @@ def register(app):
         purchase_total_period = round(sum(purchase_daily.values()), 1)
         avg_daily_usage_period = round(_safe_divide(usage_total_period, days), 1)
 
+        usage_windows = collect_usage_windows(filaments)
         forecast_rows = []
         for filament in filaments:
-            display_name = _display_filament_name(filament)
-            last_30_usage = MovementHistory.query.with_entities(
-                db.func.coalesce(db.func.sum(MovementHistory.weight), 0.0)
-            ).filter(
-                MovementHistory.filament_name == display_name,
-                MovementHistory.action_type.in_(('remove', 'bambu_print')),
-                MovementHistory.created_at >= last_30_dt,
-            ).scalar() or 0.0
-
-            avg_daily = _safe_divide(last_30_usage, 30)
+            usage_30 = usage_windows.get(filament.id, {}).get('usage_30', 0.0)
+            usage_90 = usage_windows.get(filament.id, {}).get('usage_90', 0.0)
+            avg_daily = _safe_divide(usage_30, 30)
             days_left = _safe_divide(filament.weight_remaining, avg_daily) if avg_daily > 0 else None
-
-            if days_left is None:
-                reorder_status = 'stable'
-            elif days_left <= 7:
-                reorder_status = 'critical'
-            elif days_left <= 21:
-                reorder_status = 'warning'
-            else:
-                reorder_status = 'stable'
+            stock = compute_stock_status(filament, usage_30, usage_90)
+            reorder_status = stock['status']
 
             forecast_rows.append({
+                'filament_id': filament.id,
                 'filament_name': filament.name,
                 'material_name': filament.material.name if filament.material else '',
                 'color_name': filament.color.name if filament.color else '',
@@ -182,6 +171,12 @@ def register(app):
                 'avg_daily_usage': round(avg_daily, 2),
                 'days_left': round(days_left, 1) if days_left is not None else None,
                 'reorder_status': reorder_status,
+                'min_stock': stock['min_stock'],
+                'max_stock': stock['max_stock'],
+                'usage_30': stock['usage_30'],
+                'usage_90': stock['usage_90'],
+                'recommended_grams': stock['recommended_grams'],
+                'recommended_spools': stock['recommended_spools'],
             })
 
         forecast_rows.sort(
@@ -196,6 +191,61 @@ def register(app):
             {'name': name, 'grams': round(total, 1)}
             for name, total, _series in material_totals
         ]
+        purchase_recommendations = [row for row in forecast_rows if row['recommended_grams'] > 0]
+        purchase_recommendations.sort(
+            key=lambda item: (
+                0 if item['reorder_status'] == 'critical' else 1,
+                -item['recommended_grams'],
+                item['filament_name'].lower(),
+            )
+        )
+        purchase_recommendations = purchase_recommendations[:10]
+
+        top_turnover = sorted(
+            [{
+                'filament_id': filament.id,
+                'filament_name': filament.name,
+                'brand_name': filament.brand.name if filament.brand else '',
+                'material_name': filament.material.name if filament.material else '',
+                'usage_30': round(usage_windows.get(filament.id, {}).get('usage_30', 0.0), 1),
+                'usage_90': round(usage_windows.get(filament.id, {}).get('usage_90', 0.0), 1),
+            } for filament in filaments if usage_windows.get(filament.id, {}).get('usage_30', 0.0) > 0 or usage_windows.get(filament.id, {}).get('usage_90', 0.0) > 0],
+            key=lambda item: (item['usage_30'], item['usage_90']),
+            reverse=True,
+        )[:5]
+
+        quote_map = {}
+        for quote in ProjectQuote.query.order_by(ProjectQuote.created_at.desc()).all():
+            if quote.project_id not in quote_map:
+                quote_map[quote.project_id] = quote
+
+        profitable_projects = []
+        setting = AppSetting.query.first()
+        kwh_price = setting.kwh_price if setting else 5.0
+        printer_power = setting.printer_power if setting else 150
+        for project in Project.query.all():
+            quote = quote_map.get(project.id)
+            if not quote:
+                continue
+            actual_cost = 0.0
+            for job in project.bambu_jobs:
+                if job.materials:
+                    for slot in job.materials:
+                        if slot.filament and slot.weight_grams and slot.filament.weight_total > 0:
+                            actual_cost += (slot.filament.price / slot.filament.weight_total) * slot.weight_grams
+                elif job.filament and job.weight_grams and job.filament.weight_total > 0:
+                    actual_cost += (job.filament.price / job.filament.weight_total) * job.weight_grams
+                actual_cost += ((job.cost_time or 0) / 3600.0) * (printer_power / 1000.0) * kwh_price
+            profit = round(quote.final_price - actual_cost, 2)
+            profitable_projects.append({
+                'project_id': project.id,
+                'project_name': project.name,
+                'quote_price': round(quote.final_price, 2),
+                'actual_cost': round(actual_cost, 2),
+                'profit': profit,
+            })
+        profitable_projects.sort(key=lambda item: item['profit'], reverse=True)
+        profitable_projects = profitable_projects[:5]
 
         chart_data = {
             'labels': [day.strftime('%d.%m.') for day in labels],
@@ -222,6 +272,7 @@ def register(app):
             'active_projects': Project.query.filter(Project.status != 'DONE').count(),
             'critical_count': critical_count,
             'warning_count': warning_count,
+            'reorder_recommendations': len(purchase_recommendations),
         }
 
         return render_template(
@@ -233,4 +284,7 @@ def register(app):
             project_rows=project_rows,
             purchase_rows=purchase_filament_rows[:10],
             forecast_rows=forecast_rows[:12],
+            purchase_recommendations=purchase_recommendations,
+            top_turnover=top_turnover,
+            profitable_projects=profitable_projects,
         )

@@ -8,6 +8,7 @@ from models import (
     PrintHistory, Project, ProjectFile, ProjectLink, ProjectFilament, ProjectQuote,
     BambuPrinter, BambuPrintJob, BambuJobMaterial,
 )
+from utils import format_tags, top_tags
 
 
 def register(app):
@@ -104,6 +105,11 @@ def register(app):
                     if token:
                         setting.bambu_token = token
                     setting.bambu_region = region
+                    setting.bambu_auto_sync_enabled = request.form.get('bambu_auto_sync_enabled') == 'on'
+                    setting.bambu_auto_sync_interval_minutes = max(
+                        request.form.get('bambu_auto_sync_interval_minutes', setting.bambu_auto_sync_interval_minutes or 60, type=int),
+                        5,
+                    )
                     app.logger.debug('Bambu Cloud settings updated.')
 
                 elif action == 'bambu_cloud_disconnect':
@@ -139,10 +145,13 @@ def register(app):
         materials = Material.query.order_by(Material.name).all()
         app_settings = AppSetting.query.first()
         printers = BambuPrinter.query.order_by(BambuPrinter.name).all()
+        filament_tag_cloud = top_tags(Filament.query.all())
+        project_tag_cloud = top_tags(Project.query.all())
         return render_template(
             'settings.html',
             brands=brands, colors=colors, materials=materials,
             app_settings=app_settings, printers=printers,
+            filament_tag_cloud=filament_tag_cloud, project_tag_cloud=project_tag_cloud,
         )
 
     @app.route('/export')
@@ -166,6 +175,10 @@ def register(app):
                 'printer_power': setting.printer_power if setting else 150,
                 'debug_logging': setting.debug_logging if setting else False,
                 'bambu_region': setting.bambu_region if setting else 'global',
+                'bambu_auto_sync_enabled': setting.bambu_auto_sync_enabled if setting else False,
+                'bambu_auto_sync_interval_minutes': setting.bambu_auto_sync_interval_minutes if setting else 60,
+                'bambu_last_sync_at': setting.bambu_last_sync_at.isoformat() if setting and setting.bambu_last_sync_at else None,
+                'bambu_last_sync_status': setting.bambu_last_sync_status if setting else None,
                 # bambu_token intentionally excluded for security
             } if setting else {},
 
@@ -179,15 +192,29 @@ def register(app):
                 'weight_remaining': f.weight_remaining,
                 'price': f.price,
                 'quantity': f.quantity,
+                'min_stock_grams': f.min_stock_grams,
+                'max_stock_grams': f.max_stock_grams,
+                'tag_text': f.tag_text,
+                'quality_stringing': f.quality_stringing,
+                'quality_adhesion': f.quality_adhesion,
+                'quality_drying': f.quality_drying,
+                'quality_profile': f.quality_profile,
+                'quality_notes': f.quality_notes,
+                'recommended_nozzle_temp': f.recommended_nozzle_temp,
+                'recommended_bed_temp': f.recommended_bed_temp,
             } for f in Filament.query.all()],
 
             # ── Movement history ───────────────────────────────────────
             'movement_history': [{
                 'filament_name': m.filament_name,
+                'filament_id': m.filament_id,
+                'project_name': m.project.name if m.project else None,
+                'bambu_external_id': m.bambu_job.external_id if m.bambu_job else None,
                 'action_type': m.action_type,
                 'weight': m.weight,
                 'cost': m.cost,
                 'currency': m.currency,
+                'note': m.note,
                 'created_at': m.created_at.isoformat() if m.created_at else None,
             } for m in MovementHistory.query.order_by(MovementHistory.created_at).all()],
 
@@ -205,6 +232,7 @@ def register(app):
                 'description': proj.description,
                 'status': proj.status,
                 'client_name': proj.client_name,
+                'tag_text': proj.tag_text,
                 'estimated_print_time': proj.estimated_print_time,
                 'due_date': proj.due_date.isoformat() if proj.due_date else None,
                 'created_at': proj.created_at.isoformat() if proj.created_at else None,
@@ -324,6 +352,10 @@ def register(app):
                         setting.printer_power = s.get('printer_power', setting.printer_power)
                         setting.debug_logging = s.get('debug_logging', setting.debug_logging)
                         setting.bambu_region = s.get('bambu_region', setting.bambu_region)
+                        setting.bambu_auto_sync_enabled = s.get('bambu_auto_sync_enabled', setting.bambu_auto_sync_enabled)
+                        setting.bambu_auto_sync_interval_minutes = s.get('bambu_auto_sync_interval_minutes', setting.bambu_auto_sync_interval_minutes)
+                        setting.bambu_last_sync_at = datetime.fromisoformat(s['bambu_last_sync_at']) if s.get('bambu_last_sync_at') else setting.bambu_last_sync_at
+                        setting.bambu_last_sync_status = s.get('bambu_last_sync_status', setting.bambu_last_sync_status)
 
                 # ── 3. Filaments ───────────────────────────────────────
                 for f in data.get('filaments', []):
@@ -342,30 +374,22 @@ def register(app):
                                 weight_remaining=f.get('weight_remaining', 1000),
                                 price=f.get('price', 0),
                                 quantity=f.get('quantity', 1),
+                                min_stock_grams=f.get('min_stock_grams', 0),
+                                max_stock_grams=f.get('max_stock_grams', 0),
+                                tag_text=format_tags(f.get('tag_text', '')),
+                                quality_stringing=f.get('quality_stringing'),
+                                quality_adhesion=f.get('quality_adhesion'),
+                                quality_drying=f.get('quality_drying'),
+                                quality_profile=f.get('quality_profile'),
+                                quality_notes=f.get('quality_notes'),
+                                recommended_nozzle_temp=f.get('recommended_nozzle_temp'),
+                                recommended_bed_temp=f.get('recommended_bed_temp'),
                             ))
                             imported_filaments += 1
 
                 db.session.flush()
 
-                # ── 4. Movement history ────────────────────────────────
-                for m in data.get('movement_history', []):
-                    ts = datetime.fromisoformat(m['created_at']) if m.get('created_at') else datetime.utcnow()
-                    exists = MovementHistory.query.filter_by(
-                        filament_name=m.get('filament_name'),
-                        action_type=m.get('action_type'),
-                        created_at=ts,
-                    ).first()
-                    if not exists:
-                        db.session.add(MovementHistory(
-                            filament_name=m.get('filament_name'),
-                            action_type=m.get('action_type'),
-                            weight=m.get('weight', 0),
-                            cost=m.get('cost', 0),
-                            currency=m.get('currency', 'CZK'),
-                            created_at=ts,
-                        ))
-
-                # ── 5. Print history (calculator) ─────────────────────
+                # ── 4. Print history (calculator) ─────────────────────
                 for p in data.get('print_history', []):
                     ts = datetime.fromisoformat(p['created_at']) if p.get('created_at') else datetime.utcnow()
                     exists = PrintHistory.query.filter_by(
@@ -380,7 +404,7 @@ def register(app):
                             created_at=ts,
                         ))
 
-                # ── 6. Projects ───────────────────────────────────────
+                # ── 5. Projects ───────────────────────────────────────
                 for proj_data in data.get('projects', []):
                     proj = Project.query.filter_by(name=proj_data.get('name')).first()
                     if not proj:
@@ -389,12 +413,28 @@ def register(app):
                             description=proj_data.get('description'),
                             status=proj_data.get('status', 'NEW'),
                             client_name=proj_data.get('client_name'),
+                            tag_text=format_tags(proj_data.get('tag_text', '')),
                             estimated_print_time=proj_data.get('estimated_print_time', 0),
                             due_date=datetime.fromisoformat(proj_data['due_date']) if proj_data.get('due_date') else None,
                             created_at=datetime.fromisoformat(proj_data['created_at']) if proj_data.get('created_at') else datetime.utcnow(),
                         )
                         db.session.add(proj)
                         db.session.flush()
+                    else:
+                        proj.tag_text = format_tags(proj_data.get('tag_text', proj.tag_text or ''))
+
+                    for file_data in proj_data.get('files', []):
+                        exists_file = ProjectFile.query.filter_by(
+                            project_id=proj.id,
+                            filename=file_data.get('filename', ''),
+                            filepath=file_data.get('filepath', ''),
+                        ).first()
+                        if not exists_file:
+                            db.session.add(ProjectFile(
+                                project_id=proj.id,
+                                filename=file_data.get('filename', ''),
+                                filepath=file_data.get('filepath', ''),
+                            ))
 
                     for link in proj_data.get('links', []):
                         exists_link = ProjectLink.query.filter_by(
@@ -454,7 +494,7 @@ def register(app):
                                 created_at=quote_ts,
                             ))
 
-                # ── 7. Bambu printers ─────────────────────────────────
+                # ── 6. Bambu printers ─────────────────────────────────
                 for bp in data.get('bambu_printers', []):
                     if not BambuPrinter.query.filter_by(device_id=bp.get('device_id')).first():
                         db.session.add(BambuPrinter(
@@ -464,7 +504,7 @@ def register(app):
                             notes=bp.get('notes'),
                         ))
 
-                # ── 8. Bambu jobs ─────────────────────────────────────
+                # ── 7. Bambu jobs ─────────────────────────────────────
                 for j in data.get('bambu_jobs', []):
                     if BambuPrintJob.query.filter_by(external_id=j.get('external_id')).first():
                         continue
@@ -501,6 +541,39 @@ def register(app):
                             filament_id=mat_fil.id if mat_fil else None,
                             deducted=mat.get('deducted', False),
                         ))
+
+                db.session.flush()
+
+                # ── 8. Movement history ────────────────────────────────
+                for m in data.get('movement_history', []):
+                    ts = datetime.fromisoformat(m['created_at']) if m.get('created_at') else datetime.utcnow()
+                    exists = MovementHistory.query.filter_by(
+                        filament_name=m.get('filament_name'),
+                        action_type=m.get('action_type'),
+                        created_at=ts,
+                    ).first()
+                    if exists:
+                        continue
+
+                    filament = None
+                    if m.get('filament_name'):
+                        filament_base_name = m.get('filament_name', '').split(' | ')[0]
+                        filament = Filament.query.filter_by(name=filament_base_name).first()
+                    project = Project.query.filter_by(name=m.get('project_name')).first() if m.get('project_name') else None
+                    bambu_job = BambuPrintJob.query.filter_by(external_id=m.get('bambu_external_id')).first() if m.get('bambu_external_id') else None
+
+                    db.session.add(MovementHistory(
+                        filament_id=filament.id if filament else None,
+                        project_id=project.id if project else None,
+                        bambu_job_id=bambu_job.id if bambu_job else None,
+                        filament_name=m.get('filament_name'),
+                        action_type=m.get('action_type'),
+                        weight=m.get('weight', 0),
+                        cost=m.get('cost', 0),
+                        currency=m.get('currency', 'CZK'),
+                        created_at=ts,
+                        note=m.get('note'),
+                    ))
 
             app.logger.debug(f"Import finished: {imported_filaments} filaments, projects and Bambu jobs processed.")
         except Exception as e:

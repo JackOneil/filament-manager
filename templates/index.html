@@ -28,6 +28,24 @@
     </div>
 </div>
 
+{% if stock_alerts %}
+<div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+    <div class="flex items-center gap-2 mb-3 text-amber-800 font-semibold">
+        <i class="fa-solid fa-triangle-exclamation"></i> {{ t('inventory_low_stock_widget') }}
+    </div>
+    <div class="flex flex-wrap gap-2">
+        {% for fil in stock_alerts %}
+        <a href="{{ url_for('filament_detail', id=fil.id) }}" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-amber-200 text-sm text-gray-700 hover:border-amber-400 transition">
+            <span class="font-semibold">{{ fil.name }}</span>
+            <span class="{% if fil.stock_metrics.status == 'critical' %}text-red-600{% else %}text-amber-600{% endif %}">
+                {{ fil.stock_metrics.recommended_grams }} g
+            </span>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <!-- Filtry -->
 <div id="filter-section" class="bg-white p-3 sm:p-4 rounded-lg shadow-sm border border-gray-100 mb-4 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 items-stretch sm:items-end">
     <!-- Brand fulltext filter -->
@@ -120,6 +138,11 @@
             <div x-show="filteredColors.length === 0" class="px-3 py-2 text-gray-400 italic text-xs text-center">–</div>
         </div>
     </div>
+    <div class="flex-1 min-w-[150px]">
+        <label class="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">{{ t('tag_list') }}</label>
+        <input type="text" x-model="tagQ" @input="applyFilters()" list="inventoryTagSuggestions" placeholder="{{ t('filter_tags_placeholder') }}"
+            class="w-full rounded px-3 py-2 text-sm focus:ring-blue-500 outline-none border border-gray-300">
+    </div>
     <div class="flex gap-2">
         <button type="button" x-on:click="resetFilters()" :disabled="!hasFilters"
             class="bg-gray-200 hover:bg-gray-300 text-gray-700 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed px-4 py-2 rounded shadow font-semibold transition-colors text-sm" title="{{ t('filter_reset') }}">
@@ -127,6 +150,12 @@
         </button>
     </div>
 </div>
+
+<datalist id="inventoryTagSuggestions">
+    {% for tag in tag_options %}
+    <option value="{{ tag }}"></option>
+    {% endfor %}
+</datalist>
 
 <!-- Řazení - Quick Sort Buttons (POUZE V CARD VIEW) -->
 <div x-show="viewMode === 'card'" x-cloak class="bg-white p-3 sm:p-4 rounded-lg shadow-sm border border-gray-100 mb-6">
@@ -198,6 +227,13 @@
                             {{ fil.brand.name }} &bull; {{ fil.material.name }} &bull; {{ fil.color.name }}
                             <span class="ml-2 text-blue-600">({{ fil.quantity }} {{ t('pieces') }})</span>
                         </p>
+                        {% if fil.tag_list %}
+                        <div class="flex flex-wrap gap-1 mt-2">
+                            {% for tag in fil.tag_list[:3] %}
+                            <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">{{ tag }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
                     </div>
                     <span class="px-2 py-1 text-xs font-bold rounded shadow-sm
                         {% if pct > 50 %}bg-green-100 text-green-800
@@ -217,6 +253,14 @@
                         <span>{{ t('remaining') }}: {{ fil.weight_remaining | int }} g</span>
                         <span>{{ t('capacity') }}: {{ capacity_all | int }} g</span>
                     </div>
+                    {% if fil.stock_metrics.min_stock > 0 %}
+                    <div class="text-xs mt-2 {% if fil.stock_metrics.status == 'critical' %}text-red-600{% elif fil.stock_metrics.status == 'warning' %}text-amber-600{% else %}text-gray-400{% endif %}">
+                        {{ t('min_stock_grams') }}: {{ fil.stock_metrics.min_stock }} g
+                        {% if fil.stock_metrics.recommended_grams > 0 %}
+                        · {{ t('stats_recommend_buy') }}: {{ fil.stock_metrics.recommended_grams }} g
+                        {% endif %}
+                    </div>
+                    {% endif %}
                     <div class="text-xs text-center text-gray-400 mt-1">{{ t('spool_price').format(price='{:0.2f}'.format(fil.price), weight=fil.weight_total | int, currency=current_currency) }}</div>
                 </div>
 
@@ -233,6 +277,7 @@
                         <form action="{{ url_for('remove_spool', id=fil.id) }}" method="POST">
                             <button type="submit" title="{{ t('remove_spool') }}" class="text-yellow-500 hover:text-yellow-700 transition-colors"><i class="fa-solid fa-minus-circle"></i></button>
                         </form>
+                        <a href="{{ url_for('filament_detail', id=fil.id) }}" title="{{ t('spool_life_timeline') }}" class="text-indigo-400 hover:text-indigo-600 transition-colors"><i class="fa-solid fa-wave-square"></i></a>
                         <a href="{{ url_for('edit', id=fil.id) }}" title="{{ t('edit') }}" class="text-gray-400 hover:text-blue-500 transition-colors"><i class="fa-solid fa-edit"></i></a>
                         <form action="{{ url_for('delete', id=fil.id) }}" method="POST" onsubmit="return confirm('{{ t('delete_confirm') }}');">
                             <button type="submit" class="text-gray-400 hover:text-red-500 transition-colors"><i class="fa-solid fa-trash"></i></button>
@@ -249,9 +294,22 @@
     </div>
     {% endfor %}
 {% else %}
+    <form id="bulkDeleteForm" method="POST" action="{{ url_for('inventory_bulk') }}" onsubmit="return confirm('{{ t('bulk_delete_confirm') }}');" class="bg-white p-2.5 rounded-t-lg shadow-sm border border-gray-100 border-b-0 mb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div class="flex items-center gap-3">
+            <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" id="selectAllFilaments" class="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                <span class="text-sm font-medium text-gray-700">{{ t('select_all_filaments') }}</span>
+            </label>
+            <span id="selectedFilamentsCount" class="text-sm text-gray-500">{{ t('selected_filaments_count').format(count=0) }}</span>
+        </div>
+        <button type="submit" id="bulkDeleteButton" disabled class="bg-red-600 hover:bg-red-700 disabled:bg-red-200 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded font-semibold transition-colors text-sm whitespace-nowrap">
+            <i class="fa-solid fa-trash"></i> {{ t('bulk_delete_selected') }}
+        </button>
+    </form>
     <!-- SEZNAM POHLED - HEADER -->
     <div class="hidden sm:grid grid-cols-12 gap-3 bg-gray-100 border-b border-gray-300 px-4 py-2 sticky top-0 z-10 rounded-t-lg mb-0">
-        <button type="button" x-on:click="toggleSort('name')" class="col-span-4 font-bold text-gray-700 text-xs uppercase hover:text-blue-600 hover:underline cursor-pointer flex items-center gap-1 group transition bg-transparent border-0 p-0 text-left">
+        <div class="col-span-1"></div>
+        <button type="button" x-on:click="toggleSort('name')" class="col-span-3 font-bold text-gray-700 text-xs uppercase hover:text-blue-600 hover:underline cursor-pointer flex items-center gap-1 group transition bg-transparent border-0 p-0 text-left">
             {{ t('name') }}
             <i class="fa-solid" :class="sortBy === 'name' ? (sortDir === 'asc' ? 'fa-arrow-up text-blue-600' : 'fa-arrow-down text-blue-600') : 'fa-arrow-up-arrow-down opacity-30'"></i>
         </button>
@@ -286,19 +344,29 @@
         {% endif %}
         <div class="bg-white border-b border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors grid grid-cols-12 gap-3 items-center">
             <!-- Barva a název (ZVĚTŠENO) -->
-            <div class="col-span-3 sm:col-span-4 flex items-start gap-2">
+        <div class="col-span-1 flex justify-center">
+            <input type="checkbox" form="bulkDeleteForm" name="selected_ids" value="{{ fil.id }}" class="filament-select w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+        </div>
+        <div class="col-span-2 sm:col-span-3 flex items-start gap-2">
                 <div class="w-3 h-10 rounded-full flex-shrink-0" style="background-color: {{ fil.color.hex_value }};"></div>
                 <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-1.5">
+                <div class="flex items-center gap-1.5">
                         {% if fil.quantity == 0 or pct < 20 %}
                         <span class="text-xs font-bold px-1.5 py-0.5 rounded flex-shrink-0 {% if fil.quantity == 0 %}bg-red-600 text-white{% else %}bg-orange-500 text-white{% endif %}">
                             {% if fil.quantity == 0 %}<i class="fa-solid fa-exclamation-circle"></i>{% else %}<i class="fa-solid fa-triangle-exclamation"></i>{% endif %}
                         </span>
                         {% endif %}
-                        <h3 class="font-bold text-gray-800 truncate text-sm" title="{{ fil.name }}">{{ fil.name }}</h3>
-                    </div>
+                    <h3 class="font-bold text-gray-800 truncate text-sm" title="{{ fil.name }}">{{ fil.name }}</h3>
                 </div>
+                {% if fil.tag_list %}
+                <div class="flex flex-wrap gap-1 mt-1">
+                    {% for tag in fil.tag_list[:2] %}
+                    <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-semibold">{{ tag }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
             </div>
+        </div>
             
             <!-- Značka a materiál (skryto na malých obrazovkách) -->
             <div class="col-span-0 sm:col-span-2 hidden sm:block text-xs text-gray-600 truncate text-center">
@@ -341,6 +409,7 @@
                 <form action="{{ url_for('remove_spool', id=fil.id) }}" method="POST">
                     <button type="submit" title="{{ t('remove_spool') }}" class="text-yellow-500 hover:text-yellow-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-minus-circle"></i></button>
                 </form>
+                <a href="{{ url_for('filament_detail', id=fil.id) }}" title="{{ t('spool_life_timeline') }}" class="text-indigo-400 hover:text-indigo-600 transition-colors text-sm sm:text-base"><i class="fa-solid fa-wave-square"></i></a>
                 <a href="{{ url_for('edit', id=fil.id) }}" title="{{ t('edit') }}" class="text-gray-400 hover:text-blue-500 transition-colors text-sm sm:text-base"><i class="fa-solid fa-edit"></i></a>
                 <form action="{{ url_for('delete', id=fil.id) }}" method="POST" onsubmit="return confirm('{{ t('delete_confirm') }}');">
                     <button type="submit" title="{{ t('delete') }}" class="text-gray-400 hover:text-red-500 transition-colors text-sm sm:text-base"><i class="fa-solid fa-trash"></i></button>
@@ -419,6 +488,7 @@ function inventoryApp() {
         brand: '{{ f_brand }}',
         material: '{{ f_material }}',
         color: '{{ f_color }}',
+        tagQ: {{ f_tag|tojson }},
         viewMode: '{{ view_mode }}',
         perPage: {{ per_page }},
         currentPage: {{ filaments.page }},
@@ -446,7 +516,7 @@ function inventoryApp() {
         },
 
         get hasFilters() {
-            return this.brand !== '' || this.material !== '' || this.color !== '';
+            return this.brand !== '' || this.material !== '' || this.color !== '' || this.tagQ.trim() !== '';
         },
 
         get paginationPages() {
@@ -500,6 +570,7 @@ function inventoryApp() {
                 brand: this.brand,
                 material: this.material,
                 color: this.color,
+                tag: this.tagQ,
                 view: this.viewMode,
                 page,
                 per_page: this.perPage
@@ -526,8 +597,9 @@ function inventoryApp() {
                         wrapper.classList.add('grid', 'grid-cols-1', 'md:grid-cols-2', 'lg:grid-cols-3', 'gap-6');
                     }
                     wrapper.innerHTML = this.viewMode === 'list'
-                        ? buildListHeaderHtml() + data.html
+                        ? buildListBulkToolbarHtml() + buildListHeaderHtml() + data.html
                         : data.html;
+                    initBulkSelectionUI();
                 }
             } catch (e) {
                 console.error('Fetch error:', e);
@@ -563,6 +635,7 @@ function inventoryApp() {
             this.brandQ = '';
             this.materialQ = '';
             this.colorQ = '';
+            this.tagQ = '';
             this.fetchContent();
         }
     };
@@ -589,7 +662,7 @@ function buildListHeaderHtml() {
         return `<i class="fa-solid ${inv.sortDir === 'asc' ? 'fa-arrow-up' : 'fa-arrow-down'} text-blue-600"></i>`;
     }
     const fields = [
-        { key: 'name',      cls: 'col-span-4 text-left' },
+        { key: 'name',      cls: 'col-span-3 text-left' },
         { key: 'brand',     cls: 'col-span-2 text-center justify-center' },
         { key: 'pieces',    cls: 'col-span-1 text-center justify-center' },
         { key: 'remaining', cls: 'col-span-1 text-center justify-center' },
@@ -605,9 +678,28 @@ function buildListHeaderHtml() {
             </button>`).join('');
     return `
         <div class="hidden sm:grid grid-cols-12 gap-3 bg-gray-100 border-b border-gray-300 px-4 py-2 sticky top-0 z-10 rounded-t-lg mb-0">
+            <div class="col-span-1"></div>
             ${btns}
             <div class="col-span-2 font-bold text-gray-700 text-xs uppercase text-right pr-1">${listHeaderLabels.action}</div>
         </div>`;
+}
+
+function buildListBulkToolbarHtml() {
+    return `
+        <form id="bulkDeleteForm" method="POST" action="{{ url_for('inventory_bulk') }}" onsubmit="return confirm('{{ t('bulk_delete_confirm') }}');"
+            class="bg-white p-2.5 rounded-t-lg shadow-sm border border-gray-100 border-b-0 mb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div class="flex items-center gap-3">
+                <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" id="selectAllFilaments" class="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                    <span class="text-sm font-medium text-gray-700">{{ t('select_all_filaments') }}</span>
+                </label>
+                <span id="selectedFilamentsCount" class="text-sm text-gray-500">{{ t('selected_filaments_count').format(count=0) }}</span>
+            </div>
+            <button type="submit" id="bulkDeleteButton" disabled
+                class="bg-red-600 hover:bg-red-700 disabled:bg-red-200 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded font-semibold transition-colors text-sm whitespace-nowrap">
+                <i class="fa-solid fa-trash"></i> {{ t('bulk_delete_selected') }}
+            </button>
+        </form>`;
 }
 
 // =============================================
@@ -626,6 +718,57 @@ function closeUseFilamentModal() {
     document.getElementById('useFilamentModal').classList.add('hidden');
 }
 
+let __lastCheckedFilament = null;
+
+function updateBulkDeleteState() {
+    const checkboxes = Array.from(document.querySelectorAll('.filament-select'));
+    const checked = checkboxes.filter(cb => cb.checked);
+    const countLabel = document.getElementById('selectedFilamentsCount');
+    const deleteButton = document.getElementById('bulkDeleteButton');
+    const selectAll = document.getElementById('selectAllFilaments');
+    if (countLabel) countLabel.textContent = `{{ t("selected_filaments_count_prefix") }} ${checked.length}`;
+    if (deleteButton) deleteButton.disabled = checked.length === 0;
+    if (selectAll) {
+        selectAll.checked = checkboxes.length > 0 && checked.length === checkboxes.length;
+        selectAll.indeterminate = checked.length > 0 && checked.length < checkboxes.length;
+    }
+}
+
+function initBulkSelectionUI() {
+    const checkboxes = Array.from(document.querySelectorAll('.filament-select'));
+    const selectAll = document.getElementById('selectAllFilaments');
+    __lastCheckedFilament = null;
+
+    checkboxes.forEach((checkbox, index) => {
+        checkbox.dataset.checkboxIndex = index;
+        checkbox.onclick = (event) => {
+            if (event.shiftKey && __lastCheckedFilament !== null) {
+                const last = Number(__lastCheckedFilament.dataset.checkboxIndex);
+                const current = Number(checkbox.dataset.checkboxIndex);
+                const [start, end] = [Math.min(last, current), Math.max(last, current)];
+                for (let i = start; i <= end; i += 1) {
+                    checkboxes[i].checked = checkbox.checked;
+                }
+            }
+            __lastCheckedFilament = checkbox;
+            updateBulkDeleteState();
+        };
+        checkbox.onchange = null;
+    });
+
+    if (selectAll) {
+        selectAll.onchange = () => {
+            checkboxes.forEach((checkbox) => {
+                checkbox.checked = selectAll.checked;
+            });
+            __lastCheckedFilament = null;
+            updateBulkDeleteState();
+        };
+    }
+
+    updateBulkDeleteState();
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     const modal = document.getElementById('useFilamentModal');
     if (modal) {
@@ -633,6 +776,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (e.target === this) closeUseFilamentModal();
         });
     }
+    initBulkSelectionUI();
 });
 </script>
 </div>

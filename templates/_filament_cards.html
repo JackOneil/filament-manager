@@ -21,6 +21,13 @@
                         {{ fil.brand.name }} &bull; {{ fil.material.name }} &bull; {{ fil.color.name }}
                         <span class="ml-2 text-blue-600">({{ fil.quantity }} {{ t('pieces') }})</span>
                     </p>
+                    {% if fil.tag_list %}
+                    <div class="flex flex-wrap gap-1 mt-2">
+                        {% for tag in fil.tag_list[:3] %}
+                        <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">{{ tag }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                 </div>
                 <span class="px-2 py-1 text-xs font-bold rounded shadow-sm
                     {% if pct > 50 %}bg-green-100 text-green-800
@@ -40,6 +47,14 @@
                     <span>{{ t('remaining') }}: {{ fil.weight_remaining | int }} g</span>
                     <span>{{ t('capacity') }}: {{ capacity_all | int }} g</span>
                 </div>
+                {% if fil.stock_metrics.min_stock > 0 %}
+                <div class="text-xs mt-2 {% if fil.stock_metrics.status == 'critical' %}text-red-600{% elif fil.stock_metrics.status == 'warning' %}text-amber-600{% else %}text-gray-400{% endif %}">
+                    {{ t('min_stock_grams') }}: {{ fil.stock_metrics.min_stock }} g
+                    {% if fil.stock_metrics.recommended_grams > 0 %}
+                    · {{ t('stats_recommend_buy') }}: {{ fil.stock_metrics.recommended_grams }} g
+                    {% endif %}
+                </div>
+                {% endif %}
                 <div class="text-xs text-center text-gray-400 mt-1">{{ t('spool_price').format(price='{:0.2f}'.format(fil.price), weight=fil.weight_total | int, currency=current_currency) }}</div>
             </div>
 
@@ -56,6 +71,7 @@
                     <form action="{{ url_for('remove_spool', id=fil.id) }}" method="POST">
                         <button type="submit" title="{{ t('remove_spool') }}" class="text-yellow-500 hover:text-yellow-700 transition-colors"><i class="fa-solid fa-minus-circle"></i></button>
                     </form>
+                    <a href="{{ url_for('filament_detail', id=fil.id) }}" title="{{ t('spool_life_timeline') }}" class="text-indigo-400 hover:text-indigo-600 transition-colors"><i class="fa-solid fa-wave-square"></i></a>
                     <a href="{{ url_for('edit', id=fil.id) }}" title="{{ t('edit') }}" class="text-gray-400 hover:text-blue-500 transition-colors"><i class="fa-solid fa-edit"></i></a>
                     <form action="{{ url_for('delete', id=fil.id) }}" method="POST" onsubmit="return confirm('{{ t('delete_confirm') }}');">
                         <button type="submit" class="text-gray-400 hover:text-red-500 transition-colors"><i class="fa-solid fa-trash"></i></button>

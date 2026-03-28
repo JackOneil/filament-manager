@@ -3,6 +3,7 @@ from flask import request, render_template, jsonify
 from sqlalchemy.orm import joinedload
 from database import db
 from models import Filament, Brand, AppSetting
+from utils import collect_usage_windows, compute_stock_status, get_filament_tags
 
 
 def register(app):
@@ -18,6 +19,7 @@ def register(app):
         f_brand = request.args.get('brand', '')
         f_material = request.args.get('material', '')
         f_color = request.args.get('color', '')
+        f_tag = request.args.get('tag', '').strip()
         sort_by = request.args.get('sort_by', 'name')
         sort_direction = request.args.get('sort_direction', 'asc')
         view_mode = request.args.get('view', 'card')
@@ -31,6 +33,8 @@ def register(app):
             filaments_query = filaments_query.filter(Filament.material_id == f_material)
         if f_color:
             filaments_query = filaments_query.filter(Filament.color_id == f_color)
+        if f_tag:
+            filaments_query = filaments_query.filter(Filament.tag_text.ilike(f'%{f_tag}%'))
 
         if sort_by == 'brand':
             order_expr = Brand.name
@@ -64,6 +68,14 @@ def register(app):
             per_page = default_per_page
 
         filaments_paginated = db.paginate(filaments_query, page=page, per_page=per_page, error_out=False)
+        usage_map = collect_usage_windows(filaments_paginated.items)
+        for fil in filaments_paginated.items:
+            fil.stock_metrics = compute_stock_status(
+                fil,
+                usage_map.get(fil.id, {}).get('usage_30', 0.0),
+                usage_map.get(fil.id, {}).get('usage_90', 0.0),
+            )
+            fil.tag_list = get_filament_tags(fil)
 
         if view_mode == 'card':
             html = render_template('_filament_cards.html', filaments=filaments_paginated.items)

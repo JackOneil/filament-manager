@@ -8,6 +8,15 @@
             <i class="fa-solid fa-arrow-left text-xl"></i>
         </a>
         <h1 class="text-3xl font-bold text-gray-800">{{ project.name }}</h1>
+        {% if project_tags %}
+        <div class="flex flex-wrap gap-1">
+            {% for tag in project_tags.split(',') %}
+            {% if tag.strip() %}
+            <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">{{ tag.strip() }}</span>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
         {% if project.status == 'NEW' %}
             <span class="bg-gray-100 text-gray-800 text-xs font-semibold px-2.5 py-0.5 rounded border border-gray-300">{{ t('status_new') }}</span>
         {% elif project.status == 'PRINTING' %}

@@ -39,22 +39,34 @@
 
     <div id="sync-result" class="hidden rounded-lg px-4 py-3 text-sm font-medium"></div>
 
+    {% if active_filament %}
+    <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between gap-3 text-blue-800">
+        <div class="flex items-center gap-2">
+            <i class="fa-solid fa-filter"></i>
+            <span>{{ t('bambu_filtered_filament') }}: <strong>{{ active_filament.name }}</strong></span>
+        </div>
+        <a href="{{ url_for('bambu_jobs', filter=job_filter) }}" class="text-sm font-semibold text-blue-700 hover:underline">
+            {{ t('filter_reset') }}
+        </a>
+    </div>
+    {% endif %}
+
     {# ── Filter bar ──────────────────────────────────────────────────────── #}
     <div class="flex flex-wrap gap-2 items-center">
-        <a href="{{ url_for('bambu_jobs') }}"
+        <a href="{{ url_for('bambu_jobs', filament_id=active_filament_id) if active_filament_id else url_for('bambu_jobs') }}"
            class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold transition-colors
                   {% if not job_filter %}bg-blue-600 text-white shadow{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
             {{ t('bambu_filter_all') }}
             <span id="count-all" class="ml-1 text-xs {% if not job_filter %}bg-blue-500{% else %}bg-gray-300 text-gray-700{% endif %} px-1.5 py-0.5 rounded-full">{{ count_all }}</span>
         </a>
-        <a href="{{ url_for('bambu_jobs', filter='unassigned') }}"
+        <a href="{{ url_for('bambu_jobs', filter='unassigned', filament_id=active_filament_id) if active_filament_id else url_for('bambu_jobs', filter='unassigned') }}"
            class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold transition-colors
                   {% if job_filter == 'unassigned' %}bg-orange-500 text-white shadow{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
             <i class="fa-solid fa-circle-exclamation"></i>
             {{ t('bambu_filter_unassigned') }}
             <span id="count-unassigned" class="ml-1 text-xs {% if job_filter == 'unassigned' %}bg-orange-400{% else %}bg-gray-300 text-gray-700{% endif %} px-1.5 py-0.5 rounded-full">{{ count_unassigned }}</span>
         </a>
-        <a href="{{ url_for('bambu_jobs', filter='not_deducted') }}"
+        <a href="{{ url_for('bambu_jobs', filter='not_deducted', filament_id=active_filament_id) if active_filament_id else url_for('bambu_jobs', filter='not_deducted') }}"
            class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold transition-colors
                   {% if job_filter == 'not_deducted' %}bg-amber-500 text-white shadow{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
             <i class="fa-solid fa-scale-unbalanced"></i>
@@ -433,14 +445,14 @@
     {% if jobs.pages > 1 %}
     <nav class="flex items-center gap-1 bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-2 w-fit mx-auto mt-2">
         {% if jobs.has_prev %}
-        <a href="{{ url_for('bambu_jobs', page=jobs.prev_num, filter=job_filter) }}"
+        <a href="{{ url_for('bambu_jobs', page=jobs.prev_num, filter=job_filter, filament_id=active_filament_id) if active_filament_id else url_for('bambu_jobs', page=jobs.prev_num, filter=job_filter) }}"
            class="px-3 py-1 rounded hover:bg-gray-100 transition text-sm text-gray-700">
             <i class="fa-solid fa-chevron-left"></i> {{ t('prev_page') }}
         </a>
         {% endif %}
         <span class="px-3 py-1 text-sm text-gray-500">{{ jobs.page }} / {{ jobs.pages }}</span>
         {% if jobs.has_next %}
-        <a href="{{ url_for('bambu_jobs', page=jobs.next_num, filter=job_filter) }}"
+        <a href="{{ url_for('bambu_jobs', page=jobs.next_num, filter=job_filter, filament_id=active_filament_id) if active_filament_id else url_for('bambu_jobs', page=jobs.next_num, filter=job_filter) }}"
            class="px-3 py-1 rounded hover:bg-gray-100 transition text-sm text-gray-700">
             {{ t('next_page') }} <i class="fa-solid fa-chevron-right"></i>
         </a>

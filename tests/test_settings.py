@@ -7,7 +7,7 @@ import unittest
 
 from app import create_app
 from database import db
-from models import Brand, Color, Filament, Material, Project, ProjectQuote
+from models import BambuPrintJob, Brand, Color, Filament, Material, MovementHistory, Project, ProjectFile, ProjectQuote
 
 
 class ImportAtomicityTests(unittest.TestCase):
@@ -128,6 +128,79 @@ class ImportAtomicityTests(unittest.TestCase):
             quote = ProjectQuote.query.first()
             self.assertIsNotNone(quote)
             self.assertEqual(quote.final_price, 80.6)
+
+    def test_export_and_import_preserve_new_filament_fields_and_movement_links(self):
+        with self.app.app_context():
+            brand = Brand.query.filter_by(name='Prusament').first()
+            color = Color.query.first()
+            material = Material.query.filter_by(name='PLA').first()
+            project = Project(name='Backup Project', tag_text='customer, rush')
+            filament = Filament(
+                name='Backup Filament',
+                brand_id=brand.id,
+                material_id=material.id,
+                color_id=color.id,
+                weight_total=1000,
+                weight_remaining=640,
+                price=720,
+                quantity=1,
+                min_stock_grams=250,
+                max_stock_grams=2000,
+                tag_text='matte, proto',
+                quality_stringing='low',
+                quality_adhesion='great',
+                quality_drying='dry box',
+                quality_profile='0.20 structural',
+                quality_notes='stable',
+                recommended_nozzle_temp=220,
+                recommended_bed_temp=60,
+            )
+            db.session.add_all([project, filament])
+            db.session.flush()
+            db.session.add(ProjectFile(project_id=project.id, filename='sample.3mf', filepath='/tmp/sample.3mf'))
+            job = BambuPrintJob(external_id='BKP-1', model_name='Backup job', filament_id=filament.id, project_id=project.id)
+            db.session.add(job)
+            db.session.flush()
+            db.session.add(MovementHistory(
+                filament_id=filament.id,
+                project_id=project.id,
+                bambu_job_id=job.id,
+                filament_name='Backup Filament | Prusament PLA',
+                action_type='bambu_print',
+                weight=42,
+                cost=30,
+                currency='CZK',
+                note='Linked movement',
+            ))
+            db.session.commit()
+
+        exported = self.client.get('/export').get_json()
+
+        with self.app.app_context():
+            db.drop_all()
+            db.create_all()
+
+        response = self.client.post(
+            '/import',
+            data={'file': (io.BytesIO(json.dumps(exported).encode('utf-8')), 'backup.json')},
+            content_type='multipart/form-data',
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+
+        with self.app.app_context():
+            filament = Filament.query.filter_by(name='Backup Filament').first()
+            self.assertIsNotNone(filament)
+            self.assertEqual(filament.min_stock_grams, 250)
+            self.assertEqual(filament.tag_text, 'matte, proto')
+            self.assertEqual(filament.quality_profile, '0.20 structural')
+            self.assertEqual(filament.recommended_nozzle_temp, 220)
+
+            movement = MovementHistory.query.filter_by(note='Linked movement').first()
+            self.assertIsNotNone(movement)
+            self.assertIsNotNone(movement.project_id)
+            self.assertIsNotNone(movement.bambu_job_id)
+            self.assertIsNotNone(ProjectFile.query.filter_by(filename='sample.3mf').first())
 
 
 if __name__ == '__main__':

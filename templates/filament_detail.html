@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <a href="{{ url_for('index') }}" class="text-gray-500 hover:text-blue-600 transition">
+                <i class="fa-solid fa-arrow-left text-xl"></i>
+            </a>
+            <div class="w-4 h-10 rounded" style="background-color: {{ filament.color.hex_value }};"></div>
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800">{{ filament.name }}</h1>
+                <p class="text-sm text-gray-500">{{ filament.brand.name }} · {{ filament.material.name }} · {{ filament.color.name }}</p>
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <a href="{{ url_for('edit', id=filament.id) }}" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg transition">
+                <i class="fa-solid fa-pen"></i> {{ t('edit') }}
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+            <h2 class="text-xl font-bold text-gray-800">{{ t('spool_life_timeline') }}</h2>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                    <div class="text-gray-500">{{ t('remaining') }}</div>
+                    <div class="font-bold text-gray-800">{{ filament.weight_remaining | round(1) }} g</div>
+                </div>
+                <div>
+                    <div class="text-gray-500">{{ t('quantity') }}</div>
+                    <div class="font-bold text-gray-800">{{ filament.quantity }}</div>
+                </div>
+                <div>
+                    <div class="text-gray-500">{{ t('min_stock_grams') }}</div>
+                    <div class="font-bold {% if filament.stock_metrics.status == 'critical' %}text-red-600{% elif filament.stock_metrics.status == 'warning' %}text-amber-600{% else %}text-gray-800{% endif %}">
+                        {{ filament.stock_metrics.min_stock }} g
+                    </div>
+                </div>
+                <div>
+                    <div class="text-gray-500">{{ t('stats_recommend_buy') }}</div>
+                    <div class="font-bold text-blue-700">{{ filament.stock_metrics.recommended_grams }} g</div>
+                </div>
+            </div>
+            {% if filament.tag_list %}
+            <div>
+                <div class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">{{ t('tag_list') }}</div>
+                <div class="flex flex-wrap gap-2">
+                    {% for tag in filament.tag_list %}
+                    <span class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">{{ tag }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            <div class="text-sm text-gray-600">
+                30d: <span class="font-semibold">{{ filament.stock_metrics.usage_30 }} g</span>
+                <span class="mx-2 text-gray-300">|</span>
+                90d: <span class="font-semibold">{{ filament.stock_metrics.usage_90 }} g</span>
+            </div>
+        </div>
+
+        <div class="xl:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div class="flex items-center gap-2 mb-4 border-b pb-3">
+                <i class="fa-solid fa-flask-vial text-blue-500"></i>
+                <h2 class="text-xl font-bold text-gray-800">{{ t('quality_log') }}</h2>
+            </div>
+            <form method="POST" action="{{ url_for('filament_update_meta', id=filament.id) }}" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('tag_list') }}</label>
+                        <input type="text" name="tag_text" value="{{ formatted_tags }}" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('min_stock_grams') }}</label>
+                        <input type="number" name="min_stock_grams" value="{{ filament.min_stock_grams or 0 }}" min="0" step="1" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('max_stock_grams') }}</label>
+                        <input type="number" name="max_stock_grams" value="{{ filament.max_stock_grams or 0 }}" min="0" step="1" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('recommended_nozzle_temp') }}</label>
+                        <input type="number" name="recommended_nozzle_temp" value="{{ filament.recommended_nozzle_temp or '' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('recommended_bed_temp') }}</label>
+                        <input type="number" name="recommended_bed_temp" value="{{ filament.recommended_bed_temp or '' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('quality_stringing') }}</label>
+                        <textarea name="quality_stringing" rows="3" class="w-full border border-gray-300 rounded-lg px-4 py-2">{{ filament.quality_stringing or '' }}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('quality_adhesion') }}</label>
+                        <textarea name="quality_adhesion" rows="3" class="w-full border border-gray-300 rounded-lg px-4 py-2">{{ filament.quality_adhesion or '' }}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('quality_drying') }}</label>
+                        <textarea name="quality_drying" rows="3" class="w-full border border-gray-300 rounded-lg px-4 py-2">{{ filament.quality_drying or '' }}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('quality_profile') }}</label>
+                        <textarea name="quality_profile" rows="3" class="w-full border border-gray-300 rounded-lg px-4 py-2">{{ filament.quality_profile or '' }}</textarea>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('quality_notes') }}</label>
+                    <textarea name="quality_notes" rows="4" class="w-full border border-gray-300 rounded-lg px-4 py-2">{{ filament.quality_notes or '' }}</textarea>
+                </div>
+
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow transition">
+                    <i class="fa-solid fa-save"></i> {{ t('save_changes') }}
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div class="xl:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div class="flex items-center gap-2 mb-4 border-b pb-3">
+                <i class="fa-solid fa-timeline text-indigo-500"></i>
+                <h2 class="text-xl font-bold text-gray-800">{{ t('spool_life_timeline') }}</h2>
+            </div>
+            <div class="space-y-3">
+                {% for item in timeline %}
+                <div class="bg-gray-50 border border-gray-100 rounded-lg p-4">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                        <div>
+                            <div class="font-semibold text-gray-800">{{ item.action_label }}</div>
+                            <div class="text-xs text-gray-500">
+                                {{ item.created_at.strftime('%d.%m.%Y %H:%M') if item.created_at else '-' }}
+                                {% if item.project %}
+                                · <a href="{{ url_for('project_detail', id=item.project.id) }}" class="text-blue-600 hover:underline">{{ item.project.name }}</a>
+                                {% endif %}
+                                {% if item.bambu_job %}
+                                · <a href="{{ url_for('bambu_jobs', filament_id=filament.id) }}" class="text-indigo-600 hover:underline">{{ item.bambu_job.model_name or item.bambu_job.external_id }}</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="text-sm font-bold {% if item.action_type in ['remove', 'bambu_print'] %}text-red-600{% else %}text-emerald-600{% endif %}">
+                            {% if item.action_type in ['remove', 'bambu_print'] %}-{% else %}+{% endif %}{{ item.weight | round(1) }} g
+                        </div>
+                    </div>
+                    {% if item.note %}
+                    <div class="text-sm text-gray-600 mt-2">{{ item.note }}</div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-400">{{ t('history_empty') }}</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="space-y-6">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 class="text-lg font-bold text-gray-800 mb-4">{{ t('project_filaments') }}</h2>
+                <div class="space-y-2">
+                    {% for row in related_project_rows %}
+                    <a href="{{ url_for('project_detail', id=row.project.id) }}" class="block bg-gray-50 hover:bg-gray-100 border border-gray-100 rounded-lg px-3 py-2 transition">
+                        <div class="font-semibold text-gray-800">{{ row.project.name }}</div>
+                        <div class="text-xs text-gray-500">{{ row.estimated_weight | round(1) }} g{% if row.is_used %} · {{ t('status_done') }}{% endif %}</div>
+                    </a>
+                    {% else %}
+                    <p class="text-sm text-gray-400">{{ t('stats_no_project_data') }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 class="text-lg font-bold text-gray-800 mb-4">{{ t('bambu_jobs_title') }}</h2>
+                <div class="space-y-2">
+                    {% for job in related_jobs %}
+                    <a href="{{ url_for('bambu_jobs', filament_id=filament.id) }}" class="block bg-gray-50 hover:bg-gray-100 border border-gray-100 rounded-lg px-3 py-2 transition">
+                        <div class="font-semibold text-gray-800">{{ job.model_name or job.external_id }}</div>
+                        <div class="text-xs text-gray-500">{{ job.status }}{% if job.weight_grams %} · {{ job.weight_grams | round(1) }} g{% endif %}</div>
+                    </a>
+                    {% else %}
+                    <p class="text-sm text-gray-400">{{ t('bambu_no_jobs') }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
