@@ -83,3 +83,4 @@ class StatsDashboardTests(unittest.TestCase):
         self.assertIn('65.0 g', html)
         self.assertIn('PLA Basic', html)
         self.assertIn('Objednat hned', html)
+        self.assertNotIn('>warning<', html)

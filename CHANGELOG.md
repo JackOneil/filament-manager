@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.36.11] - 2026-03-28
+### Fixed
+- **Bambu mapping panel JavaScript repaired**: per-slot Alpine state now escapes filament names safely inside `x-data`, which fixes browser errors like `Unexpected token '}'` and missing `assignedLabel` / `slotQ` variables on the Bambu jobs page.
+
+## [1.36.10] - 2026-03-28
+### Changed
+- **Project overview pagination**: `/projects` now uses the shared per-page app setting and renders navigation controls, so large project lists stay responsive and readable.
+- **Compressed backup format**: Settings export now downloads a gzip-compressed `.json.gz` backup to reduce disk usage while keeping the same full-application payload.
+
+### Fixed
+- **Backup import compatibility**: `/import` now accepts both the new compressed backups and legacy plain `.json` exports, so older backup files remain restorable.
+
+## [1.36.9] - 2026-03-28
+### Fixed
+- **Backup/import relationships hardened**: export/import now preserves filament references with full identity data instead of relying only on filament names, which prevents cross-linking the wrong spool when duplicate names exist.
+- **Project file backups made portable**: exported project files now include restorable file content and import recreates real upload files instead of leaving dead filesystem paths in the database.
+- **Statistics reorder labels restored**: purchase recommendations again show translated reorder states and the stock-status thresholds now mark very short remaining coverage as immediate reorder situations.
+- **Projects name sorting repaired**: the projects overview now truly sorts by project name when that header is selected.
+- **Storage redirects realigned**: shelf actions now redirect using the live shelf filter parameter instead of the stale `shelf_id` query argument.
+- **Schema migration noise reduced**: expected duplicate-column `ALTER TABLE` cases no longer flood logs as application errors during startup and tests.
+
 ## [1.36.8] - 2026-03-28
 ### Changed
 - **Shelf assignment modal decoupled from filters**: opening the slot-assignment dialog now always starts with an empty filament search, so it no longer inherits any active shelf-page filter context.

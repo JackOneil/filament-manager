@@ -575,6 +575,61 @@ class BambuDeductionRouteTests(unittest.TestCase):
         self.assertFalse(data['show_unassigned'])
         self.assertEqual(data['filament_name'], 'TestPLA')
 
+    def test_bambu_page_escapes_slot_x_data_for_special_filament_names(self):
+        with self.app.app_context():
+            brand = Brand.query.filter_by(name='Prusament').first()
+            mat = Material.query.filter_by(name='PLA').first()
+            color = Color.query.filter_by(name='Černá').first()
+            special_filament = Filament(
+                name='Bob\'s "Quoted" PLA',
+                brand_id=brand.id,
+                color_id=color.id,
+                material_id=mat.id,
+                weight_total=1000.0,
+                weight_remaining=900.0,
+                price=600.0,
+                quantity=1,
+            )
+            db.session.add(special_filament)
+            db.session.flush()
+
+            job = BambuPrintJob(
+                external_id='TEST_JOB_008',
+                model_name='EscapedSlotData',
+                printer_name='P1P',
+                status='FINISH',
+                weight_grams=20.0,
+            )
+            db.session.add(job)
+            db.session.flush()
+            db.session.add(BambuJobMaterial(
+                job_id=job.id,
+                ams_id=0,
+                tray_id=0,
+                material_name='PLA',
+                weight_grams=20.0,
+                filament_id=special_filament.id,
+                deducted=False,
+            ))
+            db.session.add(BambuJobMaterial(
+                job_id=job.id,
+                ams_id=0,
+                tray_id=1,
+                material_name='PLA',
+                weight_grams=5.0,
+                filament_id=None,
+                deducted=False,
+            ))
+            db.session.commit()
+
+        response = self.client.get('/bambu')
+
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode('utf-8')
+        self.assertIn("x-data='bambuSlotMap(", html)
+        self.assertIn('EscapedSlotData', html)
+        self.assertIn('Bob\\u0027s \\"Quoted\\" PLA', html)
+
 
 # ─── Integration tests: sync endpoint ───────────────────────────────────────
 

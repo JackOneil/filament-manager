@@ -101,7 +101,9 @@ def compute_stock_status(filament, usage_30=0.0, usage_90=0.0):
     spool_price = float(getattr(filament, 'price', 0.0) or 0.0)
     recommended_order_price = recommended_spools * spool_price if recommended_spools > 0 and spool_price > 0 else 0.0
 
-    if remaining <= 0 or (min_stock > 0 and remaining < min_stock * 0.5):
+    critical_usage_threshold = usage_30 / 4.0 if usage_30 > 0 else 0.0
+
+    if remaining <= 0 or (min_stock > 0 and remaining < min_stock * 0.5) or (critical_usage_threshold > 0 and remaining <= critical_usage_threshold):
         status = 'critical'
     elif min_stock > 0 and remaining < min_stock:
         status = 'warning'

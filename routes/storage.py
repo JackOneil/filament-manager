@@ -49,6 +49,12 @@ def _repack_shelf_slots(shelf, new_slots_count):
         db.session.delete(placement)
 
 
+def _storage_redirect_for_shelf(shelf):
+    if not shelf:
+        return redirect(url_for('storage'))
+    return redirect(url_for('storage', shelf=f'{shelf.id} - {shelf.name}'))
+
+
 def register(app):
 
     @app.route('/storage')
@@ -176,7 +182,7 @@ def register(app):
             shelf.slots_count = slots_count
             _repack_shelf_slots(shelf, slots_count)
             db.session.commit()
-        return redirect(url_for('storage', shelf_id=shelf_id))
+        return _storage_redirect_for_shelf(shelf)
 
     @app.route('/storage/shelf/<int:shelf_id>/delete', methods=['POST'])
     def storage_delete_shelf(shelf_id):
@@ -234,14 +240,14 @@ def register(app):
         orientation = request.form.get('orientation', placement.orientation).strip() or placement.orientation
         placement.orientation = orientation
         db.session.commit()
-        return redirect(url_for('storage', shelf_id=placement.shelf_id))
+        return _storage_redirect_for_shelf(placement.shelf)
 
     @app.route('/storage/placement/<int:placement_id>/delete', methods=['POST'])
     def storage_delete_placement(placement_id):
         placement = db.session.get(StoragePlacement, placement_id)
         if placement:
-            shelf_id = placement.shelf_id
+            shelf = placement.shelf
             db.session.delete(placement)
             db.session.commit()
-            return redirect(url_for('storage', shelf_id=shelf_id))
+            return _storage_redirect_for_shelf(shelf)
         return redirect(url_for('storage'))

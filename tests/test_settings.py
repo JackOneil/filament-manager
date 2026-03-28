@@ -1,4 +1,5 @@
 import io
+import gzip
 import json
 import os
 import shutil
@@ -9,8 +10,19 @@ from app import create_app
 from database import db
 from models import (
     BambuPrintJob, Brand, Color, Filament, Material, MovementHistory,
-    Project, ProjectFile, ProjectQuote, StoragePlacement, StorageShelf,
+    Project, ProjectFile, ProjectFilament, ProjectQuote, StoragePlacement, StorageShelf,
 )
+
+
+def decode_backup_response(response):
+    payload = response.data
+    if response.headers.get('Content-Type') == 'application/gzip' or payload[:2] == b'\x1f\x8b':
+        payload = gzip.decompress(payload)
+    return json.loads(payload.decode('utf-8'))
+
+
+def encode_backup_payload(payload):
+    return io.BytesIO(gzip.compress(json.dumps(payload).encode('utf-8')))
 
 
 class ImportAtomicityTests(unittest.TestCase):
@@ -111,7 +123,8 @@ class ImportAtomicityTests(unittest.TestCase):
 
         export_response = self.client.get('/export')
         self.assertEqual(export_response.status_code, 200)
-        exported = export_response.get_json()
+        self.assertEqual(export_response.headers.get('Content-Disposition'), 'attachment; filename=filament_backup.json.gz')
+        exported = decode_backup_response(export_response)
         self.assertEqual(exported['projects'][0]['quotes'][0]['final_price'], 80.6)
 
         with self.app.app_context():
@@ -120,7 +133,7 @@ class ImportAtomicityTests(unittest.TestCase):
 
         import_response = self.client.post(
             '/import',
-            data={'file': (io.BytesIO(json.dumps(exported).encode('utf-8')), 'backup.json')},
+            data={'file': (encode_backup_payload(exported), 'backup.json.gz')},
             content_type='multipart/form-data',
             follow_redirects=False,
         )
@@ -161,7 +174,10 @@ class ImportAtomicityTests(unittest.TestCase):
             )
             db.session.add_all([project, filament])
             db.session.flush()
-            db.session.add(ProjectFile(project_id=project.id, filename='sample.3mf', filepath='/tmp/sample.3mf'))
+            sample_path = os.path.join(self.temp_dir, 'sample.3mf')
+            with open(sample_path, 'wb') as handle:
+                handle.write(b'3mf-backup-content')
+            db.session.add(ProjectFile(project_id=project.id, filename='sample.3mf', filepath=sample_path))
             job = BambuPrintJob(external_id='BKP-1', model_name='Backup job', filament_id=filament.id, project_id=project.id)
             db.session.add(job)
             db.session.flush()
@@ -178,7 +194,7 @@ class ImportAtomicityTests(unittest.TestCase):
             ))
             db.session.commit()
 
-        exported = self.client.get('/export').get_json()
+        exported = decode_backup_response(self.client.get('/export'))
 
         with self.app.app_context():
             db.drop_all()
@@ -186,7 +202,7 @@ class ImportAtomicityTests(unittest.TestCase):
 
         response = self.client.post(
             '/import',
-            data={'file': (io.BytesIO(json.dumps(exported).encode('utf-8')), 'backup.json')},
+            data={'file': (encode_backup_payload(exported), 'backup.json.gz')},
             content_type='multipart/form-data',
             follow_redirects=False,
         )
@@ -205,7 +221,11 @@ class ImportAtomicityTests(unittest.TestCase):
             self.assertIsNotNone(movement)
             self.assertIsNotNone(movement.project_id)
             self.assertIsNotNone(movement.bambu_job_id)
-            self.assertIsNotNone(ProjectFile.query.filter_by(filename='sample.3mf').first())
+            restored_file = ProjectFile.query.filter_by(filename='sample.3mf').first()
+            self.assertIsNotNone(restored_file)
+            self.assertTrue(os.path.exists(restored_file.filepath))
+            with open(restored_file.filepath, 'rb') as handle:
+                self.assertEqual(handle.read(), b'3mf-backup-content')
 
     def test_export_and_import_preserve_storage_layout(self):
         with self.app.app_context():
@@ -233,7 +253,7 @@ class ImportAtomicityTests(unittest.TestCase):
             ))
             db.session.commit()
 
-        exported = self.client.get('/export').get_json()
+        exported = decode_backup_response(self.client.get('/export'))
         self.assertEqual(exported['storage_shelves'][0]['name'], 'Rack A')
         self.assertEqual(exported['storage_placements'][0]['slot_index'], 4)
 
@@ -243,7 +263,7 @@ class ImportAtomicityTests(unittest.TestCase):
 
         response = self.client.post(
             '/import',
-            data={'file': (io.BytesIO(json.dumps(exported).encode('utf-8')), 'backup.json')},
+            data={'file': (encode_backup_payload(exported), 'backup.json.gz')},
             content_type='multipart/form-data',
             follow_redirects=False,
         )
@@ -256,6 +276,123 @@ class ImportAtomicityTests(unittest.TestCase):
             self.assertIsNotNone(placement)
             self.assertEqual(placement.orientation, 'flat')
             self.assertEqual(placement.filament.name, 'Storage Filament')
+
+    def test_export_and_import_preserve_duplicate_name_filament_references(self):
+        with self.app.app_context():
+            brand_a = Brand.query.filter_by(name='Prusament').first()
+            brand_b = Brand(name='Alt Brand')
+            color_a = Color.query.first()
+            color_b = Color(name='Signal Orange', hex_value='#ff6600')
+            material = Material.query.filter_by(name='PLA').first()
+            project = Project(name='Duplicate Names Project')
+            db.session.add_all([brand_b, color_b, project])
+            db.session.flush()
+
+            primary = Filament(
+                name='Shared Name',
+                brand_id=brand_a.id,
+                material_id=material.id,
+                color_id=color_a.id,
+                weight_total=1000,
+                weight_remaining=700,
+                price=500,
+                quantity=1,
+            )
+            secondary = Filament(
+                name='Shared Name',
+                brand_id=brand_b.id,
+                material_id=material.id,
+                color_id=color_b.id,
+                weight_total=850,
+                weight_remaining=500,
+                price=420,
+                quantity=1,
+            )
+            db.session.add_all([primary, secondary])
+            db.session.flush()
+
+            db.session.add(ProjectFilament(project_id=project.id, filament_id=secondary.id, estimated_weight=55, is_used=True))
+            job = BambuPrintJob(
+                external_id='DUPL-1',
+                model_name='Dual choice',
+                filament_id=secondary.id,
+                project_id=project.id,
+            )
+            shelf = StorageShelf(name='Duplicate Shelf', columns=2, slots_count=2, sort_order=1)
+            db.session.add_all([job, shelf])
+            db.session.flush()
+            db.session.add(StoragePlacement(shelf_id=shelf.id, filament_id=secondary.id, slot_index=1, orientation='standing'))
+            db.session.add(MovementHistory(
+                filament_id=secondary.id,
+                project_id=project.id,
+                bambu_job_id=job.id,
+                filament_name='Shared Name | Alt Brand PLA',
+                action_type='remove',
+                weight=55,
+                cost=27,
+                currency='CZK',
+                note='duplicate-ref',
+            ))
+            db.session.commit()
+
+        exported = decode_backup_response(self.client.get('/export'))
+
+        with self.app.app_context():
+            db.drop_all()
+            db.create_all()
+
+        response = self.client.post(
+            '/import',
+            data={'file': (encode_backup_payload(exported), 'backup.json.gz')},
+            content_type='multipart/form-data',
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+
+        with self.app.app_context():
+            brand_b = Brand.query.filter_by(name='Alt Brand').first()
+            color_b = Color.query.filter_by(name='Signal Orange').first()
+            self.assertIsNotNone(brand_b)
+            self.assertIsNotNone(color_b)
+            restored_filament = Filament.query.filter_by(
+                name='Shared Name',
+                brand_id=brand_b.id,
+                color_id=color_b.id,
+            ).first()
+            self.assertIsNotNone(restored_filament)
+            self.assertEqual(ProjectFilament.query.first().filament_id, restored_filament.id)
+            self.assertEqual(BambuPrintJob.query.filter_by(external_id='DUPL-1').first().filament_id, restored_filament.id)
+            self.assertEqual(StoragePlacement.query.filter_by(slot_index=1).first().filament_id, restored_filament.id)
+            self.assertEqual(MovementHistory.query.filter_by(note='duplicate-ref').first().filament_id, restored_filament.id)
+
+    def test_import_accepts_legacy_plain_json_backup(self):
+        payload = {
+            'brands': ['Legacy Brand'],
+            'materials': ['PLA'],
+            'colors': [{'name': 'Legacy Color', 'hex_value': '#112233'}],
+            'filaments': [{
+                'name': 'Legacy Filament',
+                'brand': 'Legacy Brand',
+                'material': 'PLA',
+                'color': 'Legacy Color',
+                'weight_total': 1000,
+                'weight_remaining': 850,
+                'price': 400,
+                'quantity': 1,
+            }],
+        }
+
+        response = self.client.post(
+            '/import',
+            data={'file': (io.BytesIO(json.dumps(payload).encode('utf-8')), 'backup.json')},
+            content_type='multipart/form-data',
+            follow_redirects=False,
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        with self.app.app_context():
+            self.assertIsNotNone(Filament.query.filter_by(name='Legacy Filament').first())
 
 
 if __name__ == '__main__':

@@ -245,7 +245,7 @@
                             <td class="py-3 pr-4 text-gray-600">{{ row.recommended_spools }} ks / {{ row.recommended_order_grams }} g / {{ row.recommended_order_price }} {{ current_currency }}</td>
                             <td class="py-3">
                                 <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold {% if row.reorder_status == 'critical' %}bg-red-100 text-red-700{% elif row.reorder_status == 'warning' %}bg-amber-100 text-amber-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
-                                    {{ row.reorder_status }}
+                                    {{ t(reorder_status_label_key(row.reorder_status)) }}
                                 </span>
                             </td>
                         </tr>

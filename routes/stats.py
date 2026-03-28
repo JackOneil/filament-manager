@@ -38,6 +38,14 @@ def _safe_divide(numerator, denominator):
     return numerator / denominator
 
 
+def _reorder_status_label_key(status):
+    return {
+        'critical': 'stats_reorder_now',
+        'warning': 'stats_reorder_soon',
+        'stable': 'stats_stock_ok',
+    }.get(status, status)
+
+
 def _project_usage_rows():
     rows = defaultdict(lambda: {'grams': 0.0, 'jobs': 0, 'source': set()})
 
@@ -292,4 +300,5 @@ def register(app):
             purchase_recommendations=purchase_recommendations,
             top_turnover=top_turnover,
             profitable_projects=profitable_projects,
+            reorder_status_label_key=_reorder_status_label_key,
         )

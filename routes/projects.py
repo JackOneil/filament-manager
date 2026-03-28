@@ -40,8 +40,15 @@ def register(app):
 
     @app.route('/projects')
     def projects_index():
+        from models import AppSetting
+
         sort_by = request.args.get('sort_by', 'due_date')
-        if sort_by == 'due_date':
+        page = request.args.get('page', 1, type=int)
+        setting = AppSetting.query.first()
+        per_page = setting.items_per_page if setting and setting.items_per_page in [12, 24, 48, 96] else 12
+        if sort_by == 'name':
+            order_expr = [Project.name.asc()]
+        elif sort_by == 'due_date':
             order_expr = [db.case((Project.due_date == None, 1), else_=0), Project.due_date.asc()]
         elif sort_by == 'client':
             order_expr = [Project.client_name.asc()]
@@ -52,8 +59,13 @@ def register(app):
         else:
             order_expr = [Project.created_at.desc()]
 
-        projects = Project.query.order_by(*order_expr).all()
-        return render_template('projects_index.html', projects=projects, sort_by=sort_by)
+        projects = db.paginate(
+            Project.query.order_by(*order_expr),
+            page=page,
+            per_page=per_page,
+            error_out=False,
+        )
+        return render_template('projects_index.html', projects=projects, sort_by=sort_by, per_page=per_page)
 
     @app.route('/projects/create', methods=['GET', 'POST'])
     def project_create():

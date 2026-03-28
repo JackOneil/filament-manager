@@ -374,9 +374,9 @@
                         {% for mat in job.materials %}
                         {# Pass initial state to Alpine so it can manage the slot reactively #}
                         {% set init_fid = mat.filament_id if mat.filament_id is not none else 'null' %}
-                        {% set init_flabel = mat.filament.name|tojson if mat.filament else 'null' %}
+                        {% set init_flabel = mat.filament.name|tojson|forceescape if mat.filament else 'null' %}
                         <div class="flex flex-col sm:flex-row sm:items-center gap-2 bg-white rounded-lg border border-gray-100 px-3 py-2"
-                             x-data="bambuSlotMap({{ job.id }}, {{ mat.id }}, {{ init_fid }}, {{ init_flabel }}, {{ 'true' if mat.deducted else 'false' }})">
+                             x-data='bambuSlotMap({{ job.id }}, {{ mat.id }}, {{ init_fid }}, {{ init_flabel }}, {{ "true" if mat.deducted else "false" }})'>
                             <div class="flex items-center gap-2 min-w-[180px]">
                                 {% if mat.color_hex %}
                                 <span class="w-4 h-4 rounded-full border border-gray-200 flex-shrink-0"

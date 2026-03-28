@@ -34,7 +34,7 @@ from utils import get_settings
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.36.8'
+APP_VERSION = '1.36.11'
 
 
 def create_app(test_config=None) -> Flask:
@@ -147,7 +147,11 @@ def _safe_alter(app: Flask, sql: str) -> None:
             db.session.commit()
         except Exception as e:
             db.session.rollback()
-            app.logger.error(f"Error in _safe_alter executing '{sql}': {e}")
+            message = str(e).lower()
+            if 'duplicate column name' in message or 'already exists' in message:
+                app.logger.debug(f"Skipping existing schema change for '{sql}'")
+            else:
+                app.logger.error(f"Error in _safe_alter executing '{sql}': {e}")
 
 
 def _start_bambu_sync_worker(app: Flask) -> None:

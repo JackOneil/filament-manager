@@ -69,3 +69,45 @@ class ProjectUploadTests(unittest.TestCase):
             self.assertNotEqual(files[0].filepath, files[1].filepath)
             self.assertTrue(os.path.exists(files[0].filepath))
             self.assertTrue(os.path.exists(files[1].filepath))
+
+
+class ProjectSortingTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp(prefix='filament-project-sort-')
+        db_path = os.path.join(self.temp_dir, 'test.db')
+        self.app = create_app({
+            'TESTING': True,
+            'SQLALCHEMY_DATABASE_URI': f'sqlite:///{db_path}',
+            'PROJECT_UPLOAD_FOLDER': os.path.join(self.temp_dir, 'uploads'),
+            'WTF_CSRF_ENABLED': False,
+        })
+        self.client = self.app.test_client()
+
+        with self.app.app_context():
+            db.session.add_all([
+                Project(name='Zulu Project'),
+                Project(name='Alpha Project'),
+            ])
+            db.session.commit()
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_projects_can_be_sorted_by_name(self):
+        response = self.client.get('/projects?sort_by=name')
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode('utf-8')
+        self.assertLess(html.index('Alpha Project'), html.index('Zulu Project'))
+
+    def test_projects_list_is_paginated_using_app_setting(self):
+        with self.app.app_context():
+            for idx in range(13):
+                db.session.add(Project(name=f'Paged Project {idx:02d}'))
+            db.session.commit()
+
+        response = self.client.get('/projects?sort_by=name')
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode('utf-8')
+        self.assertIn('Paged Project 00', html)
+        self.assertNotIn('Paged Project 12', html)
+        self.assertIn('?sort_by=name&amp;page=2', html)

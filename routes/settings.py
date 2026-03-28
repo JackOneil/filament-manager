@@ -1,7 +1,12 @@
 """Settings, export/import, and theme routes."""
+import base64
+import gzip
 import json
 import logging
-from flask import render_template, request, redirect, url_for, jsonify
+import os
+import uuid
+from flask import render_template, request, redirect, url_for, Response
+from werkzeug.utils import secure_filename
 from database import db
 from models import (
     Brand, Color, Material, AppSetting, Filament, MovementHistory,
@@ -9,6 +14,79 @@ from models import (
     BambuPrinter, BambuPrintJob, BambuJobMaterial, StoragePlacement, StorageShelf,
 )
 from utils import format_tags, top_tags
+
+
+def _filament_ref(filament):
+    if not filament:
+        return None
+    return {
+        'name': filament.name,
+        'brand': filament.brand.name if filament.brand else None,
+        'material': filament.material.name if filament.material else None,
+        'color': filament.color.name if filament.color else None,
+    }
+
+
+def _resolve_filament_ref(ref, fallback_name=None):
+    if isinstance(ref, str):
+        fallback_name = ref
+        ref = None
+
+    if isinstance(ref, dict):
+        name = (ref.get('name') or '').strip()
+        brand_name = (ref.get('brand') or '').strip()
+        material_name = (ref.get('material') or '').strip()
+        color_name = (ref.get('color') or '').strip()
+        if name and brand_name and material_name and color_name:
+            brand = Brand.query.filter_by(name=brand_name).first()
+            material = Material.query.filter_by(name=material_name).first()
+            color = Color.query.filter_by(name=color_name).first()
+            if brand and material and color:
+                filament = Filament.query.filter_by(
+                    name=name,
+                    brand_id=brand.id,
+                    material_id=material.id,
+                    color_id=color.id,
+                ).first()
+                if filament:
+                    return filament
+        if name:
+            fallback_name = name
+
+    fallback_name = (fallback_name or '').split(' | ')[0].strip()
+    if fallback_name:
+        return Filament.query.filter_by(name=fallback_name).order_by(Filament.id.asc()).first()
+    return None
+
+
+def _project_file_payload(project_file):
+    payload = {
+        'filename': project_file.filename,
+        'filepath': project_file.filepath,
+        'uploaded_at': project_file.uploaded_at.isoformat() if project_file.uploaded_at else None,
+        'content_b64': None,
+    }
+    if project_file.filepath and os.path.isfile(project_file.filepath):
+        with open(project_file.filepath, 'rb') as handle:
+            payload['content_b64'] = base64.b64encode(handle.read()).decode('ascii')
+    return payload
+
+
+def _build_import_file_path(upload_folder, project_id, filename, uploaded_at_text):
+    safe_name = secure_filename(filename or '') or f'project_file_{uuid.uuid4().hex[:8]}'
+    stamp = ''.join(ch for ch in (uploaded_at_text or '') if ch.isdigit())[:14] or uuid.uuid4().hex[:12]
+    return os.path.join(upload_folder, f'{project_id}_{stamp}_{safe_name}')
+
+
+def _load_backup_payload(uploaded_file):
+    raw_bytes = uploaded_file.read()
+    if not raw_bytes:
+        return {}
+
+    filename = (uploaded_file.filename or '').lower()
+    if filename.endswith('.gz') or raw_bytes[:2] == b'\x1f\x8b':
+        raw_bytes = gzip.decompress(raw_bytes)
+    return json.loads(raw_bytes.decode('utf-8'))
 
 
 def register(app):
@@ -209,6 +287,7 @@ def register(app):
             'movement_history': [{
                 'filament_name': m.filament_name,
                 'filament_id': m.filament_id,
+                'filament_ref': _filament_ref(m.filament),
                 'project_name': m.project.name if m.project else None,
                 'bambu_external_id': m.bambu_job.external_id if m.bambu_job else None,
                 'action_type': m.action_type,
@@ -237,10 +316,7 @@ def register(app):
                 'estimated_print_time': proj.estimated_print_time,
                 'due_date': proj.due_date.isoformat() if proj.due_date else None,
                 'created_at': proj.created_at.isoformat() if proj.created_at else None,
-                'files': [{
-                    'filename': pf.filename,
-                    'filepath': pf.filepath,
-                } for pf in proj.files],
+                'files': [_project_file_payload(pf) for pf in proj.files],
                 'links': [{
                     'url': pl.url,
                     'name': pl.name,
@@ -251,11 +327,13 @@ def register(app):
                 } for pl in proj.links],
                 'filaments': [{
                     'filament_name': pf.filament.name if pf.filament else None,
+                    'filament_ref': _filament_ref(pf.filament),
                     'estimated_weight': pf.estimated_weight,
                     'is_used': pf.is_used,
                 } for pf in proj.filaments],
                 'quotes': [{
                     'filament_name': quote.filament_name,
+                    'filament_ref': _filament_ref(quote.filament),
                     'weight': quote.weight,
                     'print_time': quote.print_time,
                     'material_cost': quote.material_cost,
@@ -291,6 +369,7 @@ def register(app):
                 'synced_at': j.synced_at.isoformat() if j.synced_at else None,
                 'deducted': j.deducted,
                 'filament_name': j.filament.name if j.filament else None,
+                'filament_ref': _filament_ref(j.filament),
                 'project_name': j.project.name if j.project else None,
                 'materials': [{
                     'ams_id': m.ams_id,
@@ -299,6 +378,7 @@ def register(app):
                     'material_name': m.material_name,
                     'weight_grams': m.weight_grams,
                     'filament_name': m.filament.name if m.filament else None,
+                    'filament_ref': _filament_ref(m.filament),
                     'deducted': m.deducted,
                 } for m in j.materials],
             } for j in BambuPrintJob.query.order_by(BambuPrintJob.started_at).all()],
@@ -314,6 +394,7 @@ def register(app):
             'storage_placements': [{
                 'shelf_name': placement.shelf.name if placement.shelf else None,
                 'filament_name': placement.filament.name if placement.filament else None,
+                'filament_ref': _filament_ref(placement.filament),
                 'slot_index': placement.slot_index,
                 'orientation': placement.orientation,
             } for placement in StoragePlacement.query.order_by(StoragePlacement.shelf_id, StoragePlacement.slot_index).all()],
@@ -324,8 +405,12 @@ def register(app):
             f"{len(data['projects'])} projects, "
             f"{len(data['bambu_jobs'])} Bambu jobs"
         )
-        response = jsonify(data)
-        response.headers['Content-Disposition'] = 'attachment; filename=filament_backup.json'
+        compressed = gzip.compress(
+            json.dumps(data, ensure_ascii=False, separators=(',', ':')).encode('utf-8'),
+            compresslevel=9,
+        )
+        response = Response(compressed, mimetype='application/gzip')
+        response.headers['Content-Disposition'] = 'attachment; filename=filament_backup.json.gz'
         return response
 
     @app.route('/import', methods=['POST'])
@@ -336,8 +421,10 @@ def register(app):
             return redirect(url_for('settings'))
 
         imported_filaments = 0
+        upload_folder = app.config.get('PROJECT_UPLOAD_FOLDER')
+        os.makedirs(upload_folder, exist_ok=True)
         try:
-            data = json.load(file)
+            data = _load_backup_payload(file)
             with db.session.begin():
                 # ── 1. Enumerations ────────────────────────────────────
                 for b_name in data.get('brands', []):
@@ -441,16 +528,24 @@ def register(app):
                         proj.tag_text = format_tags(proj_data.get('tag_text', proj.tag_text or ''))
 
                     for file_data in proj_data.get('files', []):
+                        uploaded_at = datetime.fromisoformat(file_data['uploaded_at']) if file_data.get('uploaded_at') else datetime.utcnow()
                         exists_file = ProjectFile.query.filter_by(
                             project_id=proj.id,
                             filename=file_data.get('filename', ''),
-                            filepath=file_data.get('filepath', ''),
+                            uploaded_at=uploaded_at,
                         ).first()
                         if not exists_file:
+                            filepath = file_data.get('filepath', '')
+                            content_b64 = file_data.get('content_b64')
+                            if content_b64:
+                                filepath = _build_import_file_path(upload_folder, proj.id, file_data.get('filename', ''), file_data.get('uploaded_at'))
+                                with open(filepath, 'wb') as handle:
+                                    handle.write(base64.b64decode(content_b64))
                             db.session.add(ProjectFile(
                                 project_id=proj.id,
                                 filename=file_data.get('filename', ''),
-                                filepath=file_data.get('filepath', ''),
+                                filepath=filepath,
+                                uploaded_at=uploaded_at,
                             ))
 
                     for link in proj_data.get('links', []):
@@ -470,7 +565,7 @@ def register(app):
                             ))
 
                     for pf_data in proj_data.get('filaments', []):
-                        fil = Filament.query.filter_by(name=pf_data.get('filament_name')).first()
+                        fil = _resolve_filament_ref(pf_data.get('filament_ref'), pf_data.get('filament_name'))
                         exists_pf = None
                         if fil:
                             exists_pf = ProjectFilament.query.filter_by(
@@ -494,7 +589,7 @@ def register(app):
                             created_at=quote_ts,
                         ).first()
                         if not exists_quote:
-                            quote_fil = Filament.query.filter_by(name=quote_data.get('filament_name', '').split(' | ')[0]).first()
+                            quote_fil = _resolve_filament_ref(quote_data.get('filament_ref'), quote_data.get('filament_name'))
                             db.session.add(ProjectQuote(
                                 project_id=proj.id,
                                 filament_id=quote_fil.id if quote_fil else None,
@@ -525,7 +620,7 @@ def register(app):
                 for j in data.get('bambu_jobs', []):
                     if BambuPrintJob.query.filter_by(external_id=j.get('external_id')).first():
                         continue
-                    fil = Filament.query.filter_by(name=j.get('filament_name')).first() if j.get('filament_name') else None
+                    fil = _resolve_filament_ref(j.get('filament_ref'), j.get('filament_name'))
                     proj = Project.query.filter_by(name=j.get('project_name')).first() if j.get('project_name') else None
                     job = BambuPrintJob(
                         external_id=j.get('external_id'),
@@ -547,7 +642,7 @@ def register(app):
                     db.session.flush()
 
                     for mat in j.get('materials', []):
-                        mat_fil = Filament.query.filter_by(name=mat.get('filament_name')).first() if mat.get('filament_name') else None
+                        mat_fil = _resolve_filament_ref(mat.get('filament_ref'), mat.get('filament_name'))
                         db.session.add(BambuJobMaterial(
                             job_id=job.id,
                             ams_id=mat.get('ams_id'),
@@ -572,10 +667,7 @@ def register(app):
                     if exists:
                         continue
 
-                    filament = None
-                    if m.get('filament_name'):
-                        filament_base_name = m.get('filament_name', '').split(' | ')[0]
-                        filament = Filament.query.filter_by(name=filament_base_name).first()
+                    filament = _resolve_filament_ref(m.get('filament_ref'), m.get('filament_name'))
                     project = Project.query.filter_by(name=m.get('project_name')).first() if m.get('project_name') else None
                     bambu_job = BambuPrintJob.query.filter_by(external_id=m.get('bambu_external_id')).first() if m.get('bambu_external_id') else None
 
@@ -608,7 +700,7 @@ def register(app):
 
                 for placement_data in data.get('storage_placements', []):
                     shelf = StorageShelf.query.filter_by(name=placement_data.get('shelf_name')).first()
-                    filament = Filament.query.filter_by(name=placement_data.get('filament_name')).first()
+                    filament = _resolve_filament_ref(placement_data.get('filament_ref'), placement_data.get('filament_name'))
                     slot_index = placement_data.get('slot_index')
                     if not shelf or not filament or not slot_index:
                         continue

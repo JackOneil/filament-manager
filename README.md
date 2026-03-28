@@ -1,5 +1,5 @@
 # Filament Manager 🧵
-*Current version: **v1.36.8***
+*Current version: **v1.36.11***
 
 A minimalist and modern web application for tracking and managing 3D printer filaments.
 The application allows detailed tracking of weight balances, material costs, and also includes a calculator for a precise print cost estimation of a given model (in grams relative to the spool's total weight).
@@ -39,5 +39,6 @@ This package includes an optimized `Dockerfile` and `docker-compose.yml`. You ca
 
 ## Safe Backups
 The whole backend database portfolio resides locally within your mounted project layout. 
-It's fully sufficient to just safely backup your `/opt/git/filament/data/` folder if needed. 
+It's fully sufficient to just safely backup your `/opt/git/filament/data/` folder if needed.
+The built-in Settings export now downloads a compressed `.json.gz` backup that also contains uploaded project files, while import accepts both the new compressed format and older plain `.json` backups.
 During version upgrades, standard rebuilding the app instance triggers natively, while seamlessly linking back to your original uncompromised DB location. Users do not lose tracking metrics.
