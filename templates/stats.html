@@ -55,10 +55,11 @@
                     <div>
                         <div class="font-semibold text-gray-800">{{ row.filament_name }}</div>
                         <div class="text-xs text-gray-400">{{ row.remaining }} g · min {{ row.min_stock }} g</div>
+                        <div class="text-xs text-gray-400">{{ row.recommended_spools }} ks × {{ row.spool_weight | round(0) }} g · {{ row.recommended_order_price }} {{ current_currency }}</div>
                     </div>
                     <div class="text-right">
-                        <div class="{% if row.reorder_status == 'critical' %}text-red-600{% else %}text-amber-600{% endif %} font-bold">{{ row.recommended_grams }} g</div>
-                        <div class="text-xs text-gray-400">{{ row.recommended_spools }} ks</div>
+                        <div class="{% if row.reorder_status == 'critical' %}text-red-600{% else %}text-amber-600{% endif %} font-bold">{{ row.recommended_spools }} ks</div>
+                        <div class="text-xs text-gray-400">{{ row.recommended_order_grams }} g</div>
                     </div>
                 </a>
                 {% else %}
@@ -241,7 +242,7 @@
                             </td>
                             <td class="py-3 pr-4 text-gray-600">{{ row.usage_30 }} g</td>
                             <td class="py-3 pr-4 text-gray-600">{{ row.usage_90 }} g</td>
-                            <td class="py-3 pr-4 text-gray-600">{{ row.recommended_grams }} g / {{ row.recommended_spools }} ks</td>
+                            <td class="py-3 pr-4 text-gray-600">{{ row.recommended_spools }} ks / {{ row.recommended_order_grams }} g / {{ row.recommended_order_price }} {{ current_currency }}</td>
                             <td class="py-3">
                                 <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold {% if row.reorder_status == 'critical' %}bg-red-100 text-red-700{% elif row.reorder_status == 'warning' %}bg-amber-100 text-amber-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
                                     {{ row.reorder_status }}

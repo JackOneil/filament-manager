@@ -202,6 +202,7 @@ def register(app):
                 'quality_notes': f.quality_notes,
                 'recommended_nozzle_temp': f.recommended_nozzle_temp,
                 'recommended_bed_temp': f.recommended_bed_temp,
+                'reorder_alert_snoozed': f.reorder_alert_snoozed,
             } for f in Filament.query.all()],
 
             # ── Movement history ───────────────────────────────────────
@@ -399,6 +400,7 @@ def register(app):
                                 quality_notes=f.get('quality_notes'),
                                 recommended_nozzle_temp=f.get('recommended_nozzle_temp'),
                                 recommended_bed_temp=f.get('recommended_bed_temp'),
+                                reorder_alert_snoozed=f.get('reorder_alert_snoozed', False),
                             ))
                             imported_filaments += 1
 

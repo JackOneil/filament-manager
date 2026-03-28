@@ -30,6 +30,25 @@ def _resolve_named_entity(raw_value, model):
     return None
 
 
+def _repack_shelf_slots(shelf, new_slots_count):
+    kept_slots = set()
+    overflow = []
+
+    for placement in sorted(shelf.placements, key=lambda item: item.slot_index):
+        if placement.slot_index <= new_slots_count and placement.slot_index not in kept_slots:
+            kept_slots.add(placement.slot_index)
+        else:
+            overflow.append(placement)
+
+    free_slots = [slot for slot in range(1, new_slots_count + 1) if slot not in kept_slots]
+    for placement, target_slot in zip(overflow, free_slots):
+        placement.slot_index = target_slot
+        kept_slots.add(target_slot)
+
+    for placement in overflow[len(free_slots):]:
+        db.session.delete(placement)
+
+
 def register(app):
 
     @app.route('/storage')
@@ -155,9 +174,7 @@ def register(app):
                 shelf.name = new_name
             shelf.columns = columns
             shelf.slots_count = slots_count
-            for placement in list(shelf.placements):
-                if placement.slot_index > slots_count:
-                    db.session.delete(placement)
+            _repack_shelf_slots(shelf, slots_count)
             db.session.commit()
         return redirect(url_for('storage', shelf_id=shelf_id))
 
@@ -184,11 +201,7 @@ def register(app):
                     orientation='standing',
                 ))
                 db.session.commit()
-        return redirect(url_for(
-            'storage',
-            shelf=(f"{shelf.id} - {shelf.name}" if shelf else None),
-            filament=(f"{filament.id} - {filament.name}" if filament else None),
-        ))
+        return redirect(url_for('storage'))
 
     @app.route('/storage/placement/<int:placement_id>/move', methods=['POST'])
     def storage_move_placement(placement_id):

@@ -39,9 +39,18 @@
                 </div>
                 <div>
                     <div class="text-gray-500">{{ t('stats_recommend_buy') }}</div>
-                    <div class="font-bold text-blue-700">{{ filament.stock_metrics.recommended_grams }} g</div>
+                    <div class="font-bold text-blue-700">{{ filament.stock_metrics.recommended_spools }} ks</div>
+                    <div class="text-xs text-gray-400">{{ filament.stock_metrics.recommended_order_grams }} g · {{ filament.stock_metrics.recommended_order_price }} {{ current_currency }}</div>
                 </div>
             </div>
+            {% if filament.stock_metrics.status in ['critical', 'warning'] %}
+            <form method="POST" action="{{ url_for('filament_toggle_reorder_snooze', id=filament.id) }}">
+                <button type="submit" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-semibold {% if filament.reorder_alert_snoozed %}bg-slate-100 border-slate-200 text-slate-700{% else %}bg-amber-50 border-amber-200 text-amber-700{% endif %}">
+                    <i class="fa-solid {% if filament.reorder_alert_snoozed %}fa-bell{% else %}fa-bell-slash{% endif %}"></i>
+                    {% if filament.reorder_alert_snoozed %}{{ t('reorder_alert_unsnooze') }}{% else %}{{ t('reorder_alert_snooze') }}{% endif %}
+                </button>
+            </form>
+            {% endif %}
             {% if filament.tag_list %}
             <div>
                 <div class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">{{ t('tag_list') }}</div>

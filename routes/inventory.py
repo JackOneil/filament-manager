@@ -167,7 +167,7 @@ def register(app):
         }, key=str.lower)
 
         stock_alerts = sorted(
-            [fil for fil in filaments_paginated.items if fil.stock_metrics['status'] in ('critical', 'warning')],
+            [fil for fil in filaments_paginated.items if fil.stock_metrics['status'] in ('critical', 'warning') and not fil.reorder_alert_snoozed],
             key=lambda item: (
                 0 if item.stock_metrics['status'] == 'critical' else 1,
                 item.stock_metrics['recommended_grams'] * -1,
@@ -263,6 +263,13 @@ def register(app):
         filament.quality_notes = request.form.get('quality_notes', '').strip() or None
         db.session.commit()
         return redirect(url_for('filament_detail', id=filament.id))
+
+    @app.route('/filament/<int:id>/toggle-reorder-snooze', methods=['POST'])
+    def filament_toggle_reorder_snooze(id):
+        filament = db.get_or_404(Filament, id)
+        filament.reorder_alert_snoozed = not bool(filament.reorder_alert_snoozed)
+        db.session.commit()
+        return redirect(request.referrer or url_for('filament_detail', id=filament.id))
 
     @app.route('/inventory/bulk', methods=['POST'])
     def inventory_bulk():

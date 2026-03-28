@@ -262,7 +262,6 @@
                             <div class="h-1 rounded-full bg-gradient-to-r from-emerald-500 to-blue-500" style="width: {{ placement.fill_percent }}%"></div>
                         </div>
 
-                        {% if row.compact %}
                         <div class="hidden group-hover:block pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-30 w-52">
                             <div class="rounded-xl border border-gray-200 bg-white shadow-xl p-3">
                                 <div class="flex items-start gap-3">
@@ -279,7 +278,6 @@
                                 <div class="mt-1 text-xs text-gray-500">{{ placement.fill_percent }}%</div>
                             </div>
                         </div>
-                        {% endif %}
                     </div>
                     {% else %}
                     <button type="button"
@@ -322,7 +320,7 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('select_filament') }}</label>
                     <input type="hidden" name="filament" :value="assignFilament">
                     <div class="relative">
-                        <input type="text" x-model="assignFilamentQ" @focus="assignFilamentOpen = true" @input="assignFilamentOpen = true"
+                        <input type="text" x-ref="assignFilamentInput" x-model="assignFilamentQ" @focus="assignFilamentOpen = true" @input="assignFilamentOpen = true"
                             placeholder="{{ t('filter_search') }}" autocomplete="off"
                             :class="assignFilament ? 'border-blue-400 bg-blue-50' : 'border-gray-300'"
                             class="w-full rounded-lg px-3 py-2 text-sm focus:ring-blue-500 outline-none border pr-8">
@@ -507,9 +505,14 @@ function storageBoard(config) {
             this.assignShelfId = shelfId;
             this.assignSlotIndex = slotIndex;
             this.assignShelfName = shelfName;
-            this.assignFilament = this.filament || '';
-            this.assignFilamentQ = this.filamentQ || '';
+            this.assignFilament = '';
+            this.assignFilamentQ = '';
             this.assignModalOpen = true;
+            this.$nextTick(() => {
+                this.assignFilamentOpen = true;
+                this.$refs.assignFilamentInput?.focus();
+                this.$refs.assignFilamentInput?.select();
+            });
         },
         closeAssignModal() {
             this.assignModalOpen = false;

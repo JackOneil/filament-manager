@@ -35,12 +35,19 @@
     </div>
     <div class="flex flex-wrap gap-2">
         {% for fil in stock_alerts %}
-        <a href="{{ url_for('filament_detail', id=fil.id) }}" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-amber-200 text-sm text-gray-700 hover:border-amber-400 transition">
-            <span class="font-semibold">{{ fil.name }}</span>
-            <span class="{% if fil.stock_metrics.status == 'critical' %}text-red-600{% else %}text-amber-600{% endif %}">
-                {{ fil.stock_metrics.recommended_grams }} g
-            </span>
-        </a>
+        <div class="relative">
+            <a href="{{ url_for('filament_detail', id=fil.id) }}" class="inline-flex items-center gap-2 px-3 py-2 pr-10 rounded-lg bg-white border border-amber-200 text-sm text-gray-700 hover:border-amber-400 transition">
+                <span class="font-semibold">{{ fil.name }}</span>
+                <span class="{% if fil.stock_metrics.status == 'critical' %}text-red-600{% else %}text-amber-600{% endif %}">
+                    {{ fil.stock_metrics.recommended_spools }} ks
+                </span>
+            </a>
+            <form action="{{ url_for('filament_toggle_reorder_snooze', id=fil.id) }}" method="POST" class="absolute inset-y-0 right-1 flex items-center">
+                <button type="submit" class="w-8 h-8 inline-flex items-center justify-center rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition" title="{{ t('reorder_alert_snooze') }}" aria-label="{{ t('reorder_alert_snooze') }}">
+                    <i class="fa-solid fa-bell-slash"></i>
+                </button>
+            </form>
+        </div>
         {% endfor %}
     </div>
 </div>

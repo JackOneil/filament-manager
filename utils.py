@@ -97,6 +97,9 @@ def compute_stock_status(filament, usage_30=0.0, usage_90=0.0):
     recommended_grams = max(0.0, target_stock - remaining)
     spool_weight = float(getattr(filament, 'weight_total', 0.0) or 0.0)
     recommended_spools = math.ceil(recommended_grams / spool_weight) if spool_weight > 0 and recommended_grams > 0 else 0
+    recommended_order_grams = recommended_spools * spool_weight if recommended_spools > 0 and spool_weight > 0 else 0.0
+    spool_price = float(getattr(filament, 'price', 0.0) or 0.0)
+    recommended_order_price = recommended_spools * spool_price if recommended_spools > 0 and spool_price > 0 else 0.0
 
     if remaining <= 0 or (min_stock > 0 and remaining < min_stock * 0.5):
         status = 'critical'
@@ -116,6 +119,9 @@ def compute_stock_status(filament, usage_30=0.0, usage_90=0.0):
         'target_stock': round(target_stock, 1),
         'recommended_grams': round(recommended_grams, 1),
         'recommended_spools': recommended_spools,
+        'recommended_order_grams': round(recommended_order_grams, 1),
+        'recommended_order_price': round(recommended_order_price, 2),
+        'spool_price': round(spool_price, 2),
         'status': status,
     }
 

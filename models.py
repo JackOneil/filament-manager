@@ -39,6 +39,7 @@ class Filament(db.Model):
     quality_notes = db.Column(db.Text, nullable=True)
     recommended_nozzle_temp = db.Column(db.Integer, nullable=True)
     recommended_bed_temp = db.Column(db.Integer, nullable=True)
+    reorder_alert_snoozed = db.Column(db.Boolean, nullable=False, default=False)
 
     brand = db.relationship('Brand', backref=db.backref('filaments', lazy=True))
     color = db.relationship('Color', backref=db.backref('filaments', lazy=True))

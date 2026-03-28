@@ -157,6 +157,7 @@ class ImportAtomicityTests(unittest.TestCase):
                 quality_notes='stable',
                 recommended_nozzle_temp=220,
                 recommended_bed_temp=60,
+                reorder_alert_snoozed=True,
             )
             db.session.add_all([project, filament])
             db.session.flush()
@@ -198,6 +199,7 @@ class ImportAtomicityTests(unittest.TestCase):
             self.assertEqual(filament.tag_text, 'matte, proto')
             self.assertEqual(filament.quality_profile, '0.20 structural')
             self.assertEqual(filament.recommended_nozzle_temp, 220)
+            self.assertTrue(filament.reorder_alert_snoozed)
 
             movement = MovementHistory.query.filter_by(note='Linked movement').first()
             self.assertIsNotNone(movement)

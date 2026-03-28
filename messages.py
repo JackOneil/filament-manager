@@ -338,6 +338,8 @@ TRANSLATIONS = {
         'storage_slot_label': 'Pozice',
         'storage_delete_shelf': 'Smazat polici',
         'storage_delete_shelf_confirm': 'Opravdu chcete tuto polici smazat? Všechna přiřazení v polici budou odstraněna.',
+        'reorder_alert_snooze': 'Uspat upozornění',
+        'reorder_alert_unsnooze': 'Obnovit upozornění',
     },
     'en': {
         'title': 'Filament Manager',
@@ -678,5 +680,7 @@ TRANSLATIONS = {
         'storage_slot_label': 'Slot',
         'storage_delete_shelf': 'Delete shelf',
         'storage_delete_shelf_confirm': 'Are you sure you want to delete this shelf? All assignments inside it will be removed.',
+        'reorder_alert_snooze': 'Snooze alert',
+        'reorder_alert_unsnooze': 'Restore alert',
     }
 }

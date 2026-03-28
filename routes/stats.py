@@ -177,6 +177,11 @@ def register(app):
                 'usage_90': stock['usage_90'],
                 'recommended_grams': stock['recommended_grams'],
                 'recommended_spools': stock['recommended_spools'],
+                'recommended_order_grams': stock['recommended_order_grams'],
+                'recommended_order_price': stock['recommended_order_price'],
+                'spool_price': stock['spool_price'],
+                'spool_weight': filament.weight_total,
+                'reorder_alert_snoozed': bool(filament.reorder_alert_snoozed),
             })
 
         forecast_rows.sort(

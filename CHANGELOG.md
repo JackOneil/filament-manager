@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.36.8] - 2026-03-28
+### Changed
+- **Shelf assignment modal decoupled from filters**: opening the slot-assignment dialog now always starts with an empty filament search, so it no longer inherits any active shelf-page filter context.
+
+### Fixed
+- **Shelf preview behavior kept universal**: hover previews remain available across both dense and smaller shelf layouts so reduced boards stay readable too.
+
+## [1.36.7] - 2026-03-28
+### Changed
+- **Shelf hover previews expanded**: filament preview cards now appear on hover for all shelf layouts, not only dense boards.
+
+### Fixed
+- **No forced shelf filter after assignment**: assigning a filament into a shelf slot now returns to the unfiltered shelf view unless a filter was explicitly chosen by the user.
+
+## [1.36.6] - 2026-03-28
+### Changed
+- **Reorder recommendations now respect spool capacity**: the statistics page now recommends only whole spools, shows the actual orderable gram total, and includes the resulting purchase price.
+
+### Added
+- **Per-filament alert snooze**: active reorder alerts can now be snoozed individually from the inventory/detail workflow while still remaining visible inside statistics.
+
+## [1.36.5] - 2026-03-28
+### Changed
+- **Shelf assignment flow refined**: opening the slot-assignment modal now focuses the filament search input immediately so typing can start without an extra click.
+
+### Fixed
+- **No implicit filament filter after assignment**: assigning a filament into a shelf slot no longer activates the shelf-page filament filter afterward.
+- **Shelf resize repacking**: when shrinking a shelf, out-of-range placements are now moved into any free slots that still exist before anything is removed from the layout.
+
 ## [1.36.4] - 2026-03-28
 ### Added
 - **Shelf hover preview**: compact shelf slots now show a larger filament preview card on hover so dense layouts stay readable without sacrificing drag-and-drop between positions.
