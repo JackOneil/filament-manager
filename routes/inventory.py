@@ -6,7 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
 from database import db
-from models import AppSetting, BambuPrintJob, Brand, Color, Filament, Material, MovementHistory, ProjectFilament
+from models import AppSetting, BambuJobMaterial, BambuPrintJob, Brand, Color, Filament, Material, MovementHistory, ProjectFilament
 from utils import (
     compute_stock_status,
     format_tags,
@@ -202,12 +202,17 @@ def register(app):
         usage_map = collect_usage_windows([filament])
         _decorate_filament(filament, usage_map)
 
+        timeline_page = request.args.get('timeline_page', 1, type=int)
+        jobs_page = request.args.get('jobs_page', 1, type=int)
+        detail_per_page = 10
+
         timeline_rows = MovementHistory.query.options(
             joinedload(MovementHistory.project),
             joinedload(MovementHistory.bambu_job),
         ).filter(
             db.or_(MovementHistory.filament_id == filament.id, MovementHistory.filament_name == _display_filament_name(filament))
-        ).order_by(MovementHistory.created_at.desc()).limit(80).all()
+        ).order_by(MovementHistory.created_at.desc())
+        timeline_paginated = db.paginate(timeline_rows, page=timeline_page, per_page=detail_per_page, error_out=False)
 
         timeline = [{
             'created_at': row.created_at,
@@ -217,25 +222,29 @@ def register(app):
             'note': row.note,
             'project': row.project,
             'bambu_job': row.bambu_job,
-        } for row in timeline_rows]
+        } for row in timeline_paginated.items]
 
         related_project_rows = ProjectFilament.query.options(
             joinedload(ProjectFilament.project),
         ).filter(ProjectFilament.filament_id == filament.id).order_by(ProjectFilament.id.desc()).limit(20).all()
-        related_jobs = BambuPrintJob.query.options(
+        related_jobs_query = BambuPrintJob.query.options(
             joinedload(BambuPrintJob.materials),
-        ).order_by(BambuPrintJob.started_at.desc().nullslast()).limit(80).all()
-        related_jobs = [
-            job for job in related_jobs
-            if job.filament_id == filament.id or any(slot.filament_id == filament.id for slot in job.materials)
-        ]
+        ).filter(
+            db.or_(
+                BambuPrintJob.filament_id == filament.id,
+                BambuPrintJob.materials.any(BambuJobMaterial.filament_id == filament.id),
+            )
+        ).order_by(BambuPrintJob.started_at.desc().nullslast())
+        related_jobs_paginated = db.paginate(related_jobs_query, page=jobs_page, per_page=detail_per_page, error_out=False)
 
         return render_template(
             'filament_detail.html',
             filament=filament,
             timeline=timeline,
+            timeline_paginated=timeline_paginated,
             related_project_rows=related_project_rows,
-            related_jobs=related_jobs,
+            related_jobs=related_jobs_paginated.items,
+            related_jobs_paginated=related_jobs_paginated,
             formatted_tags=format_tags(filament.tag_text),
         )
 

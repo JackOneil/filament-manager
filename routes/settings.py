@@ -6,7 +6,7 @@ from database import db
 from models import (
     Brand, Color, Material, AppSetting, Filament, MovementHistory,
     PrintHistory, Project, ProjectFile, ProjectLink, ProjectFilament, ProjectQuote,
-    BambuPrinter, BambuPrintJob, BambuJobMaterial,
+    BambuPrinter, BambuPrintJob, BambuJobMaterial, StoragePlacement, StorageShelf,
 )
 from utils import format_tags, top_tags
 
@@ -301,6 +301,21 @@ def register(app):
                     'deducted': m.deducted,
                 } for m in j.materials],
             } for j in BambuPrintJob.query.order_by(BambuPrintJob.started_at).all()],
+
+            # ── Storage visualization ────────────────────────────────
+            'storage_shelves': [{
+                'name': shelf.name,
+                'columns': shelf.columns,
+                'slots_count': shelf.slots_count,
+                'sort_order': shelf.sort_order,
+            } for shelf in StorageShelf.query.order_by(StorageShelf.sort_order, StorageShelf.name).all()],
+
+            'storage_placements': [{
+                'shelf_name': placement.shelf.name if placement.shelf else None,
+                'filament_name': placement.filament.name if placement.filament else None,
+                'slot_index': placement.slot_index,
+                'orientation': placement.orientation,
+            } for placement in StoragePlacement.query.order_by(StoragePlacement.shelf_id, StoragePlacement.slot_index).all()],
         }
 
         app.logger.debug(
@@ -573,6 +588,39 @@ def register(app):
                         currency=m.get('currency', 'CZK'),
                         created_at=ts,
                         note=m.get('note'),
+                    ))
+
+                # ── 9. Storage shelves and placements ─────────────────
+                for shelf_data in data.get('storage_shelves', []):
+                    shelf_name = shelf_data.get('name')
+                    if not shelf_name or StorageShelf.query.filter_by(name=shelf_name).first():
+                        continue
+                    db.session.add(StorageShelf(
+                        name=shelf_name,
+                        columns=max(shelf_data.get('columns', 4) or 4, 1),
+                        slots_count=max(shelf_data.get('slots_count', 12) or 12, 1),
+                        sort_order=shelf_data.get('sort_order', 0) or 0,
+                    ))
+
+                db.session.flush()
+
+                for placement_data in data.get('storage_placements', []):
+                    shelf = StorageShelf.query.filter_by(name=placement_data.get('shelf_name')).first()
+                    filament = Filament.query.filter_by(name=placement_data.get('filament_name')).first()
+                    slot_index = placement_data.get('slot_index')
+                    if not shelf or not filament or not slot_index:
+                        continue
+                    exists_placement = StoragePlacement.query.filter_by(
+                        shelf_id=shelf.id,
+                        slot_index=slot_index,
+                    ).first()
+                    if exists_placement:
+                        continue
+                    db.session.add(StoragePlacement(
+                        shelf_id=shelf.id,
+                        filament_id=filament.id,
+                        slot_index=slot_index,
+                        orientation=placement_data.get('orientation', 'standing') or 'standing',
                     ))
 
             app.logger.debug(f"Import finished: {imported_filaments} filaments, projects and Bambu jobs processed.")

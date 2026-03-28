@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.36.4] - 2026-03-28
+### Added
+- **Shelf hover preview**: compact shelf slots now show a larger filament preview card on hover so dense layouts stay readable without sacrificing drag-and-drop between positions.
+
+## [1.36.3] - 2026-03-28
+### Changed
+- **Shelf assignment modal aligned with overview filters**: filament assignment inside empty shelf slots now uses the same interactive searchable dropdown pattern as the main inventory overview.
+- **Shelf page header simplified**: adding a shelf is now opened from a compact action button with a modal form, leaving more room for shelf filters at the top of the page.
+
+## [1.36.2] - 2026-03-28
+### Changed
+- **Shelf inputs upgraded**: shelf filters and slot assignment now use searchable text inputs with narrowed suggestion lists instead of plain selects.
+- **Shelf board densified**: large shelves now render as a compact square map that stays within the page width instead of forcing horizontal scrolling.
+- **Orientation removed from shelf UI**: slot assignment and board cards no longer expose orientation controls, keeping the layout cleaner and faster to use.
+
+### Added
+- **Shelf deletion**: shelves can now be removed directly from their edit panel including all slot assignments in that shelf.
+
+## [1.36.1] - 2026-03-28
+### Changed
+- **Shelf workflow reworked**: spool placement is now done directly from empty shelf slots, shelves can be edited in place, and large shelf grids use a more compact board layout with horizontal scrolling for better readability.
+- **Shelf filtering improved**: filtering can now target a specific filament and matching slot positions are highlighted directly in the board instead of disappearing from view.
+
+## [1.36.0] - 2026-03-28
+### Added
+- **Shelf layout prototype**: added a new visual `/storage` page with named shelves, configurable slot grids, spool placement cards, orientation controls, drag-and-drop moves, fill indicators, and filtering by shelf, brand, material, and tag.
+
+### Changed
+- **Filament detail pagination**: the spool-life timeline and related Bambu print list on the filament detail page are now paginated to keep long histories readable.
+- **Backup schema expanded again**: `/export` and `/import` now include shelf layouts and spool placements so the new storage prototype remains fully portable in backups.
+
+### Fixed
+- **Project stats chart axis**: the project consumption chart now keeps project names on the categorical axis instead of formatting them as gram values.
+
 ## [1.35.0] - 2026-03-28
 ### Added
 - **Automatic purchase recommendations**: the statistics dashboard now calculates what to order next from the last 30/90 days of real usage, including suggested grams and spool counts.

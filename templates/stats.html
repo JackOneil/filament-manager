@@ -392,6 +392,15 @@ new Chart(document.getElementById('projectChart'), {
     options: {
         ...baseChartOptions(),
         indexAxis: 'y',
+        scales: {
+            x: {
+                beginAtZero: true,
+                ticks: { callback: (value) => `${value} g` }
+            },
+            y: {
+                ticks: { callback: (value, index) => statsData.projectLabels[index] || value }
+            }
+        },
     },
 });
 {% endif %}

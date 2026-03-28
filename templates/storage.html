@@ -1,0 +1,540 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6" x-data="storageBoard(window.storageBoardConfig)">
+    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800"><i class="fa-solid fa-warehouse text-slate-600"></i> {{ t('storage_title') }}</h1>
+            <p class="text-gray-500 mt-2">{{ t('storage_desc') }}</p>
+        </div>
+    </div>
+
+    <div class="space-y-6">
+        <div class="flex justify-end">
+            <button type="button"
+                    class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded shadow font-bold transition-colors"
+                    @click="openShelfModal()">
+                <i class="fa-solid fa-plus"></i> {{ t('storage_add_shelf') }}
+            </button>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">{{ t('storage_filters') }}</h2>
+            <form method="GET" action="{{ url_for('storage') }}" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
+                <div class="relative" @click.outside="shelfOpen = false">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('storage_shelf') }}</label>
+                    <input type="hidden" name="shelf" :value="shelf">
+                    <div class="relative">
+                        <input type="text" x-model="shelfQ" @focus="shelfOpen = true" @input="shelfOpen = true"
+                            placeholder="{{ t('filter_search') }}" autocomplete="off"
+                            :class="shelf ? 'border-blue-400 bg-blue-50' : 'border-gray-300'"
+                            class="w-full rounded-lg px-3 py-2 text-sm focus:ring-blue-500 outline-none border pr-8">
+                        <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-gray-400">
+                            <i class="fa-solid fa-chevron-down text-xs transition-transform duration-150" :class="shelfOpen ? 'rotate-180' : ''"></i>
+                        </div>
+                    </div>
+                    <div x-show="shelfOpen" x-cloak class="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                        <div @click="selectShelf('', ''); shelfOpen = false"
+                            class="px-3 py-2 cursor-pointer text-sm italic border-b border-gray-100"
+                            :class="shelf === '' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-400 hover:bg-gray-50'">
+                            — {{ t('filter_all') }} —
+                        </div>
+                        <template x-for="opt in filteredShelves" :key="opt.id">
+                            <div @click="selectShelf(opt.id, opt.name); shelfOpen = false"
+                                class="px-3 py-2 cursor-pointer text-sm border-b border-gray-50 last:border-b-0 flex items-center justify-between"
+                                :class="shelf == opt.id ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-800 hover:bg-blue-50'">
+                                <span x-text="opt.name"></span>
+                                <i x-show="shelf == opt.id" class="fa-solid fa-check text-blue-500 text-xs"></i>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="relative" @click.outside="filamentOpen = false">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('storage_filament_filter') }}</label>
+                    <input type="hidden" name="filament" :value="filament">
+                    <div class="relative">
+                        <input type="text" x-model="filamentQ" @focus="filamentOpen = true" @input="filamentOpen = true"
+                            placeholder="{{ t('filter_search') }}" autocomplete="off"
+                            :class="filament ? 'border-blue-400 bg-blue-50' : 'border-gray-300'"
+                            class="w-full rounded-lg px-3 py-2 text-sm focus:ring-blue-500 outline-none border pr-8">
+                        <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-gray-400">
+                            <i class="fa-solid fa-chevron-down text-xs transition-transform duration-150" :class="filamentOpen ? 'rotate-180' : ''"></i>
+                        </div>
+                    </div>
+                    <div x-show="filamentOpen" x-cloak class="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                        <div @click="selectFilament('', ''); filamentOpen = false"
+                            class="px-3 py-2 cursor-pointer text-sm italic border-b border-gray-100"
+                            :class="filament === '' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-400 hover:bg-gray-50'">
+                            — {{ t('filter_all') }} —
+                        </div>
+                        <template x-for="opt in filteredFilaments" :key="opt.id">
+                            <div @click="selectFilament(opt.id, opt.name); filamentOpen = false"
+                                class="px-3 py-2 cursor-pointer text-sm border-b border-gray-50 last:border-b-0 flex items-center justify-between"
+                                :class="filament == opt.id ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-800 hover:bg-blue-50'">
+                                <span x-text="opt.name"></span>
+                                <i x-show="filament == opt.id" class="fa-solid fa-check text-blue-500 text-xs"></i>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="relative" @click.outside="brandOpen = false">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('brand') }}</label>
+                    <input type="hidden" name="brand" :value="brand">
+                    <div class="relative">
+                        <input type="text" x-model="brandQ" @focus="brandOpen = true" @input="brandOpen = true"
+                            placeholder="{{ t('filter_search') }}" autocomplete="off"
+                            :class="brand ? 'border-blue-400 bg-blue-50' : 'border-gray-300'"
+                            class="w-full rounded-lg px-3 py-2 text-sm focus:ring-blue-500 outline-none border pr-8">
+                        <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-gray-400">
+                            <i class="fa-solid fa-chevron-down text-xs transition-transform duration-150" :class="brandOpen ? 'rotate-180' : ''"></i>
+                        </div>
+                    </div>
+                    <div x-show="brandOpen" x-cloak class="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                        <div @click="selectBrand('', ''); brandOpen = false"
+                            class="px-3 py-2 cursor-pointer text-sm italic border-b border-gray-100"
+                            :class="brand === '' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-400 hover:bg-gray-50'">
+                            — {{ t('filter_all') }} —
+                        </div>
+                        <template x-for="opt in filteredBrands" :key="opt.id">
+                            <div @click="selectBrand(opt.id, opt.name); brandOpen = false"
+                                class="px-3 py-2 cursor-pointer text-sm border-b border-gray-50 last:border-b-0 flex items-center justify-between"
+                                :class="brand == opt.id ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-800 hover:bg-blue-50'">
+                                <span x-text="opt.name"></span>
+                                <i x-show="brand == opt.id" class="fa-solid fa-check text-blue-500 text-xs"></i>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="relative" @click.outside="materialOpen = false">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('material') }}</label>
+                    <input type="hidden" name="material" :value="material">
+                    <div class="relative">
+                        <input type="text" x-model="materialQ" @focus="materialOpen = true" @input="materialOpen = true"
+                            placeholder="{{ t('filter_search') }}" autocomplete="off"
+                            :class="material ? 'border-blue-400 bg-blue-50' : 'border-gray-300'"
+                            class="w-full rounded-lg px-3 py-2 text-sm focus:ring-blue-500 outline-none border pr-8">
+                        <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-gray-400">
+                            <i class="fa-solid fa-chevron-down text-xs transition-transform duration-150" :class="materialOpen ? 'rotate-180' : ''"></i>
+                        </div>
+                    </div>
+                    <div x-show="materialOpen" x-cloak class="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                        <div @click="selectMaterial('', ''); materialOpen = false"
+                            class="px-3 py-2 cursor-pointer text-sm italic border-b border-gray-100"
+                            :class="material === '' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-400 hover:bg-gray-50'">
+                            — {{ t('filter_all') }} —
+                        </div>
+                        <template x-for="opt in filteredMaterials" :key="opt.id">
+                            <div @click="selectMaterial(opt.id, opt.name); materialOpen = false"
+                                class="px-3 py-2 cursor-pointer text-sm border-b border-gray-50 last:border-b-0 flex items-center justify-between"
+                                :class="material == opt.id ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-800 hover:bg-blue-50'">
+                                <span x-text="opt.name"></span>
+                                <i x-show="material == opt.id" class="fa-solid fa-check text-blue-500 text-xs"></i>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="relative" @click.outside="colorOpen = false">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('color') }}</label>
+                    <input type="hidden" name="color" :value="color">
+                    <div class="relative">
+                        <input type="text" x-model="colorQ" @focus="colorOpen = true" @input="colorOpen = true"
+                            placeholder="{{ t('filter_search') }}" autocomplete="off"
+                            :class="color ? 'border-blue-400 bg-blue-50' : 'border-gray-300'"
+                            class="w-full rounded-lg px-3 py-2 text-sm focus:ring-blue-500 outline-none border pr-8">
+                        <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-gray-400">
+                            <i class="fa-solid fa-chevron-down text-xs transition-transform duration-150" :class="colorOpen ? 'rotate-180' : ''"></i>
+                        </div>
+                    </div>
+                    <div x-show="colorOpen" x-cloak class="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                        <div @click="selectColor('', ''); colorOpen = false"
+                            class="px-3 py-2 cursor-pointer text-sm italic border-b border-gray-100"
+                            :class="color === '' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-400 hover:bg-gray-50'">
+                            — {{ t('filter_all') }} —
+                        </div>
+                        <template x-for="opt in filteredColors" :key="opt.id">
+                            <div @click="selectColor(opt.id, opt.name); colorOpen = false"
+                                class="px-3 py-2 cursor-pointer text-sm border-b border-gray-50 last:border-b-0 flex items-center gap-2"
+                                :class="color == opt.id ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-800 hover:bg-blue-50'">
+                                <div class="w-3 h-3 rounded-full flex-shrink-0 border border-gray-200" :style="'background-color:' + opt.hex"></div>
+                                <span x-text="opt.name" class="flex-1"></span>
+                                <i x-show="color == opt.id" class="fa-solid fa-check text-blue-500 text-xs"></i>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('tag_list') }}</label>
+                    <input type="text" name="tag" x-model="tagQ" list="storageTagSuggestions" placeholder="{{ t('filter_search') }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                    <datalist id="storageTagSuggestions">
+                        {% for tag in tag_options %}
+                        <option value="{{ tag }}"></option>
+                        {% endfor %}
+                    </datalist>
+                </div>
+                
+                <div class="md:col-span-2 xl:col-span-6 flex flex-wrap gap-2 items-center">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow text-sm font-semibold">{{ t('filter_btn') }}</button>
+                    <a href="{{ url_for('storage') }}" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold">{{ t('filter_reset') }}</a>
+                    {% if has_active_filter %}
+                    <span class="text-sm text-red-600 font-semibold">{{ t('storage_filter_hint') }}</span>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="space-y-6">
+        {% for row in shelves %}
+        <section class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4 mb-5">
+                <div>
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <h2 class="text-xl font-bold text-gray-800">{{ row.shelf.name }}</h2>
+                        {% if has_active_filter %}
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-red-50 text-red-700 text-xs font-semibold">
+                            {{ row.matched_slots }} {{ t('storage_matches_count') }}
+                        </span>
+                        {% endif %}
+                    </div>
+                    <p class="text-sm text-gray-500 mt-1">{{ row.shelf.slots_count }} {{ t('storage_slots_count') }} · {{ row.shelf.columns }} {{ t('storage_columns') }}</p>
+                </div>
+
+                <details class="bg-gray-50 border border-gray-200 rounded-xl p-4 xl:min-w-[360px]">
+                    <summary class="cursor-pointer text-sm font-semibold text-gray-700">{{ t('storage_edit_shelf') }}</summary>
+                    <form method="POST" action="{{ url_for('storage_update_shelf', shelf_id=row.shelf.id) }}" class="space-y-3 mt-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('name') }}</label>
+                            <input type="text" name="name" value="{{ row.shelf.name }}" required class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('storage_columns') }}</label>
+                                <input type="number" name="columns" min="1" value="{{ row.shelf.columns }}" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('storage_slots_count') }}</label>
+                                <input type="number" name="slots_count" min="1" value="{{ row.shelf.slots_count }}" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-400">{{ t('storage_edit_shelf_hint') }}</p>
+                        <div class="flex gap-2">
+                            <button type="submit" class="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg shadow text-sm font-semibold">{{ t('save_changes') }}</button>
+                        </div>
+                    </form>
+                    <form method="POST" action="{{ url_for('storage_delete_shelf', shelf_id=row.shelf.id) }}" class="mt-3" onsubmit="return confirm('{{ t('storage_delete_shelf_confirm') }}')">
+                        <button type="submit" class="bg-red-50 hover:bg-red-100 text-red-700 px-4 py-2 rounded-lg text-sm font-semibold border border-red-200">{{ t('storage_delete_shelf') }}</button>
+                    </form>
+                </details>
+            </div>
+
+            <div class="mx-auto grid gap-1.5" style="grid-template-columns: repeat({{ row.shelf.columns }}, minmax(0, clamp(3.3rem, calc((100vw - 10rem) / {{ row.shelf.columns }}), 4.2rem))); width: fit-content; max-width: 100%;">
+                {% for slot_index in row.slots %}
+                {% set placement = row.slot_map.get(slot_index) %}
+                <div class="relative aspect-square rounded-lg border p-1.5 {% if placement %}bg-white{% else %}bg-slate-50 border-dashed{% endif %} {% if placement and has_active_filter and placement.matches_filter %}border-red-500 ring-2 ring-red-200 animate-pulse{% elif placement and has_active_filter and not placement.matches_filter %}border-gray-200 opacity-25{% else %}border-gray-300{% endif %}"
+                     @dragover.prevent
+                     @drop="movePlacement($event, {{ row.shelf.id }}, {{ slot_index }})">
+                    <div class="absolute top-1 left-1 text-[9px] font-bold text-gray-400">{{ slot_index }}</div>
+                    {% if placement %}
+                    <div class="group h-full rounded-md border border-gray-200 p-1 cursor-move flex flex-col justify-between"
+                         draggable="true"
+                         @dragstart="startDrag($event, {{ placement.id }})"
+                         title="{{ placement.filament.name }} · {{ placement.filament.brand.name }} · {{ placement.filament.material.name }}">
+                        <div class="flex items-start justify-between gap-1">
+                            <div class="flex items-start gap-1 min-w-0 flex-1 pr-1">
+                                <span class="w-3 h-3 rounded-full border border-gray-200 flex-shrink-0 mt-0.5" style="background-color: {{ placement.filament.color.hex_value }}"></span>
+                                <div class="min-w-0 flex-1 text-left">
+                                    <div class="text-[10px] font-bold text-gray-700 leading-none truncate">{{ placement.brand_short }}</div>
+                                    <div class="text-[9px] text-gray-500 leading-none truncate mt-0.5">{{ placement.filament.name }}</div>
+                                </div>
+                            </div>
+                            <form method="POST" action="{{ url_for('storage_delete_placement', placement_id=placement.id) }}" class="flex-shrink-0">
+                                <button type="submit" class="text-gray-300 hover:text-red-500 text-[10px] leading-none"><i class="fa-solid fa-xmark"></i></button>
+                            </form>
+                        </div>
+                        <div class="text-left px-0.5 pt-0.5">
+                            <div class="text-[9px] text-gray-400 leading-none">{{ placement.fill_percent }}%</div>
+                        </div>
+                        <div class="h-1 rounded-full bg-gray-200 overflow-hidden">
+                            <div class="h-1 rounded-full bg-gradient-to-r from-emerald-500 to-blue-500" style="width: {{ placement.fill_percent }}%"></div>
+                        </div>
+
+                        {% if row.compact %}
+                        <div class="hidden group-hover:block pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-30 w-52">
+                            <div class="rounded-xl border border-gray-200 bg-white shadow-xl p-3">
+                                <div class="flex items-start gap-3">
+                                    <span class="w-5 h-5 rounded-full border border-gray-200 flex-shrink-0 mt-0.5" style="background-color: {{ placement.filament.color.hex_value }}"></span>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="text-sm font-bold text-gray-800 leading-tight">{{ placement.filament.name }}</div>
+                                        <div class="text-xs text-gray-500 mt-1">{{ placement.filament.brand.name }} · {{ placement.filament.material.name }}</div>
+                                        <div class="text-xs text-gray-400 mt-1">{{ t('remaining') }}: {{ placement.filament.weight_remaining | round(0) }} g</div>
+                                    </div>
+                                </div>
+                                <div class="mt-3 h-2 rounded-full bg-gray-200 overflow-hidden">
+                                    <div class="h-2 rounded-full bg-gradient-to-r from-emerald-500 to-blue-500" style="width: {{ placement.fill_percent }}%"></div>
+                                </div>
+                                <div class="mt-1 text-xs text-gray-500">{{ placement.fill_percent }}%</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <button type="button"
+                            class="w-full h-full rounded-md border border-dashed border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-600 transition flex flex-col items-center justify-center"
+                            @click="openAssignModal({{ row.shelf.id }}, {{ slot_index }}, '{{ row.shelf.name|escape }}')">
+                        <i class="fa-solid fa-plus text-xs"></i>
+                    </button>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% else %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center text-gray-400">
+            <i class="fa-solid fa-warehouse text-5xl mb-4 block opacity-30"></i>
+            <p class="text-lg font-semibold text-gray-500">{{ t('storage_no_shelves') }}</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div x-show="assignModalOpen" x-cloak class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4" @click.self="closeAssignModal()">
+        <div class="bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-lg p-6">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <h3 class="text-xl font-bold text-gray-800">{{ t('storage_assign_modal_title') }}</h3>
+                    <p class="text-sm text-gray-500 mt-1">
+                        <span x-text="assignShelfName"></span> · {{ t('storage_slot_label') }} <span x-text="assignSlotIndex"></span>
+                    </p>
+                </div>
+                <button type="button" class="text-gray-400 hover:text-gray-700" @click="closeAssignModal()">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            {% if all_filaments %}
+            <form method="POST" action="{{ url_for('storage_assign_slot') }}" class="space-y-4 mt-5">
+                <input type="hidden" name="shelf_id" :value="assignShelfId">
+                <input type="hidden" name="slot_index" :value="assignSlotIndex">
+                <div class="relative" @click.outside="assignFilamentOpen = false">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('select_filament') }}</label>
+                    <input type="hidden" name="filament" :value="assignFilament">
+                    <div class="relative">
+                        <input type="text" x-model="assignFilamentQ" @focus="assignFilamentOpen = true" @input="assignFilamentOpen = true"
+                            placeholder="{{ t('filter_search') }}" autocomplete="off"
+                            :class="assignFilament ? 'border-blue-400 bg-blue-50' : 'border-gray-300'"
+                            class="w-full rounded-lg px-3 py-2 text-sm focus:ring-blue-500 outline-none border pr-8">
+                        <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-gray-400">
+                            <i class="fa-solid fa-chevron-down text-xs transition-transform duration-150" :class="assignFilamentOpen ? 'rotate-180' : ''"></i>
+                        </div>
+                    </div>
+                    <div x-show="assignFilamentOpen" x-cloak class="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                        <template x-for="opt in filteredAssignFilaments" :key="opt.id">
+                            <div @click="selectAssignFilament(opt.id, opt.name); assignFilamentOpen = false"
+                                class="px-3 py-2 cursor-pointer text-sm border-b border-gray-50 last:border-b-0 flex items-center justify-between text-gray-800 hover:bg-blue-50">
+                                <span x-text="opt.name"></span>
+                                <i x-show="assignFilament == opt.id" class="fa-solid fa-check text-blue-500 text-xs"></i>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                <div class="flex gap-2 justify-end">
+                    <button type="button" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold" @click="closeAssignModal()">{{ t('cancel') }}</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow text-sm font-semibold">{{ t('storage_assign_here') }}</button>
+                </div>
+            </form>
+            {% else %}
+            <p class="text-sm text-gray-400 mt-5">{{ t('storage_no_filaments_available') }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div x-show="shelfModalOpen" x-cloak class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4" @click.self="closeShelfModal()">
+        <div class="bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-lg p-6">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <h3 class="text-xl font-bold text-gray-800">{{ t('storage_add_shelf') }}</h3>
+                </div>
+                <button type="button" class="text-gray-400 hover:text-gray-700" @click="closeShelfModal()">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form method="POST" action="{{ url_for('storage_add_shelf') }}" class="space-y-4 mt-5">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('name') }}</label>
+                    <input type="text" name="name" required class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('storage_columns') }}</label>
+                        <input type="number" name="columns" min="1" value="4" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('storage_slots_count') }}</label>
+                        <input type="number" name="slots_count" min="1" value="12" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                    </div>
+                </div>
+                <div class="flex gap-2 justify-end">
+                    <button type="button" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold" @click="closeShelfModal()">{{ t('cancel') }}</button>
+                    <button type="submit" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg shadow text-sm font-semibold">{{ t('save') }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+window.storageBoardConfig = {
+    shelf: {{ active_shelf|tojson }},
+    brand: {{ active_brand|tojson }},
+    material: {{ active_material|tojson }},
+    color: {{ active_color|tojson }},
+    filament: {{ active_filament|tojson }},
+    tag: {{ active_tag|tojson }},
+    shelfOptions: [{% for shelf in all_shelves %}{ id: {{ shelf.id }}, name: {{ shelf.name|tojson }} }{% if not loop.last %}, {% endif %}{% endfor %}],
+    brandOptions: [{% for brand in brands %}{ id: {{ brand.id }}, name: {{ brand.name|tojson }} }{% if not loop.last %}, {% endif %}{% endfor %}],
+    materialOptions: [{% for material in materials %}{ id: {{ material.id }}, name: {{ material.name|tojson }} }{% if not loop.last %}, {% endif %}{% endfor %}],
+    colorOptions: [{% for color in colors %}{ id: {{ color.id }}, name: {{ color.name|tojson }}, hex: {{ color.hex_value|tojson }} }{% if not loop.last %}, {% endif %}{% endfor %}],
+    filamentOptions: [{% for filament in all_filaments %}{ id: {{ filament.id }}, name: {{ filament.name|tojson }} }{% if not loop.last %}, {% endif %}{% endfor %}]
+};
+
+function storageBoard(config) {
+    return {
+        draggedPlacementId: null,
+        assignModalOpen: false,
+        shelfModalOpen: false,
+        assignShelfId: '',
+        assignSlotIndex: '',
+        assignShelfName: '',
+        assignFilament: '',
+        assignFilamentQ: '',
+        assignFilamentOpen: false,
+        shelf: config?.shelf || '',
+        brand: config?.brand || '',
+        material: config?.material || '',
+        color: config?.color || '',
+        filament: config?.filament || '',
+        tagQ: config?.tag || '',
+        shelfQ: '',
+        brandQ: '',
+        materialQ: '',
+        colorQ: '',
+        filamentQ: '',
+        shelfOpen: false,
+        brandOpen: false,
+        materialOpen: false,
+        colorOpen: false,
+        filamentOpen: false,
+        shelfOptions: config?.shelfOptions || [],
+        brandOptions: config?.brandOptions || [],
+        materialOptions: config?.materialOptions || [],
+        colorOptions: config?.colorOptions || [],
+        filamentOptions: config?.filamentOptions || [],
+        init() {
+            const selectedShelf = this.shelfOptions.find((opt) => this.shelf == opt.id);
+            const selectedBrand = this.brandOptions.find((opt) => this.brand == opt.id);
+            const selectedMaterial = this.materialOptions.find((opt) => this.material == opt.id);
+            const selectedColor = this.colorOptions.find((opt) => this.color == opt.id);
+            const selectedFilament = this.filamentOptions.find((opt) => this.filament == opt.id);
+            this.shelfQ = selectedShelf ? selectedShelf.name : '';
+            this.brandQ = selectedBrand ? selectedBrand.name : '';
+            this.materialQ = selectedMaterial ? selectedMaterial.name : '';
+            this.colorQ = selectedColor ? selectedColor.name : '';
+            this.filamentQ = selectedFilament ? selectedFilament.name : '';
+        },
+        get filteredShelves() {
+            const q = this.shelfQ.toLowerCase();
+            return this.shelfOptions.filter((opt) => opt.name.toLowerCase().includes(q));
+        },
+        get filteredBrands() {
+            const q = this.brandQ.toLowerCase();
+            return this.brandOptions.filter((opt) => opt.name.toLowerCase().includes(q));
+        },
+        get filteredMaterials() {
+            const q = this.materialQ.toLowerCase();
+            return this.materialOptions.filter((opt) => opt.name.toLowerCase().includes(q));
+        },
+        get filteredColors() {
+            const q = this.colorQ.toLowerCase();
+            return this.colorOptions.filter((opt) => opt.name.toLowerCase().includes(q));
+        },
+        get filteredFilaments() {
+            const q = this.filamentQ.toLowerCase();
+            return this.filamentOptions.filter((opt) => opt.name.toLowerCase().includes(q));
+        },
+        get filteredAssignFilaments() {
+            const q = this.assignFilamentQ.toLowerCase();
+            return this.filamentOptions.filter((opt) => opt.name.toLowerCase().includes(q));
+        },
+        selectShelf(id, name) {
+            this.shelf = id;
+            this.shelfQ = name;
+        },
+        selectBrand(id, name) {
+            this.brand = id;
+            this.brandQ = name;
+        },
+        selectMaterial(id, name) {
+            this.material = id;
+            this.materialQ = name;
+        },
+        selectColor(id, name) {
+            this.color = id;
+            this.colorQ = name;
+        },
+        selectFilament(id, name) {
+            this.filament = id;
+            this.filamentQ = name;
+        },
+        selectAssignFilament(id, name) {
+            this.assignFilament = id;
+            this.assignFilamentQ = name;
+        },
+        openShelfModal() {
+            this.shelfModalOpen = true;
+        },
+        closeShelfModal() {
+            this.shelfModalOpen = false;
+        },
+        startDrag(event, placementId) {
+            this.draggedPlacementId = placementId;
+            event.dataTransfer.setData('text/plain', String(placementId));
+        },
+        openAssignModal(shelfId, slotIndex, shelfName) {
+            this.assignShelfId = shelfId;
+            this.assignSlotIndex = slotIndex;
+            this.assignShelfName = shelfName;
+            this.assignFilament = this.filament || '';
+            this.assignFilamentQ = this.filamentQ || '';
+            this.assignModalOpen = true;
+        },
+        closeAssignModal() {
+            this.assignModalOpen = false;
+            this.assignShelfId = '';
+            this.assignSlotIndex = '';
+            this.assignShelfName = '';
+            this.assignFilament = '';
+            this.assignFilamentQ = '';
+            this.assignFilamentOpen = false;
+        },
+        async movePlacement(event, shelfId, slotIndex) {
+            const placementId = this.draggedPlacementId || event.dataTransfer.getData('text/plain');
+            if (!placementId) return;
+            const form = new FormData();
+            form.append('shelf_id', shelfId);
+            form.append('slot_index', slotIndex);
+            const response = await fetch(`/storage/placement/${placementId}/move`, {
+                method: 'POST',
+                body: form,
+            });
+            if (response.ok) {
+                window.location.reload();
+            }
+        },
+    };
+}
+</script>
+{% endblock %}

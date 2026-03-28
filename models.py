@@ -153,6 +153,25 @@ class ProjectFilament(db.Model):
     filament = db.relationship('Filament')
 
 
+class StorageShelf(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False, unique=True)
+    columns = db.Column(db.Integer, nullable=False, default=4)
+    slots_count = db.Column(db.Integer, nullable=False, default=12)
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+
+
+class StoragePlacement(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    shelf_id = db.Column(db.Integer, db.ForeignKey('storage_shelf.id', ondelete='CASCADE'), nullable=False)
+    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id'), nullable=False)
+    slot_index = db.Column(db.Integer, nullable=False)
+    orientation = db.Column(db.String(20), nullable=False, default='standing')
+
+    shelf = db.relationship('StorageShelf', backref=db.backref('placements', lazy=True, cascade='all, delete-orphan'))
+    filament = db.relationship('Filament')
+
+
 class BambuPrinter(db.Model):
     """Known Bambu Lab printers, auto-discovered from sync or manually added."""
     id = db.Column(db.Integer, primary_key=True)

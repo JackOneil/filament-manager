@@ -28,13 +28,13 @@ from database import db
 from models import (
     Brand, Color, Material, AppSetting, Filament, 
     MovementHistory, PrintHistory, Project, ProjectFile, 
-    ProjectLink, ProjectFilament, ProjectQuote, BambuPrinter, BambuPrintJob, BambuJobMaterial
+    ProjectLink, ProjectFilament, ProjectQuote, StorageShelf, StoragePlacement, BambuPrinter, BambuPrintJob, BambuJobMaterial
 )  # noqa: F401
 from utils import get_settings
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.35.0'
+APP_VERSION = '1.36.4'
 
 
 def create_app(test_config=None) -> Flask:

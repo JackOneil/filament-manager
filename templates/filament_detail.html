@@ -156,6 +156,17 @@
                 <p class="text-sm text-gray-400">{{ t('history_empty') }}</p>
                 {% endfor %}
             </div>
+            {% if timeline_paginated.pages > 1 %}
+            <div class="flex items-center justify-center gap-2 mt-4">
+                {% if timeline_paginated.has_prev %}
+                <a href="{{ url_for('filament_detail', id=filament.id, timeline_page=timeline_paginated.prev_num, jobs_page=related_jobs_paginated.page) }}" class="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm">{{ t('prev_page') }}</a>
+                {% endif %}
+                <span class="text-sm text-gray-500">{{ timeline_paginated.page }} / {{ timeline_paginated.pages }}</span>
+                {% if timeline_paginated.has_next %}
+                <a href="{{ url_for('filament_detail', id=filament.id, timeline_page=timeline_paginated.next_num, jobs_page=related_jobs_paginated.page) }}" class="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm">{{ t('next_page') }}</a>
+                {% endif %}
+            </div>
+            {% endif %}
         </div>
 
         <div class="space-y-6">
@@ -185,6 +196,17 @@
                     <p class="text-sm text-gray-400">{{ t('bambu_no_jobs') }}</p>
                     {% endfor %}
                 </div>
+                {% if related_jobs_paginated.pages > 1 %}
+                <div class="flex items-center justify-center gap-2 mt-4">
+                    {% if related_jobs_paginated.has_prev %}
+                    <a href="{{ url_for('filament_detail', id=filament.id, timeline_page=timeline_paginated.page, jobs_page=related_jobs_paginated.prev_num) }}" class="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm">{{ t('prev_page') }}</a>
+                    {% endif %}
+                    <span class="text-sm text-gray-500">{{ related_jobs_paginated.page }} / {{ related_jobs_paginated.pages }}</span>
+                    {% if related_jobs_paginated.has_next %}
+                    <a href="{{ url_for('filament_detail', id=filament.id, timeline_page=timeline_paginated.page, jobs_page=related_jobs_paginated.next_num) }}" class="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm">{{ t('next_page') }}</a>
+                    {% endif %}
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>

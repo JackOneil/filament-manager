@@ -7,7 +7,10 @@ import unittest
 
 from app import create_app
 from database import db
-from models import BambuPrintJob, Brand, Color, Filament, Material, MovementHistory, Project, ProjectFile, ProjectQuote
+from models import (
+    BambuPrintJob, Brand, Color, Filament, Material, MovementHistory,
+    Project, ProjectFile, ProjectQuote, StoragePlacement, StorageShelf,
+)
 
 
 class ImportAtomicityTests(unittest.TestCase):
@@ -201,6 +204,56 @@ class ImportAtomicityTests(unittest.TestCase):
             self.assertIsNotNone(movement.project_id)
             self.assertIsNotNone(movement.bambu_job_id)
             self.assertIsNotNone(ProjectFile.query.filter_by(filename='sample.3mf').first())
+
+    def test_export_and_import_preserve_storage_layout(self):
+        with self.app.app_context():
+            brand = Brand.query.filter_by(name='Prusament').first()
+            color = Color.query.first()
+            material = Material.query.filter_by(name='PLA').first()
+            filament = Filament(
+                name='Storage Filament',
+                brand_id=brand.id,
+                material_id=material.id,
+                color_id=color.id,
+                weight_total=1000,
+                weight_remaining=480,
+                price=500,
+                quantity=1,
+            )
+            shelf = StorageShelf(name='Rack A', columns=3, slots_count=9, sort_order=1)
+            db.session.add_all([filament, shelf])
+            db.session.flush()
+            db.session.add(StoragePlacement(
+                shelf_id=shelf.id,
+                filament_id=filament.id,
+                slot_index=4,
+                orientation='flat',
+            ))
+            db.session.commit()
+
+        exported = self.client.get('/export').get_json()
+        self.assertEqual(exported['storage_shelves'][0]['name'], 'Rack A')
+        self.assertEqual(exported['storage_placements'][0]['slot_index'], 4)
+
+        with self.app.app_context():
+            db.drop_all()
+            db.create_all()
+
+        response = self.client.post(
+            '/import',
+            data={'file': (io.BytesIO(json.dumps(exported).encode('utf-8')), 'backup.json')},
+            content_type='multipart/form-data',
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+
+        with self.app.app_context():
+            shelf = StorageShelf.query.filter_by(name='Rack A').first()
+            self.assertIsNotNone(shelf)
+            placement = StoragePlacement.query.filter_by(slot_index=4).first()
+            self.assertIsNotNone(placement)
+            self.assertEqual(placement.orientation, 'flat')
+            self.assertEqual(placement.filament.name, 'Storage Filament')
 
 
 if __name__ == '__main__':

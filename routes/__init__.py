@@ -11,6 +11,7 @@ from routes.settings import register as register_settings
 from routes.projects import register as register_projects
 from routes.bambu import register as register_bambu
 from routes.stats import register as register_stats
+from routes.storage import register as register_storage
 
 
 def register_all(app):
@@ -22,3 +23,4 @@ def register_all(app):
     register_projects(app)
     register_bambu(app)
     register_stats(app)
+    register_storage(app)
