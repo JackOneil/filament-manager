@@ -1,6 +1,7 @@
 """Statistics dashboard: usage charts, project summaries, and stock forecast."""
 from collections import defaultdict
 from datetime import datetime, timedelta
+import colorsys
 import json
 
 from flask import render_template, request
@@ -9,6 +10,24 @@ from sqlalchemy.orm import joinedload
 from database import db
 from models import AppSetting, BambuPrintJob, Filament, MovementHistory, Project, ProjectFilament, ProjectQuote
 from utils import build_filament_history_name as _display_filament_name, collect_usage_windows, compute_stock_status
+
+
+def _hex_to_hsl_sort_key(hex_value):
+    """Return sort key (bucket, hue, -saturation) for rainbow-order color grouping.
+    Neutrals (saturation < 10 %) are placed at the end, ordered light→dark."""
+    hex_color = (hex_value or '').lstrip('#')
+    if len(hex_color) != 6:
+        return (2, 0, 0)
+    try:
+        r = int(hex_color[0:2], 16) / 255.0
+        g = int(hex_color[2:4], 16) / 255.0
+        b = int(hex_color[4:6], 16) / 255.0
+    except ValueError:
+        return (2, 0, 0)
+    h, l, s = colorsys.rgb_to_hls(r, g, b)
+    if s < 0.10:          # neutral — group separately at end, ordered by lightness
+        return (1, l, 0)
+    return (0, h, -s)    # chromatic — rainbow order, vivid first within same hue
 
 
 CHART_PALETTE = [
@@ -193,7 +212,7 @@ def register(app):
         critical_count = sum(1 for row in forecast_rows if row['reorder_status'] == 'critical')
         warning_count = sum(1 for row in forecast_rows if row['reorder_status'] == 'warning')
 
-        project_rows = _project_usage_rows()[:8]
+        project_rows = _project_usage_rows()[:20]
         top_materials = [
             {'name': name, 'grams': round(total, 1)}
             for name, total, _series in material_totals
@@ -303,7 +322,7 @@ def register(app):
                 'fill_pct': min(fill_pct, 100),
                 'quantity': fil.quantity,
             })
-        color_palette = sorted(color_map.values(), key=lambda c: c['color_name'].lower())
+        color_palette = sorted(color_map.values(), key=lambda c: _hex_to_hsl_sort_key(c['hex_value']))
 
         return render_template(
             'stats.html',
@@ -311,12 +330,12 @@ def register(app):
             summary=summary,
             chart_data=json.dumps(chart_data),
             top_materials=top_materials,
-            project_rows=project_rows,
-            purchase_rows=purchase_filament_rows[:10],
-            forecast_rows=forecast_rows[:12],
+            project_rows=project_rows[:20],
+            purchase_rows=purchase_filament_rows[:30],
+            forecast_rows=forecast_rows[:50],
             purchase_recommendations=purchase_recommendations,
-            top_turnover=top_turnover,
-            profitable_projects=profitable_projects,
+            top_turnover=top_turnover[:20],
+            profitable_projects=profitable_projects[:15],
             reorder_status_label_key=_reorder_status_label_key,
             color_palette=color_palette,
         )

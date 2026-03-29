@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.41.0] - 2026-03-29
+### Changed
+- **Color palette sort**: The color palette widget on the Statistics page now sorts colors by HSL hue (rainbow order) instead of alphabetically by name. Neutral/gray tones are grouped at the end. Implemented via `_hex_to_hsl_sort_key()` in `routes/stats.py` using Python's `colorsys` module.
+- **README**: Updated feature list to reflect all current pages (Statistics, Storage, Bambu, Movement History, full backup/restore) and added Alpine.js + Chart.js to the technologies section.
+- **Copilot instructions**: Added `stats.py` and `storage.py` to the file structure; added Rule 18 (Stats Page Draggable Layout) covering section IDs, localStorage key, edit mode, row-limit fix, and color sort.
+
+## [1.40.0] - 2026-03-29
+### Fixed
+- **Stats record-limit bug**: The row-limit selector had no effect on the *Co dochází*, *Co se nejvíc točí*, and *Nejziskovější projekty* cards because `element.hidden` was overridden by Tailwind's `display: flex` class. Fixed by using `element.style.display` (inline style) instead.
+
+### Added
+- **Up/Down buttons in edit mode**: Each section-edit-bar now shows ▲ / ▼ arrow buttons alongside the drag handle so sections can be reordered by clicking without drag-and-drop.
+
+## [1.39.0] - 2026-03-29
+### Added
+- **Draggable stats layout**: All 7 sections on the Statistics page can be freely reordered by drag-and-drop in edit mode. Order is persisted in `localStorage` per browser.
+- **Hide/show individual cards**: Every card on the Statistics page has an eye-slash button (visible in edit mode) to hide it from view. Hidden cards can be restored from a restore panel that appears at the bottom of the page in edit mode.
+- **Per-card record count**: Cards with tabular/list data (low stock, top turnover, profitable projects, forecast, purchase recommendations, project usage, purchase log) have a configurable row limit (e.g. 3/5/10/all) shown in edit mode. Limits are saved to `localStorage`.
+- **Edit mode toggle**: A "Edit layout" button in the page header activates edit mode showing all section drag handles and card controls. "Done editing" returns to read-only view.
+- **Reset layout**: A "Reset to default layout" link inside the edit mode hint bar reloads the page with the default section order and clears saved layout state.
+- Backend now passes increased data sets to the stats page: up to 50 forecast rows, 30 purchase log entries, 20 project rows, 20 top-turnover rows, 15 profitable projects, all purchase recommendations.
+
 ## [1.38.0] - 2026-03-29
 ### Added
 - **Color palette on Stats page**: New full-width card at the bottom of the Statistics page displays all filament colors as colored circles. Hovering over a circle reveals a popup card listing all filaments of that color with their name, brand, material, remaining weight and fill percentage bar. Clicking the circle navigates to the filtered inventory view for that color.

@@ -1,7 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<div class="max-w-7xl mx-auto space-y-6">
+<style>
+.stats-section { position: relative; }
+.stats-section.drag-over { outline: 2px dashed #3b82f6; outline-offset: 4px; border-radius: 1rem; }
+.stats-section.is-dragging { opacity: 0.35; }
+.section-edit-bar, .card-edit-bar { display: none; }
+.edit-mode .section-edit-bar { display: flex; }
+.edit-mode .card-edit-bar { display: flex; }
+</style>
+<div class="max-w-7xl mx-auto space-y-6" id="stats-page">
     <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div>
             <h1 class="text-3xl font-bold text-gray-800 flex items-center gap-3">
@@ -9,261 +17,452 @@
             </h1>
             <p class="text-gray-500 mt-2">{{ t('stats_desc') }}</p>
         </div>
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap gap-2 items-center">
             {% for option in [7, 30, 90, 180] %}
             <a href="{{ url_for('stats', days=option) }}"
                class="px-4 py-2 rounded-full text-sm font-semibold transition-colors {% if days == option %}bg-blue-600 text-white shadow{% else %}bg-white border border-gray-200 text-gray-600 hover:bg-gray-50{% endif %}">
                 {{ option }} {{ t('stats_days_suffix') }}
             </a>
             {% endfor %}
+            <button id="editModeBtn" onclick="toggleEditMode()"
+                    class="px-4 py-2 rounded-full text-sm font-semibold border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-all flex items-center gap-2">
+                <i class="fa-solid fa-pen-to-square"></i>
+                <span id="editModeBtnLabel">{{ t('stats_edit_layout') }}</span>
+            </button>
         </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <p class="text-sm text-gray-500">{{ t('stats_usage_period') }}</p>
-            <p class="text-3xl font-bold text-gray-800 mt-2">{{ summary.usage_total_period }} g</p>
-            <p class="text-xs text-gray-400 mt-1">{{ t('stats_usage_period_hint') }}</p>
-        </div>
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <p class="text-sm text-gray-500">{{ t('stats_purchase_period') }}</p>
-            <p class="text-3xl font-bold text-gray-800 mt-2">{{ summary.purchase_total_period }} g</p>
-            <p class="text-xs text-gray-400 mt-1">{{ t('stats_purchase_period_hint') }}</p>
-        </div>
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <p class="text-sm text-gray-500">{{ t('stats_daily_average') }}</p>
-            <p class="text-3xl font-bold text-gray-800 mt-2">{{ summary.avg_daily_usage_period }} g</p>
-            <p class="text-xs text-gray-400 mt-1">{{ t('stats_daily_average_hint') }}</p>
-        </div>
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <p class="text-sm text-gray-500">{{ t('stats_reorder_alerts') }}</p>
-            <p class="text-3xl font-bold text-gray-800 mt-2">{{ summary.critical_count + summary.warning_count }}</p>
-            <p class="text-xs mt-1">
-                <span class="text-red-500 font-semibold">{{ summary.critical_count }} {{ t('stats_critical') }}</span>
-                <span class="text-gray-300 mx-1">|</span>
-                <span class="text-amber-500 font-semibold">{{ summary.warning_count }} {{ t('stats_warning') }}</span>
-            </p>
-        </div>
+    <div id="editModeHint" class="hidden bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 text-sm text-blue-700">
+        <i class="fa-solid fa-arrows-up-down-left-right"></i>
+        <span>{{ t('stats_drag_hint') }}</span>
+        <button onclick="resetLayout()" class="ml-auto text-xs font-semibold text-blue-600 hover:text-blue-800 underline">{{ t('stats_reset_layout') }}</button>
     </div>
 
-    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h2 class="text-lg font-bold text-gray-800 mb-4">{{ t('inventory_low_stock_widget') }}</h2>
-            <div class="space-y-3">
-                {% for row in purchase_recommendations[:5] %}
-                <a href="{{ url_for('filament_detail', id=row.filament_id) }}" class="flex items-center justify-between gap-3 text-sm hover:bg-gray-50 rounded-lg px-2 py-2 transition">
-                    <div>
-                        <div class="font-semibold text-gray-800">{{ row.filament_name }}</div>
-                        <div class="text-xs text-gray-400">{{ row.remaining }} g · min {{ row.min_stock }} g</div>
-                        <div class="text-xs text-gray-400">{{ row.recommended_spools }} ks × {{ row.spool_weight | round(0) }} g · {{ row.recommended_order_price }} {{ current_currency }}</div>
-                    </div>
-                    <div class="text-right">
-                        <div class="{% if row.reorder_status == 'critical' %}text-red-600{% else %}text-amber-600{% endif %} font-bold">{{ row.recommended_spools }} ks</div>
-                        <div class="text-xs text-gray-400">{{ row.recommended_order_grams }} g</div>
-                    </div>
-                </a>
-                {% else %}
-                <p class="text-sm text-gray-400">{{ t('stats_no_recommendations') }}</p>
-                {% endfor %}
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- SECTION: KPI summary -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div class="stats-section" data-section-id="section_kpi">
+        <div class="section-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+            <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
+            <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('stats_kpi_section') }}</span>
+            <div class="ml-auto flex items-center gap-1">
+                <button onclick="moveSectionUp('section_kpi')" title="{{ t('stats_move_up') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-up text-xs"></i></button>
+                <button onclick="moveSectionDown('section_kpi')" title="{{ t('stats_move_down') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-down text-xs"></i></button>
+                <button onclick="hideCard('kpi_summary')" class="ml-1 text-xs text-red-500 hover:text-red-700 font-semibold flex items-center gap-1"><i class="fa-solid fa-eye-slash"></i> {{ t('stats_hide_widget') }}</button>
             </div>
         </div>
+        <div class="stats-card grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4" data-card-id="kpi_summary">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                <p class="text-sm text-gray-500">{{ t('stats_usage_period') }}</p>
+                <p class="text-3xl font-bold text-gray-800 mt-2">{{ summary.usage_total_period }} g</p>
+                <p class="text-xs text-gray-400 mt-1">{{ t('stats_usage_period_hint') }}</p>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                <p class="text-sm text-gray-500">{{ t('stats_purchase_period') }}</p>
+                <p class="text-3xl font-bold text-gray-800 mt-2">{{ summary.purchase_total_period }} g</p>
+                <p class="text-xs text-gray-400 mt-1">{{ t('stats_purchase_period_hint') }}</p>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                <p class="text-sm text-gray-500">{{ t('stats_daily_average') }}</p>
+                <p class="text-3xl font-bold text-gray-800 mt-2">{{ summary.avg_daily_usage_period }} g</p>
+                <p class="text-xs text-gray-400 mt-1">{{ t('stats_daily_average_hint') }}</p>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                <p class="text-sm text-gray-500">{{ t('stats_reorder_alerts') }}</p>
+                <p class="text-3xl font-bold text-gray-800 mt-2">{{ summary.critical_count + summary.warning_count }}</p>
+                <p class="text-xs mt-1">
+                    <span class="text-red-500 font-semibold">{{ summary.critical_count }} {{ t('stats_critical') }}</span>
+                    <span class="text-gray-300 mx-1">|</span>
+                    <span class="text-amber-500 font-semibold">{{ summary.warning_count }} {{ t('stats_warning') }}</span>
+                </p>
+            </div>
+        </div>
+    </div>
 
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h2 class="text-lg font-bold text-gray-800 mb-4">{{ t('inventory_top_turnover_widget') }}</h2>
-            <div class="space-y-3">
-                {% for row in top_turnover %}
-                <a href="{{ url_for('filament_detail', id=row.filament_id) }}" class="flex items-center justify-between gap-3 text-sm hover:bg-gray-50 rounded-lg px-2 py-2 transition">
-                    <div>
-                        <div class="font-semibold text-gray-800">{{ row.filament_name }}</div>
-                        <div class="text-xs text-gray-400">{{ row.brand_name }} · {{ row.material_name }}</div>
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- SECTION: overview [low_stock | top_turnover | profitable] -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div class="stats-section" data-section-id="section_overview">
+        <div class="section-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+            <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
+            <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('stats_overview_section') }}</span>
+            <div class="ml-auto flex items-center gap-1">
+                <button onclick="moveSectionUp('section_overview')" title="{{ t('stats_move_up') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-up text-xs"></i></button>
+                <button onclick="moveSectionDown('section_overview')" title="{{ t('stats_move_down') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-down text-xs"></i></button>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+            <!-- low_stock card -->
+            <div class="stats-card bg-white rounded-2xl shadow-sm border border-gray-100 p-5" data-card-id="low_stock">
+                <div class="card-edit-bar items-center gap-2 mb-3 pb-3 border-b border-gray-100">
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">{{ t('inventory_low_stock_widget') }}</span>
+                    <div class="ml-auto flex items-center gap-2">
+                        <label class="text-xs text-gray-400">{{ t('stats_widget_limit') }}</label>
+                        <select class="widget-limit-select text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white" onchange="setCardLimit('low_stock', this.value)">
+                            <option value="3">3</option>
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="all">{{ t('stats_limit_all') }}</option>
+                        </select>
+                        <button onclick="hideCard('low_stock')" class="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 ml-1"><i class="fa-solid fa-eye-slash"></i></button>
                     </div>
-                    <div class="text-right">
-                        <div class="font-bold text-blue-700">{{ row.usage_30 }} g</div>
-                        <div class="text-xs text-gray-400">30d / {{ row.usage_90 }} g</div>
+                </div>
+                <h2 class="text-lg font-bold text-gray-800 mb-4">{{ t('inventory_low_stock_widget') }}</h2>
+                <div class="space-y-3">
+                    {% for row in purchase_recommendations %}
+                    <a href="{{ url_for('filament_detail', id=row.filament_id) }}" class="flex items-center justify-between gap-3 text-sm hover:bg-gray-50 rounded-lg px-2 py-2 transition" data-row-index="{{ loop.index0 }}">
+                        <div>
+                            <div class="font-semibold text-gray-800">{{ row.filament_name }}</div>
+                            <div class="text-xs text-gray-400">{{ row.remaining }} g · min {{ row.min_stock }} g</div>
+                            <div class="text-xs text-gray-400">{{ row.recommended_spools }} ks × {{ row.spool_weight | round(0) }} g · {{ row.recommended_order_price }} {{ current_currency }}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="{% if row.reorder_status == 'critical' %}text-red-600{% else %}text-amber-600{% endif %} font-bold">{{ row.recommended_spools }} ks</div>
+                            <div class="text-xs text-gray-400">{{ row.recommended_order_grams }} g</div>
+                        </div>
+                    </a>
+                    {% else %}
+                    <p class="text-sm text-gray-400">{{ t('stats_no_recommendations') }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- top_turnover card -->
+            <div class="stats-card bg-white rounded-2xl shadow-sm border border-gray-100 p-5" data-card-id="top_turnover">
+                <div class="card-edit-bar items-center gap-2 mb-3 pb-3 border-b border-gray-100">
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">{{ t('inventory_top_turnover_widget') }}</span>
+                    <div class="ml-auto flex items-center gap-2">
+                        <label class="text-xs text-gray-400">{{ t('stats_widget_limit') }}</label>
+                        <select class="widget-limit-select text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white" onchange="setCardLimit('top_turnover', this.value)">
+                            <option value="3">3</option>
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="all">{{ t('stats_limit_all') }}</option>
+                        </select>
+                        <button onclick="hideCard('top_turnover')" class="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 ml-1"><i class="fa-solid fa-eye-slash"></i></button>
                     </div>
-                </a>
+                </div>
+                <h2 class="text-lg font-bold text-gray-800 mb-4">{{ t('inventory_top_turnover_widget') }}</h2>
+                <div class="space-y-3">
+                    {% for row in top_turnover %}
+                    <a href="{{ url_for('filament_detail', id=row.filament_id) }}" class="flex items-center justify-between gap-3 text-sm hover:bg-gray-50 rounded-lg px-2 py-2 transition" data-row-index="{{ loop.index0 }}">
+                        <div>
+                            <div class="font-semibold text-gray-800">{{ row.filament_name }}</div>
+                            <div class="text-xs text-gray-400">{{ row.brand_name }} · {{ row.material_name }}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-bold text-blue-700">{{ row.usage_30 }} g</div>
+                            <div class="text-xs text-gray-400">30d / {{ row.usage_90 }} g</div>
+                        </div>
+                    </a>
+                    {% else %}
+                    <p class="text-sm text-gray-400">{{ t('stats_no_usage_data') }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- profitable_projects card -->
+            <div class="stats-card bg-white rounded-2xl shadow-sm border border-gray-100 p-5" data-card-id="profitable_projects">
+                <div class="card-edit-bar items-center gap-2 mb-3 pb-3 border-b border-gray-100">
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">{{ t('stats_profitable_projects_widget') }}</span>
+                    <div class="ml-auto flex items-center gap-2">
+                        <label class="text-xs text-gray-400">{{ t('stats_widget_limit') }}</label>
+                        <select class="widget-limit-select text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white" onchange="setCardLimit('profitable_projects', this.value)">
+                            <option value="3">3</option>
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="all">{{ t('stats_limit_all') }}</option>
+                        </select>
+                        <button onclick="hideCard('profitable_projects')" class="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 ml-1"><i class="fa-solid fa-eye-slash"></i></button>
+                    </div>
+                </div>
+                <h2 class="text-lg font-bold text-gray-800 mb-4">{{ t('stats_profitable_projects_widget') }}</h2>
+                <div class="space-y-3">
+                    {% for row in profitable_projects %}
+                    <a href="{{ url_for('project_detail', id=row.project_id) }}" class="flex items-center justify-between gap-3 text-sm hover:bg-gray-50 rounded-lg px-2 py-2 transition" data-row-index="{{ loop.index0 }}">
+                        <div>
+                            <div class="font-semibold text-gray-800">{{ row.project_name }}</div>
+                            <div class="text-xs text-gray-400">{{ row.actual_cost }} {{ current_currency }} / {{ row.quote_price }} {{ current_currency }}</div>
+                        </div>
+                        <div class="font-bold {% if row.profit >= 0 %}text-emerald-700{% else %}text-red-600{% endif %}">
+                            {{ row.profit }} {{ current_currency }}
+                        </div>
+                    </a>
+                    {% else %}
+                    <p class="text-sm text-gray-400">{{ t('stats_no_project_data') }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- SECTION: charts primary [usage (2/3) | material (1/3)] -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div class="stats-section" data-section-id="section_charts_primary">
+        <div class="section-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+            <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
+            <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('stats_charts_primary_section') }}</span>
+            <div class="ml-auto flex items-center gap-1">
+                <button onclick="moveSectionUp('section_charts_primary')" title="{{ t('stats_move_up') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-up text-xs"></i></button>
+                <button onclick="moveSectionDown('section_charts_primary')" title="{{ t('stats_move_down') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-down text-xs"></i></button>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+            <div class="xl:col-span-2 stats-card bg-white rounded-2xl shadow-sm border border-gray-100 p-5" data-card-id="usage_chart">
+                <div class="card-edit-bar items-center gap-2 mb-3 pb-3 border-b border-gray-100">
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">{{ t('stats_usage_chart') }}</span>
+                    <button onclick="hideCard('usage_chart')" class="ml-auto text-xs text-red-500 hover:text-red-700 flex items-center gap-1"><i class="fa-solid fa-eye-slash"></i> {{ t('stats_hide_widget') }}</button>
+                </div>
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-bold text-gray-800">{{ t('stats_usage_chart') }}</h2>
+                    <span class="text-xs text-gray-400">{{ t('stats_usage_chart_hint') }}</span>
+                </div>
+                <div class="relative h-80">
+                    <canvas id="usageChart"></canvas>
+                </div>
+            </div>
+
+            <div class="stats-card bg-white rounded-2xl shadow-sm border border-gray-100 p-5" data-card-id="material_chart">
+                <div class="card-edit-bar items-center gap-2 mb-3 pb-3 border-b border-gray-100">
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">{{ t('stats_material_mix') }}</span>
+                    <button onclick="hideCard('material_chart')" class="ml-auto text-xs text-red-500 hover:text-red-700 flex items-center gap-1"><i class="fa-solid fa-eye-slash"></i> {{ t('stats_hide_widget') }}</button>
+                </div>
+                <h2 class="text-lg font-bold text-gray-800 mb-4">{{ t('stats_material_mix') }}</h2>
+                {% if top_materials %}
+                <div class="space-y-3">
+                    {% for item in top_materials %}
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="font-medium text-gray-700">{{ item.name }}</span>
+                        <span class="text-gray-500">{{ item.grams }} g</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="relative h-72 mt-5">
+                    <canvas id="materialChart"></canvas>
+                </div>
                 {% else %}
                 <p class="text-sm text-gray-400">{{ t('stats_no_usage_data') }}</p>
-                {% endfor %}
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- SECTION: charts secondary [purchase | project] -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div class="stats-section" data-section-id="section_charts_secondary">
+        <div class="section-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+            <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
+            <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('stats_charts_secondary_section') }}</span>
+            <div class="ml-auto flex items-center gap-1">
+                <button onclick="moveSectionUp('section_charts_secondary')" title="{{ t('stats_move_up') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-up text-xs"></i></button>
+                <button onclick="moveSectionDown('section_charts_secondary')" title="{{ t('stats_move_down') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-down text-xs"></i></button>
             </div>
         </div>
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h2 class="text-lg font-bold text-gray-800 mb-4">{{ t('stats_profitable_projects_widget') }}</h2>
-            <div class="space-y-3">
-                {% for row in profitable_projects %}
-                <a href="{{ url_for('project_detail', id=row.project_id) }}" class="flex items-center justify-between gap-3 text-sm hover:bg-gray-50 rounded-lg px-2 py-2 transition">
-                    <div>
-                        <div class="font-semibold text-gray-800">{{ row.project_name }}</div>
-                        <div class="text-xs text-gray-400">{{ row.actual_cost }} {{ current_currency }} / {{ row.quote_price }} {{ current_currency }}</div>
-                    </div>
-                    <div class="font-bold {% if row.profit >= 0 %}text-emerald-700{% else %}text-red-600{% endif %}">
-                        {{ row.profit }} {{ current_currency }}
-                    </div>
-                </a>
+            <div class="stats-card bg-white rounded-2xl shadow-sm border border-gray-100 p-5" data-card-id="purchase_chart">
+                <div class="card-edit-bar items-center gap-2 mb-3 pb-3 border-b border-gray-100">
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">{{ t('stats_purchase_chart') }}</span>
+                    <button onclick="hideCard('purchase_chart')" class="ml-auto text-xs text-red-500 hover:text-red-700 flex items-center gap-1"><i class="fa-solid fa-eye-slash"></i> {{ t('stats_hide_widget') }}</button>
+                </div>
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-bold text-gray-800">{{ t('stats_purchase_chart') }}</h2>
+                    <span class="text-xs text-gray-400">{{ t('stats_purchase_chart_hint') }}</span>
+                </div>
+                <div class="relative h-72">
+                    <canvas id="purchaseChart"></canvas>
+                </div>
+            </div>
+
+            <div class="stats-card bg-white rounded-2xl shadow-sm border border-gray-100 p-5" data-card-id="project_chart">
+                <div class="card-edit-bar items-center gap-2 mb-3 pb-3 border-b border-gray-100">
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">{{ t('stats_project_chart') }}</span>
+                    <button onclick="hideCard('project_chart')" class="ml-auto text-xs text-red-500 hover:text-red-700 flex items-center gap-1"><i class="fa-solid fa-eye-slash"></i> {{ t('stats_hide_widget') }}</button>
+                </div>
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-bold text-gray-800">{{ t('stats_project_chart') }}</h2>
+                    <span class="text-xs text-gray-400">{{ t('stats_project_chart_hint') }}</span>
+                </div>
+                {% if project_rows %}
+                <div class="relative h-72">
+                    <canvas id="projectChart"></canvas>
+                </div>
                 {% else %}
                 <p class="text-sm text-gray-400">{{ t('stats_no_project_data') }}</p>
-                {% endfor %}
+                {% endif %}
             </div>
+
         </div>
     </div>
 
-    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div class="xl:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-bold text-gray-800">{{ t('stats_usage_chart') }}</h2>
-                <span class="text-xs text-gray-400">{{ t('stats_usage_chart_hint') }}</span>
-            </div>
-            <div class="relative h-80">
-                <canvas id="usageChart"></canvas>
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- SECTION: tables [forecast | purchase_recommendations] -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div class="stats-section" data-section-id="section_tables">
+        <div class="section-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+            <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
+            <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('stats_tables_section') }}</span>
+            <div class="ml-auto flex items-center gap-1">
+                <button onclick="moveSectionUp('section_tables')" title="{{ t('stats_move_up') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-up text-xs"></i></button>
+                <button onclick="moveSectionDown('section_tables')" title="{{ t('stats_move_down') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-down text-xs"></i></button>
             </div>
         </div>
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h2 class="text-lg font-bold text-gray-800 mb-4">{{ t('stats_material_mix') }}</h2>
-            {% if top_materials %}
-            <div class="space-y-3">
-                {% for item in top_materials %}
-                <div class="flex items-center justify-between text-sm">
-                    <span class="font-medium text-gray-700">{{ item.name }}</span>
-                    <span class="text-gray-500">{{ item.grams }} g</span>
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+
+            <!-- forecast table -->
+            <div class="stats-card bg-white rounded-2xl shadow-sm border border-gray-100 p-5 overflow-hidden" data-card-id="forecast_table">
+                <div class="card-edit-bar items-center gap-2 mb-3 pb-3 border-b border-gray-100">
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">{{ t('stats_forecast_title') }}</span>
+                    <div class="ml-auto flex items-center gap-2">
+                        <label class="text-xs text-gray-400">{{ t('stats_widget_limit') }}</label>
+                        <select class="widget-limit-select text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white" onchange="setCardLimit('forecast_table', this.value)">
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                            <option value="all">{{ t('stats_limit_all') }}</option>
+                        </select>
+                        <button onclick="hideCard('forecast_table')" class="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 ml-1"><i class="fa-solid fa-eye-slash"></i></button>
+                    </div>
                 </div>
-                {% endfor %}
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-bold text-gray-800">{{ t('stats_forecast_title') }}</h2>
+                    <span class="text-xs text-gray-400">{{ t('stats_forecast_hint') }}</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="text-left text-gray-500 border-b border-gray-100">
+                            <tr>
+                                <th class="py-2 pr-4">{{ t('name') }}</th>
+                                <th class="py-2 pr-4">{{ t('remaining') }}</th>
+                                <th class="py-2 pr-4">{{ t('stats_daily_average') }}</th>
+                                <th class="py-2 pr-4">{{ t('stats_days_left') }}</th>
+                                <th class="py-2">{{ t('stats_reorder_status') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in forecast_rows %}
+                            <tr class="border-b border-gray-50 last:border-0" data-row-index="{{ loop.index0 }}">
+                                <td class="py-3 pr-4">
+                                    <p class="font-semibold text-gray-800">{{ row.filament_name }}</p>
+                                    <p class="text-xs text-gray-400">{{ row.material_name }}{% if row.color_name %} · {{ row.color_name }}{% endif %}</p>
+                                </td>
+                                <td class="py-3 pr-4 text-gray-600">{{ row.remaining }} g</td>
+                                <td class="py-3 pr-4 text-gray-600">{{ row.avg_daily_usage }} g</td>
+                                <td class="py-3 pr-4 text-gray-600">
+                                    {% if row.days_left is not none %}{{ row.days_left }}{% else %}{{ t('stats_no_forecast') }}{% endif %}
+                                </td>
+                                <td class="py-3">
+                                    {% if row.reorder_status == 'critical' %}
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold"><i class="fa-solid fa-triangle-exclamation"></i> {{ t('stats_reorder_now') }}</span>
+                                    {% elif row.reorder_status == 'warning' %}
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold"><i class="fa-solid fa-bell"></i> {{ t('stats_reorder_soon') }}</span>
+                                    {% else %}
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold"><i class="fa-solid fa-check"></i> {{ t('stats_stock_ok') }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            <div class="relative h-72 mt-5">
-                <canvas id="materialChart"></canvas>
+
+            <!-- purchase recommendations table -->
+            <div class="stats-card bg-white rounded-2xl shadow-sm border border-gray-100 p-5 overflow-hidden" data-card-id="purchase_recommendations">
+                <div class="card-edit-bar items-center gap-2 mb-3 pb-3 border-b border-gray-100">
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">{{ t('stats_purchase_recommendations') }}</span>
+                    <div class="ml-auto flex items-center gap-2">
+                        <label class="text-xs text-gray-400">{{ t('stats_widget_limit') }}</label>
+                        <select class="widget-limit-select text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white" onchange="setCardLimit('purchase_recommendations', this.value)">
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                            <option value="all">{{ t('stats_limit_all') }}</option>
+                        </select>
+                        <button onclick="hideCard('purchase_recommendations')" class="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 ml-1"><i class="fa-solid fa-eye-slash"></i></button>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-bold text-gray-800">{{ t('stats_purchase_recommendations') }}</h2>
+                    <span class="text-xs text-gray-400">30d / 90d</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="text-left text-gray-500 border-b border-gray-100">
+                            <tr>
+                                <th class="py-2 pr-4">{{ t('name') }}</th>
+                                <th class="py-2 pr-4">30d</th>
+                                <th class="py-2 pr-4">90d</th>
+                                <th class="py-2 pr-4">{{ t('stats_recommend_buy') }}</th>
+                                <th class="py-2">{{ t('stats_reorder_status') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in purchase_recommendations %}
+                            <tr class="border-b border-gray-50 last:border-0" data-row-index="{{ loop.index0 }}">
+                                <td class="py-3 pr-4">
+                                    <a href="{{ url_for('filament_detail', id=row.filament_id) }}" class="font-semibold text-blue-700 hover:underline">{{ row.filament_name }}</a>
+                                </td>
+                                <td class="py-3 pr-4 text-gray-600">{{ row.usage_30 }} g</td>
+                                <td class="py-3 pr-4 text-gray-600">{{ row.usage_90 }} g</td>
+                                <td class="py-3 pr-4 text-gray-600">{{ row.recommended_spools }} ks / {{ row.recommended_order_grams }} g / {{ row.recommended_order_price }} {{ current_currency }}</td>
+                                <td class="py-3">
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold {% if row.reorder_status == 'critical' %}bg-red-100 text-red-700{% elif row.reorder_status == 'warning' %}bg-amber-100 text-amber-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                                        {{ t(reorder_status_label_key(row.reorder_status)) }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5" class="py-6 text-sm text-gray-400">{{ t('stats_no_recommendations') }}</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            {% else %}
-            <p class="text-sm text-gray-400">{{ t('stats_no_usage_data') }}</p>
-            {% endif %}
+
         </div>
     </div>
 
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-bold text-gray-800">{{ t('stats_purchase_chart') }}</h2>
-                <span class="text-xs text-gray-400">{{ t('stats_purchase_chart_hint') }}</span>
-            </div>
-            <div class="relative h-72">
-                <canvas id="purchaseChart"></canvas>
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- SECTION: detail [project_usage | purchase_log] -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div class="stats-section" data-section-id="section_detail">
+        <div class="section-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+            <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
+            <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('stats_detail_section') }}</span>
+            <div class="ml-auto flex items-center gap-1">
+                <button onclick="moveSectionUp('section_detail')" title="{{ t('stats_move_up') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-up text-xs"></i></button>
+                <button onclick="moveSectionDown('section_detail')" title="{{ t('stats_move_down') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-down text-xs"></i></button>
             </div>
         </div>
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-bold text-gray-800">{{ t('stats_project_chart') }}</h2>
-                <span class="text-xs text-gray-400">{{ t('stats_project_chart_hint') }}</span>
-            </div>
-            {% if project_rows %}
-            <div class="relative h-72">
-                <canvas id="projectChart"></canvas>
-            </div>
-            {% else %}
-            <p class="text-sm text-gray-400">{{ t('stats_no_project_data') }}</p>
-            {% endif %}
-        </div>
-    </div>
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 overflow-hidden">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-bold text-gray-800">{{ t('stats_forecast_title') }}</h2>
-                <span class="text-xs text-gray-400">{{ t('stats_forecast_hint') }}</span>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
-                    <thead class="text-left text-gray-500 border-b border-gray-100">
-                        <tr>
-                            <th class="py-2 pr-4">{{ t('name') }}</th>
-                            <th class="py-2 pr-4">{{ t('remaining') }}</th>
-                            <th class="py-2 pr-4">{{ t('stats_daily_average') }}</th>
-                            <th class="py-2 pr-4">{{ t('stats_days_left') }}</th>
-                            <th class="py-2">{{ t('stats_reorder_status') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in forecast_rows %}
-                        <tr class="border-b border-gray-50 last:border-0">
-                            <td class="py-3 pr-4">
-                                <p class="font-semibold text-gray-800">{{ row.filament_name }}</p>
-                                <p class="text-xs text-gray-400">{{ row.material_name }}{% if row.color_name %} · {{ row.color_name }}{% endif %}</p>
-                            </td>
-                            <td class="py-3 pr-4 text-gray-600">{{ row.remaining }} g</td>
-                            <td class="py-3 pr-4 text-gray-600">{{ row.avg_daily_usage }} g</td>
-                            <td class="py-3 pr-4 text-gray-600">
-                                {% if row.days_left is not none %}
-                                    {{ row.days_left }}
-                                {% else %}
-                                    {{ t('stats_no_forecast') }}
-                                {% endif %}
-                            </td>
-                            <td class="py-3">
-                                {% if row.reorder_status == 'critical' %}
-                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">
-                                    <i class="fa-solid fa-triangle-exclamation"></i> {{ t('stats_reorder_now') }}
-                                </span>
-                                {% elif row.reorder_status == 'warning' %}
-                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">
-                                    <i class="fa-solid fa-bell"></i> {{ t('stats_reorder_soon') }}
-                                </span>
-                                {% else %}
-                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
-                                    <i class="fa-solid fa-check"></i> {{ t('stats_stock_ok') }}
-                                </span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 overflow-hidden">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-bold text-gray-800">{{ t('stats_purchase_recommendations') }}</h2>
-                <span class="text-xs text-gray-400">30d / 90d</span>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
-                    <thead class="text-left text-gray-500 border-b border-gray-100">
-                        <tr>
-                            <th class="py-2 pr-4">{{ t('name') }}</th>
-                            <th class="py-2 pr-4">30d</th>
-                            <th class="py-2 pr-4">90d</th>
-                            <th class="py-2 pr-4">{{ t('stats_recommend_buy') }}</th>
-                            <th class="py-2">{{ t('stats_reorder_status') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in purchase_recommendations %}
-                        <tr class="border-b border-gray-50 last:border-0">
-                            <td class="py-3 pr-4">
-                                <a href="{{ url_for('filament_detail', id=row.filament_id) }}" class="font-semibold text-blue-700 hover:underline">{{ row.filament_name }}</a>
-                            </td>
-                            <td class="py-3 pr-4 text-gray-600">{{ row.usage_30 }} g</td>
-                            <td class="py-3 pr-4 text-gray-600">{{ row.usage_90 }} g</td>
-                            <td class="py-3 pr-4 text-gray-600">{{ row.recommended_spools }} ks / {{ row.recommended_order_grams }} g / {{ row.recommended_order_price }} {{ current_currency }}</td>
-                            <td class="py-3">
-                                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold {% if row.reorder_status == 'critical' %}bg-red-100 text-red-700{% elif row.reorder_status == 'warning' %}bg-amber-100 text-amber-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
-                                    {{ t(reorder_status_label_key(row.reorder_status)) }}
-                                </span>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="5" class="py-6 text-sm text-gray-400">{{ t('stats_no_recommendations') }}</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="space-y-6">
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <!-- project_usage card -->
+            <div class="stats-card bg-white rounded-2xl shadow-sm border border-gray-100 p-5" data-card-id="project_usage">
+                <div class="card-edit-bar items-center gap-2 mb-3 pb-3 border-b border-gray-100">
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">{{ t('stats_project_usage_title') }}</span>
+                    <div class="ml-auto flex items-center gap-2">
+                        <label class="text-xs text-gray-400">{{ t('stats_widget_limit') }}</label>
+                        <select class="widget-limit-select text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white" onchange="setCardLimit('project_usage', this.value)">
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="15">15</option>
+                            <option value="all">{{ t('stats_limit_all') }}</option>
+                        </select>
+                        <button onclick="hideCard('project_usage')" class="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 ml-1"><i class="fa-solid fa-eye-slash"></i></button>
+                    </div>
+                </div>
                 <h2 class="text-lg font-bold text-gray-800 mb-4">{{ t('stats_project_usage_title') }}</h2>
                 {% if project_rows %}
                 <div class="space-y-3">
                     {% for row in project_rows %}
-                    <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center justify-between gap-3" data-row-index="{{ loop.index0 }}">
                         <div>
                             <p class="font-semibold text-gray-800">{{ row.project_name }}</p>
                             <p class="text-xs text-gray-400">{{ row.jobs }} {{ t('stats_jobs_count') }} · {{ row.source }}</p>
@@ -277,12 +476,26 @@
                 {% endif %}
             </div>
 
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <!-- purchase_log card -->
+            <div class="stats-card bg-white rounded-2xl shadow-sm border border-gray-100 p-5" data-card-id="purchase_log">
+                <div class="card-edit-bar items-center gap-2 mb-3 pb-3 border-b border-gray-100">
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">{{ t('stats_purchase_log_title') }}</span>
+                    <div class="ml-auto flex items-center gap-2">
+                        <label class="text-xs text-gray-400">{{ t('stats_widget_limit') }}</label>
+                        <select class="widget-limit-select text-xs border border-gray-300 rounded px-1.5 py-0.5 bg-white" onchange="setCardLimit('purchase_log', this.value)">
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                            <option value="all">{{ t('stats_limit_all') }}</option>
+                        </select>
+                        <button onclick="hideCard('purchase_log')" class="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 ml-1"><i class="fa-solid fa-eye-slash"></i></button>
+                    </div>
+                </div>
                 <h2 class="text-lg font-bold text-gray-800 mb-4">{{ t('stats_purchase_log_title') }}</h2>
                 {% if purchase_rows %}
                 <div class="space-y-3">
                     {% for row in purchase_rows %}
-                    <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center justify-between gap-3" data-row-index="{{ loop.index0 }}">
                         <div>
                             <p class="font-semibold text-gray-800">{{ row.filament_name }}</p>
                             <p class="text-xs text-gray-400">{{ row.date }}</p>
@@ -298,155 +511,327 @@
                 <p class="text-sm text-gray-400">{{ t('stats_no_purchase_data') }}</p>
                 {% endif %}
             </div>
+
         </div>
     </div>
 
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- SECTION: color palette -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
     {% if color_palette %}
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-bold text-gray-800">{{ t('stats_color_palette') }}</h2>
-            <span class="text-xs text-gray-400">{{ t('stats_color_palette_hint') }}</span>
+    <div class="stats-section" data-section-id="section_colors">
+        <div class="section-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+            <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
+            <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('stats_color_palette') }}</span>
+            <div class="ml-auto flex items-center gap-1">
+                <button onclick="moveSectionUp('section_colors')" title="{{ t('stats_move_up') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-up text-xs"></i></button>
+                <button onclick="moveSectionDown('section_colors')" title="{{ t('stats_move_down') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-down text-xs"></i></button>
+                <button onclick="hideCard('color_palette')" class="ml-1 text-xs text-red-500 hover:text-red-700 flex items-center gap-1"><i class="fa-solid fa-eye-slash"></i> {{ t('stats_hide_widget') }}</button>
+            </div>
         </div>
-        <div class="flex flex-wrap gap-3">
-            {% for entry in color_palette %}
-            <div class="relative group">
-                <a href="{{ url_for('index', color=entry.color_id) }}"
-                   class="block w-10 h-10 rounded-full border-2 border-white shadow-md ring-1 ring-gray-200 hover:ring-2 hover:ring-offset-1 hover:ring-blue-400 transition-all cursor-pointer"
-                   style="background-color: {{ entry.hex_value }};"
-                   title="{{ entry.color_name }}"></a>
-
-                {# Hover card #}
-                <div class="hidden group-hover:block pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-30 w-60">
-                    <div class="rounded-xl border border-gray-200 bg-white shadow-xl p-3">
-                        <div class="flex items-center gap-2 mb-2">
-                            <span class="w-4 h-4 rounded-full border border-gray-200 flex-shrink-0" style="background-color: {{ entry.hex_value }};"></span>
-                            <span class="text-sm font-bold text-gray-800">{{ entry.color_name }}</span>
-                            <span class="ml-auto text-xs text-gray-400">{{ entry.filaments|length }} {{ t('stats_color_spools') }}</span>
-                        </div>
-                        <div class="space-y-2 max-h-52 overflow-y-auto">
-                            {% for fil in entry.filaments %}
-                            <div class="text-xs">
-                                <div class="font-semibold text-gray-700 truncate">{{ fil.name }}</div>
-                                <div class="text-gray-400">{{ fil.brand }} · {{ fil.material }}</div>
-                                <div class="mt-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
-                                    <div class="h-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-blue-500" style="width: {{ fil.fill_pct }}%;"></div>
-                                </div>
-                                <div class="text-gray-400 mt-0.5">{{ fil.remaining }} g · {{ fil.fill_pct }}%{% if fil.quantity > 1 %} · {{ fil.quantity }}× {{ t('pieces') }}{% endif %}</div>
+        <div class="stats-card bg-white rounded-2xl shadow-sm border border-gray-100 p-5" data-card-id="color_palette">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-bold text-gray-800">{{ t('stats_color_palette') }}</h2>
+                <span class="text-xs text-gray-400">{{ t('stats_color_palette_hint') }}</span>
+            </div>
+            <div class="flex flex-wrap gap-3">
+                {% for entry in color_palette %}
+                <div class="relative group">
+                    <a href="{{ url_for('index', color=entry.color_id) }}"
+                       class="block w-10 h-10 rounded-full border-2 border-white shadow-md ring-1 ring-gray-200 hover:ring-2 hover:ring-offset-1 hover:ring-blue-400 transition-all cursor-pointer"
+                       style="background-color: {{ entry.hex_value }};"
+                       title="{{ entry.color_name }}"></a>
+                    <div class="hidden group-hover:block pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-30 w-60">
+                        <div class="rounded-xl border border-gray-200 bg-white shadow-xl p-3">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="w-4 h-4 rounded-full border border-gray-200 flex-shrink-0" style="background-color: {{ entry.hex_value }};"></span>
+                                <span class="text-sm font-bold text-gray-800">{{ entry.color_name }}</span>
+                                <span class="ml-auto text-xs text-gray-400">{{ entry.filaments|length }} {{ t('stats_color_spools') }}</span>
                             </div>
-                            {% if not loop.last %}<div class="border-t border-gray-100"></div>{% endif %}
-                            {% endfor %}
+                            <div class="space-y-2 max-h-52 overflow-y-auto">
+                                {% for fil in entry.filaments %}
+                                <div class="text-xs">
+                                    <div class="font-semibold text-gray-700 truncate">{{ fil.name }}</div>
+                                    <div class="text-gray-400">{{ fil.brand }} · {{ fil.material }}</div>
+                                    <div class="mt-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                                        <div class="h-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-blue-500" style="width: {{ fil.fill_pct }}%;"></div>
+                                    </div>
+                                    <div class="text-gray-400 mt-0.5">{{ fil.remaining }} g · {{ fil.fill_pct }}%{% if fil.quantity > 1 %} · {{ fil.quantity }}× {{ t('pieces') }}{% endif %}</div>
+                                </div>
+                                {% if not loop.last %}<div class="border-t border-gray-100"></div>{% endif %}
+                                {% endfor %}
+                            </div>
                         </div>
                     </div>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
         </div>
     </div>
     {% endif %}
+
+    <!-- Restore hidden cards (visible only in edit mode) -->
+    <div id="restorePanel" class="hidden bg-gray-50 border border-gray-200 rounded-xl p-4">
+        <p class="text-sm font-semibold text-gray-700 mb-3">
+            <i class="fa-solid fa-eye-slash mr-1 text-gray-400"></i> {{ t('stats_hidden_widgets') }}
+        </p>
+        <div id="restoreButtons" class="flex flex-wrap gap-2"></div>
+    </div>
+
 </div>
 
 <script>
 const statsData = {{ chart_data|safe }};
 
+// ── Chart.js ─────────────────────────────────────────────────────────────────
 function baseChartOptions() {
     return {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: {
-            legend: { labels: { boxWidth: 12 } }
-        },
-        scales: {
-            y: {
-                beginAtZero: true,
-                ticks: { callback: (value) => `${value} g` }
-            }
-        }
+        plugins: { legend: { labels: { boxWidth: 12 } } },
+        scales: { y: { beginAtZero: true, ticks: { callback: (v) => `${v} g` } } },
     };
 }
-
 new Chart(document.getElementById('usageChart'), {
     type: 'line',
     data: {
         labels: statsData.labels,
         datasets: [
-            {
-                label: '{{ t("stats_usage_dataset") }}',
-                data: statsData.usageDaily,
-                borderColor: '#2563eb',
-                backgroundColor: 'rgba(37, 99, 235, 0.18)',
-                fill: true,
-                tension: 0.3,
-            },
-            ...statsData.materialSeries.map(series => ({
-                ...series,
-                fill: false,
-                tension: 0.25,
-                borderDash: [5, 4],
-            })),
+            { label: '{{ t("stats_usage_dataset") }}', data: statsData.usageDaily, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.18)', fill: true, tension: 0.3 },
+            ...statsData.materialSeries.map(s => ({ ...s, fill: false, tension: 0.25, borderDash: [5, 4] })),
         ],
     },
     options: baseChartOptions(),
 });
-
 new Chart(document.getElementById('purchaseChart'), {
     type: 'bar',
-    data: {
-        labels: statsData.labels,
-        datasets: [{
-            label: '{{ t("stats_purchase_dataset") }}',
-            data: statsData.purchaseDaily,
-            backgroundColor: '#10b981',
-            borderRadius: 8,
-        }],
-    },
+    data: { labels: statsData.labels, datasets: [{ label: '{{ t("stats_purchase_dataset") }}', data: statsData.purchaseDaily, backgroundColor: '#10b981', borderRadius: 8 }] },
     options: baseChartOptions(),
 });
-
 {% if top_materials %}
 new Chart(document.getElementById('materialChart'), {
     type: 'doughnut',
     data: {
         labels: {{ top_materials|map(attribute='name')|list|tojson }},
-        datasets: [{
-            data: {{ top_materials|map(attribute='grams')|list|tojson }},
-            backgroundColor: ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
-            borderWidth: 0,
-        }],
+        datasets: [{ data: {{ top_materials|map(attribute='grams')|list|tojson }}, backgroundColor: ['#2563eb','#10b981','#f59e0b','#ef4444','#8b5cf6'], borderWidth: 0 }],
     },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom' } },
-    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
 });
 {% endif %}
-
 {% if project_rows %}
 new Chart(document.getElementById('projectChart'), {
     type: 'bar',
-    data: {
-        labels: statsData.projectLabels,
-        datasets: [{
-            label: '{{ t("stats_project_dataset") }}',
-            data: statsData.projectData,
-            backgroundColor: '#8b5cf6',
-            borderRadius: 8,
-        }],
-    },
-    options: {
-        ...baseChartOptions(),
-        indexAxis: 'y',
-        scales: {
-            x: {
-                beginAtZero: true,
-                ticks: { callback: (value) => `${value} g` }
-            },
-            y: {
-                ticks: { callback: (value, index) => statsData.projectLabels[index] || value }
-            }
-        },
-    },
+    data: { labels: statsData.projectLabels, datasets: [{ label: '{{ t("stats_project_dataset") }}', data: statsData.projectData, backgroundColor: '#8b5cf6', borderRadius: 8 }] },
+    options: { ...baseChartOptions(), indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: { callback: (v) => `${v} g` } }, y: { ticks: { callback: (v, i) => statsData.projectLabels[i] || v } } } },
 });
 {% endif %}
+
+// ── Layout persistence ────────────────────────────────────────────────────────
+const LAYOUT_KEY = 'stats_layout_v2';
+const DEFAULT_ORDER = ['section_kpi','section_overview','section_charts_primary','section_charts_secondary','section_tables','section_detail','section_colors'];
+const DEFAULT_LIMITS = { low_stock: 5, top_turnover: 5, profitable_projects: 5, forecast_table: 10, purchase_recommendations: 10, project_usage: 8, purchase_log: 10 };
+
+let layout = loadLayout();
+let editMode = false;
+
+function loadLayout() {
+    try {
+        const s = JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}');
+        return { order: s.order || [...DEFAULT_ORDER], hidden: s.hidden || [], limits: { ...DEFAULT_LIMITS, ...(s.limits || {}) } };
+    } catch { return { order: [...DEFAULT_ORDER], hidden: [], limits: { ...DEFAULT_LIMITS } }; }
+}
+
+function saveLayout() {
+    layout.order = [...document.querySelectorAll('#stats-page > [data-section-id]')].map(s => s.dataset.sectionId);
+    localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
+}
+
+function applyOrder() {
+    const page = document.getElementById('stats-page');
+    const map = {};
+    page.querySelectorAll(':scope > [data-section-id]').forEach(s => map[s.dataset.sectionId] = s);
+    layout.order.forEach(id => { if (map[id]) page.appendChild(map[id]); });
+}
+
+function applyVisibility() {
+    layout.hidden.forEach(cardId => {
+        const el = document.querySelector(`[data-card-id="${cardId}"]`);
+        if (el) el.classList.add('hidden');
+    });
+    updateEmptySections();
+}
+
+function updateEmptySections() {
+    document.querySelectorAll('#stats-page > [data-section-id]').forEach(section => {
+        const cards = section.querySelectorAll('.stats-card');
+        const allHidden = cards.length > 0 && [...cards].every(c => c.classList.contains('hidden'));
+        section.style.display = (!editMode && allHidden) ? 'none' : '';
+    });
+}
+
+function applyLimits() {
+    Object.entries(layout.limits).forEach(([id, lim]) => applyCardLimit(id, lim));
+}
+
+function applyCardLimit(cardId, limit) {
+    const card = document.querySelector(`[data-card-id="${cardId}"]`);
+    if (!card) return;
+    const lim = (limit === 'all') ? Infinity : parseInt(limit);
+    card.querySelectorAll('[data-row-index]').forEach(row => {
+        row.style.display = parseInt(row.dataset.rowIndex) >= lim ? 'none' : '';
+    });
+    const sel = card.querySelector('.widget-limit-select');
+    if (sel) sel.value = String(limit);
+}
+
+function setCardLimit(cardId, value) {
+    layout.limits[cardId] = value === 'all' ? 'all' : parseInt(value);
+    applyCardLimit(cardId, layout.limits[cardId]);
+    saveLayout();
+}
+
+function hideCard(cardId) {
+    if (!layout.hidden.includes(cardId)) layout.hidden.push(cardId);
+    const el = document.querySelector(`[data-card-id="${cardId}"]`);
+    if (el) el.classList.add('hidden');
+    updateEmptySections();
+    saveLayout();
+    updateRestorePanel();
+}
+
+function showCard(cardId) {
+    layout.hidden = layout.hidden.filter(id => id !== cardId);
+    const el = document.querySelector(`[data-card-id="${cardId}"]`);
+    if (el) el.classList.remove('hidden');
+    updateEmptySections();
+    saveLayout();
+    updateRestorePanel();
+}
+
+function updateRestorePanel() {
+    const panel = document.getElementById('restorePanel');
+    const btns = document.getElementById('restoreButtons');
+    if (!panel || !btns) return;
+    btns.innerHTML = '';
+    layout.hidden.forEach(cardId => {
+        const card = document.querySelector(`[data-card-id="${cardId}"]`);
+        const h2 = card ? card.querySelector('h2') : null;
+        const label = h2 ? h2.textContent.trim() : cardId;
+        const btn = document.createElement('button');
+        btn.className = 'inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:border-blue-400 transition';
+        btn.innerHTML = `<i class="fa-solid fa-eye text-blue-500"></i> ${label}`;
+        btn.onclick = () => showCard(cardId);
+        btns.appendChild(btn);
+    });
+    panel.classList.toggle('hidden', layout.hidden.length === 0 || !editMode);
+}
+
+// ── Edit mode ─────────────────────────────────────────────────────────────────
+function toggleEditMode() {
+    editMode = !editMode;
+    const page = document.getElementById('stats-page');
+    const btn = document.getElementById('editModeBtn');
+    const label = document.getElementById('editModeBtnLabel');
+    const hint = document.getElementById('editModeHint');
+    if (editMode) {
+        page.classList.add('edit-mode');
+        btn.classList.add('bg-blue-600','text-white','border-blue-600');
+        btn.classList.remove('bg-white','text-gray-700','border-gray-300');
+        label.textContent = '{{ t("stats_done_editing") }}';
+        hint.classList.remove('hidden');
+        enableDrag();
+    } else {
+        page.classList.remove('edit-mode');
+        btn.classList.remove('bg-blue-600','text-white','border-blue-600');
+        btn.classList.add('bg-white','text-gray-700','border-gray-300');
+        label.textContent = '{{ t("stats_edit_layout") }}';
+        hint.classList.add('hidden');
+        disableDrag();
+    }
+    updateEmptySections();
+    updateRestorePanel();
+}
+
+function resetLayout() {
+    localStorage.removeItem(LAYOUT_KEY);
+    location.reload();
+}
+
+// ── Section reorder (up / down) ───────────────────────────────────────────────
+function moveSectionUp(sectionId) {
+    const page = document.getElementById('stats-page');
+    const sections = [...page.querySelectorAll(':scope > [data-section-id]')];
+    const idx = sections.findIndex(s => s.dataset.sectionId === sectionId);
+    if (idx > 0) { page.insertBefore(sections[idx], sections[idx - 1]); saveLayout(); }
+}
+
+function moveSectionDown(sectionId) {
+    const page = document.getElementById('stats-page');
+    const sections = [...page.querySelectorAll(':scope > [data-section-id]')];
+    const idx = sections.findIndex(s => s.dataset.sectionId === sectionId);
+    if (idx < sections.length - 1) { page.insertBefore(sections[idx + 1], sections[idx]); saveLayout(); }
+}
+
+// ── Drag & drop ───────────────────────────────────────────────────────────────
+let dragSrc = null;
+
+function onDragStart(e) {
+    dragSrc = this;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', this.dataset.sectionId);
+    setTimeout(() => this.classList.add('is-dragging'), 0);
+}
+function onDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+function onDragEnter(e) { e.preventDefault(); if (this !== dragSrc) this.classList.add('drag-over'); }
+function onDragLeave() { this.classList.remove('drag-over'); }
+function onDrop(e) {
+    e.preventDefault(); e.stopPropagation();
+    this.classList.remove('drag-over');
+    if (dragSrc && dragSrc !== this) {
+        const page = document.getElementById('stats-page');
+        const all = [...page.querySelectorAll(':scope > [data-section-id]')];
+        const si = all.indexOf(dragSrc), di = all.indexOf(this);
+        if (si < di) page.insertBefore(dragSrc, this.nextSibling);
+        else page.insertBefore(dragSrc, this);
+        saveLayout();
+    }
+}
+function onDragEnd() {
+    this.classList.remove('is-dragging');
+    document.querySelectorAll('[data-section-id]').forEach(s => s.classList.remove('drag-over'));
+    dragSrc = null;
+}
+
+function enableDrag() {
+    document.querySelectorAll('#stats-page > [data-section-id]').forEach(s => {
+        s.setAttribute('draggable', 'true');
+        s.addEventListener('dragstart', onDragStart);
+        s.addEventListener('dragover', onDragOver);
+        s.addEventListener('dragenter', onDragEnter);
+        s.addEventListener('dragleave', onDragLeave);
+        s.addEventListener('drop', onDrop);
+        s.addEventListener('dragend', onDragEnd);
+    });
+}
+
+function disableDrag() {
+    document.querySelectorAll('#stats-page > [data-section-id]').forEach(s => {
+        s.removeAttribute('draggable');
+        s.removeEventListener('dragstart', onDragStart);
+        s.removeEventListener('dragover', onDragOver);
+        s.removeEventListener('dragenter', onDragEnter);
+        s.removeEventListener('dragleave', onDragLeave);
+        s.removeEventListener('drop', onDrop);
+        s.removeEventListener('dragend', onDragEnd);
+    });
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    applyOrder();
+    applyVisibility();
+    applyLimits();
+    updateRestorePanel();
+});
 </script>
 {% endblock %}

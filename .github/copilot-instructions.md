@@ -34,9 +34,17 @@ routes/
   bambu.py           # /bambu, /bambu/sync, /bambu/job/<id>/assign, /bambu/job/<id>/deduct,
                      #   Bambu Cloud API integration (BambuPrinter, BambuPrintJob, BambuJobMaterial)
   settings.py        # /settings, /export, /import, /toggle-theme, /edit_bambu_printer
+  stats.py           # /stats — Statistics dashboard (usage charts, forecast, stock health,
+                     #   top-turnover, profitable projects, color palette). Sorted with HSL hue helper.
+  storage.py         # /storage, /storage/shelf (POST), /storage/shelf/<id>/update,
+                     #   /storage/shelf/<id>/delete, /storage/slot/assign,
+                     #   /storage/placement/<id>/move, /storage/placement/<id>/orientation,
+                     #   /storage/placement/<id>/delete — physical shelf/slot management
 templates/
   base.html          # Layout with Alpine.js + TailwindCSS CDN
   index.html         # Inventory page (Alpine.js x-data="inventoryApp()")
+  stats.html         # Statistics dashboard — Chart.js charts, 7 draggable sections (see rule 18)
+  storage.html       # Visual storage shelf map
   ...
 ```
 
@@ -171,6 +179,17 @@ When a user asks for modifications to the project, you must follow and automatic
     - **Idempotency**: use a "skip if already exists" strategy (check by natural key) so that importing the same backup twice does not create duplicates.
     - **Whenever a new model or column is added to the project, update both the export dict and the import handler in `routes/settings.py` in the same pull/commit.**
 
+18. **Stats Page Draggable Layout Rule**
+    - The Statistics page (`/stats`, `templates/stats.html`) has **7 named sections**, each a `<div class="stats-section" data-section-id="...">`:
+      `section_kpi`, `section_overview`, `section_charts_primary`, `section_charts_secondary`, `section_tables`, `section_detail`, `section_colors`.
+    - Section order, hidden card IDs, and per-card row limits are persisted in `localStorage` under the key **`stats_layout_v2`** as `{order:[...sectionIds], hidden:[...cardIds], limits:{cardId: number|'all'}}`.
+    - **Edit mode** is toggled by `toggleEditMode()`. In edit mode the `<div id="stats-page">` gets the class `edit-mode`, which makes `.section-edit-bar` and `.card-edit-bar` elements visible via CSS.
+    - Each section-edit-bar contains: a drag grip, a label, ▲/▼ reorder buttons (`moveSectionUp/Down(sectionId)`), and optionally a hide button.
+    - Each card-edit-bar (inside `.stats-card`) contains: a label, a `<select class="widget-limit-select">`, and a hide button.
+    - **Row limit display fix**: Always use `row.style.display = 'none'` / `row.style.display = ''` to show/hide `[data-row-index]` rows — **never `row.hidden = bool`** — because Tailwind's `display:flex` class on `<a>` elements overrides the UA `[hidden]` rule.
+    - Color palette in `routes/stats.py` is sorted by HSL hue via `_hex_to_hsl_sort_key()` (chromatic colors in rainbow order, neutrals at end). Do **not** revert to alphabetical sort.
+    - Chart.js is loaded via CDN; chart instances are created in a `<script>` block at the bottom of `stats.html`. Avoid re-fetching chart data via AJAX — it is embedded as `chart_data` JSON in the template.
+
 ---
 
 ## Post-Implementation Versioning Checklist
@@ -184,3 +203,21 @@ When a user asks for modifications to the project, you must follow and automatic
 5. ✅ **Update README.md** – change the version tag in the first line
 6. ✅ `docker compose up -d --build` → verify HTTP 200
 7. ✅ If the feature touched any DB table or column — verify that `/export` and `/import` in `routes/settings.py` are updated to match (rule 17).
+8. ✅ If the feature added any user-facing text — verify that `messages.py` is updated with the new keys/values in both languages (rule 1).
+9. ✅ If the feature added or modified any route — verify that it is registered correctly in the appropriate `routes/*.py` file and that `url_for()` works without prefixes (rule 3).
+10. ✅ If the feature modified inventory filters or view modes — verify that Alpine.js state and `fetchContent()` class updates are correct (rules 4 and 11).
+11. ✅ If the feature modified inventory item rendering — verify that low-stock indicators are implemented correctly (rule 13) and that all `<div>` tags are properly closed (rule 9). 
+12. ✅ If the feature added any external URL fetching — verify that security rules are followed (rule 14).
+13. ✅ If the feature added any file upload — verify that validation and naming rules are followed (rule 15).
+14. ✅ If the feature added any security-sensitive helper — verify that automated tests are added (rule 16).
+15. ✅ If the feature modified the frontend design — verify that Tailwind classes are used correctly and that spacing/colors are consistent (rule 7).
+16. ✅ If the feature modified the Stats page sections, cards, row-limit logic, or color palette sort — verify compliance with rule 18.
+17. ✅ Keep the readme and documentation up to date with any new features or changes.
+18. ✅ Keep the instruction file up to date with any new rules or patterns that should be followed in future interactions.
+19. ✅ Always maintain a clean commit history with descriptive messages for each change.
+20. ✅ Regularly review and refactor code to maintain readability and performance as the project evolves.
+21. ✅ Engage with users and gather feedback to continuously improve the application and address any issues that arise.
+22. ✅ Stay informed about updates to the technologies used in the project (Flask, SQLAlchemy, TailwindCSS, Alpine.js) and apply necessary updates or optimizations when appropriate.
+23. ✅ Ensure that the application remains secure by regularly reviewing code for potential vulnerabilities and applying best practices for web security.
+24. ✅ Foster a collaborative development environment by encouraging contributions, providing clear documentation, and maintaining open communication channels for feedback and support.
+25. ✅ Continuously monitor the application's performance and scalability, making necessary adjustments to ensure it can handle increased usage and data as the user base grows.
