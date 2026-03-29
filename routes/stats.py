@@ -282,6 +282,29 @@ def register(app):
             'reorder_recommendations': len(purchase_recommendations),
         }
 
+        color_map = {}
+        for fil in filaments:
+            if not fil.color_id:
+                continue
+            if fil.color_id not in color_map:
+                color_map[fil.color_id] = {
+                    'color_id': fil.color_id,
+                    'color_name': fil.color.name if fil.color else '',
+                    'hex_value': (fil.color.hex_value or '#cccccc') if fil.color else '#cccccc',
+                    'filaments': [],
+                }
+            fill_pct = round(fil.weight_remaining / fil.weight_total * 100) if fil.weight_total > 0 else 0
+            color_map[fil.color_id]['filaments'].append({
+                'id': fil.id,
+                'name': fil.name,
+                'brand': fil.brand.name if fil.brand else '',
+                'material': fil.material.name if fil.material else '',
+                'remaining': round(fil.weight_remaining, 1),
+                'fill_pct': min(fill_pct, 100),
+                'quantity': fil.quantity,
+            })
+        color_palette = sorted(color_map.values(), key=lambda c: c['color_name'].lower())
+
         return render_template(
             'stats.html',
             days=days,
@@ -295,4 +318,5 @@ def register(app):
             top_turnover=top_turnover,
             profitable_projects=profitable_projects,
             reorder_status_label_key=_reorder_status_label_key,
+            color_palette=color_palette,
         )

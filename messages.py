@@ -351,6 +351,9 @@ TRANSLATIONS = {
         'reorder_alert_snooze': 'Uspat upozornění',
         'reorder_alert_unsnooze': 'Obnovit upozornění',
         'reorder_alert_is_snoozed': 'Upozornění je uspáno',
+        'stats_color_palette': 'Paleta barev filamentů',
+        'stats_color_palette_hint': 'Přejezdem myší zobrazíte filamenty dané barvy.',
+        'stats_color_spools': 'cívek',
     },
     'en': {
         'title': 'Filament Manager',
@@ -704,5 +707,8 @@ TRANSLATIONS = {
         'reorder_alert_snooze': 'Snooze alert',
         'reorder_alert_unsnooze': 'Restore alert',
         'reorder_alert_is_snoozed': 'Alert is snoozed',
+        'stats_color_palette': 'Filament Color Palette',
+        'stats_color_palette_hint': 'Hover over a color to see all filaments of that color.',
+        'stats_color_spools': 'spools',
     }
 }

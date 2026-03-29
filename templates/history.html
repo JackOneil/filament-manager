@@ -12,7 +12,7 @@
         {% if movements.items and movements.items|length > 0 %}
         <div class="flex flex-col sm:flex-row items-center gap-2 text-sm bg-white px-3 py-1.5 rounded shadow-sm border border-gray-200">
             <label for="per_page" class="text-gray-600 font-semibold">{{ t('per_page') }}</label>
-            <select id="per_page" class="bg-transparent border-none focus:ring-0 outline-none cursor-pointer text-gray-800 font-bold" onchange="window.location.href='{{ url_for('history') }}?per_page='+this.value">
+            <select id="per_page" class="bg-transparent border-none focus:ring-0 outline-none cursor-pointer text-gray-800 font-bold" onchange="changeHistoryPerPage(this.value)">
                 <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
                 <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
                 <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
@@ -106,4 +106,20 @@
         </p>
     {% endif %}
 </div>
+
+<script>
+function changeHistoryPerPage(val) {
+    localStorage.setItem('history_per_page', val);
+    window.location.href = '{{ url_for('history') }}?per_page=' + val;
+}
+(function () {
+    var urlParams = new URLSearchParams(window.location.search);
+    if (!urlParams.has('per_page')) {
+        var saved = localStorage.getItem('history_per_page');
+        if (saved && ['10', '20', '50', '100'].indexOf(saved) !== -1) {
+            window.location.replace('{{ url_for('history') }}?per_page=' + saved);
+        }
+    }
+})();
+</script>
 {% endblock %}

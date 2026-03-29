@@ -300,6 +300,49 @@
             </div>
         </div>
     </div>
+
+    {% if color_palette %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-gray-800">{{ t('stats_color_palette') }}</h2>
+            <span class="text-xs text-gray-400">{{ t('stats_color_palette_hint') }}</span>
+        </div>
+        <div class="flex flex-wrap gap-3">
+            {% for entry in color_palette %}
+            <div class="relative group">
+                <a href="{{ url_for('index', color=entry.color_id) }}"
+                   class="block w-10 h-10 rounded-full border-2 border-white shadow-md ring-1 ring-gray-200 hover:ring-2 hover:ring-offset-1 hover:ring-blue-400 transition-all cursor-pointer"
+                   style="background-color: {{ entry.hex_value }};"
+                   title="{{ entry.color_name }}"></a>
+
+                {# Hover card #}
+                <div class="hidden group-hover:block pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-30 w-60">
+                    <div class="rounded-xl border border-gray-200 bg-white shadow-xl p-3">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="w-4 h-4 rounded-full border border-gray-200 flex-shrink-0" style="background-color: {{ entry.hex_value }};"></span>
+                            <span class="text-sm font-bold text-gray-800">{{ entry.color_name }}</span>
+                            <span class="ml-auto text-xs text-gray-400">{{ entry.filaments|length }} {{ t('stats_color_spools') }}</span>
+                        </div>
+                        <div class="space-y-2 max-h-52 overflow-y-auto">
+                            {% for fil in entry.filaments %}
+                            <div class="text-xs">
+                                <div class="font-semibold text-gray-700 truncate">{{ fil.name }}</div>
+                                <div class="text-gray-400">{{ fil.brand }} · {{ fil.material }}</div>
+                                <div class="mt-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                                    <div class="h-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-blue-500" style="width: {{ fil.fill_pct }}%;"></div>
+                                </div>
+                                <div class="text-gray-400 mt-0.5">{{ fil.remaining }} g · {{ fil.fill_pct }}%{% if fil.quantity > 1 %} · {{ fil.quantity }}× {{ t('pieces') }}{% endif %}</div>
+                            </div>
+                            {% if not loop.last %}<div class="border-t border-gray-100"></div>{% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <script>

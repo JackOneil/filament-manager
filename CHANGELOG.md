@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.38.0] - 2026-03-29
+### Added
+- **Color palette on Stats page**: New full-width card at the bottom of the Statistics page displays all filament colors as colored circles. Hovering over a circle reveals a popup card listing all filaments of that color with their name, brand, material, remaining weight and fill percentage bar. Clicking the circle navigates to the filtered inventory view for that color.
+- **Persistent per-page setting in Movement History**: The "Records per page" selector in `/history` now saves its value to `localStorage`. When a user navigates away and returns, the previous selection is automatically restored (without adding an extra entry to the browser history).
+
 ## [1.37.0] - 2026-03-28
 ### Security
 - **CSRF protection**: Added Flask-WTF `CSRFProtect`. Every POST form now receives an auto-injected `csrf_token` hidden field via a global JavaScript snippet in `base.html`. AJAX `fetch()` calls automatically receive the `X-CSRFToken` header.
