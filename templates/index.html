@@ -145,10 +145,33 @@
             <div x-show="filteredColors.length === 0" class="px-3 py-2 text-gray-400 italic text-xs text-center">–</div>
         </div>
     </div>
-    <div class="flex-1 min-w-[150px]">
+    <div class="flex-1 min-w-[150px] relative" @click.outside="tagOpen = false">
         <label class="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">{{ t('tag_list') }}</label>
-        <input type="text" x-model="tagQ" @input="applyFilters()" list="inventoryTagSuggestions" placeholder="{{ t('filter_tags_placeholder') }}"
-            class="w-full rounded px-3 py-2 text-sm focus:ring-blue-500 outline-none border border-gray-300">
+        <div class="relative">
+            <input type="text" x-model="tagQ" @focus="tagOpen = true" @input="tagOpen = true; applyFilters()"
+                placeholder="{{ t('filter_tags_placeholder') }}" autocomplete="off"
+                :class="tagQ.trim() ? 'border-blue-400 bg-blue-50' : 'border-gray-300'"
+                class="w-full rounded px-3 py-2 text-sm focus:ring-blue-500 outline-none border pr-8">
+            <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-gray-400">
+                <i class="fa-solid fa-chevron-down text-xs transition-transform duration-150" :class="tagOpen ? 'rotate-180' : ''"></i>
+            </div>
+        </div>
+        <div x-show="tagOpen" x-cloak class="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+            <div @click="tagQ = ''; applyFilters(); tagOpen = false"
+                class="px-3 py-2 cursor-pointer text-sm italic border-b border-gray-100"
+                :class="tagQ.trim() === '' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-400 hover:bg-gray-50'">
+                — {{ t('filter_all') }} —
+            </div>
+            <template x-for="opt in filteredTagOptions" :key="opt">
+                <div @click="selectTag(opt)"
+                    class="px-3 py-2 cursor-pointer text-sm border-b border-gray-50 last:border-b-0 flex items-center justify-between"
+                    :class="tagQ === opt ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-800 hover:bg-blue-50'">
+                    <span x-text="opt"></span>
+                    <i x-show="tagQ === opt" class="fa-solid fa-check text-blue-500 text-xs"></i>
+                </div>
+            </template>
+            <div x-show="filteredTagOptions.length === 0" class="px-3 py-2 text-gray-400 italic text-xs text-center">–</div>
+        </div>
     </div>
     <div class="flex gap-2">
         <button type="button" x-on:click="resetFilters()" :disabled="!hasFilters"
@@ -157,12 +180,6 @@
         </button>
     </div>
 </div>
-
-<datalist id="inventoryTagSuggestions">
-    {% for tag in tag_options %}
-    <option value="{{ tag }}"></option>
-    {% endfor %}
-</datalist>
 
 <!-- Řazení - Quick Sort Buttons (POUZE V CARD VIEW) -->
 <div x-show="viewMode === 'card'" x-cloak class="bg-white p-3 sm:p-4 rounded-lg shadow-sm border border-gray-100 mb-6">
@@ -224,6 +241,11 @@
             {% if fil.quantity == 0 or pct < 20 %}
             <div class="absolute top-2 right-2 text-xs font-bold px-2 py-1 rounded shadow-md {% if fil.quantity == 0 %}bg-red-600 text-white{% else %}bg-orange-500 text-white{% endif %}">
                 {% if fil.quantity == 0 %}{{ t('out_of_stock') }}{% else %}{{ t('low_stock') }}{% endif %}
+            </div>
+            {% endif %}
+            {% if fil.reorder_alert_snoozed %}
+            <div class="absolute top-2 left-2 text-gray-400" title="{{ t('reorder_alert_is_snoozed') }}">
+                <i class="fa-solid fa-bell-slash text-sm"></i>
             </div>
             {% endif %}
             <div class="p-6">
@@ -309,7 +331,7 @@
             </label>
             <span id="selectedFilamentsCount" class="text-sm text-gray-500">{{ t('selected_filaments_count').format(count=0) }}</span>
         </div>
-        <button type="submit" id="bulkDeleteButton" disabled class="bg-red-600 hover:bg-red-700 disabled:bg-red-200 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded font-semibold transition-colors text-sm whitespace-nowrap">
+        <button type="submit" id="bulkDeleteButton" disabled name="action" value="bulk_delete_selected" class="bg-red-600 hover:bg-red-700 disabled:bg-red-200 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded font-semibold transition-colors text-sm whitespace-nowrap">
             <i class="fa-solid fa-trash"></i> {{ t('bulk_delete_selected') }}
         </button>
     </form>
@@ -361,6 +383,11 @@
                         {% if fil.quantity == 0 or pct < 20 %}
                         <span class="text-xs font-bold px-1.5 py-0.5 rounded flex-shrink-0 {% if fil.quantity == 0 %}bg-red-600 text-white{% else %}bg-orange-500 text-white{% endif %}">
                             {% if fil.quantity == 0 %}<i class="fa-solid fa-exclamation-circle"></i>{% else %}<i class="fa-solid fa-triangle-exclamation"></i>{% endif %}
+                        </span>
+                        {% endif %}
+                        {% if fil.reorder_alert_snoozed %}
+                        <span class="text-gray-400 flex-shrink-0" title="{{ t('reorder_alert_is_snoozed') }}">
+                            <i class="fa-solid fa-bell-slash text-xs"></i>
                         </span>
                         {% endif %}
                     <h3 class="font-bold text-gray-800 truncate text-sm" title="{{ fil.name }}">{{ fil.name }}</h3>
@@ -496,6 +523,8 @@ function inventoryApp() {
         material: '{{ f_material }}',
         color: '{{ f_color }}',
         tagQ: {{ f_tag|tojson }},
+        tagOpen: false,
+        tagOptions: [{% for tag in tag_options %}{{ tag|tojson }}{% if not loop.last %},{% endif %}{% endfor %}],
         viewMode: '{{ view_mode }}',
         perPage: {{ per_page }},
         currentPage: {{ filaments.page }},
@@ -557,6 +586,10 @@ function inventoryApp() {
             return rangeWithDots;
         },
 
+        get filteredTagOptions() {
+            const q = (this.tagQ || '').toLowerCase();
+            return q ? this.tagOptions.filter(t => t.toLowerCase().includes(q)) : this.tagOptions;
+        },
         get filteredBrands() {
             const q = (this.brandQ || '').toLowerCase();
             return q ? this.brandOptions.filter(o => o.name.toLowerCase().includes(q)) : this.brandOptions;
@@ -632,6 +665,7 @@ function inventoryApp() {
         selectBrand(id, name)   { this.brand = id;    this.brandQ = name;    this.applyFilters(); },
         selectMaterial(id, name) { this.material = id; this.materialQ = name; this.applyFilters(); },
         selectColor(id, name)    { this.color = id;    this.colorQ = name;    this.applyFilters(); },
+        selectTag(name)          { this.tagQ = name;   this.tagOpen = false;  this.applyFilters(); },
 
         applyFilters() { this.fetchContent(); },
 
@@ -643,6 +677,7 @@ function inventoryApp() {
             this.materialQ = '';
             this.colorQ = '';
             this.tagQ = '';
+            this.tagOpen = false;
             this.fetchContent();
         }
     };
@@ -703,6 +738,7 @@ function buildListBulkToolbarHtml() {
                 <span id="selectedFilamentsCount" class="text-sm text-gray-500">{{ t('selected_filaments_count').format(count=0) }}</span>
             </div>
             <button type="submit" id="bulkDeleteButton" disabled
+                name="action" value="bulk_delete_selected"
                 class="bg-red-600 hover:bg-red-700 disabled:bg-red-200 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded font-semibold transition-colors text-sm whitespace-nowrap">
                 <i class="fa-solid fa-trash"></i> {{ t('bulk_delete_selected') }}
             </button>

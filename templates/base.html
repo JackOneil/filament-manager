@@ -140,6 +140,7 @@
         html.dark .text-green-700 { color: #059669; }
         html.dark .bg-gradient-to-b.from-blue-50 { background: linear-gradient(to bottom, #0c4a6e, #1f2937) !important; }
     </style>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>
 <body class="bg-gray-100 font-sans text-gray-800 flex flex-col min-h-screen">
     <nav class="bg-blue-600 text-white shadow-lg relative z-20">
@@ -199,6 +200,61 @@
                 icon.classList.add('fa-times');
             }
         });
+    </script>
+    <script>
+        // ── CSRF auto-protection ──────────────────────────────────────────────
+        // Injects the CSRF token into every POST form and patches window.fetch
+        // so AJAX calls automatically include the X-CSRFToken header.
+        // Flask-WTF accepts the token either as a form field or this header.
+        (function () {
+            var meta = document.querySelector('meta[name="csrf-token"]');
+            if (!meta) return;
+            var csrfToken = meta.getAttribute('content');
+
+            function injectCsrfIntoForms() {
+                document.querySelectorAll('form').forEach(function (form) {
+                    if (
+                        form.method &&
+                        form.method.toLowerCase() === 'post' &&
+                        !form.querySelector('[name="csrf_token"]')
+                    ) {
+                        var input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'csrf_token';
+                        input.value = csrfToken;
+                        form.appendChild(input);
+                    }
+                });
+            }
+
+            // Inject into forms already in the DOM
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', injectCsrfIntoForms);
+            } else {
+                injectCsrfIntoForms();
+            }
+
+            // Inject into forms added by AJAX (e.g. fetchContent() in inventory)
+            document.addEventListener('DOMContentLoaded', function () {
+                new MutationObserver(injectCsrfIntoForms).observe(
+                    document.body,
+                    { childList: true, subtree: true }
+                );
+            });
+
+            // Patch window.fetch to send the CSRF header on every non-GET request
+            var _origFetch = window.fetch;
+            window.fetch = function (url, opts) {
+                opts = opts || {};
+                var method = (opts.method || 'GET').toUpperCase();
+                if (method !== 'GET' && method !== 'HEAD') {
+                    opts.headers = Object.assign({}, opts.headers, {
+                        'X-CSRFToken': csrfToken
+                    });
+                }
+                return _origFetch.call(this, url, opts);
+            };
+        })();
     </script>
     <div class="container mx-auto px-4 sm:px-6 py-4 sm:py-8 flex-grow overflow-x-hidden">
         {% with flashes = get_flashed_messages(with_categories=true) %}

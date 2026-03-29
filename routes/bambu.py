@@ -18,7 +18,7 @@ from models import (
     Filament, PrintHistory, Project, ProjectFilament,
 )
 from sqlalchemy import and_, func, or_, select
-from utils import deduct_filament_stock, log_movement
+from utils import deduct_filament_stock, decrypt_token, log_movement
 
 _LOG = logging.getLogger(__name__)
 
@@ -442,7 +442,8 @@ def register(app):
         setting = AppSetting.query.first()
         if not setting or not setting.bambu_token:
             return jsonify({'ok': False, 'error': 'No Bambu token configured'}), 400
-        result = do_sync(setting.bambu_token, setting.bambu_region or 'global')
+        token = decrypt_token(setting.bambu_token)
+        result = do_sync(token, setting.bambu_region or 'global')
         setting.bambu_last_sync_at = datetime.utcnow()
         if result.get('error'):
             setting.bambu_last_sync_status = f"error: {result['error'][:220]}"

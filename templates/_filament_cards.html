@@ -13,6 +13,11 @@
             {% if fil.quantity == 0 %}{{ t('out_of_stock') }}{% else %}{{ t('low_stock') }}{% endif %}
         </div>
         {% endif %}
+        {% if fil.reorder_alert_snoozed %}
+        <div class="absolute top-2 left-2 text-gray-400" title="{{ t('reorder_alert_is_snoozed') }}">
+            <i class="fa-solid fa-bell-slash text-sm"></i>
+        </div>
+        {% endif %}
         <div class="p-6">
             <div class="flex justify-between items-start">
                 <div>

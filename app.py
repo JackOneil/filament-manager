@@ -21,6 +21,7 @@ import threading
 import time
 from datetime import datetime, timedelta
 from flask import Flask
+from flask_wtf.csrf import CSRFProtect
 from sqlalchemy import text
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -34,13 +35,21 @@ from utils import get_settings
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.36.11'
+APP_VERSION = '1.37.0'
+
+csrf = CSRFProtect()
 
 
 def create_app(test_config=None) -> Flask:
     app = Flask(__name__)
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
-    app.secret_key = 'filament-manager-secret'
+    # Secret key: must be set via SECRET_KEY env var in production.
+    # Defaults to a random value (sessions lost on restart) if not configured.
+    app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24).hex())
+    if not os.environ.get('SECRET_KEY'):
+        app.logger.warning('SECRET_KEY env var not set — sessions will not persist across restarts.')
+    # Only trust X-Forwarded-* headers when explicitly running behind a reverse proxy.
+    if os.environ.get('BEHIND_PROXY'):
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
     db_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data')
     os.makedirs(db_dir, exist_ok=True)
@@ -48,11 +57,16 @@ def create_app(test_config=None) -> Flask:
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024
     app.config['PROJECT_UPLOAD_FOLDER'] = os.path.join(db_dir, 'uploads')
+    # Increase SQLite busy-timeout to reduce 'database is locked' errors under load.
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'connect_args': {'timeout': 30},
+    }
 
     if test_config:
         app.config.update(test_config)
 
     db.init_app(app)
+    csrf.init_app(app)
     register_all(app)
 
     @app.context_processor
@@ -141,17 +155,17 @@ def _setup_database(app: Flask) -> None:
 
 
 def _safe_alter(app: Flask, sql: str) -> None:
-    with app.app_context():
-        try:
-            db.session.execute(text(sql))
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            message = str(e).lower()
-            if 'duplicate column name' in message or 'already exists' in message:
-                app.logger.debug(f"Skipping existing schema change for '{sql}'")
-            else:
-                app.logger.error(f"Error in _safe_alter executing '{sql}': {e}")
+    """Run a schema migration SQL inside the already-active app context."""
+    try:
+        db.session.execute(text(sql))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        message = str(e).lower()
+        if 'duplicate column name' in message or 'already exists' in message:
+            app.logger.debug(f"Skipping existing schema change for '{sql}'")
+        else:
+            app.logger.error(f"Error in _safe_alter executing '{sql}': {e}")
 
 
 def _start_bambu_sync_worker(app: Flask) -> None:
@@ -166,7 +180,9 @@ def _start_bambu_sync_worker(app: Flask) -> None:
 
     def worker():
         from routes.bambu import do_sync
+        from utils import decrypt_token
 
+        _consecutive_errors = 0
         while True:
             try:
                 with app.app_context():
@@ -182,7 +198,8 @@ def _start_bambu_sync_worker(app: Flask) -> None:
                             or setting.bambu_last_sync_at <= datetime.utcnow() - timedelta(minutes=interval)
                         )
                         if due:
-                            result = do_sync(setting.bambu_token, setting.bambu_region or 'global')
+                            token = decrypt_token(setting.bambu_token)
+                            result = do_sync(token, setting.bambu_region or 'global')
                             setting.bambu_last_sync_at = datetime.utcnow()
                             if result.get('error'):
                                 setting.bambu_last_sync_status = f"error: {result['error'][:220]}"
@@ -193,9 +210,12 @@ def _start_bambu_sync_worker(app: Flask) -> None:
                                     'skipped': result.get('skipped', 0),
                                 })
                             db.session.commit()
+                _consecutive_errors = 0
             except Exception as exc:
                 app.logger.error("Background Bambu sync failed: %s", exc)
-            time.sleep(60)
+                _consecutive_errors += 1
+            # Exponential backoff: 60s → 120s → 240s → … → 3600s max
+            time.sleep(min(60 * (2 ** min(_consecutive_errors, 5)), 3600))
 
     thread = threading.Thread(target=worker, name='bambu-sync-worker', daemon=True)
     thread.start()

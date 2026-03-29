@@ -19,6 +19,11 @@
                         {% if fil.quantity == 0 %}<i class="fa-solid fa-exclamation-circle"></i>{% else %}<i class="fa-solid fa-triangle-exclamation"></i>{% endif %}
                     </span>
                     {% endif %}
+                    {% if fil.reorder_alert_snoozed %}
+                    <span class="text-gray-400 flex-shrink-0" title="{{ t('reorder_alert_is_snoozed') }}">
+                        <i class="fa-solid fa-bell-slash text-xs"></i>
+                    </span>
+                    {% endif %}
                     <h3 class="font-bold text-gray-800 truncate text-sm" title="{{ fil.name }}">{{ fil.name }}</h3>
                 </div>
                 {% if fil.tag_list %}

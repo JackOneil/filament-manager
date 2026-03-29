@@ -8,19 +8,13 @@ from sqlalchemy.orm import joinedload
 
 from database import db
 from models import AppSetting, BambuPrintJob, Filament, MovementHistory, Project, ProjectFilament, ProjectQuote
-from utils import collect_usage_windows, compute_stock_status
+from utils import build_filament_history_name as _display_filament_name, collect_usage_windows, compute_stock_status
 
 
 CHART_PALETTE = [
     '#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
     '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#14b8a6',
 ]
-
-
-def _display_filament_name(filament):
-    brand_name = filament.brand.name if filament.brand else ''
-    mat_name = filament.material.name if filament.material else ''
-    return f"{filament.name} | {brand_name} {mat_name}".strip(" | ")
 
 
 def _date_labels(days):

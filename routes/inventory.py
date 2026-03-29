@@ -8,6 +8,7 @@ from sqlalchemy.orm import joinedload
 from database import db
 from models import AppSetting, BambuJobMaterial, BambuPrintJob, Brand, Color, Filament, Material, MovementHistory, ProjectFilament
 from utils import (
+    build_filament_history_name as _display_filament_name,
     compute_stock_status,
     format_tags,
     get_filament_tags,
@@ -41,12 +42,6 @@ def _apply_inventory_filters(filaments_query):
         filaments_query = filaments_query.filter(Filament.tag_text.ilike(f'%{f_tag}%'))
 
     return filaments_query, f_brand, f_material, f_color, f_tag
-
-
-def _display_filament_name(filament):
-    brand_name = filament.brand.name if filament.brand else ''
-    material_name = filament.material.name if filament.material else ''
-    return f"{filament.name} | {brand_name} {material_name}".strip(" | ")
 
 
 def _decorate_filament(filament, usage_map):
@@ -273,6 +268,12 @@ def register(app):
 
     @app.route('/inventory/bulk', methods=['POST'])
     def inventory_bulk():
+        # Only the delete action is supported from the UI; validate explicitly
+        # so an unexpected action never silently deletes filaments.
+        action = request.form.get('action', '')
+        if action != 'bulk_delete_selected':
+            return redirect(url_for('index'))
+
         selected = _selected_filaments()
         if not selected:
             return redirect(url_for('index'))
@@ -288,13 +289,20 @@ def register(app):
     def add():
         if request.method == 'POST':
             name = request.form.get('name', '').strip()
-            brand_id = request.form['brand_id']
-            color_id = request.form['color_id']
-            material_id = request.form['material_id']
-            weight_total = float(request.form['weight_total'])
-            quantity = int(request.form['quantity'])
-            weight_remaining = float(request.form.get('weight_remaining', weight_total * quantity))
-            price = float(request.form['price'])
+            try:
+                brand_id = request.form.get('brand_id', type=int)
+                color_id = request.form.get('color_id', type=int)
+                material_id = request.form.get('material_id', type=int)
+                weight_total = request.form.get('weight_total', type=float)
+                quantity = request.form.get('quantity', 1, type=int) or 1
+                price = request.form.get('price', type=float)
+                if not all([brand_id, color_id, material_id, weight_total, price is not None]):
+                    return redirect(url_for('add'))
+                weight_remaining = float(
+                    request.form.get('weight_remaining') or weight_total * quantity
+                )
+            except (TypeError, ValueError):
+                return redirect(url_for('add'))
             min_stock_grams = max(request.form.get('min_stock_grams', 0.0, type=float) or 0.0, 0.0)
             max_stock_grams = max(request.form.get('max_stock_grams', 0.0, type=float) or 0.0, 0.0)
             tag_text = format_tags(request.form.get('tag_text', ''))
@@ -334,11 +342,13 @@ def register(app):
         filament = db.get_or_404(Filament, id)
         if request.method == 'POST':
             old_weight = filament.weight_remaining
-
-            filament.name = request.form['name']
-            filament.weight_remaining = float(request.form['weight_remaining'])
-            filament.price = float(request.form['price'])
-            filament.quantity = int(request.form['quantity'])
+            try:
+                filament.name = request.form.get('name', filament.name) or filament.name
+                filament.weight_remaining = float(request.form.get('weight_remaining', filament.weight_remaining))
+                filament.price = float(request.form.get('price', filament.price))
+                filament.quantity = int(request.form.get('quantity', filament.quantity))
+            except (TypeError, ValueError):
+                return redirect(url_for('edit', id=id))
             filament.tag_text = format_tags(request.form.get('tag_text', filament.tag_text or ''))
             filament.min_stock_grams = max(request.form.get('min_stock_grams', filament.min_stock_grams, type=float) or 0.0, 0.0)
             filament.max_stock_grams = max(request.form.get('max_stock_grams', filament.max_stock_grams, type=float) or 0.0, 0.0)
@@ -356,7 +366,12 @@ def register(app):
 
     @app.route('/use/<int:id>', methods=['POST'])
     def use_filament(id):
-        amount = float(request.form['amount'])
+        try:
+            amount = float(request.form.get('amount', 0) or 0)
+        except (TypeError, ValueError):
+            amount = 0.0
+        if amount <= 0:
+            return redirect(url_for('index'))
         filament = db.get_or_404(Filament, id)
         old_weight = filament.weight_remaining
         filament.weight_remaining -= amount

@@ -209,6 +209,11 @@ def register(app):
         pf = db.get_or_404(ProjectFile, file_id)
         if pf.project_id != id:
             return "Unauthorized", 401
+        # Guard against path traversal: ensure the stored path is inside UPLOAD_FOLDER
+        real_path = os.path.realpath(pf.filepath)
+        real_folder = os.path.realpath(UPLOAD_FOLDER)
+        if not real_path.startswith(real_folder + os.sep):
+            return "Forbidden", 403
         directory = os.path.dirname(pf.filepath)
         filename = os.path.basename(pf.filepath)
         return send_from_directory(directory, filename, as_attachment=True, download_name=pf.filename)
@@ -218,6 +223,11 @@ def register(app):
         pf = db.get_or_404(ProjectFile, file_id)
         if pf.project_id != id or _get_extension(pf.filename) not in IMAGE_EXTENSIONS:
             return "Unauthorized", 401
+        # Guard against path traversal
+        real_path = os.path.realpath(pf.filepath)
+        real_folder = os.path.realpath(UPLOAD_FOLDER)
+        if not real_path.startswith(real_folder + os.sep):
+            return "Forbidden", 403
         directory = os.path.dirname(pf.filepath)
         filename = os.path.basename(pf.filepath)
         return send_from_directory(directory, filename, as_attachment=False)

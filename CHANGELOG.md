@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.37.0] - 2026-03-28
+### Security
+- **CSRF protection**: Added Flask-WTF `CSRFProtect`. Every POST form now receives an auto-injected `csrf_token` hidden field via a global JavaScript snippet in `base.html`. AJAX `fetch()` calls automatically receive the `X-CSRFToken` header.
+- **Secret key from environment**: `app.secret_key` is now read from the `SECRET_KEY` environment variable instead of being hardcoded. Falls back to a random value per process (sessions not persisted across restarts) when the variable is not set.
+- **Conditional ProxyFix**: `ProxyFix` middleware is only activated when `BEHIND_PROXY` env var is set, preventing IP header spoofing on direct deployments.
+- **Bambu token encryption**: Bambu Lab Cloud token is now encrypted at rest using Fernet symmetric encryption when `FERNET_KEY` env var is configured. Fully backward-compatible — unset `FERNET_KEY` preserves existing plaintext behaviour.
+- **Path traversal protection**: `project_download_file` and `project_image_file` now verify that the stored file path resolves inside `UPLOAD_FOLDER` before serving, blocking crafted import backups that could reference arbitrary filesystem paths.
+- **Bulk-delete action validation**: `inventory_bulk` now requires `action=bulk_delete_selected` in the POST body. Unknown actions are silently ignored, preventing accidental data loss if the form is extended in future.
+
+### Fixed
+- **Input validation in inventory routes**: `add()`, `edit()`, and `use_filament()` now use `request.form.get()` with type coercion and proper error handling instead of raw `request.form['key']` which caused HTTP 500 on bad input.
+- **Nested app context in `_safe_alter`**: Removed redundant inner `app.app_context()` wrap — `_safe_alter` is always called from within an existing context.
+- **Gunicorn worker count**: Reduced from 2 to 1 worker to avoid SQLite `database is locked` errors under concurrent load.
+- **Background Bambu worker exponential backoff**: Worker now backs off exponentially from 60 s up to 3600 s on consecutive errors instead of hammering the API every 60 s regardless.
+- **Duplicate `_display_filament_name`**: Removed two local redefinitions in `routes/stats.py` and `routes/inventory.py`; both now use `build_filament_history_name` from `utils.py`.
+
+### Changed
+- **Dependencies pinned**: `requests` and `beautifulsoup4` now have version ranges (`>=2.31,<3` and `>=4.12,<5`). Added `Flask-WTF==1.2.1` and `cryptography>=42,<43`.
+- **DB indexes**: Added `index=True` on `MovementHistory.created_at` and `MovementHistory.filament_id` to speed up the 90-day usage window query.
+- **FK cascade on `StoragePlacement.filament_id`**: Changed to `ondelete='CASCADE'` so shelf placements are automatically removed when a filament is deleted.
+- **FK cascade on `BambuPrintJob.project_id` / `filament_id`**: Changed to `ondelete='SET NULL'` so Bambu jobs are not orphaned silently when their parent project or filament is deleted.
+- **SQLite connection timeout**: Added `connect_args={'timeout': 30}` to the SQLAlchemy engine options.
+
 ## [1.36.11] - 2026-03-28
 ### Fixed
 - **Bambu mapping panel JavaScript repaired**: per-slot Alpine state now escapes filament names safely inside `x-data`, which fixes browser errors like `Unexpected token '}'` and missing `assignedLabel` / `slotQ` variables on the Bambu jobs page.

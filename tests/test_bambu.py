@@ -641,6 +641,7 @@ class BambuSyncEndpointTests(unittest.TestCase):
             'TESTING': True,
             'SQLALCHEMY_DATABASE_URI': f'sqlite:///{db_path}',
             'PROJECT_UPLOAD_FOLDER': os.path.join(self.temp_dir, 'uploads'),
+            'WTF_CSRF_ENABLED': False,
         })
         self.client = self.app.test_client()
 

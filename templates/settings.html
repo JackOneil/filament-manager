@@ -254,7 +254,12 @@
                 <form method="POST" class="space-y-4">
                     <input type="hidden" name="action" value="bambu_cloud_settings">
                     <div>
-                        <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('bambu_token_label') }}</label>
+                        <div class="flex items-center gap-2 mb-1">
+                            <label class="text-xs font-bold text-gray-600 block">{{ t('bambu_token_label') }}</label>
+                            <button type="button" onclick="openBambuTokenHelp()" class="text-gray-400 hover:text-blue-500 transition-colors" title="{{ t('bambu_token_help') }}">
+                                <i class="fa-solid fa-circle-question"></i>
+                            </button>
+                        </div>
                         <input type="password" name="bambu_token"
                             placeholder="{{ t('bambu_token_placeholder') }}"
                             autocomplete="off"
@@ -407,4 +412,68 @@
         </div>
     </div>
 </div>
+
+<!-- Modal for Bambu token help -->
+<div id="bambuTokenHelpModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="sticky top-0 flex items-center justify-between border-b border-gray-200 p-6 bg-white">
+            <h2 class="text-2xl font-bold text-gray-800">
+                <i class="fa-solid fa-key text-blue-500 mr-2"></i>{{ t('bambu_get_token_title') }}
+            </h2>
+            <button onclick="closeBambuTokenHelp()" class="text-gray-500 hover:text-gray-700 transition-colors">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+        
+        <div class="p-6 space-y-4">
+            <p class="text-gray-700">{{ t('bambu_get_token_intro') }}</p>
+            
+            <ol class="space-y-3 list-decimal list-inside text-gray-700">
+                <li>{{ t('bambu_get_token_step1') }}</li>
+                <li>{{ t('bambu_get_token_step2') }}</li>
+                <li>{{ t('bambu_get_token_step3') }}</li>
+                <li>{{ t('bambu_get_token_step4') }}</li>
+                <li>{{ t('bambu_get_token_step5') }}</li>
+                <li>{{ t('bambu_get_token_step6') }}</li>
+            </ol>
+            
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+                <p class="text-sm text-blue-800">
+                    <i class="fa-solid fa-lightbulb text-blue-500 mr-2"></i>
+                    <strong>Tip:</strong> {{ t('bambu_cloud_desc') }}
+                </p>
+            </div>
+        </div>
+        
+        <div class="border-t border-gray-200 p-6 flex justify-end">
+            <button onclick="closeBambuTokenHelp()" class="bg-blue-600 hover:bg-blue-700 transition-colors text-white font-semibold py-2 px-6 rounded-lg">
+                {{ t('bambu_get_token_close') }}
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+function openBambuTokenHelp() {
+    document.getElementById('bambuTokenHelpModal').classList.remove('hidden');
+}
+
+function closeBambuTokenHelp() {
+    document.getElementById('bambuTokenHelpModal').classList.add('hidden');
+}
+
+// Close modal when clicking outside the modal content
+document.getElementById('bambuTokenHelpModal')?.addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeBambuTokenHelp();
+    }
+});
+
+// Close modal with Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && !document.getElementById('bambuTokenHelpModal').classList.contains('hidden')) {
+        closeBambuTokenHelp();
+    }
+});
+</script>
 {% endblock %}

@@ -9,3 +9,9 @@ services:
     volumes:
       - ./data:/app/data
     restart: unless-stopped
+    env_file: .env
+    environment:
+      # These can also override .env values if needed
+      SECRET_KEY: ${SECRET_KEY}
+      FERNET_KEY: ${FERNET_KEY}
+      # BEHIND_PROXY: ${BEHIND_PROXY}

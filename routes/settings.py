@@ -13,7 +13,7 @@ from models import (
     PrintHistory, Project, ProjectFile, ProjectLink, ProjectFilament, ProjectQuote,
     BambuPrinter, BambuPrintJob, BambuJobMaterial, StoragePlacement, StorageShelf,
 )
-from utils import format_tags, top_tags
+from utils import format_tags, top_tags, encrypt_token
 
 
 def _filament_ref(filament):
@@ -181,7 +181,7 @@ def register(app):
                     if region not in ('global', 'china'):
                         region = 'global'
                     if token:
-                        setting.bambu_token = token
+                        setting.bambu_token = encrypt_token(token)
                     setting.bambu_region = region
                     setting.bambu_auto_sync_enabled = request.form.get('bambu_auto_sync_enabled') == 'on'
                     setting.bambu_auto_sync_interval_minutes = max(

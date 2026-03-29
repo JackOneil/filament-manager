@@ -1,6 +1,7 @@
 import ipaddress
 import json
 import math
+import os
 import re
 import socket
 from collections import Counter
@@ -128,8 +129,47 @@ def compute_stock_status(filament, usage_30=0.0, usage_90=0.0):
     }
 
 
+def encrypt_token(plaintext: str) -> str:
+    """Encrypt a sensitive token using FERNET_KEY env var.
+
+    Returns the plaintext unchanged when FERNET_KEY is not configured
+    (preserves backward compatibility for existing installations).
+    """
+    if not plaintext:
+        return plaintext
+    raw_key = os.environ.get('FERNET_KEY', '').strip().encode()
+    if not raw_key:
+        return plaintext
+    try:
+        from cryptography.fernet import Fernet
+        return Fernet(raw_key).encrypt(plaintext.encode()).decode()
+    except Exception:
+        return plaintext
+
+
+def decrypt_token(ciphertext: str) -> str:
+    """Decrypt a token encrypted with encrypt_token().
+
+    When FERNET_KEY is not set, or when decryption fails (e.g. legacy
+    plaintext token), the value is returned as-is so existing deployments
+    are not broken.
+    """
+    if not ciphertext:
+        return ciphertext
+    raw_key = os.environ.get('FERNET_KEY', '').strip().encode()
+    if not raw_key:
+        return ciphertext
+    try:
+        from cryptography.fernet import Fernet
+        return Fernet(raw_key).decrypt(ciphertext.encode()).decode()
+    except Exception:
+        return ciphertext  # legacy plaintext or wrong key — return as-is
+
+
 def collect_usage_windows(filaments, now=None):
-    now = now or datetime.utcnow()
+    if now is None:
+        from datetime import datetime as _dt
+        now = _dt.utcnow()
     by_id = {fil.id: {'usage_30': 0.0, 'usage_90': 0.0} for fil in filaments}
     by_name = {build_filament_history_name(fil): fil.id for fil in filaments}
     since_90 = now - timedelta(days=90)

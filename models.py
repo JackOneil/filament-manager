@@ -48,8 +48,8 @@ class Filament(db.Model):
 
 class MovementHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id'), nullable=True, index=True)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
     bambu_job_id = db.Column(db.Integer, db.ForeignKey('bambu_print_job.id'), nullable=True)
     filament_name = db.Column(db.String(255), nullable=False)
@@ -165,7 +165,7 @@ class StorageShelf(db.Model):
 class StoragePlacement(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     shelf_id = db.Column(db.Integer, db.ForeignKey('storage_shelf.id', ondelete='CASCADE'), nullable=False)
-    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id'), nullable=False)
+    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='CASCADE'), nullable=False)
     slot_index = db.Column(db.Integer, nullable=False)
     orientation = db.Column(db.String(20), nullable=False, default='standing')
 
@@ -197,8 +197,8 @@ class BambuPrintJob(db.Model):
     weight_grams = db.Column(db.Float, nullable=True)
     cost_time = db.Column(db.Integer, nullable=True)   # print duration in seconds
     raw_payload = db.Column(db.Text, nullable=True)
-    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
-    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id'), nullable=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='SET NULL'), nullable=True)
+    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='SET NULL'), nullable=True)
     deducted = db.Column(db.Boolean, default=False)
     synced_at = db.Column(db.DateTime, default=datetime.utcnow)
 

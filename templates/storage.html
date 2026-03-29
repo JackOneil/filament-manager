@@ -166,14 +166,34 @@
                     </div>
                 </div>
 
-                <div>
+                <div class="relative" @click.outside="tagOpen = false">
                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('tag_list') }}</label>
-                    <input type="text" name="tag" x-model="tagQ" list="storageTagSuggestions" placeholder="{{ t('filter_search') }}" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                    <datalist id="storageTagSuggestions">
-                        {% for tag in tag_options %}
-                        <option value="{{ tag }}"></option>
-                        {% endfor %}
-                    </datalist>
+                    <input type="hidden" name="tag" :value="tagQ">
+                    <div class="relative">
+                        <input type="text" x-model="tagQ" @focus="tagOpen = true" @input="tagOpen = true"
+                            placeholder="{{ t('filter_search') }}" autocomplete="off"
+                            :class="tagQ ? 'border-blue-400 bg-blue-50' : 'border-gray-300'"
+                            class="w-full rounded-lg px-3 py-2 text-sm focus:ring-blue-500 outline-none border pr-8">
+                        <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-gray-400">
+                            <i class="fa-solid fa-chevron-down text-xs transition-transform duration-150" :class="tagOpen ? 'rotate-180' : ''"></i>
+                        </div>
+                    </div>
+                    <div x-show="tagOpen" x-cloak class="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                        <div @click="tagQ = ''; tagOpen = false"
+                            class="px-3 py-2 cursor-pointer text-sm italic border-b border-gray-100"
+                            :class="tagQ === '' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-400 hover:bg-gray-50'">
+                            — {{ t('filter_all') }} —
+                        </div>
+                        <template x-for="opt in filteredTagOptions" :key="opt">
+                            <div @click="selectTag(opt); tagOpen = false"
+                                class="px-3 py-2 cursor-pointer text-sm border-b border-gray-50 last:border-b-0 flex items-center justify-between"
+                                :class="tagQ === opt ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-800 hover:bg-blue-50'">
+                                <span x-text="opt"></span>
+                                <i x-show="tagQ === opt" class="fa-solid fa-check text-blue-500 text-xs"></i>
+                            </div>
+                        </template>
+                        <div x-show="filteredTagOptions.length === 0" class="px-3 py-2 text-gray-400 italic text-xs text-center">–</div>
+                    </div>
                 </div>
                 
                 <div class="md:col-span-2 xl:col-span-6 flex flex-wrap gap-2 items-center">
@@ -396,7 +416,8 @@ window.storageBoardConfig = {
     brandOptions: [{% for brand in brands %}{ id: {{ brand.id }}, name: {{ brand.name|tojson }} }{% if not loop.last %}, {% endif %}{% endfor %}],
     materialOptions: [{% for material in materials %}{ id: {{ material.id }}, name: {{ material.name|tojson }} }{% if not loop.last %}, {% endif %}{% endfor %}],
     colorOptions: [{% for color in colors %}{ id: {{ color.id }}, name: {{ color.name|tojson }}, hex: {{ color.hex_value|tojson }} }{% if not loop.last %}, {% endif %}{% endfor %}],
-    filamentOptions: [{% for filament in all_filaments %}{ id: {{ filament.id }}, name: {{ filament.name|tojson }} }{% if not loop.last %}, {% endif %}{% endfor %}]
+    filamentOptions: [{% for filament in all_filaments %}{ id: {{ filament.id }}, name: {{ filament.name|tojson }} }{% if not loop.last %}, {% endif %}{% endfor %}],
+    tagOptions: [{% for tag in tag_options %}{{ tag|tojson }}{% if not loop.last %}, {% endif %}{% endfor %}]
 };
 
 function storageBoard(config) {
@@ -416,6 +437,7 @@ function storageBoard(config) {
         color: config?.color || '',
         filament: config?.filament || '',
         tagQ: config?.tag || '',
+        tagOpen: false,
         shelfQ: '',
         brandQ: '',
         materialQ: '',
@@ -431,6 +453,7 @@ function storageBoard(config) {
         materialOptions: config?.materialOptions || [],
         colorOptions: config?.colorOptions || [],
         filamentOptions: config?.filamentOptions || [],
+        tagOptions: config?.tagOptions || [],
         init() {
             const selectedShelf = this.shelfOptions.find((opt) => this.shelf == opt.id);
             const selectedBrand = this.brandOptions.find((opt) => this.brand == opt.id);
@@ -459,6 +482,10 @@ function storageBoard(config) {
             const q = this.colorQ.toLowerCase();
             return this.colorOptions.filter((opt) => opt.name.toLowerCase().includes(q));
         },
+        get filteredTagOptions() {
+            const q = this.tagQ.toLowerCase();
+            return this.tagOptions.filter((opt) => opt.toLowerCase().includes(q));
+        },
         get filteredFilaments() {
             const q = this.filamentQ.toLowerCase();
             return this.filamentOptions.filter((opt) => opt.name.toLowerCase().includes(q));
@@ -482,6 +509,9 @@ function storageBoard(config) {
         selectColor(id, name) {
             this.color = id;
             this.colorQ = name;
+        },
+        selectTag(name) {
+            this.tagQ = name;
         },
         selectFilament(id, name) {
             this.filament = id;
