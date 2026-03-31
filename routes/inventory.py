@@ -6,7 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
 from database import db
-from models import AppSetting, BambuJobMaterial, BambuPrintJob, Brand, Color, Filament, Material, MovementHistory, ProjectFilament
+from models import AppSetting, BambuJobMaterial, BambuPrintJob, Brand, Color, Filament, Material, MovementHistory, ProjectFilament, ProjectQuote
 from utils import (
     build_filament_history_name as _display_filament_name,
     compute_stock_status,
@@ -278,6 +278,9 @@ def register(app):
         if not selected:
             return redirect(url_for('index'))
 
+        selected_ids = [f.id for f in selected]
+        ProjectFilament.query.filter(ProjectFilament.filament_id.in_(selected_ids)).delete(synchronize_session=False)
+        ProjectQuote.query.filter(ProjectQuote.filament_id.in_(selected_ids)).update({'filament_id': None}, synchronize_session=False)
         for filament in selected:
             log_movement(filament, 'bulk_delete', filament.weight_remaining, note='Bulk delete')
             db.session.delete(filament)
@@ -415,6 +418,8 @@ def register(app):
     def delete(id):
         filament = db.get_or_404(Filament, id)
         log_movement(filament, 'remove', filament.weight_remaining, note='Deleted filament')
+        ProjectFilament.query.filter_by(filament_id=filament.id).delete()
+        ProjectQuote.query.filter_by(filament_id=filament.id).update({'filament_id': None})
         db.session.delete(filament)
         db.session.commit()
         return redirect(url_for('index'))

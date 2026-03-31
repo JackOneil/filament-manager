@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.41.2] - 2026-03-31
+### Fixed
+- **Orphaned ProjectFilament rows on filament delete**: Deleting a filament (single or bulk) now explicitly removes associated `ProjectFilament` rows and nullifies `ProjectQuote.filament_id` references *before* the filament is deleted, preventing integrity errors and template crashes.
+- **Model FK `ondelete` clauses**: Added `ondelete='CASCADE'` to `ProjectFilament.filament_id` and `ondelete='SET NULL'` to `ProjectQuote.filament_id` for correct behavior when FK enforcement is enabled.
+
+### Removed
+- **Dead code `get_project_tags()`**: Removed unused helper function from `utils.py` (never called anywhere).
+- **Unused i18n keys**: Removed `project_files` and `bambu_project_link` from both `cs` and `en` translation dictionaries (defined but never referenced in any template or route).
+
+### Changed
+- **Updated `copilot-instructions.md`**: Replaced phantom route references (`serve_file`, `link_preview`) with the actual current project routes (`download`, `image`, `status`, `consume`, `refresh_link`).
+
 ## [1.41.1] - 2026-03-31
 ### Fixed
 - **Bambu status string aliases**: Extended `_STATUS_STR_ALIASES` in `routes/bambu.py` to handle additional string status values from Bambu Lab Cloud API (`in_progress`, `printing`, `running`, `paused`, `canceled`, `init`, `prepare`, `slicing`, `failed`). Previously, these string statuses would fall through to the unknown status case and display incorrectly.

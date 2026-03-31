@@ -69,10 +69,6 @@ def get_filament_tags(filament):
     return parse_tags(getattr(filament, 'tag_text', ''))
 
 
-def get_project_tags(project):
-    return parse_tags(getattr(project, 'tag_text', ''))
-
-
 def movement_action_label(action_type):
     return {
         'add': 'Add',

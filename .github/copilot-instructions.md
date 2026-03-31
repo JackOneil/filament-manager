@@ -26,11 +26,13 @@ routes/
   calculator.py      # /calculator, /calculator/history/<id>/delete
   history.py         # /history
   projects.py        # /projects, /projects/create, /projects/<id>, /projects/<id>/edit,
-                     #   /projects/<id>/delete, /projects/<id>/add_filament,
-                     #   /projects/<id>/update_filament/<pf_id>, /projects/<id>/remove_filament/<pf_id>,
-                     #   /projects/<id>/upload, /projects/<id>/delete_file/<fid>,
+                     #   /projects/<id>/delete, /projects/<id>/status,
+                     #   /projects/<id>/add_filament, /projects/<id>/update_filament/<pf_id>,
+                     #   /projects/<id>/remove_filament/<pf_id>, /projects/<id>/consume/<pf_id>,
+                     #   /projects/<id>/upload, /projects/<id>/download/<file_id>,
+                     #   /projects/<id>/image/<file_id>, /projects/<id>/delete_file/<file_id>,
                      #   /projects/<id>/add_link, /projects/<id>/delete_link/<lid>,
-                     #   /projects/<id>/serve_file/<fid>, /projects/<id>/link_preview
+                     #   /projects/<id>/refresh_link/<lid>
   bambu.py           # /bambu, /bambu/sync, /bambu/job/<id>/assign, /bambu/job/<id>/deduct,
                      #   Bambu Cloud API integration (BambuPrinter, BambuPrintJob, BambuJobMaterial)
   settings.py        # /settings, /export, /import, /toggle-theme, /edit_bambu_printer

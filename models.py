@@ -94,7 +94,7 @@ class PrintHistory(db.Model):
 class ProjectQuote(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='CASCADE'), nullable=False)
-    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id'), nullable=True)
+    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='SET NULL'), nullable=True)
     filament_name = db.Column(db.String(255), nullable=False)
     weight = db.Column(db.Float, nullable=False)
     print_time = db.Column(db.Float, nullable=False)
@@ -147,7 +147,7 @@ class ProjectLink(db.Model):
 class ProjectFilament(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='CASCADE'), nullable=False)
-    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id'), nullable=False)
+    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='CASCADE'), nullable=False)
     estimated_weight = db.Column(db.Float, nullable=False, default=0.0)
     is_used = db.Column(db.Boolean, default=False)
     project = db.relationship('Project', backref=db.backref('filaments', lazy=True, cascade="all, delete-orphan"))
