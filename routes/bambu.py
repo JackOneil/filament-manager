@@ -384,6 +384,7 @@ def register(app):
         filament_id = request.args.get('filament_id', type=int)
         per_page = 20
 
+        hide_failed = request.args.get('hide_failed', '') == '1'
         base_q = BambuPrintJob.query
         active_filament = db.session.get(Filament, filament_id) if filament_id else None
         if filament_id:
@@ -391,6 +392,8 @@ def register(app):
                 BambuPrintJob.filament_id == filament_id,
                 BambuPrintJob.materials.any(BambuJobMaterial.filament_id == filament_id),
             ))
+        if hide_failed:
+            base_q = base_q.filter(BambuPrintJob.status.notin_(('FAILED', 'CANCELLED')))
         if job_filter == 'unassigned':
             base_q = base_q.filter(_job_unassigned_filter())
         elif job_filter == 'not_deducted':
@@ -409,6 +412,8 @@ def register(app):
                 BambuPrintJob.filament_id == filament_id,
                 BambuPrintJob.materials.any(BambuJobMaterial.filament_id == filament_id),
             ))
+        if hide_failed:
+            count_base = count_base.filter(BambuPrintJob.status.notin_(('FAILED', 'CANCELLED')))
         count_all = count_base.count()
         count_unassigned = count_base.filter(_job_unassigned_filter()).count()
         count_not_deducted = count_base.filter(_job_not_deducted_filter()).count()
@@ -444,6 +449,7 @@ def register(app):
             count_all=count_all,
             count_unassigned=count_unassigned,
             count_not_deducted=count_not_deducted,
+            hide_failed=hide_failed,
         )
 
     @app.route('/bambu/sync', methods=['POST'])

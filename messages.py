@@ -235,6 +235,8 @@ TRANSLATIONS = {
         'bambu_filter_all': 'Vše',
         'bambu_filter_unassigned': 'Bez filamentu',
         'bambu_filter_not_deducted': 'Neodečteno',
+        'bambu_hide_failed': 'Skrýt selhané',
+        'bambu_show_failed': 'Zobrazit selhané',
         'bambu_unassigned_badge': 'Nepřiřazeno',
         'bambu_multimaterial': 'Multimaterial',
         # ── Printer / energy settings
@@ -605,6 +607,8 @@ TRANSLATIONS = {
         'bambu_filter_all': 'All',
         'bambu_filter_unassigned': 'Without filament',
         'bambu_filter_not_deducted': 'Not deducted',
+        'bambu_hide_failed': 'Hide failed',
+        'bambu_show_failed': 'Show failed',
         'bambu_unassigned_badge': 'Unassigned',
         'bambu_multimaterial': 'Multi-material',
         # ── Printer / energy settings
