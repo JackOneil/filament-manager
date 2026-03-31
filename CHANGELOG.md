@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.41.1] - 2026-03-31
+### Fixed
+- **Bambu status string aliases**: Extended `_STATUS_STR_ALIASES` in `routes/bambu.py` to handle additional string status values from Bambu Lab Cloud API (`in_progress`, `printing`, `running`, `paused`, `canceled`, `init`, `prepare`, `slicing`, `failed`). Previously, these string statuses would fall through to the unknown status case and display incorrectly.
+
 ## [1.41.0] - 2026-03-29
 ### Changed
 - **Color palette sort**: The color palette widget on the Statistics page now sorts colors by HSL hue (rainbow order) instead of alphabetically by name. Neutral/gray tones are grouped at the end. Implemented via `_hex_to_hsl_sort_key()` in `routes/stats.py` using Python's `colorsys` module.

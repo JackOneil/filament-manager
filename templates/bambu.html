@@ -100,10 +100,18 @@
             {% set status_label = t('bambu_status_cancelled') %}
             {% set status_cls = 'bg-gray-100 text-gray-500' %}
             {% set status_icon = 'fa-ban' %}
-        {% elif status_upper == 'SLICING' or status_upper == 'PREPARE' %}
+        {% elif status_upper == 'SLICING' %}
             {% set status_label = t('bambu_status_slicing') %}
             {% set status_cls = 'bg-purple-100 text-purple-700' %}
             {% set status_icon = 'fa-hourglass-half' %}
+        {% elif status_upper == 'PREPARE' %}
+            {% set status_label = t('bambu_status_prepare') %}
+            {% set status_cls = 'bg-purple-100 text-purple-700' %}
+            {% set status_icon = 'fa-hourglass-half' %}
+        {% elif status_upper == 'INIT' %}
+            {% set status_label = t('bambu_status_init') %}
+            {% set status_cls = 'bg-gray-100 text-gray-500' %}
+            {% set status_icon = 'fa-clock' %}
         {% else %}
             {% set status_label = job.status or t('bambu_status_init') %}
             {% set status_cls = 'bg-gray-100 text-gray-500' %}

@@ -28,9 +28,9 @@ _LOG = logging.getLogger(__name__)
 _STATUS_MAP = {
     0: 'INIT',
     1: 'RUNNING',
-    2: 'FINISH',      # Bambu Cloud: 2 = successfully finished
+    2: 'FINISH',      # Bambu Cloud: 2 = successfully finished (start→end delta ≈ costTime)
     3: 'FAILED',
-    4: 'PAUSED',
+    4: 'RUNNING',     # Bambu Cloud: 4 = currently printing (API sets endTime placeholder ~6s after start)
     5: 'PREPARE',
     6: 'SLICING',
     7: 'CANCELLED',
@@ -43,7 +43,16 @@ _STATUS_STR_ALIASES = {
     'complete': 'FINISH',
     'completed': 'FINISH',
     'cancel': 'CANCELLED',
+    'canceled': 'CANCELLED',
     'pause': 'PAUSED',
+    'paused': 'PAUSED',
+    'in_progress': 'RUNNING',
+    'printing': 'RUNNING',
+    'running': 'RUNNING',
+    'init': 'INIT',
+    'prepare': 'PREPARE',
+    'slicing': 'SLICING',
+    'failed': 'FAILED',
 }
 _FINISHED_STATUSES = {'FINISH'}
 
