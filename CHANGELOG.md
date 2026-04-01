@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.43.1] - 2026-04-01
+### Changed
+- **Conditional navigation links**: The "Bambu Lab" menu item is now visible only when a Bambu Cloud token is configured in Settings. The "Prusa Printers" menu item is visible only when at least one enabled PrusaLink printer exists. Both integrations must be set up in Settings before their respective pages appear in the navigation bar.
+
+## [1.43.0] - 2026-04-01
+### Added
+- **PrusaLink Integration**: New printer integration via local PrusaLink REST API (no cloud required). Add any Prusa printer by its local IP address and API key; the background worker polls each enabled printer every 60 s and records active/completed print jobs automatically.
+- **PrusaPrinter model**: Stores printer alias, host URL (encrypted), API key (encrypted), auto-detected model, notes, and enabled flag.
+- **PrusaPrintJob model**: Stores captured print jobs including filename, display name, status, started/finished timestamps, weight from g-code metadata, estimated duration, progress (0–100 %), filament and project assignment, deduction flag, and raw API payload.
+- **`/prusa` page**: Paginated print job history with filter pills (All / Without filament / Not deducted), hide-stopped toggle, per-printer manual sync buttons with AJAX feedback, expandable mapping panel (assign filament + project, deduct from stock), and animated progress badge for jobs in progress.
+- **Settings — PrusaLink section** (`/settings#prusa-printers`): Add/edit/delete configured printers, test connection (returns firmware version and model), enable/disable individual printers.
+- **Navigation**: "Prusa tiskárny / Prusa Printers" link added to the top navigation menu.
+- **Background poll worker** (`_start_prusa_sync_worker`): Daemon thread polls all enabled printers every 60 s; exponential backoff on repeated errors (max 15 min gap).
+- **Filament + stock deduction**: Clicking "Deduct from stock" on a finished job reduces `weight_remaining`, creates a `MovementHistory` entry (`prusa_print`), and records a `PrintHistory` row.
+- **Test connection endpoint** (`POST /prusa/printer/<id>/test`): Validates connectivity against `/api/version` and back-fills detected printer model from `/api/v1/info`.
+- **ALTER TABLE migrations**: `_safe_alter` guards for `prusa_printer.notes`, `prusa_printer.enabled`, `prusa_print_job.progress`, `prusa_print_job.raw_payload`.
+- **Export/Import coverage**: `prusa_printers` and `prusa_jobs` are now included in full-application backup/restore (API keys excluded for security with a note on import).
+- **i18n**: All UI strings translated in Czech (`cs`) and English (`en`).
+
 ## [1.42.0] - 2026-03-31
 ### Added
 - **Bambu: Hide failed prints filter**: New persistent toggle on the Bambu print jobs page that hides failed and cancelled jobs. The preference is stored in `localStorage` and automatically restored on subsequent visits. Works independently alongside the existing filter pills (All / Unassigned / Not deducted) and the filament filter.

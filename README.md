@@ -11,10 +11,11 @@ The application allows detailed tracking of weight balances, material costs, and
 - **Statistics Dashboard:** A fully customizable dashboard with 7 draggable/hideable sections: KPI overview, stock health and turnover charts, forecast tables, purchase recommendations, project analytics, and a color palette. Section order, hidden cards, and per-card record limits are persisted per browser via `localStorage`.
 - **Storage Shelf Map:** Visualize where each spool lives on your physical shelves. Assign spools to named shelf slots, move or reorient them, and see stock levels at a glance on the shelf grid.
 - **Bambu Cloud Integration:** Sync print jobs from Bambu Lab printers. Assign jobs to projects and optionally deduct material usage directly from inventory.
+- **PrusaLink Integration:** Poll any Prusa printer on your local network via the PrusaLink REST API (no cloud account required). Add printers by IP address and API key; the background worker captures active and completed print jobs automatically.
 - **Movement History:** Full audit log of every filament weight change with reasons and timestamps.
 - **Custom Dictionaries:** Pre-configured with popular manufacturers, materials, and colors. Everything can be freely expanded, renamed, and safely deleted in the base Settings.
 - **Multi-Language Support:** Natively supports both English and Czech.
-- **Full Backup / Restore:** Export the entire application state (inventory, history, projects, settings, Bambu jobs) as a compressed `.json.gz` archive including uploaded project files. Import accepts both the compressed format and older plain `.json` backups.
+- **Full Backup / Restore:** Export the entire application state (inventory, history, projects, settings, Bambu jobs, PrusaLink printers and jobs) as a compressed `.json.gz` archive including uploaded project files. Import accepts both the compressed format and older plain `.json` backups.
 
 ## Technologies Used 🛠️
 The application is built and bundled within Python, making it lightweight, reliable, and instantly portable.

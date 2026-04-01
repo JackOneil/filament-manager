@@ -10,6 +10,7 @@ from routes.history import register as register_history
 from routes.settings import register as register_settings
 from routes.projects import register as register_projects
 from routes.bambu import register as register_bambu
+from routes.prusa import register as register_prusa
 from routes.stats import register as register_stats
 from routes.storage import register as register_storage
 
@@ -22,5 +23,6 @@ def register_all(app):
     register_settings(app)
     register_projects(app)
     register_bambu(app)
+    register_prusa(app)
     register_stats(app)
     register_storage(app)

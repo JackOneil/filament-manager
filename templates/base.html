@@ -162,7 +162,12 @@
                 <a href="{{ url_for('history') }}" class="block hover:text-blue-200 transition-colors py-1 md:py-0 border-b border-blue-500 md:border-0"><i class="fa-solid fa-clock-rotate-left"></i> {{ t('movement_history') }}</a>
                 <a href="{{ url_for('stats') }}" class="block hover:text-blue-200 transition-colors py-1 md:py-0 border-b border-blue-500 md:border-0"><i class="fa-solid fa-chart-column"></i> {{ t('stats_nav') }}</a>
                 <a href="{{ url_for('storage') }}" class="block hover:text-blue-200 transition-colors py-1 md:py-0 border-b border-blue-500 md:border-0"><i class="fa-solid fa-warehouse"></i> {{ t('storage_nav') }}</a>
+                {% if nav_bambu_enabled %}
                 <a href="{{ url_for('bambu_jobs') }}" class="block hover:text-blue-200 transition-colors py-1 md:py-0 border-b border-blue-500 md:border-0"><i class="fa-solid fa-print"></i> {{ t('bambu_jobs') }}</a>
+                {% endif %}
+                {% if nav_prusa_enabled %}
+                <a href="{{ url_for('prusa_jobs') }}" class="block hover:text-blue-200 transition-colors py-1 md:py-0 border-b border-blue-500 md:border-0"><i class="fa-solid fa-3d-print"></i> {{ t('prusa_jobs') }}</a>
+                {% endif %}
                 <a href="{{ url_for('settings') }}" class="block hover:text-blue-200 transition-colors py-1 md:py-0"><i class="fa-solid fa-cog"></i> {{ t('settings') }}</a>
                 
                 <!-- Theme Toggle Button - Mobile -->

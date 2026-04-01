@@ -12,8 +12,9 @@ from models import (
     Brand, Color, Material, AppSetting, Filament, MovementHistory,
     PrintHistory, Project, ProjectFile, ProjectLink, ProjectFilament, ProjectQuote,
     BambuPrinter, BambuPrintJob, BambuJobMaterial, StoragePlacement, StorageShelf,
+    PrusaPrinter, PrusaPrintJob,
 )
-from utils import format_tags, top_tags, encrypt_token
+from utils import format_tags, top_tags, encrypt_token, decrypt_token
 
 
 def _filament_ref(filament):
@@ -212,6 +213,44 @@ def register(app):
                         pass
                     app.logger.debug(f"Printer/energy settings updated: kwh={setting.kwh_price}, power={setting.printer_power}W")
 
+                elif action == 'add_prusa_printer':
+                    from routes.prusa import _validate_host
+                    host_raw = request.form.get('host', '').strip()
+                    host = _validate_host(host_raw)
+                    alias = request.form.get('name', '').strip()
+                    api_key_raw = request.form.get('api_key', '').strip()
+                    if host and alias and api_key_raw:
+                        db.session.add(PrusaPrinter(
+                            name=alias,
+                            host=host,
+                            api_key=encrypt_token(api_key_raw),
+                            notes=request.form.get('notes', '').strip() or None,
+                        ))
+                        app.logger.debug(f'Added PrusaLink printer: {alias} @ {host}')
+
+                elif action == 'edit_prusa_printer':
+                    from routes.prusa import _validate_host
+                    printer = db.session.get(PrusaPrinter, request.form.get('id', type=int))
+                    if printer:
+                        new_name = request.form.get('name', '').strip()
+                        new_host = _validate_host(request.form.get('host', '').strip())
+                        new_key = request.form.get('api_key', '').strip()
+                        if new_name:
+                            printer.name = new_name
+                        if new_host:
+                            printer.host = new_host
+                        if new_key:
+                            printer.api_key = encrypt_token(new_key)
+                        printer.notes = request.form.get('notes', '').strip() or None
+                        printer.enabled = request.form.get('enabled') == 'on'
+                        app.logger.debug(f'Edited PrusaLink printer id={printer.id}')
+
+                elif action == 'delete_prusa_printer':
+                    printer = db.session.get(PrusaPrinter, request.form.get('id', type=int))
+                    if printer:
+                        db.session.delete(printer)
+                        app.logger.debug(f'Deleted PrusaLink printer: {printer.name}')
+
                 db.session.commit()
             except Exception as e:
                 db.session.rollback()
@@ -223,12 +262,14 @@ def register(app):
         materials = Material.query.order_by(Material.name).all()
         app_settings = AppSetting.query.first()
         printers = BambuPrinter.query.order_by(BambuPrinter.name).all()
+        prusa_printers = PrusaPrinter.query.order_by(PrusaPrinter.name).all()
         filament_tag_cloud = top_tags(Filament.query.all())
         project_tag_cloud = top_tags(Project.query.all())
         return render_template(
             'settings.html',
             brands=brands, colors=colors, materials=materials,
             app_settings=app_settings, printers=printers,
+            prusa_printers=prusa_printers,
             filament_tag_cloud=filament_tag_cloud, project_tag_cloud=project_tag_cloud,
         )
 
@@ -398,6 +439,33 @@ def register(app):
                 'slot_index': placement.slot_index,
                 'orientation': placement.orientation,
             } for placement in StoragePlacement.query.order_by(StoragePlacement.shelf_id, StoragePlacement.slot_index).all()],
+
+            # ── PrusaLink integration ────────────────────────────────
+            'prusa_printers': [{
+                'name': pp.name,
+                'host': pp.host,
+                # api_key intentionally excluded for security
+                'printer_model': pp.printer_model,
+                'notes': pp.notes,
+                'enabled': pp.enabled,
+            } for pp in PrusaPrinter.query.all()],
+
+            'prusa_jobs': [{
+                'printer_name': j.printer_name,
+                'file_name': j.file_name,
+                'display_name': j.display_name,
+                'status': j.status,
+                'weight_grams': j.weight_grams,
+                'cost_time': j.cost_time,
+                'progress': j.progress,
+                'started_at': j.started_at.isoformat() if j.started_at else None,
+                'finished_at': j.finished_at.isoformat() if j.finished_at else None,
+                'synced_at': j.synced_at.isoformat() if j.synced_at else None,
+                'deducted': j.deducted,
+                'filament_name': j.filament.name if j.filament else None,
+                'filament_ref': _filament_ref(j.filament),
+                'project_name': j.project.name if j.project else None,
+            } for j in PrusaPrintJob.query.order_by(PrusaPrintJob.synced_at).all()],
         }
 
         app.logger.debug(
@@ -715,6 +783,52 @@ def register(app):
                         filament_id=filament.id,
                         slot_index=slot_index,
                         orientation=placement_data.get('orientation', 'standing') or 'standing',
+                    ))
+
+                # ── 10. PrusaLink printers (no api_key — user must re-enter it) ──
+                for pp in data.get('prusa_printers', []):
+                    if PrusaPrinter.query.filter_by(name=pp.get('name'), host=pp.get('host', '')).first():
+                        continue
+                    # Only restore if host present; api_key is not exported so skip
+                    if pp.get('host'):
+                        db.session.add(PrusaPrinter(
+                            name=pp.get('name', ''),
+                            host=pp.get('host', ''),
+                            api_key=encrypt_token('NEEDS_CONFIGURATION'),
+                            printer_model=pp.get('printer_model'),
+                            notes=pp.get('notes'),
+                            enabled=pp.get('enabled', True),
+                        ))
+
+                db.session.flush()
+
+                # ── 11. PrusaLink jobs ────────────────────────────────
+                for j in data.get('prusa_jobs', []):
+                    pp_printer = PrusaPrinter.query.filter_by(name=j.get('printer_name')).first() if j.get('printer_name') else None
+                    exists = PrusaPrintJob.query.filter_by(
+                        printer_name=j.get('printer_name'),
+                        file_name=j.get('file_name'),
+                        synced_at=datetime.fromisoformat(j['synced_at']) if j.get('synced_at') else None,
+                    ).first()
+                    if exists:
+                        continue
+                    fil = _resolve_filament_ref(j.get('filament_ref'), j.get('filament_name'))
+                    proj = Project.query.filter_by(name=j.get('project_name')).first() if j.get('project_name') else None
+                    db.session.add(PrusaPrintJob(
+                        printer_id=pp_printer.id if pp_printer else None,
+                        printer_name=j.get('printer_name'),
+                        file_name=j.get('file_name'),
+                        display_name=j.get('display_name'),
+                        status=j.get('status'),
+                        weight_grams=j.get('weight_grams'),
+                        cost_time=j.get('cost_time'),
+                        progress=j.get('progress'),
+                        started_at=datetime.fromisoformat(j['started_at']) if j.get('started_at') else None,
+                        finished_at=datetime.fromisoformat(j['finished_at']) if j.get('finished_at') else None,
+                        synced_at=datetime.fromisoformat(j['synced_at']) if j.get('synced_at') else datetime.utcnow(),
+                        deducted=j.get('deducted', False),
+                        filament_id=fil.id if fil else None,
+                        project_id=proj.id if proj else None,
                     ))
 
             app.logger.debug(f"Import finished: {imported_filaments} filaments, projects and Bambu jobs processed.")

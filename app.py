@@ -29,13 +29,15 @@ from database import db
 from models import (
     Brand, Color, Material, AppSetting, Filament, 
     MovementHistory, PrintHistory, Project, ProjectFile, 
-    ProjectLink, ProjectFilament, ProjectQuote, StorageShelf, StoragePlacement, BambuPrinter, BambuPrintJob, BambuJobMaterial
+    ProjectLink, ProjectFilament, ProjectQuote, StorageShelf, StoragePlacement,
+    BambuPrinter, BambuPrintJob, BambuJobMaterial,
+    PrusaPrinter, PrusaPrintJob,
 )  # noqa: F401
 from utils import get_settings
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.42.0'
+APP_VERSION = '1.43.1'
 
 csrf = CSRFProtect()
 
@@ -79,10 +81,27 @@ def create_app(test_config=None) -> Flask:
         def t(key):
             return TRANSLATIONS.get(lang, TRANSLATIONS['cs']).get(key, key)
 
-        return dict(t=t, current_lang=lang, current_currency=currency, theme=theme, app_version=APP_VERSION)
+        # Navigation visibility flags ─────────────────────────────────────────
+        nav_bambu_enabled = bool(setting and setting.bambu_token)
+        try:
+            from models import PrusaPrinter
+            nav_prusa_enabled = PrusaPrinter.query.filter_by(enabled=True).first() is not None
+        except Exception:
+            nav_prusa_enabled = False
+
+        return dict(
+            t=t,
+            current_lang=lang,
+            current_currency=currency,
+            theme=theme,
+            app_version=APP_VERSION,
+            nav_bambu_enabled=nav_bambu_enabled,
+            nav_prusa_enabled=nav_prusa_enabled,
+        )
 
     _setup_database(app)
     _start_bambu_sync_worker(app)
+    _start_prusa_sync_worker(app)
     return app
 
 
@@ -143,6 +162,13 @@ def _setup_database(app: Flask) -> None:
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN bambu_region VARCHAR(10) NOT NULL DEFAULT 'global'")
         _safe_alter(app, "ALTER TABLE bambu_print_job ADD COLUMN cost_time INTEGER DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE project_link ADD COLUMN domain VARCHAR(100) DEFAULT NULL")
+
+        # PrusaLink integration — new tables are created by db.create_all() above;
+        # these alters guard against columns added in future versions.
+        _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN notes TEXT DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN enabled BOOLEAN NOT NULL DEFAULT 1")
+        _safe_alter(app, "ALTER TABLE prusa_print_job ADD COLUMN progress FLOAT DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE prusa_print_job ADD COLUMN raw_payload TEXT DEFAULT NULL")
 
         if not AppSetting.query.first():
             db.session.add(AppSetting(lang='cs', kwh_price=5.0, printer_power=150,
@@ -218,6 +244,41 @@ def _start_bambu_sync_worker(app: Flask) -> None:
             time.sleep(min(60 * (2 ** min(_consecutive_errors, 5)), 3600))
 
     thread = threading.Thread(target=worker, name='bambu-sync-worker', daemon=True)
+    thread.start()
+
+
+def _start_prusa_sync_worker(app: Flask) -> None:
+    """Background thread that polls all enabled PrusaLink printers every 60 s."""
+    if app.config.get('TESTING'):
+        return
+    if app.debug and os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+        return
+    if app.extensions.get('prusa_sync_worker_started'):
+        return
+
+    app.extensions['prusa_sync_worker_started'] = True
+
+    def worker():
+        from routes.prusa import do_poll
+
+        _consecutive_errors = 0
+        while True:
+            try:
+                with app.app_context():
+                    printers = PrusaPrinter.query.filter_by(enabled=True).all()
+                    for printer in printers:
+                        try:
+                            do_poll(printer)
+                        except Exception as exc:
+                            app.logger.warning('Prusa poll error for %s: %s', printer.name, exc)
+                _consecutive_errors = 0
+            except Exception as exc:
+                app.logger.error('Background Prusa sync failed: %s', exc)
+                _consecutive_errors += 1
+            # Poll interval: 60 s under normal conditions, exponential backoff on errors
+            time.sleep(min(60 * (2 ** min(_consecutive_errors, 4)), 900))
+
+    thread = threading.Thread(target=worker, name='prusa-sync-worker', daemon=True)
     thread.start()
 
 
