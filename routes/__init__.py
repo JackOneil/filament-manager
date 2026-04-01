@@ -13,6 +13,7 @@ from routes.bambu import register as register_bambu
 from routes.prusa import register as register_prusa
 from routes.stats import register as register_stats
 from routes.storage import register as register_storage
+from routes.pwa import register as register_pwa
 
 
 def register_all(app):
@@ -26,3 +27,4 @@ def register_all(app):
     register_prusa(app)
     register_stats(app)
     register_storage(app)
+    register_pwa(app)

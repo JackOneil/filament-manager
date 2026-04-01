@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.44.0] - 2026-04-01
+### Added
+- **Live printers on dashboard:** Displays current running print jobs (for both Bambu and Prusa printers) directly at the top of the main dashboard in a compact grid. Includes a progress bar thermometer, estimated time of arrival, and a pulsing status indicator.
+- **Project 3D Viewer:** Integrated `Online3DViewer` CDN. Allows interactive 3D rendering of `.stl` and `.3mf` files attached to projects directly in the browser via an Alpine-powered modal dialog, with full CORS compatibility.
+- **Full PWA Support (Progressive Web App):** Introduced auto-generated `/manifest.json` and a basic Service Worker (`/sw.js`). The application can now be installed on mobile devices or as a standalone desktop app.
+
+### Changed
+- **Toast notifications (UX Improvement):** Flash messages no longer push page content down. They have been replaced with elegant pop-up "toast" notifications in the top right corner that automatically dismiss after 5 seconds, driven by Alpine.js with smooth CSS transitions.
+
 ## [1.43.1] - 2026-04-01
 ### Changed
 - **Conditional navigation links**: The "Bambu Lab" menu item is now visible only when a Bambu Cloud token is configured in Settings. The "Prusa Printers" menu item is visible only when at least one enabled PrusaLink printer exists. Both integrations must be set up in Settings before their respective pages appear in the navigation bar.

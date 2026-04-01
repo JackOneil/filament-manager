@@ -6,7 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
 from database import db
-from models import AppSetting, BambuJobMaterial, BambuPrintJob, Brand, Color, Filament, Material, MovementHistory, ProjectFilament, ProjectQuote
+from models import AppSetting, BambuPrinter, PrusaPrinter, BambuJobMaterial, BambuPrintJob, PrusaPrintJob, Brand, Color, Filament, Material, MovementHistory, ProjectFilament, ProjectQuote
 from utils import (
     build_filament_history_name as _display_filament_name,
     compute_stock_status,
@@ -170,6 +170,21 @@ def register(app):
             ),
         )[:6]
 
+        bambu_printers_live = []
+        bambu_enabled = BambuPrinter.query.all()
+        for bp in bambu_enabled:
+            job = BambuPrintJob.query.filter_by(device_id=bp.device_id).order_by(BambuPrintJob.started_at.desc().nullslast()).first()
+            if job and job.status == 'RUNNING':
+                bambu_printers_live.append({'printer': bp, 'job': job, 'type': 'bambu'})
+
+        prusa_printers_live = []
+        prusa_enabled = PrusaPrinter.query.filter_by(enabled=True).all()
+        for pp in prusa_enabled:
+            job = PrusaPrintJob.query.filter_by(printer_id=pp.id).order_by(PrusaPrintJob.started_at.desc().nullslast()).first()
+            if job and job.status == 'PRINTING':
+                prusa_printers_live.append({'printer': pp, 'job': job, 'type': 'prusa'})
+
+
         return render_template(
             'index.html',
             filaments=filaments_paginated,
@@ -187,6 +202,7 @@ def register(app):
             sort_by=sort_by,
             sort_direction=sort_direction,
             stock_alerts=stock_alerts,
+            live_printers=bambu_printers_live + prusa_printers_live,
         )
 
     @app.route('/filament/<int:id>')

@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="manifest" href="{{ url_for('pwa.manifest') }}">
     <title>{{ t('title') }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -264,10 +266,30 @@
     <div class="container mx-auto px-4 sm:px-6 py-4 sm:py-8 flex-grow overflow-x-hidden">
         {% with flashes = get_flashed_messages(with_categories=true) %}
             {% if flashes %}
-                <div class="mb-6 space-y-3">
+                <div class="fixed top-20 right-4 z-50 flex flex-col gap-3 w-full max-w-sm px-4 sm:px-0 pointer-events-none">
                     {% for category, message in flashes %}
-                        <div class="rounded-lg border px-4 py-3 shadow-sm {% if category == 'error' %}bg-red-50 border-red-200 text-red-800{% else %}bg-green-50 border-green-200 text-green-800{% endif %}">
-                            {{ t(message) }}
+                        <div x-data="{ show: true }" 
+                             x-init="setTimeout(() => show = false, 5000)" 
+                             x-show="show" 
+                             x-transition:enter="transition ease-out duration-300"
+                             x-transition:enter-start="opacity-0 translate-x-8"
+                             x-transition:enter-end="opacity-100 translate-x-0"
+                             x-transition:leave="transition ease-in duration-200"
+                             x-transition:leave-start="opacity-100"
+                             x-transition:leave-end="opacity-0 translate-x-8"
+                             class="rounded-lg border px-4 py-3 shadow-xl flex items-start gap-3 backdrop-blur-md pointer-events-auto {% if category == 'error' %}bg-red-50/95 border-red-200 text-red-800 dark:bg-red-900/95 dark:border-red-700 dark:text-red-100{% else %}bg-green-50/95 border-green-200 text-green-800 dark:bg-green-900/95 dark:border-green-700 dark:text-green-100{% endif %}">
+                            
+                            <div class="mt-0.5">
+                                {% if category == 'error' %}
+                                <i class="fa-solid fa-circle-exclamation text-red-500 dark:text-red-300"></i>
+                                {% else %}
+                                <i class="fa-solid fa-circle-check text-green-500 dark:text-green-300"></i>
+                                {% endif %}
+                            </div>
+                            <div class="flex-grow font-medium">{{ t(message) }}</div>
+                            <button @click="show = false" class="opacity-50 hover:opacity-100 focus:outline-none transition-opacity">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
                         </div>
                     {% endfor %}
                 </div>
@@ -280,5 +302,19 @@
             v{{ app_version }}
         </div>
     </footer>
+    <!-- PWA Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('{{ url_for("pwa.service_worker") }}')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch(err => {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
+            });
+        }
+    </script>
 </body>
 </html>

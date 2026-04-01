@@ -5,7 +5,8 @@ This file contains permanent instructions and prompts for future interactions. A
 ## Main Project Context (Tech Stack)
 - **Application:** Web-based 3D filament management and slicer-based print cost calculator.
 - **Backend:** Python 3.11, Flask, SQLAlchemy (without complex DB migrations like Alembic), SQLite (persisted in the `./data/` directory).
-- **Frontend:** Jinja2 templates, TailwindCSS via CDN (responsive UI using flex/grid), FontAwesome icons, **Alpine.js 3.x via CDN** (reactive state for inventory filters, sort, and view toggle).
+- **Frontend:** Jinja2 templates, TailwindCSS via CDN, FontAwesome icons, **Alpine.js 3.x via CDN** (reactive state for inventory, toasts, modal windows).
+- **Frontend Enhancements:** Fixed toast notifications via Alpine, native PWA Support (`/manifest.json`, `/sw.js`), Online3DViewer CDN for `.stl` and `.3mf` browser previews.
 - **Infrastructure:** Docker & Docker Compose (`filament_app`, port `5050:5000`).
 
 ## Project File Structure (Modular Architecture)
@@ -42,6 +43,7 @@ routes/
                      #   /storage/shelf/<id>/delete, /storage/slot/assign,
                      #   /storage/placement/<id>/move, /storage/placement/<id>/orientation,
                      #   /storage/placement/<id>/delete — physical shelf/slot management
+  pwa.py             # /manifest.json, /sw.js — Progressive Web App native features
 templates/
   base.html          # Layout with Alpine.js + TailwindCSS CDN
   index.html         # Inventory page (Alpine.js x-data="inventoryApp()")

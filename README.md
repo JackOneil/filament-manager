@@ -1,5 +1,5 @@
 # Filament Manager 🧵
-*Current version: **v1.42.0***
+*Current version: **v1.44.0***
 
 A minimalist and modern web application for tracking and managing 3D printer filaments.
 The application allows detailed tracking of weight balances, material costs, and also includes a calculator for a precise print cost estimation of a given model (in grams relative to the spool's total weight).
@@ -10,8 +10,10 @@ The application allows detailed tracking of weight balances, material costs, and
 - **Print Calculator:** Before starting a print enter the model weight from your slicer and the estimated print time. You instantly see how much the specific part will cost (including calculated electricity consumption). The page saves a **history of your previous calculations**.
 - **Statistics Dashboard:** A fully customizable dashboard with 7 draggable/hideable sections: KPI overview, stock health and turnover charts, forecast tables, purchase recommendations, project analytics, and a color palette. Section order, hidden cards, and per-card record limits are persisted per browser via `localStorage`.
 - **Storage Shelf Map:** Visualize where each spool lives on your physical shelves. Assign spools to named shelf slots, move or reorient them, and see stock levels at a glance on the shelf grid.
+- **Installation & Notifications:** Native PWA (Progressive Web App) support — easily install on your dashboard or mobile device. Elegant non-blocking Toast notifications via Alpine.js.
 - **Bambu Cloud Integration:** Sync print jobs from Bambu Lab printers. Assign jobs to projects and optionally deduct material usage directly from inventory.
 - **PrusaLink Integration:** Poll any Prusa printer on your local network via the PrusaLink REST API (no cloud account required). Add printers by IP address and API key; the background worker captures active and completed print jobs automatically.
+- **Live Connected Printers:** An instantly auto-updating "Live Printers" dashboard grid summarizing all connected (both Prusa and Bambu) print statuses, current temps, progress, estimation logs, etc.
 - **Movement History:** Full audit log of every filament weight change with reasons and timestamps.
 - **Custom Dictionaries:** Pre-configured with popular manufacturers, materials, and colors. Everything can be freely expanded, renamed, and safely deleted in the base Settings.
 - **Multi-Language Support:** Natively supports both English and Czech.

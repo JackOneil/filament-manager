@@ -218,6 +218,19 @@ def register(app):
         filename = os.path.basename(pf.filepath)
         return send_from_directory(directory, filename, as_attachment=True, download_name=pf.filename)
 
+    @app.route('/projects/<int:id>/view_file/<int:file_id>/<filename>')
+    def project_view_file(id, file_id, filename):
+        pf = db.get_or_404(ProjectFile, file_id)
+        if pf.project_id != id:
+            return "Unauthorized", 401
+        real_path = os.path.realpath(pf.filepath)
+        real_folder = os.path.realpath(UPLOAD_FOLDER)
+        if not real_path.startswith(real_folder + os.sep):
+            return "Forbidden", 403
+        directory = os.path.dirname(pf.filepath)
+        filename = os.path.basename(pf.filepath)
+        return send_from_directory(directory, filename, as_attachment=False)
+
     @app.route('/projects/<int:id>/image/<int:file_id>')
     def project_image_file(id, file_id):
         pf = db.get_or_404(ProjectFile, file_id)
