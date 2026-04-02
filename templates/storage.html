@@ -1,10 +1,44 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="max-w-7xl mx-auto space-y-6" x-data="storageBoard(window.storageBoardConfig)">
+    <div class="page-hero">
+        <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+            <div>
+                <h1><i class="fa-solid fa-warehouse text-slate-600"></i> {{ t('storage_title') }}</h1>
+                <p>{{ t('storage_desc') }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="ui-filter-panel">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+                <div class="ui-label">Saved Views</div>
+                <div class="text-lg font-bold mt-1">Uložené pohledy skladu</div>
+            </div>
+            <div class="flex flex-wrap gap-2 items-center">
+                <template x-for="preset in presets" :key="preset.id">
+                    <div class="inline-flex items-center gap-1">
+                        <button type="button" @click="applyPreset(preset.id)" class="ui-badge ui-badge-brand">
+                            <i class="fa-solid fa-bookmark"></i>
+                            <span x-text="preset.name"></span>
+                        </button>
+                        <button type="button" @click="removePreset(preset.id)" class="w-8 h-8 rounded-full border border-gray-200 text-gray-500 hover:text-red-600 hover:border-red-200 transition">
+                            <i class="fa-solid fa-xmark text-xs"></i>
+                        </button>
+                    </div>
+                </template>
+                <button type="button" @click="savePreset()" class="ui-badge">
+                    <i class="fa-solid fa-floppy-disk"></i> Uložit aktuální filtr
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div>
-            <h1 class="text-3xl font-bold text-gray-800"><i class="fa-solid fa-warehouse text-slate-600"></i> {{ t('storage_title') }}</h1>
-            <p class="text-gray-500 mt-2">{{ t('storage_desc') }}</p>
+            <div class="ui-label">{{ t('storage_filters') }}</div>
+            <p class="text-gray-500 mt-2">Vyber polici, filament nebo štítky a vrať se k nim jedním klikem přes uložené pohledy.</p>
         </div>
     </div>
 
@@ -17,7 +51,7 @@
             </button>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div class="ui-panel">
             <h2 class="text-lg font-bold text-gray-800 mb-4">{{ t('storage_filters') }}</h2>
             <form method="GET" action="{{ url_for('storage') }}" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
                 <div class="relative" @click.outside="shelfOpen = false">
@@ -454,7 +488,13 @@ function storageBoard(config) {
         colorOptions: config?.colorOptions || [],
         filamentOptions: config?.filamentOptions || [],
         tagOptions: config?.tagOptions || [],
+        presets: [],
         init() {
+            try {
+                this.presets = JSON.parse(localStorage.getItem('filament.storagePresets') || '[]');
+            } catch (e) {
+                this.presets = [];
+            }
             const selectedShelf = this.shelfOptions.find((opt) => this.shelf == opt.id);
             const selectedBrand = this.brandOptions.find((opt) => this.brand == opt.id);
             const selectedMaterial = this.materialOptions.find((opt) => this.material == opt.id);
@@ -493,6 +533,59 @@ function storageBoard(config) {
         get filteredAssignFilaments() {
             const q = this.assignFilamentQ.toLowerCase();
             return this.filamentOptions.filter((opt) => opt.name.toLowerCase().includes(q));
+        },
+        persistPresets() {
+            localStorage.setItem('filament.storagePresets', JSON.stringify(this.presets));
+        },
+        navigateWithState(state = null) {
+            const current = state || {
+                shelf: this.shelf,
+                brand: this.brand,
+                material: this.material,
+                color: this.color,
+                filament: this.filament,
+                tagQ: this.tagQ,
+            };
+            const params = new URLSearchParams();
+            if (current.shelf) params.set('shelf', current.shelf);
+            if (current.brand) params.set('brand', current.brand);
+            if (current.material) params.set('material', current.material);
+            if (current.color) params.set('color', current.color);
+            if (current.filament) params.set('filament', current.filament);
+            if (current.tagQ) params.set('tag', current.tagQ);
+            window.location.href = `{{ url_for('storage') }}${params.toString() ? '?' + params.toString() : ''}`;
+        },
+        savePreset() {
+            const name = window.prompt('Název uloženého pohledu skladu');
+            if (!name) return;
+            this.presets.push({
+                id: `${Date.now()}`,
+                name: name.trim(),
+                state: {
+                    shelf: this.shelf,
+                    shelfQ: this.shelfQ,
+                    brand: this.brand,
+                    brandQ: this.brandQ,
+                    material: this.material,
+                    materialQ: this.materialQ,
+                    color: this.color,
+                    colorQ: this.colorQ,
+                    filament: this.filament,
+                    filamentQ: this.filamentQ,
+                    tagQ: this.tagQ,
+                }
+            });
+            this.persistPresets();
+        },
+        applyPreset(id) {
+            const preset = this.presets.find((item) => item.id === id);
+            if (!preset) return;
+            Object.assign(this, preset.state);
+            this.navigateWithState(preset.state);
+        },
+        removePreset(id) {
+            this.presets = this.presets.filter((item) => item.id !== id);
+            this.persistPresets();
         },
         selectShelf(id, name) {
             this.shelf = id;

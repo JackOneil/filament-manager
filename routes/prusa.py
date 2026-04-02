@@ -107,10 +107,14 @@ def do_poll(printer: PrusaPrinter) -> dict:
         {'added': int, 'updated': int, 'error': str|None}
     """
     added = updated = 0
+    now = datetime.utcnow()
 
     # ── 1. Fetch current status ───────────────────────────────────────────
     status_data = _prusa_request(printer, '/api/v1/status')
     if status_data is None:
+        printer.last_sync_at = now
+        printer.last_sync_status = f'error: Cannot reach {printer.host}'
+        db.session.commit()
         return {'added': 0, 'updated': 0, 'error': f'Cannot reach {printer.host}'}
 
     job_status = status_data.get('job') or {}
@@ -214,9 +218,22 @@ def do_poll(printer: PrusaPrinter) -> dict:
             added += 1
 
     try:
+        printer.last_sync_at = now
+        printer.last_success_at = now
+        printer.last_sync_status = json.dumps({
+            'added': added,
+            'updated': updated,
+            'skipped': 0,
+        })
         db.session.commit()
     except Exception as exc:
         db.session.rollback()
+        try:
+            printer.last_sync_at = now
+            printer.last_sync_status = f'error: {str(exc)[:220]}'
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
         _LOG.error('PrusaLink commit error: %s', exc)
         return {'added': 0, 'updated': 0, 'error': str(exc)}
 

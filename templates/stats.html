@@ -9,7 +9,7 @@
 .edit-mode .section-edit-bar { display: flex; }
 .edit-mode .card-edit-bar { display: flex; }
 </style>
-<div class="max-w-7xl mx-auto space-y-6" id="stats-page">
+<div class="max-w-7xl mx-auto space-y-6" id="stats-page" x-data="statsDashboard()">
     <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div>
             <h1 class="text-3xl font-bold text-gray-800 flex items-center gap-3">
@@ -38,10 +38,101 @@
         <button onclick="resetLayout()" class="ml-auto text-xs font-semibold text-blue-600 hover:text-blue-800 underline">{{ t('stats_reset_layout') }}</button>
     </div>
 
+    <div class="ui-panel">
+        <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4 mb-5">
+            <div>
+                <div class="ui-label">Executive View</div>
+                <h2 class="text-2xl font-bold mt-2">Denní řídicí přehled</h2>
+                <p class="text-sm text-gray-500 mt-2">Výchozí pohled zvýrazňuje nejdůležitější KPI a jeden dominantní trend. Ostatní widgety zůstávají dostupné níže v přepínatelných sekcích.</p>
+            </div>
+            <div class="flex flex-wrap gap-2 items-center">
+                <template x-for="preset in presets" :key="preset.id">
+                    <div class="inline-flex items-center gap-1">
+                        <button type="button" @click="applyPreset(preset.id)" class="ui-badge ui-badge-brand">
+                            <i class="fa-solid fa-bookmark"></i>
+                            <span x-text="preset.name"></span>
+                        </button>
+                        <button type="button" @click="removePreset(preset.id)" class="w-8 h-8 rounded-full border border-gray-200 text-gray-500 hover:text-red-600 hover:border-red-200 transition">
+                            <i class="fa-solid fa-xmark text-xs"></i>
+                        </button>
+                    </div>
+                </template>
+                <button type="button" @click="savePreset()" class="ui-badge">
+                    <i class="fa-solid fa-floppy-disk"></i> Uložit pohled
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
+            <div class="ui-kpi">
+                <div class="ui-label">{{ t('stats_usage_period') }}</div>
+                <div class="text-3xl font-bold mt-2">{{ summary.usage_total_period }} g</div>
+                <div class="text-sm text-gray-500 mt-2">{{ t('stats_usage_period_hint') }}</div>
+            </div>
+            <div class="ui-kpi">
+                <div class="ui-label">{{ t('stats_purchase_period') }}</div>
+                <div class="text-3xl font-bold mt-2">{{ summary.purchase_total_period }} g</div>
+                <div class="text-sm text-gray-500 mt-2">{{ t('stats_purchase_period_hint') }}</div>
+            </div>
+            <div class="ui-kpi">
+                <div class="ui-label">{{ t('stats_daily_average') }}</div>
+                <div class="text-3xl font-bold mt-2">{{ summary.avg_daily_usage_period }} g</div>
+                <div class="text-sm text-gray-500 mt-2">{{ summary.active_projects }} aktivních projektů</div>
+            </div>
+            <div class="ui-kpi">
+                <div class="ui-label">{{ t('stats_reorder_alerts') }}</div>
+                <div class="text-3xl font-bold mt-2">{{ summary.critical_count + summary.warning_count }}</div>
+                <div class="text-sm mt-2">
+                    <span class="text-red-500 font-semibold">{{ summary.critical_count }} {{ t('stats_critical') }}</span>
+                    <span class="mx-2 text-gray-300">·</span>
+                    <span class="text-amber-500 font-semibold">{{ summary.warning_count }} {{ t('stats_warning') }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-[1.65fr_0.95fr] gap-5">
+            <div class="ui-card-soft p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <div class="ui-label">Trend</div>
+                        <h3 class="text-xl font-bold mt-1">{{ t('stats_usage_chart') }}</h3>
+                    </div>
+                    <span class="ui-badge ui-badge-brand">{{ days }} {{ t('stats_days_suffix') }}</span>
+                </div>
+                <div class="relative h-80">
+                    <canvas id="executiveChart"></canvas>
+                </div>
+            </div>
+            <div class="ui-card-soft p-5">
+                <div class="ui-label mb-3">Sections</div>
+                <div class="flex flex-wrap gap-2 mb-4">
+                    <button type="button" @click="activeTab='executive'; sessionStorage.setItem('filament.statsActiveTab', 'executive')" :class="activeTab === 'executive' ? 'ui-badge ui-badge-brand' : 'ui-badge'">Executive</button>
+                    <button type="button" @click="activeTab='planning'; sessionStorage.setItem('filament.statsActiveTab', 'planning')" :class="activeTab === 'planning' ? 'ui-badge ui-badge-brand' : 'ui-badge'">Planning</button>
+                    <button type="button" @click="activeTab='projects'; sessionStorage.setItem('filament.statsActiveTab', 'projects')" :class="activeTab === 'projects' ? 'ui-badge ui-badge-brand' : 'ui-badge'">Projects</button>
+                    <button type="button" @click="activeTab='detail'; sessionStorage.setItem('filament.statsActiveTab', 'detail')" :class="activeTab === 'detail' ? 'ui-badge ui-badge-brand' : 'ui-badge'">Detail</button>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div class="rounded-xl border border-gray-200 px-4 py-3">
+                        <div class="font-semibold text-gray-800">{{ t('stats_recommend_buy') }}</div>
+                        <div class="text-gray-500 mt-1">{{ summary.reorder_recommendations }} doporučených nákupů</div>
+                    </div>
+                    <div class="rounded-xl border border-gray-200 px-4 py-3">
+                        <div class="font-semibold text-gray-800">{{ t('stats_project_usage_title') }}</div>
+                        <div class="text-gray-500 mt-1">{{ project_rows|length }} projektů s reálnou spotřebou</div>
+                    </div>
+                    <div class="rounded-xl border border-gray-200 px-4 py-3">
+                        <div class="font-semibold text-gray-800">{{ t('stats_color_palette') }}</div>
+                        <div class="text-gray-500 mt-1">{{ color_palette|length }} aktivních barev v inventáři</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ══════════════════════════════════════════════════════════════ -->
     <!-- SECTION: KPI summary -->
     <!-- ══════════════════════════════════════════════════════════════ -->
-    <div class="stats-section" data-section-id="section_kpi">
+    <div class="stats-section" data-section-id="section_kpi" x-show="activeTab === 'planning'" x-cloak>
         <div class="section-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
             <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
             <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('stats_kpi_section') }}</span>
@@ -82,7 +173,7 @@
     <!-- ══════════════════════════════════════════════════════════════ -->
     <!-- SECTION: overview [low_stock | top_turnover | profitable] -->
     <!-- ══════════════════════════════════════════════════════════════ -->
-    <div class="stats-section" data-section-id="section_overview">
+    <div class="stats-section" data-section-id="section_overview" x-show="activeTab === 'projects'" x-cloak>
         <div class="section-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
             <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
             <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('stats_overview_section') }}</span>
@@ -201,7 +292,7 @@
     <!-- ══════════════════════════════════════════════════════════════ -->
     <!-- SECTION: charts primary [usage (2/3) | material (1/3)] -->
     <!-- ══════════════════════════════════════════════════════════════ -->
-    <div class="stats-section" data-section-id="section_charts_primary">
+    <div class="stats-section" data-section-id="section_charts_primary" x-show="activeTab === 'planning'" x-cloak>
         <div class="section-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
             <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
             <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('stats_charts_primary_section') }}</span>
@@ -255,7 +346,7 @@
     <!-- ══════════════════════════════════════════════════════════════ -->
     <!-- SECTION: charts secondary [purchase | project] -->
     <!-- ══════════════════════════════════════════════════════════════ -->
-    <div class="stats-section" data-section-id="section_charts_secondary">
+    <div class="stats-section" data-section-id="section_charts_secondary" x-show="activeTab === 'projects'" x-cloak>
         <div class="section-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
             <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
             <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('stats_charts_secondary_section') }}</span>
@@ -304,7 +395,7 @@
     <!-- ══════════════════════════════════════════════════════════════ -->
     <!-- SECTION: tables [forecast | purchase_recommendations] -->
     <!-- ══════════════════════════════════════════════════════════════ -->
-    <div class="stats-section" data-section-id="section_tables">
+    <div class="stats-section" data-section-id="section_tables" x-show="activeTab === 'planning'" x-cloak>
         <div class="section-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
             <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
             <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('stats_tables_section') }}</span>
@@ -432,7 +523,7 @@
     <!-- ══════════════════════════════════════════════════════════════ -->
     <!-- SECTION: detail [project_usage | purchase_log] -->
     <!-- ══════════════════════════════════════════════════════════════ -->
-    <div class="stats-section" data-section-id="section_detail">
+    <div class="stats-section" data-section-id="section_detail" x-show="activeTab === 'detail'" x-cloak>
         <div class="section-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
             <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
             <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('stats_detail_section') }}</span>
@@ -519,7 +610,7 @@
     <!-- SECTION: color palette -->
     <!-- ══════════════════════════════════════════════════════════════ -->
     {% if color_palette %}
-    <div class="stats-section" data-section-id="section_colors">
+    <div class="stats-section" data-section-id="section_colors" x-show="activeTab === 'detail'" x-cloak>
         <div class="section-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
             <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
             <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('stats_color_palette') }}</span>
@@ -583,6 +674,42 @@
 <script>
 const statsData = {{ chart_data|safe }};
 
+function statsDashboard() {
+    return {
+        activeTab: 'executive',
+        presets: [],
+        init() {
+            try {
+                this.presets = JSON.parse(localStorage.getItem('filament.statsPresets') || '[]');
+            } catch (e) {
+                this.presets = [];
+            }
+            const persistedTab = sessionStorage.getItem('filament.statsActiveTab');
+            if (persistedTab) this.activeTab = persistedTab;
+        },
+        savePreset() {
+            const name = window.prompt('Název uloženého pohledu statistik');
+            if (!name) return;
+            this.presets.push({
+                id: `${Date.now()}`,
+                name: name.trim(),
+                state: { tab: this.activeTab, days: {{ days }} }
+            });
+            localStorage.setItem('filament.statsPresets', JSON.stringify(this.presets));
+        },
+        applyPreset(id) {
+            const preset = this.presets.find(item => item.id === id);
+            if (!preset) return;
+            sessionStorage.setItem('filament.statsActiveTab', preset.state.tab);
+            window.location.href = `{{ url_for('stats') }}?days=${preset.state.days}`;
+        },
+        removePreset(id) {
+            this.presets = this.presets.filter(item => item.id !== id);
+            localStorage.setItem('filament.statsPresets', JSON.stringify(this.presets));
+        },
+    };
+}
+
 // ── Chart.js ─────────────────────────────────────────────────────────────────
 function baseChartOptions() {
     return {
@@ -592,6 +719,32 @@ function baseChartOptions() {
         scales: { y: { beginAtZero: true, ticks: { callback: (v) => `${v} g` } } },
     };
 }
+new Chart(document.getElementById('executiveChart'), {
+    type: 'bar',
+    data: {
+        labels: statsData.labels,
+        datasets: [
+            {
+                label: '{{ t("stats_purchase_dataset") }}',
+                data: statsData.purchaseDaily,
+                backgroundColor: 'rgba(16,185,129,0.35)',
+                borderRadius: 8,
+                order: 2,
+            },
+            {
+                label: '{{ t("stats_usage_dataset") }}',
+                data: statsData.usageDaily,
+                type: 'line',
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37,99,235,0.18)',
+                fill: true,
+                tension: 0.3,
+                order: 1,
+            },
+        ],
+    },
+    options: baseChartOptions(),
+});
 new Chart(document.getElementById('usageChart'), {
     type: 'line',
     data: {

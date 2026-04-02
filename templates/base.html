@@ -11,6 +11,192 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         [x-cloak] { display: none !important; }
+        :root {
+            --ui-bg: #f3f4f6;
+            --ui-surface: #ffffff;
+            --ui-surface-soft: #f8fafc;
+            --ui-border: #e5e7eb;
+            --ui-border-strong: #cbd5e1;
+            --ui-text: #111827;
+            --ui-text-muted: #6b7280;
+            --ui-brand: #2563eb;
+            --ui-brand-soft: #dbeafe;
+            --status-critical-bg: #fef2f2;
+            --status-critical-text: #b91c1c;
+            --status-critical-border: #fecaca;
+            --status-warning-bg: #fffbeb;
+            --status-warning-text: #b45309;
+            --status-warning-border: #fde68a;
+            --status-success-bg: #ecfdf5;
+            --status-success-text: #047857;
+            --status-success-border: #a7f3d0;
+        }
+        html.dark {
+            --ui-bg: #0f172a;
+            --ui-surface: #111827;
+            --ui-surface-soft: #1f2937;
+            --ui-border: #374151;
+            --ui-border-strong: #4b5563;
+            --ui-text: #f3f4f6;
+            --ui-text-muted: #94a3b8;
+            --ui-brand: #60a5fa;
+            --ui-brand-soft: rgba(96, 165, 250, 0.16);
+            --status-critical-bg: rgba(127, 29, 29, 0.35);
+            --status-critical-text: #fca5a5;
+            --status-critical-border: rgba(248, 113, 113, 0.3);
+            --status-warning-bg: rgba(120, 53, 15, 0.35);
+            --status-warning-text: #fdba74;
+            --status-warning-border: rgba(251, 191, 36, 0.28);
+            --status-success-bg: rgba(6, 78, 59, 0.35);
+            --status-success-text: #6ee7b7;
+            --status-success-border: rgba(16, 185, 129, 0.28);
+        }
+        body {
+            background:
+                radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 30%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 25%),
+                var(--ui-bg);
+            color: var(--ui-text);
+        }
+        .ui-card,
+        .ui-panel,
+        .ui-filter-panel,
+        .ui-table-shell {
+            background: var(--ui-surface);
+            border: 1px solid var(--ui-border);
+            border-radius: 1rem;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+        }
+        .ui-panel {
+            padding: 1.5rem;
+        }
+        .ui-filter-panel {
+            padding: 1rem 1.25rem;
+        }
+        .ui-card-soft {
+            background: var(--ui-surface-soft);
+            border: 1px solid var(--ui-border);
+            border-radius: 0.9rem;
+        }
+        .ui-kpi {
+            padding: 1.25rem;
+            border-radius: 1rem;
+            background: linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.92));
+            border: 1px solid var(--ui-border);
+            box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05);
+        }
+        html.dark .ui-kpi {
+            background: linear-gradient(180deg, rgba(17,24,39,0.95), rgba(17,24,39,0.85));
+        }
+        .ui-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--ui-text-muted);
+        }
+        .ui-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.35rem 0.7rem;
+            border-radius: 9999px;
+            border: 1px solid var(--ui-border);
+            background: var(--ui-surface-soft);
+            color: var(--ui-text);
+            font-size: 0.72rem;
+            font-weight: 700;
+        }
+        .ui-badge-critical {
+            background: var(--status-critical-bg);
+            color: var(--status-critical-text);
+            border-color: var(--status-critical-border);
+        }
+        .ui-badge-warning {
+            background: var(--status-warning-bg);
+            color: var(--status-warning-text);
+            border-color: var(--status-warning-border);
+        }
+        .ui-badge-success {
+            background: var(--status-success-bg);
+            color: var(--status-success-text);
+            border-color: var(--status-success-border);
+        }
+        .ui-badge-brand {
+            background: var(--ui-brand-soft);
+            color: var(--ui-brand);
+            border-color: rgba(37, 99, 235, 0.18);
+        }
+        .ui-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .ui-table thead tr {
+            background: var(--ui-surface-soft);
+        }
+        .ui-table th,
+        .ui-table td {
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid var(--ui-border);
+            vertical-align: top;
+        }
+        .ui-table tbody tr:last-child td {
+            border-bottom: 0;
+        }
+        .ui-table tbody tr:hover {
+            background: rgba(148, 163, 184, 0.08);
+        }
+        .nav-group-label {
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: rgba(219, 234, 254, 0.8);
+        }
+        .nav-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.8rem;
+            border-radius: 9999px;
+            color: white;
+            transition: background-color 150ms ease, color 150ms ease;
+        }
+        .nav-pill:hover {
+            background: rgba(255,255,255,0.14);
+        }
+        .page-hero {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .page-hero h1 {
+            font-size: 1.875rem;
+            line-height: 2.25rem;
+            font-weight: 800;
+            color: var(--ui-text);
+        }
+        .page-hero p {
+            color: var(--ui-text-muted);
+        }
+        .dashboard-widget {
+            position: relative;
+        }
+        .dashboard-widget.drag-over {
+            outline: 2px dashed #3b82f6;
+            outline-offset: 4px;
+            border-radius: 1rem;
+        }
+        .dashboard-widget.is-dragging {
+            opacity: 0.35;
+        }
+        .dashboard-edit-bar {
+            display: none;
+        }
+        .layout-edit-mode .dashboard-edit-bar {
+            display: flex;
+        }
         html.dark body {
             background-color: #111827;
             color: #f3f4f6;
@@ -146,7 +332,7 @@
 </head>
 <body class="bg-gray-100 font-sans text-gray-800 flex flex-col min-h-screen">
     <nav class="bg-blue-600 text-white shadow-lg relative z-20">
-        <div class="container mx-auto px-6 py-4 flex flex-wrap justify-between items-center">
+        <div class="container mx-auto px-6 py-4 flex flex-wrap justify-between items-center gap-4">
             <a href="{{ url_for('index') }}" class="text-xl md:text-2xl font-bold flex items-center gap-2">
                 <i class="fa-solid fa-layer-group"></i> {{ t('title') }}
             </a>
@@ -157,35 +343,64 @@
             </button>
 
             <!-- Navigation Links -->
-            <div id="nav-links" class="hidden w-full md:flex md:w-auto md:space-x-6 flex-col md:flex-row mt-4 md:mt-0 space-y-3 md:space-y-0 pb-2 md:pb-0">
-                <a href="{{ url_for('index') }}" class="block hover:text-blue-200 transition-colors py-1 md:py-0 border-b border-blue-500 md:border-0"><i class="fa-solid fa-house"></i> {{ t('overview') }}</a>
-                <a href="{{ url_for('projects_index') }}" class="block hover:text-blue-200 transition-colors py-1 md:py-0 border-b border-blue-500 md:border-0"><i class="fa-solid fa-diagram-project"></i> {{ t('projects') }}</a>
-                <a href="{{ url_for('calculator') }}" class="block hover:text-blue-200 transition-colors py-1 md:py-0 border-b border-blue-500 md:border-0"><i class="fa-solid fa-calculator"></i> {{ t('calculator') }}</a>
-                <a href="{{ url_for('history') }}" class="block hover:text-blue-200 transition-colors py-1 md:py-0 border-b border-blue-500 md:border-0"><i class="fa-solid fa-clock-rotate-left"></i> {{ t('movement_history') }}</a>
-                <a href="{{ url_for('stats') }}" class="block hover:text-blue-200 transition-colors py-1 md:py-0 border-b border-blue-500 md:border-0"><i class="fa-solid fa-chart-column"></i> {{ t('stats_nav') }}</a>
-                <a href="{{ url_for('storage') }}" class="block hover:text-blue-200 transition-colors py-1 md:py-0 border-b border-blue-500 md:border-0"><i class="fa-solid fa-warehouse"></i> {{ t('storage_nav') }}</a>
-                {% if nav_bambu_enabled %}
-                <a href="{{ url_for('bambu_jobs') }}" class="block hover:text-blue-200 transition-colors py-1 md:py-0 border-b border-blue-500 md:border-0"><i class="fa-solid fa-print"></i> {{ t('bambu_jobs') }}</a>
-                {% endif %}
-                {% if nav_prusa_enabled %}
-                <a href="{{ url_for('prusa_jobs') }}" class="block hover:text-blue-200 transition-colors py-1 md:py-0 border-b border-blue-500 md:border-0"><i class="fa-solid fa-3d-print"></i> {{ t('prusa_jobs') }}</a>
-                {% endif %}
-                <a href="{{ url_for('settings') }}" class="block hover:text-blue-200 transition-colors py-1 md:py-0"><i class="fa-solid fa-cog"></i> {{ t('settings') }}</a>
-                
-                <!-- Theme Toggle Button - Mobile -->
-                <form method="POST" action="{{ url_for('toggle_theme') }}" class="block md:hidden py-1">
-                    <button type="submit" class="w-full text-left py-1 px-2 hover:bg-blue-700 rounded transition" title="{{ t('theme') }}">
-                        <i class="fa-solid {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
-                        {% if theme == 'dark' %}{{ t('light_theme') }}{% else %}{{ t('dark_theme') }}{% endif %}
-                    </button>
-                </form>
-                
-                <!-- Theme Toggle for Desktop -->
-                <form method="POST" action="{{ url_for('toggle_theme') }}" class="hidden md:block">
-                    <button type="submit" class="hover:text-blue-200 transition-colors" title="{{ t('theme') }}">
-                        <i class="fa-solid {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
-                    </button>
-                </form>
+            <div id="nav-links" class="hidden w-full md:flex md:w-auto flex-col md:flex-row md:items-start mt-4 md:mt-0 space-y-4 md:space-y-0 md:gap-6 pb-2 md:pb-0">
+                <div class="flex flex-col gap-2 border-b border-blue-500 md:border-0 pb-3 md:pb-0">
+                    <span class="nav-group-label">{{ t('inventory_nav') }}</span>
+                    <div class="flex flex-col md:flex-row gap-2">
+                        <a href="{{ url_for('index') }}" class="nav-pill"><i class="fa-solid fa-house"></i> {{ t('overview') }}</a>
+                        <a href="{{ url_for('filaments_index') }}" class="nav-pill"><i class="fa-solid fa-layer-group"></i> {{ t('filaments_nav') }}</a>
+                        <a href="{{ url_for('storage') }}" class="nav-pill"><i class="fa-solid fa-warehouse"></i> {{ t('storage_nav') }}</a>
+                        <a href="{{ url_for('history') }}" class="nav-pill"><i class="fa-solid fa-clock-rotate-left"></i> {{ t('movement_history') }}</a>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-2 border-b border-blue-500 md:border-0 pb-3 md:pb-0">
+                    <span class="nav-group-label">{{ t('projects') }}</span>
+                    <div class="flex flex-col md:flex-row gap-2">
+                        <a href="{{ url_for('projects_index') }}" class="nav-pill"><i class="fa-solid fa-diagram-project"></i> {{ t('projects') }}</a>
+                        <a href="{{ url_for('calculator') }}" class="nav-pill"><i class="fa-solid fa-calculator"></i> {{ t('calculator') }}</a>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-2 border-b border-blue-500 md:border-0 pb-3 md:pb-0">
+                    <span class="nav-group-label">{{ t('printers_nav') }}</span>
+                    <div class="flex flex-col md:flex-row gap-2">
+                        {% if nav_bambu_enabled %}
+                        <a href="{{ url_for('bambu_jobs') }}" class="nav-pill"><i class="fa-solid fa-print"></i> {{ t('bambu_jobs') }}</a>
+                        {% endif %}
+                        {% if nav_prusa_enabled %}
+                        <a href="{{ url_for('prusa_jobs') }}" class="nav-pill"><i class="fa-solid fa-3d-print"></i> {{ t('prusa_jobs') }}</a>
+                        {% endif %}
+                        {% if not nav_bambu_enabled and not nav_prusa_enabled %}
+                        <a href="{{ url_for('settings') }}#bambu-cloud" class="nav-pill"><i class="fa-solid fa-plug-circle-plus"></i> {{ t('settings') }}</a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="flex flex-col gap-2 border-b border-blue-500 md:border-0 pb-3 md:pb-0">
+                    <span class="nav-group-label">{{ t('analytics_nav') }}</span>
+                    <div class="flex flex-col md:flex-row gap-2 items-start md:items-center">
+                        <a href="{{ url_for('stats') }}" class="nav-pill"><i class="fa-solid fa-chart-column"></i> {{ t('stats_nav') }}</a>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-2">
+                    <span class="nav-group-label">{{ t('settings') }}</span>
+                    <div class="flex flex-col md:flex-row gap-2 items-start md:items-center">
+                        <a href="{{ url_for('settings') }}" class="nav-pill"><i class="fa-solid fa-cog"></i> {{ t('settings') }}</a>
+
+                        <!-- Theme Toggle Button - Mobile -->
+                        <form method="POST" action="{{ url_for('toggle_theme') }}" class="block md:hidden py-1">
+                            <button type="submit" class="nav-pill" title="{{ t('theme') }}">
+                                <i class="fa-solid {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
+                                {% if theme == 'dark' %}{{ t('light_theme') }}{% else %}{{ t('dark_theme') }}{% endif %}
+                            </button>
+                        </form>
+                        
+                        <!-- Theme Toggle for Desktop -->
+                        <form method="POST" action="{{ url_for('toggle_theme') }}" class="hidden md:block">
+                            <button type="submit" class="nav-pill" title="{{ t('theme') }}">
+                                <i class="fa-solid {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
             </div>
         </div>
     </nav>
@@ -209,6 +424,186 @@
         });
     </script>
     <script>
+        function createWidgetLayoutManager(config) {
+            const container = document.getElementById(config.containerId);
+            if (!container) {
+                return {
+                    toggleEditMode() {},
+                    moveUp() {},
+                    moveDown() {},
+                    reset() {},
+                };
+            }
+
+            const itemSelector = config.itemSelector || '[data-widget-id]';
+            const defaultOrder = config.defaultOrder || [];
+            let layout = loadLayout();
+            let editMode = false;
+            let dragSrc = null;
+
+            function loadLayout() {
+                try {
+                    const raw = JSON.parse(localStorage.getItem(config.storageKey) || '{}');
+                    return {
+                        order: Array.isArray(raw.order) ? raw.order : [...defaultOrder],
+                    };
+                } catch (e) {
+                    return { order: [...defaultOrder] };
+                }
+            }
+
+            function items() {
+                return [...container.querySelectorAll(`:scope > ${itemSelector}`)];
+            }
+
+            function saveLayout() {
+                layout.order = items().map((item) => item.dataset.widgetId);
+                localStorage.setItem(config.storageKey, JSON.stringify(layout));
+            }
+
+            function applyOrder() {
+                const map = {};
+                items().forEach((item) => { map[item.dataset.widgetId] = item; });
+                layout.order.forEach((id) => {
+                    if (map[id]) {
+                        container.appendChild(map[id]);
+                        delete map[id];
+                    }
+                });
+                Object.values(map).forEach((item) => container.appendChild(item));
+                saveLayout();
+            }
+
+            function onDragStart(e) {
+                dragSrc = this;
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', this.dataset.widgetId);
+                setTimeout(() => this.classList.add('is-dragging'), 0);
+            }
+
+            function onDragOver(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            }
+
+            function onDragEnter(e) {
+                e.preventDefault();
+                if (this !== dragSrc) this.classList.add('drag-over');
+            }
+
+            function onDragLeave() {
+                this.classList.remove('drag-over');
+            }
+
+            function onDrop(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.classList.remove('drag-over');
+                if (dragSrc && dragSrc !== this) {
+                    const all = items();
+                    const srcIndex = all.indexOf(dragSrc);
+                    const dstIndex = all.indexOf(this);
+                    if (srcIndex < dstIndex) container.insertBefore(dragSrc, this.nextSibling);
+                    else container.insertBefore(dragSrc, this);
+                    saveLayout();
+                }
+            }
+
+            function onDragEnd() {
+                this.classList.remove('is-dragging');
+                items().forEach((item) => item.classList.remove('drag-over'));
+                dragSrc = null;
+            }
+
+            function enableDrag() {
+                items().forEach((item) => {
+                    item.setAttribute('draggable', 'true');
+                    item.addEventListener('dragstart', onDragStart);
+                    item.addEventListener('dragover', onDragOver);
+                    item.addEventListener('dragenter', onDragEnter);
+                    item.addEventListener('dragleave', onDragLeave);
+                    item.addEventListener('drop', onDrop);
+                    item.addEventListener('dragend', onDragEnd);
+                });
+            }
+
+            function disableDrag() {
+                items().forEach((item) => {
+                    item.removeAttribute('draggable');
+                    item.removeEventListener('dragstart', onDragStart);
+                    item.removeEventListener('dragover', onDragOver);
+                    item.removeEventListener('dragenter', onDragEnter);
+                    item.removeEventListener('dragleave', onDragLeave);
+                    item.removeEventListener('drop', onDrop);
+                    item.removeEventListener('dragend', onDragEnd);
+                    item.classList.remove('drag-over', 'is-dragging');
+                });
+            }
+
+            function syncControls() {
+                const scope = document.getElementById(config.scopeId) || container;
+                const btn = document.getElementById(config.editButtonId);
+                const label = document.getElementById(config.labelId);
+                const hint = document.getElementById(config.hintId);
+                if (editMode) {
+                    scope.classList.add('layout-edit-mode');
+                    if (btn) {
+                        btn.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
+                        btn.classList.remove('bg-white', 'text-gray-700', 'border-gray-300');
+                    }
+                    if (label) label.textContent = config.doneText;
+                    if (hint) hint.classList.remove('hidden');
+                    enableDrag();
+                } else {
+                    scope.classList.remove('layout-edit-mode');
+                    if (btn) {
+                        btn.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
+                        btn.classList.add('bg-white', 'text-gray-700', 'border-gray-300');
+                    }
+                    if (label) label.textContent = config.editText;
+                    if (hint) hint.classList.add('hidden');
+                    disableDrag();
+                }
+            }
+
+            function toggleEditMode() {
+                editMode = !editMode;
+                syncControls();
+            }
+
+            function moveUp(widgetId) {
+                const currentItems = items();
+                const index = currentItems.findIndex((item) => item.dataset.widgetId === widgetId);
+                if (index > 0) {
+                    container.insertBefore(currentItems[index], currentItems[index - 1]);
+                    saveLayout();
+                }
+            }
+
+            function moveDown(widgetId) {
+                const currentItems = items();
+                const index = currentItems.findIndex((item) => item.dataset.widgetId === widgetId);
+                if (index >= 0 && index < currentItems.length - 1) {
+                    container.insertBefore(currentItems[index + 1], currentItems[index]);
+                    saveLayout();
+                }
+            }
+
+            function reset() {
+                localStorage.removeItem(config.storageKey);
+                window.location.reload();
+            }
+
+            applyOrder();
+
+            return {
+                toggleEditMode,
+                moveUp,
+                moveDown,
+                reset,
+            };
+        }
+
         // ── CSRF auto-protection ──────────────────────────────────────────────
         // Injects the CSRF token into every POST form and patches window.fetch
         // so AJAX calls automatically include the X-CSRFToken header.

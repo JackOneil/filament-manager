@@ -9,6 +9,63 @@
         </div>
     </div>
 
+    <div id="printer-diagnostics" class="ui-panel">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
+            <div>
+                <div class="ui-label">Printer Diagnostics</div>
+                <h2 class="text-2xl font-bold mt-1">Sync stav a akční centrum</h2>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <span class="ui-badge {% if action_center.counts.printer_issues %}ui-badge-critical{% else %}ui-badge-success{% endif %}">
+                    <i class="fa-solid fa-plug-circle-bolt"></i> {{ action_center.counts.printer_issues }} sync issues
+                </span>
+                <span class="ui-badge {% if action_center.counts.unmapped_jobs %}ui-badge-warning{% else %}ui-badge-success{% endif %}">
+                    <i class="fa-solid fa-link-slash"></i> {{ action_center.counts.unmapped_jobs }} unmapped jobs
+                </span>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <div class="ui-card-soft p-4">
+                <div class="flex items-center justify-between">
+                    <div class="font-semibold text-gray-800">Bambu Cloud</div>
+                    <form method="POST" action="{{ url_for('bambu_sync') }}" onsubmit="event.preventDefault(); fetch(this.action, { method: 'POST' }).then(() => window.location.reload());">
+                        <button type="submit" class="ui-badge ui-badge-brand"><i class="fa-solid fa-rotate"></i> Sync now</button>
+                    </form>
+                </div>
+                <div class="text-sm text-gray-500 mt-3">
+                    {% if app_settings and app_settings.bambu_last_sync_at %}Last sync: {{ app_settings.bambu_last_sync_at.strftime('%d.%m.%Y %H:%M') }}{% else %}Zatím neproběhla synchronizace.{% endif %}
+                </div>
+                <div class="text-sm mt-2 {% if bambu_sync_status.error %}text-red-600{% else %}text-gray-500{% endif %}">
+                    {% if bambu_sync_status.error %}{{ bambu_sync_status.error }}{% elif bambu_sync_status.ok %}Added {{ bambu_sync_status.added }}, updated {{ bambu_sync_status.updated }}, skipped {{ bambu_sync_status.skipped }}{% else %}Bez dat o stavu.{% endif %}
+                </div>
+            </div>
+            <div class="ui-card-soft p-4 xl:col-span-2">
+                <div class="font-semibold text-gray-800 mb-3">PrusaLink</div>
+                <div class="space-y-3">
+                    {% for printer in prusa_printers %}
+                    {% set sync = prusa_sync_states.get(printer.id) %}
+                    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 border border-gray-200 rounded-xl px-4 py-3">
+                        <div>
+                            <div class="font-semibold text-gray-800">{{ printer.name }}</div>
+                            <div class="text-sm text-gray-500">{{ printer.host }}</div>
+                            <div class="text-xs mt-1 {% if sync and sync.error %}text-red-600{% else %}text-gray-400{% endif %}">
+                                {% if printer.last_sync_at %}Last sync {{ printer.last_sync_at.strftime('%d.%m.%Y %H:%M') }}{% else %}Bez synchronizace{% endif %}
+                                {% if printer.last_success_at %} · success {{ printer.last_success_at.strftime('%d.%m.%Y %H:%M') }}{% endif %}
+                                {% if sync and sync.error %} · {{ sync.error }}{% endif %}
+                            </div>
+                        </div>
+                        <form method="POST" action="{{ url_for('prusa_printer_sync', printer_id=printer.id) }}" onsubmit="event.preventDefault(); fetch(this.action, { method: 'POST' }).then(() => window.location.reload());">
+                            <button type="submit" class="ui-badge ui-badge-brand"><i class="fa-solid fa-rotate"></i> Sync printer</button>
+                        </form>
+                    </div>
+                    {% else %}
+                    <p class="text-sm text-gray-400">Žádné Prusa tiskárny nejsou nakonfigurované.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Nyní bude 4 sloupcový grid na velkých displejích (Obecná natavení + Značky, Materiály, Barvy) -->
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8">
         

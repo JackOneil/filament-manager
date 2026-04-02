@@ -1,536 +1,593 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div x-data="{ lightboxOpen: false, lightboxImg: '', lightboxTitle: '', lightboxDownload: '', modelViewerOpen: false, modelViewerTitle: '', modelViewerDownload: '' }">
-<div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-    <div class="flex items-center gap-3">
-        <a href="{{ url_for('projects_index') }}" class="text-gray-500 hover:text-blue-600 transition">
-            <i class="fa-solid fa-arrow-left text-xl"></i>
-        </a>
-        <h1 class="text-3xl font-bold text-gray-800">{{ project.name }}</h1>
-        {% if project_tags %}
-        <div class="flex flex-wrap gap-1">
-            {% for tag in project_tags.split(',') %}
-            {% if tag.strip() %}
-            <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">{{ tag.strip() }}</span>
-            {% endif %}
-            {% endfor %}
-        </div>
-        {% endif %}
-        {% if project.status == 'NEW' %}
-            <span class="bg-gray-100 text-gray-800 text-xs font-semibold px-2.5 py-0.5 rounded border border-gray-300">{{ t('status_new') }}</span>
-        {% elif project.status == 'PRINTING' %}
-            <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded border border-blue-300">{{ t('status_printing') }}</span>
-        {% elif project.status == 'DONE' %}
-            <span class="bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded border border-green-300">{{ t('status_done') }}</span>
-        {% endif %}
-    </div>
-    <div class="flex gap-2">
-        <form method="POST" action="{{ url_for('project_status', id=project.id) }}" class="flex gap-2">
-            <select name="status" class="border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 outline-none h-10 w-32">
-                <option value="NEW" {% if project.status == 'NEW' %}selected{% endif %}>{{ t('status_new') }}</option>
-                <option value="PRINTING" {% if project.status == 'PRINTING' %}selected{% endif %}>{{ t('status_printing') }}</option>
-                <option value="DONE" {% if project.status == 'DONE' %}selected{% endif %}>{{ t('status_done') }}</option>
-            </select>
-            <button type="submit" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 pr-4 py-1.5 rounded-lg transition h-10">
-                <i class="fa-solid fa-check"></i>
-            </button>
-        </form>
-        <a href="{{ url_for('project_edit', id=project.id) }}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg transition flex items-center gap-2 h-10">
-            <i class="fa-solid fa-edit"></i>
-        </a>
-        <form method="POST" action="{{ url_for('project_delete', id=project.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');">
-            <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition flex items-center gap-2 h-10">
-                <i class="fa-solid fa-trash"></i>
-            </button>
-        </form>
-    </div>
-</div>
-
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-    <!-- Meta -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col gap-4">
-        <div>
-            <span class="text-xs text-gray-500 uppercase tracking-wide">{{ t('project_client') }}</span>
-            <div class="text-lg font-medium text-gray-800">{{ project.client_name or '-' }}</div>
-        </div>
-        <div>
-            <span class="text-xs text-gray-500 uppercase tracking-wide">{{ t('project_due_date') }}</span>
-            <div class="text-lg font-medium text-gray-800">{{ project.due_date.strftime('%d.%m.%Y') if project.due_date else '-' }}</div>
-        </div>
-        <div>
-            <span class="text-xs text-gray-500 uppercase tracking-wide">{{ t('project_time') }}</span>
-            <div class="text-lg font-medium text-gray-800">
-                {% set h = project.estimated_print_time // 60 %}
-                {% set m = project.estimated_print_time % 60 %}
-                {% if h > 0 %}{{ h }}h {% endif %}{{ m }}min
-            </div>
-        </div>
-        <div>
-            <span class="text-xs text-gray-500 uppercase tracking-wide">{{ t('project_description') }}</span>
-            <div class="text-gray-700 whitespace-pre-wrap mt-1">{{ project.description or '-' }}</div>
-        </div>
-    </div>
-
-    <div class="lg:col-span-2 flex flex-col gap-6">
-        
-        <!-- Filaments -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 border-b pb-2 gap-2">
-                <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-fill-drip text-orange-500"></i> {{ t('project_filaments') }}</h2>
-                <div class="flex flex-wrap gap-2 items-center">
-                    <div class="bg-green-100 text-green-800 font-bold px-3 py-1 rounded-lg border border-green-200 shadow-sm whitespace-nowrap text-sm" title="{{ t('estimated_project_cost') }}">
-                        <i class="fa-solid fa-calculator text-green-600 mr-1"></i>
-                        {% set ns = namespace(total_cost=0.0) %}
-                        {% for pf in project.filaments %}
-                            {% if pf.filament.weight_total > 0 %}
-                                {% set pf_cost = (pf.filament.price / pf.filament.weight_total) * pf.estimated_weight %}
-                                {% set ns.total_cost = ns.total_cost + pf_cost %}
-                            {% endif %}
-                        {% endfor %}
-                        {{ t('estimated_project_cost') }}: {{ ns.total_cost | round(2) }} {{ current_currency }}
-                    </div>
-                    {% set ns2 = namespace(actual_cost=0.0, has_deducted=false) %}
-                    {% for bj in project.bambu_jobs %}
-                        {% if bj.deducted and bj.filament and bj.filament.weight_total > 0 %}
-                            {% set ns2.has_deducted = true %}
-                            {% set mat_cost = (bj.filament.price / bj.filament.weight_total) * (bj.weight_grams or 0) %}
-                            {% set kwh = setting.kwh_price if setting else 5.0 %}
-                            {% set pw = setting.printer_power if setting else 150 %}
-                            {% set elec_cost = (bj.cost_time or 0) / 3600.0 * (pw / 1000.0) * kwh %}
-                            {% set ns2.actual_cost = ns2.actual_cost + mat_cost + elec_cost %}
-                        {% endif %}
-                    {% endfor %}
-                    {% if ns2.has_deducted %}
-                    <div class="bg-blue-100 text-blue-800 font-bold px-3 py-1 rounded-lg border border-blue-200 shadow-sm whitespace-nowrap text-sm" title="{{ t('actual_project_cost') }}">
-                        <i class="fa-solid fa-check-double text-blue-600 mr-1"></i>
-                        {{ t('actual_project_cost') }}: {{ ns2.actual_cost | round(2) }} {{ current_currency }}
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-            
-            <form method="POST" action="{{ url_for('project_add_filament', id=project.id) }}"
-                  class="mb-6"
-                  x-data="projectFilamentPicker()"
-                  @submit="if(!selectedId){ $event.preventDefault(); }">
-
-                <div class="flex flex-col md:flex-row gap-3 items-end">
-
-                    {# ── Fulltext filament dropdown ── #}
-                    <div class="flex-1 relative" @click.outside="open = false">
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">{{ t('choose_filament') }}</label>
-                        <input type="hidden" name="filament_id" :value="selectedId">
-                        <div class="relative">
-                            <div class="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                                <div class="w-4 h-4 rounded-full border border-gray-300 transition-all"
-                                     :style="selectedHex ? 'background-color:' + selectedHex : 'background-color:#e5e7eb'">
-                                </div>
-                            </div>
-                            <input type="text"
-                                x-model="query"
-                                @focus="open = true"
-                                @input="open = true"
-                                :placeholder="'{{ t('choose_filament') }}'"
-                                class="w-full border border-gray-300 rounded-lg pl-9 pr-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none text-sm">
-                        </div>
-                        <div x-show="open" x-cloak
-                            class="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                            <template x-for="f in filtered" :key="f.id">
-                                <button type="button"
-                                    @click="select(f)"
-                                    class="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0 flex items-center gap-2">
-                                    <span class="w-4 h-4 rounded-full border border-gray-200 flex-shrink-0"
-                                          :style="'background-color:' + f.color_hex"></span>
-                                    <span>
-                                        <span class="font-medium text-gray-800 text-sm" x-text="f.name"></span>
-                                        <span class="text-xs text-gray-400 ml-1" x-text="f.brand + ' · ' + f.material"></span>
-                                        <span class="text-xs text-gray-400 ml-1" x-text="'(' + f.remaining + 'g)'"></span>
-                                    </span>
-                                </button>
-                            </template>
-                            <div x-show="filtered.length === 0" class="px-3 py-2 text-xs text-gray-400 italic">{{ t('no_results') if t('no_results') else 'Nenalezeno' }}</div>
-                        </div>
-                    </div>
-
-                    {# ── Weight input ── #}
-                    <div class="w-full md:w-36">
-                        <label class="block text-xs font-semibold text-gray-600 mb-1">{{ t('estimated_weight') }}</label>
-                        <div class="relative">
-                            <input type="number" step="1" min="1" name="estimated_weight"
-                                   placeholder="g"
-                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:ring-2 focus:ring-blue-500 outline-none text-sm" required>
-                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400 text-xs font-bold">g</div>
-                        </div>
-                    </div>
-
-                    <button type="submit"
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition flex-shrink-0 flex items-center gap-1 text-sm font-semibold">
-                        <i class="fa-solid fa-plus"></i> {{ t('add') if t('add') else 'Přidat' }}
-                    </button>
-                </div>
-            </form>
-
-            <ul class="space-y-3">
-                {% for pf in project.filaments %}
-                <li class="flex flex-col bg-gray-50 p-3 rounded-lg border border-gray-100"
-                    x-data="{ editing: false }">
-                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
-                        <div class="flex items-center gap-3">
-                            <div class="w-6 h-6 rounded-full border border-gray-300 shadow-sm flex-shrink-0" style="background-color: {{ pf.filament.color.hex_value or '#ccc' }};"></div>
-                            <div>
-                                <div class="font-medium text-gray-800">{{ pf.filament.name }}</div>
-                                <div class="text-xs {% if pf.estimated_weight > pf.filament.weight_remaining %}text-red-600 font-bold{% else %}text-gray-500{% endif %}">
-                                    {{ t('estimated_weight') }}: {{ pf.estimated_weight | int }}g | {{ t('remaining') }}: {{ pf.filament.weight_remaining | int }}g
-                                    {% if pf.estimated_weight > pf.filament.weight_remaining %}({{ t('out_of_stock') }}){% endif %}
-                                </div>
-                                {% if pf.filament.weight_total > 0 %}
-                                <div class="text-xs font-semibold text-green-700 mt-1">
-                                    ~ {{ ((pf.filament.price / pf.filament.weight_total) * pf.estimated_weight) | round(2) }} {{ current_currency }}
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-2 mt-2 md:mt-0">
-                            {% if pf.is_used %}
-                                <span class="text-green-600 text-sm font-semibold"><i class="fa-solid fa-check-double"></i> {{ t('status_done') }}</span>
-                            {% else %}
-                                <button type="button" @click="editing = !editing"
-                                    class="text-gray-400 hover:text-blue-600 px-2 py-1 transition" title="{{ t('edit') }}">
-                                    <i class="fa-solid fa-pen text-sm"></i>
-                                </button>
-                                <form method="POST" action="{{ url_for('project_consume_filament', id=project.id, pf_id=pf.id) }}">
-                                    <button type="submit" class="bg-green-100 hover:bg-green-200 text-green-700 border border-green-300 px-3 py-1 rounded text-sm transition" title="{{ t('project_consume') }}">
-                                        <i class="fa-solid fa-box-open"></i> {{ t('project_consume') }}
-                                    </button>
-                                </form>
-                            {% endif %}
-                            <form method="POST" action="{{ url_for('project_remove_filament', id=project.id, pf_id=pf.id) }}"
-                                  onsubmit="return confirm('{{ t('delete') }}?')">
-                                <button type="submit" class="text-red-400 hover:text-red-600 px-2 py-1 transition">
-                                    <i class="fa-solid fa-times"></i>
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                    {# ── Inline edit row ── #}
-                    <form x-show="editing" x-cloak
-                          method="POST" action="{{ url_for('project_update_filament', id=project.id, pf_id=pf.id) }}"
-                          class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
-                        <label class="text-xs text-gray-500 font-semibold flex-shrink-0">{{ t('estimated_weight') }}:</label>
-                        <div class="relative">
-                            <input type="number" step="1" min="1" name="estimated_weight"
-                                   value="{{ pf.estimated_weight | int }}"
-                                   class="border border-gray-300 rounded-lg px-3 py-1.5 pr-7 text-sm focus:ring-2 focus:ring-blue-500 outline-none w-28">
-                            <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-gray-400 text-xs font-bold">g</div>
-                        </div>
-                        <button type="submit"
-                            class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm transition font-semibold">
-                            <i class="fa-solid fa-save"></i>
-                        </button>
-                        <button type="button" @click="editing = false"
-                            class="text-gray-400 hover:text-gray-600 px-2 py-1.5 text-sm transition">
-                            <i class="fa-solid fa-xmark"></i>
-                        </button>
-                    </form>
-                </li>
-                {% else %}
-                <li class="text-gray-500 text-sm italic">{{ t('project_no_filaments') }}</li>
-                {% endfor %}
-            </ul>
-
-            {# ── Bambu prints linked to this project ── #}
-            {% if project.bambu_jobs %}
-            <div class="mt-4 pt-3 border-t border-gray-100">
-                <p class="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">
-                    <i class="fa-solid fa-print mr-1"></i> {{ t('bambu_jobs_title') }}
-                </p>
-                {# ── pre-calculate totals across all jobs ── #}
-                {% set tot = namespace(mat=0.0, elec=0.0, time=0, has_any=false) %}
-                {% set kwh_g = setting.kwh_price if setting else 5.0 %}
-                {% set pw_g  = setting.printer_power if setting else 150 %}
-                {% for bj in project.bambu_jobs %}
-                    {% set tot.time = tot.time + (bj.cost_time or 0) %}
-                    {% set tot.elec = tot.elec + (bj.cost_time or 0) / 3600.0 * (pw_g / 1000.0) * kwh_g %}
-                    {% set tot_slot_ns = namespace(found=false) %}
-                    {% if bj.materials %}
-                        {% for slot in bj.materials %}
-                            {% if slot.filament and slot.filament.weight_total > 0 and slot.weight_grams %}
-                                {% set tot.mat = tot.mat + (slot.filament.price / slot.filament.weight_total) * slot.weight_grams %}
-                                {% set tot.has_any = true %}
-                                {% set tot_slot_ns.found = true %}
-                            {% endif %}
-                        {% endfor %}
-                    {% endif %}
-                    {% if not tot_slot_ns.found and bj.filament and bj.filament.weight_total > 0 and bj.weight_grams %}
-                        {% set tot.mat = tot.mat + (bj.filament.price / bj.filament.weight_total) * bj.weight_grams %}
-                        {% set tot.has_any = true %}
-                    {% endif %}
-                {% endfor %}
-                {% set tot_h = (tot.time // 3600) | int %}
-                {% set tot_m = ((tot.time % 3600) // 60) | int %}
-                <ul class="space-y-2">
-                    {% for bj in project.bambu_jobs %}
-                    {# ── per-job cost calculation ── #}
-                    {% set kwh = setting.kwh_price if setting else 5.0 %}
-                    {% set pw  = setting.printer_power if setting else 150 %}
-                    {% set elec_cost = (bj.cost_time or 0) / 3600.0 * (pw / 1000.0) * kwh %}
-                    {# material cost: sum per-slot if multi-material, fallback to job filament #}
-                    {% set bj_ns = namespace(mat_cost=0.0, has_cost=false) %}
-                    {% if bj.materials %}
-                        {% for slot in bj.materials %}
-                            {% if slot.filament and slot.filament.weight_total > 0 and slot.weight_grams %}
-                                {% set bj_ns.mat_cost = bj_ns.mat_cost + (slot.filament.price / slot.filament.weight_total) * slot.weight_grams %}
-                                {% set bj_ns.has_cost = true %}
-                            {% endif %}
-                        {% endfor %}
-                    {% endif %}
-                    {% if not bj_ns.has_cost and bj.filament and bj.filament.weight_total > 0 and bj.weight_grams %}
-                        {% set bj_ns.mat_cost = (bj.filament.price / bj.filament.weight_total) * bj.weight_grams %}
-                        {% set bj_ns.has_cost = true %}
-                    {% endif %}
-                    {% set job_total = bj_ns.mat_cost + elec_cost %}
-                    {# ── duration ── #}
-                    {% set dur_h = ((bj.cost_time or 0) // 3600) | int %}
-                    {% set dur_m = (((bj.cost_time or 0) % 3600) // 60) | int %}
-                    <li class="flex flex-col gap-1 text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-2">
-                        <div class="flex items-center gap-3">
-                            {% if bj.status == 'FINISH' %}
-                            <i class="fa-solid fa-check-circle text-green-500 flex-shrink-0"></i>
-                            {% elif bj.status == 'FAILED' %}
-                            <i class="fa-solid fa-times-circle text-red-500 flex-shrink-0"></i>
-                            {% else %}
-                            <i class="fa-solid fa-circle-dot text-blue-400 flex-shrink-0"></i>
-                            {% endif %}
-                            {% if bj.filament %}
-                            <div class="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0" style="background-color: {{ bj.filament.color.hex_value or '#ccc' }};"></div>
-                            {% endif %}
-                            <span class="font-medium flex-1 truncate">
-                                {{ bj.model_name or bj.external_id }}
-                                {% if bj.filament %}<span class="text-gray-400 font-normal"> — {{ bj.filament.name }}</span>{% endif %}
-                            </span>
-                            {% if bj.deducted %}
-                            <span class="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full flex-shrink-0">
-                                <i class="fa-solid fa-check-double"></i> {{ t('bambu_deducted') }}
-                            </span>
-                            {% endif %}
-                        </div>
-                        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 pl-7 text-xs text-gray-500">
-                            {% if bj.weight_grams %}
-                            <span><i class="fa-solid fa-weight-hanging mr-1 text-gray-400"></i>{{ '%.1f'|format(bj.weight_grams) }} g</span>
-                            {% endif %}
-                            {% if bj.cost_time %}
-                            <span><i class="fa-solid fa-clock mr-1 text-gray-400"></i>{% if dur_h %}{{ dur_h }}h {% endif %}{{ dur_m }}min</span>
-                            {% endif %}
-                            {% if bj_ns.has_cost or elec_cost > 0 %}
-                            <span class="font-semibold text-indigo-600">
-                                <i class="fa-solid fa-coins mr-1"></i>~{{ '%.2f'|format(job_total) }} {{ current_currency }}
-                                <span class="font-normal text-gray-400">({{ t('filament_cost_label') }}: {{ '%.2f'|format(bj_ns.mat_cost) }} + {{ t('energy_cost_label') }}: {{ '%.2f'|format(elec_cost) }})</span>
-                            </span>
-                            {% endif %}
-                        </div>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {# ── totals bar ── #}
-                <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-sm">
-                    <span class="font-bold text-indigo-800"><i class="fa-solid fa-sigma mr-1"></i> {{ t('total') }}</span>
-                    {% if tot.time %}
-                    <span class="text-gray-600"><i class="fa-solid fa-clock mr-1 text-gray-400"></i>{% if tot_h %}{{ tot_h }}h {% endif %}{{ tot_m }}min</span>
-                    {% endif %}
-                    {% if tot.has_any or tot.elec > 0 %}
-                    <span class="font-bold text-indigo-700">
-                        <i class="fa-solid fa-coins mr-1"></i>~{{ '%.2f'|format(tot.mat + tot.elec) }} {{ current_currency }}
-                    </span>
-                    <span class="text-xs text-gray-500">({{ t('filament_cost_label') }}: {{ '%.2f'|format(tot.mat) }} + {{ t('energy_cost_label') }}: {{ '%.2f'|format(tot.elec) }})</span>
-                    {% endif %}
-                </div>
-            </div>
-            {% endif %}
-        </div>
-
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 border-b pb-2 gap-2">
-                <h2 class="text-xl font-bold text-gray-800"><i class="fa-solid fa-file-signature text-indigo-500"></i> {{ t('quote_project_title') }}</h2>
-                <a href="{{ url_for('calculator') }}" class="text-sm text-indigo-600 hover:text-indigo-800 font-semibold">
-                    <i class="fa-solid fa-plus mr-1"></i>{{ t('quote_create_from_calculator') }}
+<div
+    x-data="{
+        lightboxOpen: false,
+        lightboxImg: '',
+        lightboxTitle: '',
+        lightboxDownload: '',
+        modelViewerOpen: false,
+        modelViewerTitle: '',
+        modelViewerDownload: '',
+        workspaceTab: '{{ active_tab }}',
+        setTab(tab) {
+            this.workspaceTab = tab;
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', tab);
+            if (tab !== 'jobs') {
+                url.searchParams.delete('jobs_page');
+            }
+            window.history.replaceState({}, '', url.toString());
+        }
+    }"
+    class="max-w-7xl mx-auto space-y-6"
+>
+    <div class="page-hero">
+        <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
+            <div class="flex items-start gap-3">
+                <a href="{{ url_for('projects_index') }}" class="text-gray-500 hover:text-blue-600 transition mt-1">
+                    <i class="fa-solid fa-arrow-left text-xl"></i>
                 </a>
-            </div>
-
-            {% if project.quotes %}
-            <div class="space-y-3">
-                {% for quote in project.quotes | sort(attribute='created_at', reverse=True) %}
-                <div class="bg-gray-50 border border-gray-100 rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                    <div>
-                        <div class="font-semibold text-gray-800">{{ quote.filament_name }}</div>
-                        <div class="text-xs text-gray-500 mt-1">
-                            {{ quote.weight }} g · {{ quote.print_time }} {{ t('hours') }} · {{ t('quote_margin') }} {{ quote.margin_percent }} %
-                        </div>
-                        <div class="text-sm text-gray-600 mt-2">
-                            {{ t('quote_base_cost') }}: <span class="font-semibold">{{ quote.base_cost | round(2) }} {{ quote.currency }}</span>
-                            <span class="mx-2 text-gray-300">|</span>
-                            {{ t('quote_margin_amount') }}: <span class="font-semibold text-indigo-700">{{ quote.margin_amount | round(2) }} {{ quote.currency }}</span>
-                            <span class="mx-2 text-gray-300">|</span>
-                            {{ t('quote_final_price') }}: <span class="font-bold text-green-700">{{ quote.final_price | round(2) }} {{ quote.currency }}</span>
-                        </div>
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h1>{{ project.name }}</h1>
+                        {% if project.status == 'NEW' %}
+                        <span class="ui-badge">{{ t('status_new') }}</span>
+                        {% elif project.status == 'PRINTING' %}
+                        <span class="ui-badge ui-badge-brand">{{ t('status_printing') }}</span>
+                        {% else %}
+                        <span class="ui-badge ui-badge-success">{{ t('status_done') }}</span>
+                        {% endif %}
+                        {% if project_tags %}
+                            {% for tag in project_tags.split(',') %}
+                                {% if tag.strip() %}
+                                <span class="ui-badge">{{ tag.strip() }}</span>
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
                     </div>
-                    <div class="flex items-center gap-2">
-                        <a href="{{ url_for('export_quote', id=quote.id) }}" target="_blank" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 border border-indigo-300 px-3 py-2 rounded-lg text-sm transition">
-                            <i class="fa-solid fa-file-export"></i> {{ t('quote_export_btn') }}
-                        </a>
-                        <form method="POST" action="{{ url_for('delete_quote', id=quote.id) }}" onsubmit="return confirm('{{ t('quote_delete_confirm') }}');">
-                            <button type="submit" class="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition-colors" title="{{ t('delete') }}">
-                                <i class="fa-solid fa-trash"></i>
-                            </button>
-                        </form>
+                    <p>
+                        {{ project.client_name or t('project_client_missing_label') }}
+                        {% if project.due_date %} · {{ project.due_date.strftime('%d.%m.%Y') }}{% endif %}
+                    </p>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <a href="{{ url_for('calculator') }}" class="ui-badge ui-badge-brand"><i class="fa-solid fa-calculator"></i> {{ t('calculator') }}</a>
+                <a href="{{ url_for('project_edit', id=project.id) }}" class="ui-badge"><i class="fa-solid fa-pen"></i> {{ t('edit') }}</a>
+                <form method="POST" action="{{ url_for('project_delete', id=project.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');">
+                    <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-trash"></i> {{ t('delete') }}</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-[340px_minmax(0,1fr)] gap-6">
+        <aside class="space-y-4 xl:sticky xl:top-6 self-start">
+            <div class="ui-panel">
+                <div class="ui-label">{{ t('project_status') }}</div>
+                <div class="text-2xl font-bold mt-2">{{ t('status_' ~ project.status|lower) }}</div>
+                <div class="grid grid-cols-2 gap-3 mt-4 text-sm">
+                    <div class="ui-card-soft p-3">
+                        <div class="text-gray-500">{{ t('project_due_date') }}</div>
+                        <div class="font-semibold mt-1">{{ project.due_date.strftime('%d.%m.%Y') if project.due_date else '-' }}</div>
+                    </div>
+                    <div class="ui-card-soft p-3">
+                        <div class="text-gray-500">{{ t('project_time') }}</div>
+                        <div class="font-semibold mt-1">
+                            {% set h = project.estimated_print_time // 60 %}
+                            {% set m = project.estimated_print_time % 60 %}
+                            {% if h > 0 %}{{ h }}h {% endif %}{{ m }}min
+                        </div>
                     </div>
                 </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p class="text-gray-500 text-sm italic">{{ t('quote_no_quotes') }}</p>
-            {% endif %}
-        </div>
-
-        {% set images = [] %}
-        {% set other_files = [] %}
-        {% for f in project.files %}
-            {% set ext = f.filepath.split('.')[-1] | lower %}
-            {% if ext in ['jpg', 'jpeg', 'png', 'gif', 'webp'] %}
-                {% set _ = images.append(f) %}
-            {% else %}
-                {% set _ = other_files.append(f) %}
-            {% endif %}
-        {% endfor %}
-
-        <!-- Files and Links -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Files -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2"><i class="fa-solid fa-file-invoice text-blue-500"></i> {{ t('other_files') }}</h2>
-                <form method="POST" action="{{ url_for('project_upload_file', id=project.id) }}" enctype="multipart/form-data" class="flex gap-2 mb-4">
-                    <input type="file" name="file" multiple required accept=".3mf,.stl,.obj,.amf,.step,.stp,.gcode,.gc,.bgcode,.jpg,.jpeg,.png,.gif,.webp" class="flex-grow text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg transition" title="{{ t('upload_file') }}"><i class="fa-solid fa-upload"></i></button>
+                <form method="POST" action="{{ url_for('project_status', id=project.id) }}" class="mt-4 flex gap-2">
+                    <select name="status" class="flex-1 border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 outline-none">
+                        <option value="NEW" {% if project.status == 'NEW' %}selected{% endif %}>{{ t('status_new') }}</option>
+                        <option value="PRINTING" {% if project.status == 'PRINTING' %}selected{% endif %}>{{ t('status_printing') }}</option>
+                        <option value="DONE" {% if project.status == 'DONE' %}selected{% endif %}>{{ t('status_done') }}</option>
+                    </select>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 rounded-xl transition">
+                        <i class="fa-solid fa-check"></i>
+                    </button>
                 </form>
-                <ul class="space-y-2">
-                    {% for f in other_files %}
-                    <li class="flex justify-between items-center bg-gray-50 p-2 rounded group">
-                        <div class="flex items-center gap-3 w-4/5 overflow-hidden">
-                            <a href="{{ url_for('project_download_file', id=project.id, file_id=f.id) }}" class="text-blue-600 hover:underline text-sm truncate" target="_blank">{{ f.filename }}</a>
-                            {% set is_3d = f.filename.split('.')[-1] | lower in ['stl', 'obj', '3mf'] %}
-                            {% if is_3d %}
-                            <button type="button" @click="modelViewerOpen = true; modelViewerTitle = '{{ f.filename | escape }}'; modelViewerDownload = '{{ url_for('project_download_file', id=project.id, file_id=f.id) }}'; open3DViewer('{{ url_for('project_view_file', id=project.id, file_id=f.id, filename=f.filename) }}')" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded text-xs border border-indigo-200 transition font-semibold flex items-center gap-1 flex-shrink-0">
-                                <i class="fa-solid fa-cube"></i> {{ t('view_3d') if t('view_3d') else '3D' }}
-                            </button>
+            </div>
+
+            <div class="ui-panel">
+                <div class="ui-label">{{ t('project_estimate_vs_actual') }}</div>
+                <div class="grid grid-cols-1 gap-3 mt-4">
+                    <div class="ui-card-soft p-3">
+                        <div class="text-sm text-gray-500">{{ t('estimated_project_cost') }}</div>
+                        <div class="text-xl font-bold mt-1">{{ project_metrics.estimated_material_cost }} {{ current_currency }}</div>
+                        <div class="text-xs text-gray-500 mt-1">{{ project_metrics.estimated_weight }} g · {{ t('project_planned_materials_label') }}</div>
+                    </div>
+                    <div class="ui-card-soft p-3">
+                        <div class="text-sm text-gray-500">{{ t('actual_project_cost') }}</div>
+                        <div class="text-xl font-bold mt-1">{{ project_metrics.actual_total_cost }} {{ current_currency }}</div>
+                        <div class="text-xs text-gray-500 mt-1">{{ project_metrics.actual_weight }} g · {{ (project_metrics.actual_seconds // 3600) | int }}h {{ ((project_metrics.actual_seconds % 3600) // 60) | int }}min</div>
+                    </div>
+                    <div class="ui-card-soft p-3">
+                        <div class="text-sm text-gray-500">{{ t('quote_final_price') }}</div>
+                        <div class="text-xl font-bold mt-1">
+                            {{ project_metrics.quote_price if project_metrics.quote_price is not none else '-' }}
+                            {% if project_metrics.quote_price is not none %} {{ current_currency }}{% endif %}
+                        </div>
+                        <div class="text-xs mt-1 {% if project_metrics.profit is not none and project_metrics.profit >= 0 %}text-emerald-600{% elif project_metrics.profit is not none %}text-red-600{% else %}text-gray-500{% endif %}">
+                            {% if project_metrics.profit is not none %}
+                            {{ t('project_margin_label') }} {{ project_metrics.profit }} {{ current_currency }}
+                            {% else %}
+                            {{ t('project_quote_missing') }}
                             {% endif %}
                         </div>
-                        <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=f.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');">
-                            <button type="submit" class="text-red-400 hover:text-red-600 px-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition"><i class="fa-solid fa-trash text-sm"></i></button>
-                        </form>
-                    </li>
-                    {% else %}
-                    <li class="text-gray-500 text-sm italic">{{ t('project_no_files') }}</li>
-                    {% endfor %}
-                </ul>
+                    </div>
+                </div>
             </div>
 
-            <!-- Links -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2"><i class="fa-solid fa-link text-blue-500"></i> {{ t('project_links') }}</h2>
-                <form method="POST" action="{{ url_for('project_add_link', id=project.id) }}" class="flex flex-col gap-2 mb-4">
-                    <input type="text" name="name" placeholder="{{ t('project_link_name_placeholder') }}" class="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                    <div class="flex gap-2">
-                        <input type="url" name="url" placeholder="https://..." required class="flex-grow border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded transition" title="{{ t('add_link') }}"><i class="fa-solid fa-plus"></i></button>
+            <div class="ui-panel">
+                <div class="ui-label">{{ t('project_next_actions') }}</div>
+                <div class="space-y-2 mt-4">
+                    {% for action in next_actions %}
+                    <div class="ui-card-soft p-3 text-sm">
+                        {% if action == 'overdue' %}
+                        <div class="font-semibold text-red-600">{{ t('project_action_overdue_title') }}</div>
+                        <div class="text-gray-500 mt-1">{{ t('project_action_overdue_desc') }}</div>
+                        {% elif action == 'plan_filaments' %}
+                        <div class="font-semibold">{{ t('project_action_plan_filaments_title') }}</div>
+                        <div class="text-gray-500 mt-1">{{ t('project_action_plan_filaments_desc') }}</div>
+                        {% elif action == 'create_quote' %}
+                        <div class="font-semibold">{{ t('project_action_quote_title') }}</div>
+                        <div class="text-gray-500 mt-1">{{ t('project_action_quote_desc') }}</div>
+                        {% elif action == 'consume_planned' %}
+                        <div class="font-semibold">{{ t('project_action_consume_title') }}</div>
+                        <div class="text-gray-500 mt-1">{{ t('project_action_consume_desc') }}</div>
+                        {% elif action == 'map_bambu_jobs' %}
+                        <div class="font-semibold">{{ t('project_action_bambu_title') }}</div>
+                        <div class="text-gray-500 mt-1">{{ t('project_action_bambu_desc') }}</div>
+                        {% elif action == 'map_prusa_jobs' %}
+                        <div class="font-semibold">{{ t('project_action_prusa_title') }}</div>
+                        <div class="text-gray-500 mt-1">{{ t('project_action_prusa_desc') }}</div>
+                        {% endif %}
                     </div>
-                </form>
-                <ul class="space-y-3">
-                    {% for l in project.links %}
-                        {% if l.og_title or l.og_image %}
-                        <li class="relative group bg-gray-50 border border-gray-200 rounded-lg overflow-hidden flex flex-col sm:flex-row hover:shadow-md transition">
-                            {% if l.og_image %}
-                            <a href="{{ l.url }}" target="_blank" class="sm:w-32 h-24 sm:h-auto flex-shrink-0 bg-gray-200 block overflow-hidden border-b sm:border-b-0 sm:border-r border-gray-200">
-                                <img src="{{ l.og_image }}" alt="" class="w-full h-full object-cover">
-                            </a>
-                            {% endif %}
-                            <div class="p-3 flex-grow flex flex-col justify-center max-w-full overflow-hidden">
-                                <a href="{{ l.url }}" target="_blank" class="text-sm font-bold text-blue-700 hover:underline truncate mb-1" title="{{ l.og_title }}">{{ l.og_title or l.name }}</a>
-                                {% if l.og_description %}
-                                <p class="text-xs text-gray-500 line-clamp-2 mb-1">{{ l.og_description }}</p>
-                                {% endif %}
-                                <div class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider flex items-center gap-1">
-                                    <i class="fa-solid fa-earth-americas"></i> {{ l.domain or l.url.split('/')[2] }}
-                                    {% if l.name %} &bull; {{ l.name }}{% endif %}
+                    {% else %}
+                    <div class="ui-card-soft p-3 text-sm text-gray-500">{{ t('project_actions_complete') }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </aside>
+
+        <section class="space-y-4">
+            <div class="ui-panel">
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" @click="setTab('overview')" :class="workspaceTab === 'overview' ? 'ui-badge ui-badge-brand' : 'ui-badge'">{{ t('project_workspace_tab_overview') }}</button>
+                    <button type="button" @click="setTab('materials')" :class="workspaceTab === 'materials' ? 'ui-badge ui-badge-brand' : 'ui-badge'">{{ t('project_workspace_tab_materials') }}</button>
+                    <button type="button" @click="setTab('files')" :class="workspaceTab === 'files' ? 'ui-badge ui-badge-brand' : 'ui-badge'">{{ t('project_workspace_tab_files') }}</button>
+                    <button type="button" @click="setTab('jobs')" :class="workspaceTab === 'jobs' ? 'ui-badge ui-badge-brand' : 'ui-badge'">{{ t('project_workspace_tab_jobs') }}</button>
+                </div>
+            </div>
+
+            <div x-show="workspaceTab === 'overview'" x-cloak class="space-y-4">
+                <div class="ui-panel">
+                    <div class="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-5">
+                        <div>
+                            <div class="ui-label">{{ t('project_description') }}</div>
+                            <div class="text-base text-gray-700 whitespace-pre-wrap mt-3">{{ project.description or '-' }}</div>
+                        </div>
+                        <div class="ui-card-soft p-4">
+                            <div class="ui-label">{{ t('project_workspace_summary') }}</div>
+                            <div class="space-y-3 mt-4 text-sm">
+                                <div class="flex items-center justify-between"><span class="text-gray-500">{{ t('project_summary_materials') }}</span><span class="font-semibold">{{ project_metrics.planned_items }}</span></div>
+                                <div class="flex items-center justify-between"><span class="text-gray-500">{{ t('project_summary_used_materials') }}</span><span class="font-semibold">{{ project_metrics.completed_plans }}</span></div>
+                                <div class="flex items-center justify-between"><span class="text-gray-500">{{ t('project_summary_files') }}</span><span class="font-semibold">{{ project.files|length }}</span></div>
+                                <div class="flex items-center justify-between"><span class="text-gray-500">{{ t('project_summary_links') }}</span><span class="font-semibold">{{ project.links|length }}</span></div>
+                                <div class="flex items-center justify-between"><span class="text-gray-500">{{ t('quote_project_title') }}</span><span class="font-semibold">{{ project.quotes|length }}</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ui-panel">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <div class="ui-label">{{ t('project_activity_title') }}</div>
+                            <h2 class="text-2xl font-bold mt-1">{{ t('project_activity_heading') }}</h2>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        {% for event in activity_events %}
+                        <div class="ui-card-soft p-4">
+                            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                                <div>
+                                    <div class="font-semibold text-gray-800">{{ event.label }}</div>
+                                    <div class="text-xs text-gray-500 mt-1">{{ event.created_at.strftime('%d.%m.%Y %H:%M') if event.created_at else '-' }}</div>
+                                </div>
+                                <div class="text-sm text-gray-500">{{ event.meta }}</div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <p class="text-sm text-gray-400">{{ t('project_no_activity') }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div x-show="workspaceTab === 'materials'" x-cloak class="space-y-4">
+                <div class="ui-panel">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                        <div>
+                            <div class="ui-label">{{ t('project_filaments') }}</div>
+                            <h2 class="text-2xl font-bold mt-1">{{ t('project_materials_heading') }}</h2>
+                        </div>
+                        <a href="{{ url_for('calculator') }}" class="ui-badge ui-badge-brand"><i class="fa-solid fa-plus"></i> {{ t('quote_create_from_calculator') }}</a>
+                    </div>
+
+                    <form method="POST" action="{{ url_for('project_add_filament', id=project.id) }}" class="ui-card-soft p-4 mb-4" x-data="projectFilamentPicker()">
+                        <div class="grid grid-cols-1 xl:grid-cols-[1fr_140px_auto] gap-3 items-end">
+                            <div class="relative" @click.outside="open = false">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('select_filament') }}</label>
+                                <input type="hidden" name="filament_id" :value="selectedId" required>
+                                <div class="relative">
+                                    <input type="text" x-model="query" @focus="open = true" @input="open = true"
+                                           class="w-full border border-gray-300 rounded-xl px-4 py-2.5 pr-10"
+                                           placeholder="{{ t('search_filament') }}" autocomplete="off">
+                                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 pointer-events-none">
+                                        <div class="w-3 h-3 rounded-full border border-gray-200 mr-2" :style="selectedHex ? `background:${selectedHex}` : ''"></div>
+                                        <i class="fa-solid fa-chevron-down text-xs"></i>
+                                    </div>
+                                </div>
+                                <div x-show="open" x-cloak class="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+                                    <template x-for="f in filtered" :key="f.id">
+                                        <button type="button" @click="select(f)" class="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-gray-50 last:border-0">
+                                            <div class="font-semibold text-gray-800" x-text="f.name"></div>
+                                            <div class="text-xs text-gray-500" x-text="`${f.brand} ${f.material}`"></div>
+                                        </button>
+                                    </template>
                                 </div>
                             </div>
-                            <form method="POST" action="{{ url_for('project_delete_link', id=project.id, link_id=l.id) }}" class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex gap-1">
-                                <button type="submit" form="refresh-{{ l.id }}" class="bg-white p-1.5 rounded-full text-blue-500 hover:text-blue-700 hover:bg-blue-50 shadow border border-gray-200 transition" title="{{ t('refresh_preview') }}"><i class="fa-solid fa-arrows-rotate text-sm"></i></button>
-                                <button type="submit" class="bg-white p-1.5 rounded-full text-red-500 hover:text-red-700 hover:bg-red-50 shadow border border-gray-200 transition"><i class="fa-solid fa-trash text-sm"></i></button>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('estimated_weight') }}</label>
+                                <input type="number" name="estimated_weight" min="1" step="1" class="w-full border border-gray-300 rounded-xl px-4 py-2.5" required>
+                            </div>
+                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold transition">
+                                <i class="fa-solid fa-plus"></i> {{ t('save') }}
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="space-y-3">
+                        {% for pf in project.filaments %}
+                        <div class="ui-card-soft p-4" x-data="{ editing: false }">
+                            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                                <div class="flex items-start gap-3">
+                                    <div class="w-10 h-10 rounded-full border border-gray-300 shadow-sm flex-shrink-0" style="background-color: {{ pf.filament.color.hex_value or '#ccc' }};"></div>
+                                    <div>
+                                        <div class="font-semibold text-gray-800">{{ pf.filament.name }}</div>
+                                        <div class="text-sm text-gray-500">{{ pf.filament.brand.name }} · {{ pf.filament.material.name }} · {{ pf.estimated_weight | int }} g</div>
+                                        <div class="text-xs mt-1 {% if pf.estimated_weight > pf.filament.weight_remaining %}text-red-600{% else %}text-gray-400{% endif %}">
+                                            {{ t('remaining') }} {{ pf.filament.weight_remaining | int }} g
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex flex-wrap gap-2 items-center">
+                                    <button type="button" @click="editing = !editing" class="ui-badge"><i class="fa-solid fa-pen"></i> {{ t('edit') }}</button>
+                                    {% if pf.is_used %}
+                                    <span class="ui-badge ui-badge-success"><i class="fa-solid fa-check-double"></i> {{ t('status_done') }}</span>
+                                    {% else %}
+                                    <form method="POST" action="{{ url_for('project_consume_filament', id=project.id, pf_id=pf.id) }}">
+                                        <button type="submit" class="ui-badge ui-badge-brand"><i class="fa-solid fa-box-open"></i> {{ t('project_consume') }}</button>
+                                    </form>
+                                    {% endif %}
+                                    <form method="POST" action="{{ url_for('project_remove_filament', id=project.id, pf_id=pf.id) }}" onsubmit="return confirm('{{ t('delete') }}?')">
+                                        <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-xmark"></i> {{ t('delete') }}</button>
+                                    </form>
+                                </div>
+                            </div>
+                            <form x-show="editing" x-cloak method="POST" action="{{ url_for('project_update_filament', id=project.id, pf_id=pf.id) }}" class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
+                                <label class="text-xs text-gray-500 font-semibold flex-shrink-0">{{ t('estimated_weight') }}:</label>
+                                <input type="number" step="1" min="1" name="estimated_weight" value="{{ pf.estimated_weight | int }}" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none w-28">
+                                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm transition font-semibold">
+                                    <i class="fa-solid fa-save"></i>
+                                </button>
+                                <button type="button" @click="editing = false" class="text-gray-400 hover:text-gray-600 px-2 py-1.5 text-sm transition">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
                             </form>
-                            <form id="refresh-{{ l.id }}" method="POST" action="{{ url_for('project_refresh_link', id=project.id, link_id=l.id) }}"></form>
-                        </li>
+                        </div>
                         {% else %}
-                        <li class="flex justify-between items-center bg-gray-50 p-2 border border-gray-200 rounded-lg group hover:shadow-sm transition">
-                            <a href="{{ l.url }}" target="_blank" class="text-blue-600 hover:underline text-sm truncate w-5/6 flex flex-col justify-center">
-                                <div class="font-medium"><i class="fa-solid fa-link mr-1"></i> {{ l.name or l.url }}</div>
-                                {% if l.name and l.url != l.name %}<div class="text-xs text-gray-400 truncate mt-0.5">{{ l.url }}</div>{% endif %}
-                            </a>
-                            <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                                <form method="POST" action="{{ url_for('project_refresh_link', id=project.id, link_id=l.id) }}">
-                                    <button type="submit" class="text-blue-500 hover:text-blue-700 p-2" title="{{ t('refresh_preview') }}"><i class="fa-solid fa-arrows-rotate"></i></button>
-                                </form>
-                                <form method="POST" action="{{ url_for('project_delete_link', id=project.id, link_id=l.id) }}">
-                                    <button type="submit" class="text-red-500 hover:text-red-700 p-2"><i class="fa-solid fa-trash"></i></button>
+                        <p class="text-sm text-gray-400">{{ t('project_no_filaments') }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="ui-panel">
+                    <div class="ui-label">{{ t('quote_project_title') }}</div>
+                    <h2 class="text-2xl font-bold mt-1 mb-4">{{ t('project_quotes_heading') }}</h2>
+                    <div class="space-y-3">
+                        {% for quote in project.quotes | sort(attribute='created_at', reverse=True) %}
+                        <div class="ui-card-soft p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                            <div>
+                                <div class="font-semibold text-gray-800">{{ quote.filament_name }}</div>
+                                <div class="text-sm text-gray-500 mt-1">{{ quote.weight }} g · {{ quote.print_time }} {{ t('hours') }} · {{ t('quote_margin') }} {{ quote.margin_percent }} %</div>
+                                <div class="text-sm text-gray-500 mt-1">{{ t('quote_base_cost') }} {{ quote.base_cost | round(2) }} {{ quote.currency }}</div>
+                            </div>
+                            <div class="flex flex-wrap gap-2 items-center">
+                                <div class="text-xl font-bold text-indigo-700">{{ quote.final_price | round(2) }} {{ quote.currency }}</div>
+                                <a href="{{ url_for('export_quote', id=quote.id) }}" class="ui-badge"><i class="fa-solid fa-file-export"></i> {{ t('quote_export_btn') }}</a>
+                                <form method="POST" action="{{ url_for('delete_quote', id=quote.id) }}">
+                                    <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-trash"></i> {{ t('delete') }}</button>
                                 </form>
                             </div>
-                        {% endif %}
-                    {% else %}
-                    <li class="text-gray-500 text-sm italic">{{ t('project_no_links') }}</li>
-                    {% endfor %}
-                </ul>
-            </div>
-        </div>
-        
-        <!-- Image Gallery -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mt-6">
-            <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2"><i class="fa-solid fa-images text-purple-500"></i> {{ t('image_gallery') }}</h2>
-            
-            <!-- Drag and Drop Upload -->
-            <form id="upload-form" method="POST" action="{{ url_for('project_upload_file', id=project.id) }}" enctype="multipart/form-data" class="mb-6">
-                <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:bg-gray-50 transition border-blue-100 cursor-pointer flex flex-col items-center justify-center gap-2">
-                    <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-400"></i>
-                    <div class="text-gray-600">
-                        {{ t('drop_files_here') }} 
-                        <label class="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer underline">
-                            {{ t('browse') }}
-                            <input type="file" name="file" multiple accept="image/*" class="hidden" id="file-input">
-                        </label>
+                        </div>
+                        {% else %}
+                        <p class="text-sm text-gray-400">{{ t('quote_no_quotes') }}</p>
+                        {% endfor %}
                     </div>
                 </div>
-            </form>
+            </div>
 
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {% for img in images %}
-                <div class="relative group aspect-square rounded-lg border border-gray-200 overflow-hidden bg-gray-100 flex items-center justify-center cursor-pointer"
-                     @click="lightboxOpen = true; lightboxImg = '{{ url_for('project_image_file', id=project.id, file_id=img.id) }}'; lightboxTitle = '{{ img.filename | escape }}'; lightboxDownload = '{{ url_for('project_download_file', id=project.id, file_id=img.id) }}'">
-                    <img src="{{ url_for('project_image_file', id=project.id, file_id=img.id) }}" alt="{{ img.filename }}" class="object-cover w-full h-full">
-                    <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
-                        <div class="text-white hover:text-blue-300 transition" title="{{ img.filename }}"><i class="fa-solid fa-expand text-2xl"></i></div>
-                        <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=img.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');" @click.stop>
-                            <button type="submit" class="text-white hover:text-red-400 transition ml-2"><i class="fa-solid fa-trash text-xl"></i></button>
-                        </form>
+            <div x-show="workspaceTab === 'files'" x-cloak class="space-y-4">
+                <div class="ui-panel">
+                    <div class="ui-label">{{ t('project_files_title') }}</div>
+                    <h2 class="text-2xl font-bold mt-1 mb-4">{{ t('project_files_heading') }}</h2>
+                    <form id="upload-form" method="POST" action="{{ url_for('project_upload_file', id=project.id) }}" enctype="multipart/form-data" class="mb-5">
+                        <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center hover:bg-gray-50 transition cursor-pointer flex flex-col items-center justify-center gap-2">
+                            <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-400"></i>
+                            <div class="text-gray-600">
+                                {{ t('drop_files_here') }}
+                                <label class="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer underline">
+                                    {{ t('browse') }}
+                                    <input type="file" name="file" multiple class="hidden" id="file-input">
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div class="ui-card-soft p-4">
+                            <div class="ui-label">{{ t('project_files') }}</div>
+                            <div class="space-y-3 mt-3">
+                                {% for file in model_files %}
+                                <div class="flex items-center justify-between gap-3">
+                                    <div>
+                                        <div class="font-semibold text-gray-800">{{ file.filename }}</div>
+                                        <div class="text-xs text-gray-500">{{ file.filename.rsplit('.', 1)[-1].upper() if '.' in file.filename else 'FILE' }}</div>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <button type="button" @click="modelViewerOpen = true; modelViewerTitle = '{{ file.filename|escape }}'; modelViewerDownload = '{{ url_for('project_download_file', id=project.id, file_id=file.id) }}'; open3DViewer('{{ url_for('project_view_file', id=project.id, file_id=file.id, filename=file.filename) }}')" class="ui-badge ui-badge-brand">
+                                            <i class="fa-solid fa-cube"></i> {{ t('project_preview_3d') }}
+                                        </button>
+                                        <a href="{{ url_for('project_download_file', id=project.id, file_id=file.id) }}" class="ui-badge"><i class="fa-solid fa-download"></i></a>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <p class="text-sm text-gray-400">{{ t('project_no_files') }}</p>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="ui-card-soft p-4">
+                            <div class="ui-label">{{ t('project_attachments_title') }}</div>
+                            <div class="space-y-3 mt-3">
+                                {% for file in other_files %}
+                                <div class="flex items-center justify-between gap-3">
+                                    <div>
+                                        <div class="font-semibold text-gray-800">{{ file.filename }}</div>
+                                        <div class="text-xs text-gray-500">{{ file.filename.rsplit('.', 1)[-1].upper() if '.' in file.filename else 'FILE' }}</div>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <a href="{{ url_for('project_download_file', id=project.id, file_id=file.id) }}" class="ui-badge"><i class="fa-solid fa-download"></i> {{ t('download') }}</a>
+                                        <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=file.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');">
+                                            <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-trash"></i></button>
+                                        </form>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <p class="text-sm text-gray-400">{{ t('project_no_attachments') }}</p>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-5">
+                        <div class="ui-label mb-3">{{ t('image_gallery') }}</div>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {% for img in images %}
+                            <div class="relative group aspect-square rounded-xl border border-gray-200 overflow-hidden bg-gray-100 flex items-center justify-center cursor-pointer"
+                                 @click="lightboxOpen = true; lightboxImg = '{{ url_for('project_image_file', id=project.id, file_id=img.id) }}'; lightboxTitle = '{{ img.filename | escape }}'; lightboxDownload = '{{ url_for('project_download_file', id=project.id, file_id=img.id) }}'">
+                                <img src="{{ url_for('project_image_file', id=project.id, file_id=img.id) }}" alt="{{ img.filename }}" class="object-cover w-full h-full">
+                                <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
+                                    <div class="text-white hover:text-blue-300 transition"><i class="fa-solid fa-expand text-2xl"></i></div>
+                                    <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=img.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');" @click.stop>
+                                        <button type="submit" class="text-white hover:text-red-400 transition ml-2"><i class="fa-solid fa-trash text-xl"></i></button>
+                                    </form>
+                                </div>
+                            </div>
+                            {% else %}
+                            <div class="col-span-full py-2 text-gray-500 text-sm italic">{{ t('project_no_files') }}</div>
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
-                {% else %}
-                <div class="col-span-full py-2 text-gray-500 text-sm italic">{{ t('project_no_files') }}</div>
-                {% endfor %}
+
+                <div class="ui-panel">
+                    <div class="ui-label">{{ t('project_links') }}</div>
+                    <h2 class="text-2xl font-bold mt-1 mb-4">{{ t('project_links_heading') }}</h2>
+                    <form method="POST" action="{{ url_for('project_add_link', id=project.id) }}" class="ui-card-soft p-4 mb-4">
+                        <div class="grid grid-cols-1 md:grid-cols-[1fr_220px_auto] gap-3">
+                            <input type="url" name="url" placeholder="https://…" required class="border border-gray-300 rounded-xl px-4 py-2.5">
+                            <input type="text" name="name" placeholder="{{ t('project_link_name_placeholder') }}" class="border border-gray-300 rounded-xl px-4 py-2.5">
+                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold transition">{{ t('add_link') }}</button>
+                        </div>
+                    </form>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {% for link in project.links %}
+                            {% if link.og_title or link.og_image %}
+                            <div class="relative group ui-card-soft overflow-hidden flex flex-col sm:flex-row">
+                                {% if link.og_image %}
+                                <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer" class="sm:w-32 h-28 sm:h-auto flex-shrink-0 bg-gray-200 block overflow-hidden border-b sm:border-b-0 sm:border-r border-gray-200">
+                                    <img src="{{ link.og_image }}" alt="" class="w-full h-full object-cover">
+                                </a>
+                                {% endif %}
+                                <div class="p-4 flex-grow flex flex-col justify-center max-w-full overflow-hidden">
+                                    <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer" class="text-sm font-bold text-blue-700 hover:underline truncate mb-1" title="{{ link.og_title }}">{{ link.og_title or link.name or link.url }}</a>
+                                    {% if link.og_description %}
+                                    <p class="text-xs text-gray-500 mb-2">{{ link.og_description }}</p>
+                                    {% endif %}
+                                    <div class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider flex items-center gap-1">
+                                        <i class="fa-solid fa-earth-americas"></i> {{ link.domain or link.url }}
+                                        {% if link.name %} · {{ link.name }}{% endif %}
+                                    </div>
+                                </div>
+                                <div class="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition flex gap-1">
+                                    <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer" class="bg-white p-1.5 rounded-full text-blue-500 hover:text-blue-700 hover:bg-blue-50 shadow border border-gray-200 transition">
+                                        <i class="fa-solid fa-arrow-up-right-from-square text-sm"></i>
+                                    </a>
+                                    <form id="refresh-{{ link.id }}" method="POST" action="{{ url_for('project_refresh_link', id=project.id, link_id=link.id) }}"></form>
+                                    <button type="submit" form="refresh-{{ link.id }}" class="bg-white p-1.5 rounded-full text-blue-500 hover:text-blue-700 hover:bg-blue-50 shadow border border-gray-200 transition" title="{{ t('refresh_preview') }}">
+                                        <i class="fa-solid fa-arrows-rotate text-sm"></i>
+                                    </button>
+                                    <form method="POST" action="{{ url_for('project_delete_link', id=project.id, link_id=link.id) }}">
+                                        <button type="submit" class="bg-white p-1.5 rounded-full text-red-500 hover:text-red-700 hover:bg-red-50 shadow border border-gray-200 transition">
+                                            <i class="fa-solid fa-trash text-sm"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                            {% else %}
+                            <div class="ui-card-soft p-4 flex justify-between items-center gap-3">
+                                <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline text-sm truncate flex flex-col justify-center min-w-0">
+                                    <div class="font-medium"><i class="fa-solid fa-link mr-1"></i> {{ link.name or link.url }}</div>
+                                    {% if link.name and link.url != link.name %}
+                                    <div class="text-xs text-gray-400 truncate mt-0.5">{{ link.url }}</div>
+                                    {% endif %}
+                                </a>
+                                <div class="flex gap-1">
+                                    <form method="POST" action="{{ url_for('project_refresh_link', id=project.id, link_id=link.id) }}">
+                                        <button type="submit" class="ui-badge" title="{{ t('refresh_preview') }}"><i class="fa-solid fa-arrows-rotate"></i></button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('project_delete_link', id=project.id, link_id=link.id) }}">
+                                        <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-trash"></i></button>
+                                    </form>
+                                </div>
+                            </div>
+                            {% endif %}
+                        {% else %}
+                        <p class="text-sm text-gray-400">{{ t('project_no_links') }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
-        </div>
-        
+
+            <div x-show="workspaceTab === 'jobs'" x-cloak class="space-y-4">
+                {% if show_bambu_jobs or show_prusa_jobs %}
+                <div class="ui-panel">
+                    <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
+                        <div>
+                            <div class="ui-label">{{ t('project_printer_jobs_title') }}</div>
+                            <h2 class="text-2xl font-bold mt-1">{{ t('project_printer_jobs_heading') }}</h2>
+                            <p class="text-sm text-gray-500 mt-2">{{ t('project_printer_jobs_desc') }}</p>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        {% for item in job_feed %}
+                        <div class="ui-card-soft p-4">
+                            <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+                                <div class="min-w-0">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="ui-badge {% if item.source == 'bambu' %}ui-badge-brand{% else %}ui-badge{% endif %}">
+                                            {% if item.source == 'bambu' %}{{ t('project_job_source_bambu') }}{% else %}{{ t('project_job_source_prusa') }}{% endif %}
+                                        </span>
+                                        {% if item.deducted %}
+                                        <span class="ui-badge ui-badge-success"><i class="fa-solid fa-check-double"></i> {{ t('bambu_deducted') }}</span>
+                                        {% endif %}
+                                        {% if item.unmapped %}
+                                        <span class="ui-badge ui-badge-warning"><i class="fa-solid fa-link-slash"></i> {{ t('project_job_unmapped') }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="font-semibold text-gray-800 mt-3 truncate">{{ item.title }}</div>
+                                    <div class="text-sm text-gray-500 mt-1">
+                                        {% if item.printer_name %}{{ item.printer_name }} · {% endif %}
+                                        {{ item.status or '-' }}
+                                        {% if item.timestamp and item.timestamp.year > 1900 %} · {{ item.timestamp.strftime('%d.%m.%Y %H:%M') }}{% endif %}
+                                    </div>
+                                    <div class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-gray-500">
+                                        {% if item.filament_name %}
+                                        <span><i class="fa-solid fa-fill-drip mr-1 text-gray-400"></i>{{ item.filament_name }}</span>
+                                        {% endif %}
+                                        {% if item.material_slots > 1 %}
+                                        <span><i class="fa-solid fa-layer-group mr-1 text-gray-400"></i>{{ item.material_slots }} {{ t('project_job_material_slots') }}</span>
+                                        {% endif %}
+                                        {% if item.weight_grams %}
+                                        <span><i class="fa-solid fa-weight-hanging mr-1 text-gray-400"></i>{{ item.weight_grams }} g</span>
+                                        {% endif %}
+                                        {% if item.cost_time %}
+                                        <span><i class="fa-solid fa-clock mr-1 text-gray-400"></i>{% set job_h = (item.cost_time // 3600) | int %}{% set job_m = ((item.cost_time % 3600) // 60) | int %}{% if job_h %}{{ job_h }}h {% endif %}{{ job_m }}min</span>
+                                        {% endif %}
+                                        {% if item.total_cost > 0 %}
+                                        <span class="font-semibold text-indigo-600"><i class="fa-solid fa-coins mr-1"></i>{{ item.total_cost }} {{ current_currency }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="flex gap-2 items-start">
+                                    <a href="{{ item.detail_url }}" class="ui-badge ui-badge-brand"><i class="fa-solid fa-arrow-up-right-from-square"></i> {{ t('project_job_open_source') }}</a>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <p class="text-sm text-gray-400">{{ t('project_no_printer_jobs') }}</p>
+                        {% endfor %}
+                    </div>
+
+                    {% if jobs_pagination.pages > 1 %}
+                    <div class="flex justify-center mt-6">
+                        <nav class="flex items-center gap-1 bg-white rounded-lg shadow-sm border border-gray-200 px-2 py-1">
+                            <a href="{{ url_for('project_detail', id=project.id, tab='jobs', jobs_page=jobs_pagination.prev_num) if jobs_pagination.has_prev else '#' }}"
+                               class="px-3 py-1 rounded {{ 'text-blue-600 hover:bg-blue-50' if jobs_pagination.has_prev else 'text-gray-300 cursor-not-allowed' }}">
+                                <i class="fa-solid fa-chevron-left"></i>
+                            </a>
+
+                            {% for p in range(1, jobs_pagination.pages + 1) %}
+                                {% if p == jobs_pagination.page %}
+                                <span class="px-3 py-1 rounded bg-blue-600 text-white font-bold">{{ p }}</span>
+                                {% else %}
+                                <a href="{{ url_for('project_detail', id=project.id, tab='jobs', jobs_page=p) }}" class="px-3 py-1 rounded text-gray-700 hover:bg-gray-100 transition-colors">{{ p }}</a>
+                                {% endif %}
+                            {% endfor %}
+
+                            <a href="{{ url_for('project_detail', id=project.id, tab='jobs', jobs_page=jobs_pagination.next_num) if jobs_pagination.has_next else '#' }}"
+                               class="px-3 py-1 rounded {{ 'text-blue-600 hover:bg-blue-50' if jobs_pagination.has_next else 'text-gray-300 cursor-not-allowed' }}">
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </a>
+                        </nav>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <div class="ui-panel">
+                    <div class="ui-label">{{ t('project_activity_title') }}</div>
+                    <h2 class="text-2xl font-bold mt-1 mb-4">{{ t('project_activity_heading') }}</h2>
+                    <div class="space-y-3">
+                        {% for event in activity_events %}
+                        <div class="ui-card-soft p-4">
+                            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                                <div>
+                                    <div class="font-semibold text-gray-800">{{ event.label }}</div>
+                                    <div class="text-xs text-gray-500 mt-1">{{ event.created_at.strftime('%d.%m.%Y %H:%M') if event.created_at else '-' }}</div>
+                                </div>
+                                <div class="text-sm text-gray-500">{{ event.meta }}</div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <p class="text-sm text-gray-400">{{ t('project_no_activity') }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </section>
     </div>
-</div>
 
-    <!-- Lightbox Modal Overlay -->
     <div x-show="lightboxOpen" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4" @keydown.escape.window="lightboxOpen = false">
         <button @click="lightboxOpen = false" class="absolute top-4 right-4 text-white hover:text-gray-300 text-3xl transition p-2">
             <i class="fa-solid fa-xmark"></i>
@@ -551,21 +608,18 @@
         </div>
     </div>
 
-    <!-- 3D Viewer Modal Overlay -->
     <div x-show="modelViewerOpen" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center bg-black/95 sm:p-4" @keydown.escape.window="modelViewerOpen = false; close3DViewer();">
         <button @click="modelViewerOpen = false; close3DViewer();" class="absolute top-4 right-4 z-50 text-white hover:text-gray-300 text-3xl transition p-2 bg-black/50 rounded-full w-12 h-12 flex items-center justify-center border border-white/20 shadow-lg backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-white/50">
             <i class="fa-solid fa-xmark"></i>
         </button>
         <div class="flex flex-col items-center w-full h-full justify-center relative">
             <div id="3d-viewer-container" class="w-full h-full sm:rounded-xl overflow-hidden bg-gradient-to-b from-slate-900 to-black shadow-2xl"></div>
-            
-            <!-- Title Bar Overlay -->
             <div class="absolute bottom-6 left-0 right-0 flex justify-center pointer-events-none px-4">
                 <div class="bg-black/70 backdrop-blur-md border border-white/10 px-6 py-3 rounded-2xl shadow-xl flex items-center gap-4 pointer-events-auto max-w-full">
                     <div x-text="modelViewerTitle" class="font-medium text-white/90 truncate text-sm sm:text-lg max-w-[200px] sm:max-w-md"></div>
                     <div class="h-6 w-px bg-white/20"></div>
                     <a :href="modelViewerDownload" download class="text-blue-400 hover:text-blue-300 transition text-sm flex items-center gap-2 font-semibold whitespace-nowrap">
-                        <i class="fa-solid fa-download"></i> {{ t('download') if t('download') else 'Stáhnout' }}
+                        <i class="fa-solid fa-download"></i> {{ t('download') }}
                     </a>
                 </div>
             </div>
@@ -574,10 +628,11 @@
 </div>
 
 <script>
-    const dropZone = document.getElementById('drop-zone');
-    const fileInput = document.getElementById('file-input');
-    const uploadForm = document.getElementById('upload-form');
-    
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const uploadForm = document.getElementById('upload-form');
+
+if (dropZone && fileInput && uploadForm) {
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         dropZone.addEventListener(eventName, preventDefaults, false);
     });
@@ -604,10 +659,10 @@
             uploadForm.submit();
         }
     });
+}
 </script>
 
 <script>
-// Filament data for interactive picker on project detail page
 const _PF_FILAMENTS = {{ filaments_json | tojson }};
 
 function projectFilamentPicker() {
@@ -635,29 +690,26 @@ function projectFilamentPicker() {
 }
 </script>
 
-<!-- Online3DViewer core -->
 <script src="https://cdn.jsdelivr.net/npm/online-3d-viewer@0.18.0/build/engine/o3dv.min.js"></script>
 <script>
-    let viewerInstance = null;
+let viewerInstance = null;
 
-    function open3DViewer(url) {
-        // Zpozdíme inicializaci, aby DOM stihl x-show zviditelnit kontejner,
-        // jinak canvas nedostane správné rozměry
-        setTimeout(() => {
-            if (!viewerInstance) {
-                viewerInstance = new OV.EmbeddedViewer(document.getElementById('3d-viewer-container'), {
-                    backgroundColor: new OV.RGBAColor(15, 23, 42, 255), // tailwind slate-900
-                    defaultColor: new OV.RGBColor(59, 130, 246) // tailwind blue-500
-                });
-            }
-            viewerInstance.LoadModelFromUrlList([url]);
-        }, 50);
-    }
-    
-    function close3DViewer() {
-        if (viewerInstance) {
-            // viewerInstance.Clear() removed in newer version; just hiding the modal is enough.
+function open3DViewer(url) {
+    setTimeout(() => {
+        if (!viewerInstance) {
+            viewerInstance = new OV.EmbeddedViewer(document.getElementById('3d-viewer-container'), {
+                backgroundColor: new OV.RGBAColor(15, 23, 42, 255),
+                defaultColor: new OV.RGBColor(59, 130, 246)
+            });
         }
+        viewerInstance.LoadModelFromUrlList([url]);
+    }, 50);
+}
+
+function close3DViewer() {
+    if (viewerInstance) {
+        // Keeping the current viewer instance alive avoids expensive reinitialization.
     }
+}
 </script>
 {% endblock %}

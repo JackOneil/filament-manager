@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from utils import fetch_link_metadata, is_safe_external_url
+from utils import fetch_link_metadata, is_safe_external_url, parse_sync_status
 
 
 class SafeUrlTests(unittest.TestCase):
@@ -109,3 +109,20 @@ class LinkPreviewTests(unittest.TestCase):
         self.assertEqual(meta['og_description'], 'Articulated axolotl multicolor by Molodos')
         reader_call_url = mock_get.call_args_list[1].args[0]
         self.assertNotIn('#profileId-1871919', reader_call_url)
+
+
+class SyncStatusParsingTests(unittest.TestCase):
+    def test_parse_sync_status_handles_error_prefix(self):
+        parsed = parse_sync_status('error: Cannot reach printer')
+
+        self.assertFalse(parsed['ok'])
+        self.assertEqual(parsed['error'], 'Cannot reach printer')
+        self.assertEqual(parsed['added'], 0)
+
+    def test_parse_sync_status_handles_json_payload(self):
+        parsed = parse_sync_status('{"added":2,"updated":1,"skipped":4}')
+
+        self.assertTrue(parsed['ok'])
+        self.assertEqual(parsed['added'], 2)
+        self.assertEqual(parsed['updated'], 1)
+        self.assertEqual(parsed['skipped'], 4)

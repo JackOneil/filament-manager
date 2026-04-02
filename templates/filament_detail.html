@@ -3,7 +3,7 @@
 <div class="max-w-6xl mx-auto space-y-6">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div class="flex items-center gap-3">
-            <a href="{{ url_for('index') }}" class="text-gray-500 hover:text-blue-600 transition">
+            <a href="{{ url_for('filaments_index') }}" class="text-gray-500 hover:text-blue-600 transition">
                 <i class="fa-solid fa-arrow-left text-xl"></i>
             </a>
             <div class="w-4 h-10 rounded" style="background-color: {{ filament.color.hex_value }};"></div>
@@ -20,7 +20,7 @@
     </div>
 
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+        <div class="ui-panel space-y-4">
             <h2 class="text-xl font-bold text-gray-800">{{ t('spool_life_timeline') }}</h2>
             <div class="grid grid-cols-2 gap-4 text-sm">
                 <div>
@@ -66,12 +66,50 @@
                 <span class="mx-2 text-gray-300">|</span>
                 90d: <span class="font-semibold">{{ filament.stock_metrics.usage_90 }} g</span>
             </div>
+            <div class="ui-card-soft p-4">
+                <div class="ui-label">Knowledge Layer</div>
+                <div class="grid grid-cols-2 gap-3 mt-3 text-sm">
+                    <div>
+                        <div class="text-gray-500">{{ t('recommended_nozzle_temp') }}</div>
+                        <div class="font-semibold">{{ filament.recommended_nozzle_temp if filament.recommended_nozzle_temp is not none else '-' }}</div>
+                    </div>
+                    <div>
+                        <div class="text-gray-500">{{ t('recommended_bed_temp') }}</div>
+                        <div class="font-semibold">{{ filament.recommended_bed_temp if filament.recommended_bed_temp is not none else '-' }}</div>
+                    </div>
+                </div>
+                <div class="space-y-2 mt-3 text-sm">
+                    {% if filament.quality_drying %}<div><span class="font-semibold text-gray-700">Drying:</span> <span class="text-gray-500">{{ filament.quality_drying }}</span></div>{% endif %}
+                    {% if filament.quality_profile %}<div><span class="font-semibold text-gray-700">Profile:</span> <span class="text-gray-500">{{ filament.quality_profile }}</span></div>{% endif %}
+                    {% if filament.quality_notes %}<div><span class="font-semibold text-gray-700">Notes:</span> <span class="text-gray-500">{{ filament.quality_notes }}</span></div>{% endif %}
+                    {% if not filament.quality_drying and not filament.quality_profile and not filament.quality_notes %}
+                    <div class="text-gray-400">Doplň sušení, profil a poznámky pro rychlejší opakované použití.</div>
+                    {% endif %}
+                </div>
+            </div>
         </div>
 
-        <div class="xl:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div class="xl:col-span-2 ui-panel">
             <div class="flex items-center gap-2 mb-4 border-b pb-3">
                 <i class="fa-solid fa-flask-vial text-blue-500"></i>
                 <h2 class="text-xl font-bold text-gray-800">{{ t('quality_log') }}</h2>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+                <div class="ui-card-soft p-4">
+                    <div class="ui-label">Print Profile</div>
+                    <div class="text-sm text-gray-500 mt-2">Nozzle: <span class="font-semibold text-gray-800">{{ filament.recommended_nozzle_temp if filament.recommended_nozzle_temp is not none else '-' }}</span></div>
+                    <div class="text-sm text-gray-500 mt-1">Bed: <span class="font-semibold text-gray-800">{{ filament.recommended_bed_temp if filament.recommended_bed_temp is not none else '-' }}</span></div>
+                </div>
+                <div class="ui-card-soft p-4">
+                    <div class="ui-label">Drying & Adhesion</div>
+                    <div class="text-sm text-gray-500 mt-2">{{ filament.quality_drying or 'Bez poznámky k sušení.' }}</div>
+                    <div class="text-sm text-gray-500 mt-2">{{ filament.quality_adhesion or 'Bez poznámky k přilnavosti.' }}</div>
+                </div>
+                <div class="ui-card-soft p-4">
+                    <div class="ui-label">Stringing & Notes</div>
+                    <div class="text-sm text-gray-500 mt-2">{{ filament.quality_stringing or 'Bez poznámky ke stringingu.' }}</div>
+                    <div class="text-sm text-gray-500 mt-2">{{ filament.quality_notes or 'Bez obecných poznámek.' }}</div>
+                </div>
             </div>
             <form method="POST" action="{{ url_for('filament_update_meta', id=filament.id) }}" class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -8,6 +8,7 @@ from sqlalchemy.orm import joinedload
 from database import db
 from models import AppSetting, BambuPrinter, PrusaPrinter, BambuJobMaterial, BambuPrintJob, PrusaPrintJob, Brand, Color, Filament, Material, MovementHistory, ProjectFilament, ProjectQuote
 from utils import (
+    build_action_center,
     build_filament_history_name as _display_filament_name,
     compute_stock_status,
     format_tags,
@@ -55,6 +56,150 @@ def _decorate_filament(filament, usage_map):
     return filament
 
 
+def _inventory_stats(f_brand='', f_material='', f_color='', f_tag=''):
+    agg_query = db.session.query(
+        func.sum(Filament.quantity).label('spools'),
+        func.sum(Filament.weight_remaining).label('remaining'),
+        func.sum(
+            db.case(
+                (Filament.weight_total > 0, (Filament.price / Filament.weight_total) * Filament.weight_remaining),
+                else_=0,
+            )
+        ).label('value'),
+    )
+
+    if f_brand:
+        agg_query = agg_query.filter(Filament.brand_id == f_brand)
+    if f_material:
+        agg_query = agg_query.filter(Filament.material_id == f_material)
+    if f_color:
+        agg_query = agg_query.filter(Filament.color_id == f_color)
+    if f_tag:
+        agg_query = agg_query.filter(Filament.tag_text.ilike(f'%{f_tag}%'))
+
+    agg_result = agg_query.first()
+    return {
+        'spools': agg_result.spools or 0,
+        'remaining': agg_result.remaining or 0,
+        'value': agg_result.value or 0,
+    }
+
+
+def _live_printers():
+    bambu_printers_live = []
+    for printer in BambuPrinter.query.all():
+        job = BambuPrintJob.query.filter_by(device_id=printer.device_id).order_by(BambuPrintJob.started_at.desc().nullslast()).first()
+        if job and job.status == 'RUNNING':
+            bambu_printers_live.append({'printer': printer, 'job': job, 'type': 'bambu'})
+
+    prusa_printers_live = []
+    for printer in PrusaPrinter.query.filter_by(enabled=True).all():
+        job = PrusaPrintJob.query.filter_by(printer_id=printer.id).order_by(PrusaPrintJob.started_at.desc().nullslast()).first()
+        if job and job.status == 'PRINTING':
+            prusa_printers_live.append({'printer': printer, 'job': job, 'type': 'prusa'})
+
+    return bambu_printers_live + prusa_printers_live
+
+
+def _inventory_page_context():
+    from utils import collect_usage_windows
+
+    filaments_query, f_brand, f_material, f_color, f_tag = _apply_inventory_filters(_build_filament_query())
+    sort_by = request.args.get('sort_by', 'name')
+    sort_direction = request.args.get('sort_direction', 'asc')
+
+    if sort_direction not in ['asc', 'desc']:
+        sort_direction = 'asc'
+
+    setting = AppSetting.query.first()
+    if not setting:
+        setting = AppSetting()
+        db.session.add(setting)
+        db.session.commit()
+
+    view_mode_param = request.args.get('view', None)
+    if view_mode_param and view_mode_param in ['card', 'list']:
+        setting.view_mode = view_mode_param
+        db.session.commit()
+
+    view_mode = setting.view_mode
+
+    if sort_by == 'brand':
+        order_expr = Brand.name
+        filaments_query = filaments_query.join(Brand)
+    elif sort_by == 'pieces':
+        order_expr = Filament.quantity
+    elif sort_by == 'remaining':
+        order_expr = Filament.weight_remaining
+    elif sort_by == 'capacity':
+        order_expr = Filament.quantity * Filament.weight_total
+    elif sort_by == 'percent':
+        order_expr = db.case(
+            (Filament.quantity * Filament.weight_total > 0,
+             Filament.weight_remaining / (Filament.quantity * Filament.weight_total)),
+            else_=0,
+        )
+    else:
+        order_expr = Filament.name
+
+    if sort_direction == 'desc':
+        filaments_query = filaments_query.order_by(order_expr.desc())
+    else:
+        filaments_query = filaments_query.order_by(order_expr.asc())
+
+    page = request.args.get('page', 1, type=int)
+    default_per_page = setting.items_per_page if setting else 12
+    per_page = request.args.get('per_page', default_per_page, type=int)
+    if per_page not in [12, 24, 48, 96]:
+        per_page = default_per_page
+
+    stats = _inventory_stats(f_brand, f_material, f_color, f_tag)
+
+    filaments_paginated = db.paginate(filaments_query, page=page, per_page=per_page, error_out=False)
+    usage_map = collect_usage_windows(filaments_paginated.items)
+    filaments_paginated.items[:] = [_decorate_filament(fil, usage_map) for fil in filaments_paginated.items]
+
+    brands = Brand.query.order_by(Brand.name).all()
+    materials = Material.query.order_by(Material.name).all()
+    colors = Color.query.order_by(Color.name).all()
+    tag_options = sorted({
+        tag
+        for filament in Filament.query.order_by(Filament.name).all()
+        for tag in parse_tags(filament.tag_text)
+    }, key=str.lower)
+
+    stock_alert_pool = [
+        fil for fil in filaments_paginated.items
+        if fil.stock_metrics['status'] in ('critical', 'warning') and not fil.reorder_alert_snoozed
+    ]
+    stock_alert_pool.sort(
+        key=lambda item: (
+            0 if item.stock_metrics['status'] == 'critical' else 1,
+            item.stock_metrics['recommended_grams'] * -1,
+            item.name.lower(),
+        ),
+    )
+
+    return {
+        'filaments': filaments_paginated,
+        'stats': stats,
+        'brands': brands,
+        'materials': materials,
+        'colors': colors,
+        'f_brand': f_brand,
+        'f_material': f_material,
+        'f_color': f_color,
+        'f_tag': f_tag,
+        'tag_options': tag_options,
+        'view_mode': view_mode,
+        'per_page': per_page,
+        'sort_by': sort_by,
+        'sort_direction': sort_direction,
+        'stock_alerts': stock_alert_pool[:6],
+        'stock_alert_count': len(stock_alert_pool),
+    }
+
+
 def _selected_filaments():
     selected_ids = request.form.getlist('selected_ids')
     ids = []
@@ -72,138 +217,16 @@ def register(app):
 
     @app.route('/')
     def index():
-        from utils import collect_usage_windows
-
-        filaments_query, f_brand, f_material, f_color, f_tag = _apply_inventory_filters(_build_filament_query())
-        sort_by = request.args.get('sort_by', 'name')
-        sort_direction = request.args.get('sort_direction', 'asc')
-
-        if sort_direction not in ['asc', 'desc']:
-            sort_direction = 'asc'
-
-        setting = AppSetting.query.first()
-        if not setting:
-            setting = AppSetting()
-            db.session.add(setting)
-            db.session.commit()
-
-        view_mode_param = request.args.get('view', None)
-        if view_mode_param and view_mode_param in ['card', 'list']:
-            setting.view_mode = view_mode_param
-            db.session.commit()
-
-        view_mode = setting.view_mode
-
-        if sort_by == 'brand':
-            order_expr = Brand.name
-            filaments_query = filaments_query.join(Brand)
-        elif sort_by == 'pieces':
-            order_expr = Filament.quantity
-        elif sort_by == 'remaining':
-            order_expr = Filament.weight_remaining
-        elif sort_by == 'capacity':
-            order_expr = Filament.quantity * Filament.weight_total
-        elif sort_by == 'percent':
-            order_expr = db.case(
-                (Filament.quantity * Filament.weight_total > 0,
-                 Filament.weight_remaining / (Filament.quantity * Filament.weight_total)),
-                else_=0,
-            )
-        else:
-            order_expr = Filament.name
-
-        if sort_direction == 'desc':
-            filaments_query = filaments_query.order_by(order_expr.desc())
-        else:
-            filaments_query = filaments_query.order_by(order_expr.asc())
-
-        page = request.args.get('page', 1, type=int)
-        default_per_page = setting.items_per_page if setting else 12
-        per_page = request.args.get('per_page', default_per_page, type=int)
-        if per_page not in [12, 24, 48, 96]:
-            per_page = default_per_page
-
-        agg_query = db.session.query(
-            func.sum(Filament.quantity).label('spools'),
-            func.sum(Filament.weight_remaining).label('remaining'),
-            func.sum(
-                db.case(
-                    (Filament.weight_total > 0, (Filament.price / Filament.weight_total) * Filament.weight_remaining),
-                    else_=0,
-                )
-            ).label('value'),
-        )
-
-        if f_brand:
-            agg_query = agg_query.filter(Filament.brand_id == f_brand)
-        if f_material:
-            agg_query = agg_query.filter(Filament.material_id == f_material)
-        if f_color:
-            agg_query = agg_query.filter(Filament.color_id == f_color)
-        if f_tag:
-            agg_query = agg_query.filter(Filament.tag_text.ilike(f'%{f_tag}%'))
-
-        agg_result = agg_query.first()
-        total_spools = agg_result.spools or 0
-        total_remaining_g = agg_result.remaining or 0
-        total_value = agg_result.value or 0
-
-        filaments_paginated = db.paginate(filaments_query, page=page, per_page=per_page, error_out=False)
-        usage_map = collect_usage_windows(filaments_paginated.items)
-        filaments_paginated.items[:] = [_decorate_filament(fil, usage_map) for fil in filaments_paginated.items]
-
-        brands = Brand.query.order_by(Brand.name).all()
-        materials = Material.query.order_by(Material.name).all()
-        colors = Color.query.order_by(Color.name).all()
-        tag_options = sorted({
-            tag
-            for filament in Filament.query.order_by(Filament.name).all()
-            for tag in parse_tags(filament.tag_text)
-        }, key=str.lower)
-
-        stock_alerts = sorted(
-            [fil for fil in filaments_paginated.items if fil.stock_metrics['status'] in ('critical', 'warning') and not fil.reorder_alert_snoozed],
-            key=lambda item: (
-                0 if item.stock_metrics['status'] == 'critical' else 1,
-                item.stock_metrics['recommended_grams'] * -1,
-                item.name.lower(),
-            ),
-        )[:6]
-
-        bambu_printers_live = []
-        bambu_enabled = BambuPrinter.query.all()
-        for bp in bambu_enabled:
-            job = BambuPrintJob.query.filter_by(device_id=bp.device_id).order_by(BambuPrintJob.started_at.desc().nullslast()).first()
-            if job and job.status == 'RUNNING':
-                bambu_printers_live.append({'printer': bp, 'job': job, 'type': 'bambu'})
-
-        prusa_printers_live = []
-        prusa_enabled = PrusaPrinter.query.filter_by(enabled=True).all()
-        for pp in prusa_enabled:
-            job = PrusaPrintJob.query.filter_by(printer_id=pp.id).order_by(PrusaPrintJob.started_at.desc().nullslast()).first()
-            if job and job.status == 'PRINTING':
-                prusa_printers_live.append({'printer': pp, 'job': job, 'type': 'prusa'})
-
-
         return render_template(
-            'index.html',
-            filaments=filaments_paginated,
-            stats={"spools": total_spools, "remaining": total_remaining_g, "value": total_value},
-            brands=brands,
-            materials=materials,
-            colors=colors,
-            f_brand=f_brand,
-            f_material=f_material,
-            f_color=f_color,
-            f_tag=f_tag,
-            tag_options=tag_options,
-            view_mode=view_mode,
-            per_page=per_page,
-            sort_by=sort_by,
-            sort_direction=sort_direction,
-            stock_alerts=stock_alerts,
-            live_printers=bambu_printers_live + prusa_printers_live,
+            'overview.html',
+            stats=_inventory_stats(),
+            action_center=build_action_center(),
+            live_printers=_live_printers(),
         )
+
+    @app.route('/filaments')
+    def filaments_index():
+        return render_template('index.html', **_inventory_page_context())
 
     @app.route('/filament/<int:id>')
     def filament_detail(id):
@@ -288,11 +311,11 @@ def register(app):
         # so an unexpected action never silently deletes filaments.
         action = request.form.get('action', '')
         if action != 'bulk_delete_selected':
-            return redirect(url_for('index'))
+            return redirect(url_for('filaments_index'))
 
         selected = _selected_filaments()
         if not selected:
-            return redirect(url_for('index'))
+            return redirect(url_for('filaments_index'))
 
         selected_ids = [f.id for f in selected]
         ProjectFilament.query.filter(ProjectFilament.filament_id.in_(selected_ids)).delete(synchronize_session=False)
@@ -302,7 +325,7 @@ def register(app):
             db.session.delete(filament)
 
         db.session.commit()
-        return redirect(url_for('index'))
+        return redirect(url_for('filaments_index'))
 
     @app.route('/add', methods=['GET', 'POST'])
     def add():
@@ -349,7 +372,7 @@ def register(app):
             db.session.flush()
             log_movement(new_fil, 'add', weight_remaining, note='Initial stock')
             db.session.commit()
-            return redirect(url_for('index'))
+            return redirect(url_for('filaments_index'))
 
         brands = Brand.query.order_by(Brand.name).all()
         colors = Color.query.order_by(Color.name).all()
@@ -379,7 +402,7 @@ def register(app):
                 log_movement(filament, 'remove', abs(weight_diff), note='Manual edit')
 
             db.session.commit()
-            return redirect(url_for('index'))
+            return redirect(url_for('filaments_index'))
 
         return render_template('edit.html', filament=filament, formatted_tags=format_tags(filament.tag_text))
 
@@ -390,7 +413,7 @@ def register(app):
         except (TypeError, ValueError):
             amount = 0.0
         if amount <= 0:
-            return redirect(url_for('index'))
+            return redirect(url_for('filaments_index'))
         filament = db.get_or_404(Filament, id)
         old_weight = filament.weight_remaining
         filament.weight_remaining -= amount
@@ -405,7 +428,7 @@ def register(app):
 
         log_movement(filament, 'remove', actual_amount, note='Manual usage')
         db.session.commit()
-        return redirect(url_for('index'))
+        return redirect(url_for('filaments_index'))
 
     @app.route('/add_spool/<int:id>', methods=['POST'])
     def add_spool(id):
@@ -414,7 +437,7 @@ def register(app):
         filament.weight_remaining += filament.weight_total
         log_movement(filament, 'add', filament.weight_total, note='Added spool')
         db.session.commit()
-        return redirect(url_for('index'))
+        return redirect(url_for('filaments_index'))
 
     @app.route('/remove_spool/<int:id>', methods=['POST'])
     def remove_spool(id):
@@ -428,7 +451,7 @@ def register(app):
             actual_amount = old_weight - filament.weight_remaining
             log_movement(filament, 'remove', actual_amount, note='Removed spool')
         db.session.commit()
-        return redirect(url_for('index'))
+        return redirect(url_for('filaments_index'))
 
     @app.route('/delete/<int:id>', methods=['POST'])
     def delete(id):
@@ -438,4 +461,4 @@ def register(app):
         ProjectQuote.query.filter_by(filament_id=filament.id).update({'filament_id': None})
         db.session.delete(filament)
         db.session.commit()
-        return redirect(url_for('index'))
+        return redirect(url_for('filaments_index'))

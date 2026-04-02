@@ -14,7 +14,7 @@ from models import (
     BambuPrinter, BambuPrintJob, BambuJobMaterial, StoragePlacement, StorageShelf,
     PrusaPrinter, PrusaPrintJob,
 )
-from utils import format_tags, top_tags, encrypt_token, decrypt_token
+from utils import build_action_center, decrypt_token, encrypt_token, format_tags, parse_sync_status, top_tags
 
 
 def _filament_ref(filament):
@@ -265,12 +265,17 @@ def register(app):
         prusa_printers = PrusaPrinter.query.order_by(PrusaPrinter.name).all()
         filament_tag_cloud = top_tags(Filament.query.all())
         project_tag_cloud = top_tags(Project.query.all())
+        bambu_sync_status = parse_sync_status(app_settings.bambu_last_sync_status if app_settings else None)
+        prusa_sync_states = {printer.id: parse_sync_status(printer.last_sync_status) for printer in prusa_printers}
         return render_template(
             'settings.html',
             brands=brands, colors=colors, materials=materials,
             app_settings=app_settings, printers=printers,
             prusa_printers=prusa_printers,
             filament_tag_cloud=filament_tag_cloud, project_tag_cloud=project_tag_cloud,
+            bambu_sync_status=bambu_sync_status,
+            prusa_sync_states=prusa_sync_states,
+            action_center=build_action_center(),
         )
 
     @app.route('/export')
@@ -448,6 +453,9 @@ def register(app):
                 'printer_model': pp.printer_model,
                 'notes': pp.notes,
                 'enabled': pp.enabled,
+                'last_sync_at': pp.last_sync_at.isoformat() if pp.last_sync_at else None,
+                'last_success_at': pp.last_success_at.isoformat() if pp.last_success_at else None,
+                'last_sync_status': pp.last_sync_status,
             } for pp in PrusaPrinter.query.all()],
 
             'prusa_jobs': [{
@@ -791,14 +799,20 @@ def register(app):
                         continue
                     # Only restore if host present; api_key is not exported so skip
                     if pp.get('host'):
-                        db.session.add(PrusaPrinter(
+                        restored_printer = PrusaPrinter(
                             name=pp.get('name', ''),
                             host=pp.get('host', ''),
                             api_key=encrypt_token('NEEDS_CONFIGURATION'),
                             printer_model=pp.get('printer_model'),
                             notes=pp.get('notes'),
                             enabled=pp.get('enabled', True),
-                        ))
+                        )
+                        if pp.get('last_sync_at'):
+                            restored_printer.last_sync_at = datetime.fromisoformat(pp['last_sync_at'])
+                        if pp.get('last_success_at'):
+                            restored_printer.last_success_at = datetime.fromisoformat(pp['last_success_at'])
+                        restored_printer.last_sync_status = pp.get('last_sync_status')
+                        db.session.add(restored_printer)
 
                 db.session.flush()
 

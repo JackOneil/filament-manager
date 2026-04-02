@@ -231,6 +231,9 @@ class PrusaPrinter(db.Model):
     printer_model = db.Column(db.String(100), nullable=True)  # filled from /api/v1/info
     notes = db.Column(db.Text, nullable=True)
     enabled = db.Column(db.Boolean, nullable=False, default=True)
+    last_sync_at = db.Column(db.DateTime, nullable=True)
+    last_success_at = db.Column(db.DateTime, nullable=True)
+    last_sync_status = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 

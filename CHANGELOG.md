@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.45.2] - 2026-04-02
+### Changed
+- **Remembered filament view mode:** The `/filaments` page now keeps the selected card/list mode even after leaving the page and coming back later.
+- **Interactive overview layout:** The overview page now supports the same edit-mode drag/reorder pattern as the statistics dashboard, with live printers promoted to the top in a more compact, immediately visible block.
+- **Interactive projects board:** The projects page now uses the same draggable widget editing model as statistics, and Kanban columns are labeled only by their actual status names.
+- **Action Center mapping cleanup:** Bambu jobs without a linked project are no longer treated as deficiencies on the overview dashboard; only missing filament/material mapping is surfaced there.
+
+## [1.45.1] - 2026-04-02
+### Changed
+- **Overview split from filament list:** `/` is now a clean operations overview, while the full filterable inventory list moved to `/filaments` so dashboard work and stock browsing no longer compete on one page.
+- **Navigation grouped for day-to-day use:** Top navigation now follows the intended structure `Inventory / Projects / Printers / Analytics / Settings` and includes a dedicated entry for the new filament list page.
+- **Project detail tab persistence:** Uploading files, adding links, refreshing previews, and materials actions now redirect back to the relevant project tab instead of dropping the user onto the default view.
+- **Project job history refined:** The project detail page now uses a compact combined Bambu/Prusa job feed with pagination, and printer history is shown only when the related integration is actually configured.
+- **Link previews restored:** Rich project link cards with image/title/description previews were brought back so saved references are easier to scan again.
+
+## [1.45.0] - 2026-04-01
+### Added
+- **Action Center on inventory dashboard:** New top-level operational panel on the main inventory page that groups low-stock alerts, overdue projects, unmapped print jobs, and printer sync issues into one place.
+- **Saved views for inventory, storage, and stats:** Added browser-persisted presets for the most filter-heavy pages so users can jump back to common views in one click.
+- **Prusa sync diagnostics persistence:** `PrusaPrinter` now stores `last_sync_at`, `last_success_at`, and `last_sync_status`, and those fields are included in export/import backups.
+
+### Changed
+- **Shared design system:** Introduced reusable UI surface, badge, filter, and table styles via CSS variables in `base.html`, with cleaner light/dark consistency across the updated pages.
+- **Grouped navigation:** Top navigation is now organized into logical areas for inventory, projects, printers, analytics, and settings.
+- **Statistics dashboard executive mode:** `/stats` now opens with a concise executive overview (primary KPI set + dominant chart) while deeper widgets are split into switchable sections for planning, projects, and detail work.
+- **Projects workspace redesign:** Project detail now behaves more like a workspace with a left-side status/finance rail, next-action guidance, estimate-vs-actual summary, tabbed content areas, and a lightweight project activity feed.
+- **Projects overview upgraded:** `/projects` now includes a kanban-style status board, due-date calendar strip, and estimate-vs-actual summary columns in the main table.
+- **Filament knowledge layer emphasized:** Filament detail now highlights profile, drying, adhesion, and print-note data more clearly so filament-specific know-how is easier to reuse.
+- **Settings printer diagnostics:** Settings now surfaces manual sync actions and last sync state summaries for both Bambu Cloud and PrusaLink integrations.
+
 ## [1.44.0] - 2026-04-01
 ### Added
 - **Live printers on dashboard:** Displays current running print jobs (for both Bambu and Prusa printers) directly at the top of the main dashboard in a compact grid. Includes a progress bar thermometer, estimated time of arrival, and a pulsing status indicator.

@@ -37,7 +37,7 @@ from utils import get_settings
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.44.0'
+APP_VERSION = '1.45.2'
 
 csrf = CSRFProtect()
 
@@ -167,6 +167,9 @@ def _setup_database(app: Flask) -> None:
         # these alters guard against columns added in future versions.
         _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN notes TEXT DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN enabled BOOLEAN NOT NULL DEFAULT 1")
+        _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN last_sync_at DATETIME DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN last_success_at DATETIME DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN last_sync_status VARCHAR(255) DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE prusa_print_job ADD COLUMN progress FLOAT DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE prusa_print_job ADD COLUMN raw_payload TEXT DEFAULT NULL")
 

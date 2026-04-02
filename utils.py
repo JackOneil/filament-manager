@@ -12,7 +12,10 @@ import requests
 from bs4 import BeautifulSoup
 
 from database import db
-from models import AppSetting, MovementHistory
+from models import (
+    AppSetting, BambuJobMaterial, BambuPrintJob, MovementHistory,
+    Project, PrusaPrintJob, PrusaPrinter,
+)
 
 
 def get_settings():
@@ -183,6 +186,223 @@ def collect_usage_windows(filaments, now=None):
         if row.created_at and row.created_at >= now - timedelta(days=30):
             by_id[filament_id]['usage_30'] += row.weight or 0.0
     return by_id
+
+
+def parse_sync_status(raw_value):
+    if not raw_value:
+        return {
+            'ok': None,
+            'error': None,
+            'added': 0,
+            'updated': 0,
+            'skipped': 0,
+            'label': None,
+        }
+
+    raw_text = str(raw_value).strip()
+    if raw_text.lower().startswith('error:'):
+        return {
+            'ok': False,
+            'error': raw_text[6:].strip(),
+            'added': 0,
+            'updated': 0,
+            'skipped': 0,
+            'label': raw_text,
+        }
+
+    try:
+        payload = json.loads(raw_text)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {
+            'ok': None,
+            'error': None,
+            'added': 0,
+            'updated': 0,
+            'skipped': 0,
+            'label': raw_text,
+        }
+
+    return {
+        'ok': True,
+        'error': None,
+        'added': int(payload.get('added', 0) or 0),
+        'updated': int(payload.get('updated', 0) or 0),
+        'skipped': int(payload.get('skipped', 0) or 0),
+        'label': raw_text,
+    }
+
+
+def build_project_metrics(project, setting=None):
+    setting = setting or get_settings()
+    kwh_price = setting.kwh_price if setting else 5.0
+    printer_power = setting.printer_power if setting else 150
+
+    estimated_material_cost = 0.0
+    estimated_weight = 0.0
+    planned_items = 0
+    completed_plans = 0
+    for item in getattr(project, 'filaments', []) or []:
+        planned_items += 1
+        estimated_weight += float(item.estimated_weight or 0.0)
+        if item.is_used:
+            completed_plans += 1
+        if item.filament and item.filament.weight_total > 0:
+            estimated_material_cost += (item.filament.price / item.filament.weight_total) * (item.estimated_weight or 0.0)
+
+    actual_material_cost = 0.0
+    actual_weight = 0.0
+    actual_seconds = 0
+
+    for job in getattr(project, 'bambu_jobs', []) or []:
+        actual_seconds += int(job.cost_time or 0)
+        if job.materials:
+            slot_total = 0.0
+            for slot in job.materials:
+                if slot.weight_grams:
+                    actual_weight += float(slot.weight_grams or 0.0)
+                if slot.filament and slot.filament.weight_total > 0 and slot.weight_grams:
+                    slot_total += (slot.filament.price / slot.filament.weight_total) * slot.weight_grams
+            if slot_total > 0:
+                actual_material_cost += slot_total
+            elif job.filament and job.filament.weight_total > 0 and job.weight_grams:
+                actual_material_cost += (job.filament.price / job.filament.weight_total) * job.weight_grams
+        elif job.filament and job.filament.weight_total > 0 and job.weight_grams:
+            actual_weight += float(job.weight_grams or 0.0)
+            actual_material_cost += (job.filament.price / job.filament.weight_total) * job.weight_grams
+        elif job.weight_grams:
+            actual_weight += float(job.weight_grams or 0.0)
+
+    for job in getattr(project, 'prusa_jobs', []) or []:
+        actual_seconds += int(job.cost_time or 0)
+        if job.weight_grams:
+            actual_weight += float(job.weight_grams or 0.0)
+        if job.filament and job.filament.weight_total > 0 and job.weight_grams:
+            actual_material_cost += (job.filament.price / job.filament.weight_total) * job.weight_grams
+
+    energy_cost = (actual_seconds / 3600.0) * (printer_power / 1000.0) * kwh_price
+    actual_total_cost = actual_material_cost + energy_cost
+    latest_quote = None
+    if getattr(project, 'quotes', None):
+        latest_quote = max(project.quotes, key=lambda item: item.created_at or datetime.min)
+
+    quote_price = float(latest_quote.final_price or 0.0) if latest_quote else 0.0
+    profit = quote_price - actual_total_cost if latest_quote else None
+    estimated_seconds = int((project.estimated_print_time or 0) * 60)
+
+    return {
+        'estimated_material_cost': round(estimated_material_cost, 2),
+        'estimated_weight': round(estimated_weight, 1),
+        'estimated_seconds': estimated_seconds,
+        'actual_material_cost': round(actual_material_cost, 2),
+        'actual_weight': round(actual_weight, 1),
+        'actual_seconds': actual_seconds,
+        'energy_cost': round(energy_cost, 2),
+        'actual_total_cost': round(actual_total_cost, 2),
+        'quote_price': round(quote_price, 2) if latest_quote else None,
+        'profit': round(profit, 2) if profit is not None else None,
+        'planned_items': planned_items,
+        'completed_plans': completed_plans,
+        'completion_ratio': round((completed_plans / planned_items) * 100) if planned_items else 0,
+        'has_quote': latest_quote is not None,
+    }
+
+
+def build_action_center(now=None):
+    now = now or datetime.utcnow()
+    setting = get_settings()
+
+    low_stock_rows = []
+    from models import Filament
+
+    usage_windows = collect_usage_windows(Filament.query.all(), now=now)
+    for filament in Filament.query.all():
+        stock = compute_stock_status(
+            filament,
+            usage_windows.get(filament.id, {}).get('usage_30', 0.0),
+            usage_windows.get(filament.id, {}).get('usage_90', 0.0),
+        )
+        if stock['status'] in ('critical', 'warning') and not filament.reorder_alert_snoozed:
+            low_stock_rows.append({
+                'filament': filament,
+                'status': stock['status'],
+                'recommended_spools': stock['recommended_spools'],
+                'recommended_grams': stock['recommended_grams'],
+            })
+    low_stock_rows.sort(key=lambda item: (0 if item['status'] == 'critical' else 1, -item['recommended_grams']))
+
+    overdue_projects = (
+        Project.query
+        .filter(Project.status != 'DONE', Project.due_date.is_not(None), Project.due_date < now)
+        .order_by(Project.due_date.asc())
+        .limit(6)
+        .all()
+    )
+
+    unmapped_bambu = (
+        BambuPrintJob.query
+        .filter(
+            db.or_(
+                BambuPrintJob.filament_id.is_(None),
+                BambuPrintJob.materials.any(BambuJobMaterial.filament_id.is_(None)),
+            )
+        )
+        .order_by(BambuPrintJob.started_at.desc().nullslast(), BambuPrintJob.synced_at.desc())
+        .limit(6)
+        .all()
+    )
+    unmapped_prusa = (
+        PrusaPrintJob.query
+        .filter(
+            db.or_(PrusaPrintJob.project_id.is_(None), PrusaPrintJob.filament_id.is_(None)),
+            PrusaPrintJob.status.in_(('PRINTING', 'FINISHED')),
+        )
+        .order_by(PrusaPrintJob.synced_at.desc())
+        .limit(6)
+        .all()
+    )
+
+    printer_issues = []
+    bambu_status = parse_sync_status(setting.bambu_last_sync_status if setting else None)
+    if setting and setting.bambu_token:
+        stale_minutes = max(int(setting.bambu_auto_sync_interval_minutes or 60) * 2, 15)
+        is_stale = not setting.bambu_last_sync_at or setting.bambu_last_sync_at < now - timedelta(minutes=stale_minutes)
+        if bambu_status['ok'] is False or is_stale:
+            printer_issues.append({
+                'type': 'bambu',
+                'name': 'Bambu Cloud',
+                'last_sync_at': setting.bambu_last_sync_at,
+                'last_success_at': setting.bambu_last_sync_at if bambu_status['ok'] else None,
+                'status': bambu_status,
+                'is_stale': is_stale,
+            })
+
+    for printer in PrusaPrinter.query.filter_by(enabled=True).order_by(PrusaPrinter.name.asc()).all():
+        status = parse_sync_status(printer.last_sync_status)
+        is_stale = not printer.last_sync_at or printer.last_sync_at < now - timedelta(minutes=15)
+        if status['ok'] is False or is_stale:
+            printer_issues.append({
+                'type': 'prusa',
+                'name': printer.name,
+                'printer': printer,
+                'last_sync_at': printer.last_sync_at,
+                'last_success_at': printer.last_success_at,
+                'status': status,
+                'is_stale': is_stale,
+            })
+
+    return {
+        'low_stock': low_stock_rows[:6],
+        'overdue_projects': overdue_projects,
+        'unmapped_bambu': unmapped_bambu,
+        'unmapped_prusa': unmapped_prusa,
+        'printer_issues': printer_issues[:6],
+        'counts': {
+            'low_stock': len(low_stock_rows),
+            'overdue_projects': len(overdue_projects),
+            'unmapped_jobs': len(unmapped_bambu) + len(unmapped_prusa),
+            'printer_issues': len(printer_issues),
+        },
+    }
 
 
 def top_tags(items, attr_name='tag_text', limit=10):

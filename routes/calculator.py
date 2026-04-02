@@ -119,7 +119,7 @@ def register(app):
         project_id = quote.project_id
         db.session.delete(quote)
         db.session.commit()
-        return redirect(url_for('project_detail', id=project_id))
+        return redirect(url_for('project_detail', id=project_id, tab='materials'))
 
     @app.route('/calculator/quote/<int:id>/export')
     def export_quote(id):
