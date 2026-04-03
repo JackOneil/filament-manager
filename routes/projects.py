@@ -153,6 +153,7 @@ def register(app):
         kanban_per_page = 5
         setting = AppSetting.query.first()
         per_page = setting.items_per_page if setting and setting.items_per_page in [12, 24, 48, 96] else 12
+
         if sort_by == 'name':
             order_expr = [Project.name.asc()]
         elif sort_by == 'due_date':
@@ -166,63 +167,94 @@ def register(app):
         else:
             order_expr = [Project.created_at.desc()]
 
+        # Canonical kanban ordering (due date first, then created)
+        kanban_order = [
+            db.case((Project.due_date == None, 1), else_=0),
+            Project.due_date.asc(),
+            Project.created_at.desc(),
+        ]
+
+        # Table — DB paginated
         projects = db.paginate(
             Project.query.order_by(*order_expr),
             page=page,
             per_page=per_page,
             error_out=False,
         )
-        all_projects = Project.query.options(
-            joinedload(Project.filaments).joinedload(ProjectFilament.filament),
-            joinedload(Project.quotes),
-            joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.filament),
-            joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.materials),
-            joinedload(Project.prusa_jobs).joinedload(PrusaPrintJob.filament),
-        ).order_by(
-            db.case((Project.due_date == None, 1), else_=0),
-            Project.due_date.asc(),
-            Project.created_at.desc(),
-        ).all()
-        project_metrics = {project.id: build_project_metrics(project, setting) for project in all_projects}
-        all_projects_by_status = {
-            'NEW': [project for project in all_projects if project.status == 'NEW'],
-            'PRINTING': [project for project in all_projects if project.status == 'PRINTING'],
-            'DONE': [project for project in all_projects if project.status == 'DONE'],
-        }
+
+        # Kanban — one DB paginated query per status column
         status_page_fields = {
             'NEW': 'kanban_new_page',
             'PRINTING': 'kanban_printing_page',
             'DONE': 'kanban_done_page',
         }
-        current_kanban_pages = {}
-        for status, field_name in status_page_fields.items():
-            items = all_projects_by_status[status]
-            page_num = request.args.get(field_name, 1, type=int)
-            _, pager = _slice_page(items, page_num, kanban_per_page)
-            current_kanban_pages[field_name] = pager.page
 
         def _projects_index_url(**overrides):
-            params = {'sort_by': sort_by, 'page': page, **current_kanban_pages}
+            params = {
+                'sort_by': sort_by,
+                'page': page,
+                **{f: request.args.get(f, 1, type=int) for f in status_page_fields.values()},
+            }
             params.update(overrides)
             return url_for('projects_index', **params)
 
         projects_by_status = {}
-        for status, items in all_projects_by_status.items():
-            field_name = status_page_fields[status]
-            paged_items, pager = _slice_page(items, current_kanban_pages[field_name], kanban_per_page)
-            page_urls = {p: _projects_index_url(**{field_name: p}) for p in range(1, pager.pages + 1)}
+        for status, field_name in status_page_fields.items():
+            status_page = max(request.args.get(field_name, 1, type=int), 1)
+            pag = db.paginate(
+                Project.query.filter(Project.status == status).order_by(*kanban_order),
+                page=status_page,
+                per_page=kanban_per_page,
+                error_out=False,
+            )
+            # Compact page list: show at most 7 page numbers with ellipsis
+            page_list = list(pag.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2))
+            page_urls = {p: _projects_index_url(**{field_name: p}) for p in page_list if p}
             projects_by_status[status] = {
-                'items': paged_items,
-                'total': len(items),
+                'items': pag.items,
+                'total': pag.total,
                 'pagination': SimpleNamespace(
-                    **pager.__dict__,
-                    prev_url=_projects_index_url(**{field_name: pager.prev_num}),
-                    next_url=_projects_index_url(**{field_name: pager.next_num}),
+                    page=pag.page,
+                    pages=pag.pages,
+                    total=pag.total,
+                    has_prev=pag.has_prev,
+                    has_next=pag.has_next,
+                    prev_num=pag.prev_num,
+                    next_num=pag.next_num,
+                    prev_url=_projects_index_url(**{field_name: pag.prev_num}) if pag.has_prev else '#',
+                    next_url=_projects_index_url(**{field_name: pag.next_num}) if pag.has_next else '#',
+                    page_list=page_list,
                     page_urls=page_urls,
                 ),
             }
 
-        upcoming_due = [project for project in all_projects if project.due_date and project.status != 'DONE'][:4]
+        # Compute metrics only for items that are actually rendered (kanban + table)
+        visible_ids = set(p.id for p in projects.items)
+        for board in projects_by_status.values():
+            for p in board['items']:
+                visible_ids.add(p.id)
+
+        if visible_ids:
+            visible_projects = Project.query.options(
+                joinedload(Project.filaments).joinedload(ProjectFilament.filament),
+                joinedload(Project.quotes),
+                joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.filament),
+                joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.materials),
+                joinedload(Project.prusa_jobs).joinedload(PrusaPrintJob.filament),
+            ).filter(Project.id.in_(visible_ids)).all()
+            project_metrics = {p.id: build_project_metrics(p, setting) for p in visible_projects}
+        else:
+            project_metrics = {}
+
+        # Upcoming due — direct DB query, no need to load everything
+        upcoming_due = (
+            Project.query
+            .filter(Project.due_date.is_not(None), Project.status != 'DONE')
+            .order_by(Project.due_date.asc())
+            .limit(4)
+            .all()
+        )
+
         project_page_urls = {
             p: _projects_index_url(page=p)
             for p in projects.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2)
@@ -237,8 +269,8 @@ def register(app):
             projects_by_status=projects_by_status,
             upcoming_due=upcoming_due,
             project_page_urls=project_page_urls,
-            projects_prev_url=_projects_index_url(page=projects.prev_num),
-            projects_next_url=_projects_index_url(page=projects.next_num),
+            projects_prev_url=_projects_index_url(page=projects.prev_num) if projects.has_prev else '#',
+            projects_next_url=_projects_index_url(page=projects.next_num) if projects.has_next else '#',
             now=datetime.utcnow(),
         )
 

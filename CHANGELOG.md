@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.46.1] - 2026-04-03
+### Fixed
+- **Stats – duplicitní KPI odstranněno:** 4. karta v sekci `section_kpi` zobrazovala stejné „Upozornění na doobjednání“ jako fixní Denní řídcí přehled v horní části stránky. Karta je nyní nahrazena metrikou **Sledované filamenty** (celkový počet sledovaných filamentů + počet aktivních projektů), která nebyla nikde jinde zobrazena.
+
+## [1.46.0] - 2026-04-03
+### Fixed
+- **Bambu live print card on overview:** Bambu Cloud jobs with `RUNNING` status are now included in the live printers widget on the overview page. Bambu cards display an animated indeterminate progress bar (since Cloud API doesn’t provide real-time progress) with a teal accent to distinguish them from local Prusa printers.
+
+### Changed
+- **Overview action center \u2013 sync section replaced:** The “Synchronizace” quadrant, which showed printer connectivity issues, has been replaced by a **Recent Prints** widget showing the last 6 completed print jobs across Bambu and Prusa printers. Printer issue count is also removed from the KPI total to keep the number actionable.
+- **Projects page \u2013 scalable Kanban pagination:** The `projects_index` route previously loaded every project (with all relationships) into memory and sliced in Python. Each Kanban status column now runs a dedicated DB-level `db.paginate()` query. Metrics are computed only for the visible items on the current page, making the page fast even with hundreds of projects.
+- **Projects Kanban \u2013 compact page links:** Kanban column pagination now uses `iter_pages()` with ellipsis truncation instead of rendering every page number, keeping the column footer clean with many pages.
+
 ## [1.45.4] - 2026-04-02
 ### Fixed
 - **Statistics color palette link:** Clicking a color in the statistics palette now opens the dedicated filament list with the matching color filter instead of the overview page.

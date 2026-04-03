@@ -159,12 +159,10 @@
                 <p class="text-xs text-gray-400 mt-1">{{ t('stats_daily_average_hint') }}</p>
             </div>
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-                <p class="text-sm text-gray-500">{{ t('stats_reorder_alerts') }}</p>
-                <p class="text-3xl font-bold text-gray-800 mt-2">{{ summary.critical_count + summary.warning_count }}</p>
+                <p class="text-sm text-gray-500">{{ t('stats_tracked_filaments') }}</p>
+                <p class="text-3xl font-bold text-gray-800 mt-2">{{ summary.tracked_filaments }}</p>
                 <p class="text-xs mt-1">
-                    <span class="text-red-500 font-semibold">{{ summary.critical_count }} {{ t('stats_critical') }}</span>
-                    <span class="text-gray-300 mx-1">|</span>
-                    <span class="text-amber-500 font-semibold">{{ summary.warning_count }} {{ t('stats_warning') }}</span>
+                    <span class="text-blue-500 font-semibold">{{ summary.active_projects }} {{ t('stats_active_projects_short') }}</span>
                 </p>
             </div>
         </div>

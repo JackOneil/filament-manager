@@ -1,6 +1,7 @@
 """Inventory routes: listing, CRUD, spool management, and filament detail."""
 import math
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 
 from flask import render_template, request, redirect, url_for
 from sqlalchemy import func
@@ -87,8 +88,10 @@ def _inventory_stats(f_brand='', f_material='', f_color='', f_tag=''):
 
 
 def _live_printers():
-    prusa_printers_live = []
+    live = []
     freshness_cutoff = datetime.utcnow() - timedelta(minutes=15)
+
+    # Prusa — real-time local-network printers with progress
     for printer in PrusaPrinter.query.filter_by(enabled=True).all():
         job = PrusaPrintJob.query.filter_by(printer_id=printer.id).order_by(PrusaPrintJob.started_at.desc().nullslast()).first()
         if (
@@ -101,9 +104,31 @@ def _live_printers():
             and job.synced_at
             and job.synced_at >= freshness_cutoff
         ):
-            prusa_printers_live.append({'printer': printer, 'job': job, 'type': 'prusa'})
+            live.append({'printer': printer, 'job': job, 'type': 'prusa'})
 
-    return prusa_printers_live
+    # Bambu Cloud — jobs with RUNNING status fetched from Cloud API
+    # Use a SimpleNamespace so the template can access attributes uniformly.
+    running_bambu = (
+        BambuPrintJob.query
+        .filter(BambuPrintJob.status == 'RUNNING')
+        .order_by(BambuPrintJob.synced_at.desc())
+        .all()
+    )
+    for job in running_bambu:
+        fake_printer = SimpleNamespace(
+            name=job.printer_name or 'Bambu Lab',
+            host=job.printer_name or 'Bambu Lab',
+        )
+        fake_job = SimpleNamespace(
+            display_name=job.model_name,
+            file_name=None,
+            id=job.id,
+            progress=None,   # No real-time progress for Bambu Cloud jobs
+            finished_at=None,
+        )
+        live.append({'printer': fake_printer, 'job': fake_job, 'type': 'bambu'})
+
+    return live
 
 
 def _inventory_page_context():

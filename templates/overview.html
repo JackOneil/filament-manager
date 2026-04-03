@@ -53,16 +53,25 @@
                     {% set live_title = lp.job.display_name or lp.job.file_name or ('Job #' ~ lp.job.id) %}
                     {% set live_progress = ((lp.job.progress or 0) * 100) | round | int %}
                     {% set live_eta = lp.job.finished_at %}
-                    <div class="ui-card-soft p-4 border-l-4 border-l-blue-500 flex flex-col relative overflow-hidden transition-all hover:shadow-md">
+                    {% set is_bambu = lp.type == 'bambu' %}
+                    <div class="ui-card-soft p-4 border-l-4 {% if is_bambu %}border-l-teal-500{% else %}border-l-blue-500{% endif %} flex flex-col relative overflow-hidden transition-all hover:shadow-md">
                         <div class="flex justify-between items-start mb-2">
                             <div class="font-bold text-gray-800 text-sm truncate flex items-center gap-2 mr-2">
-                                <i class="fa-solid fa-network-wired text-gray-400"></i>
+                                <i class="fa-solid {% if is_bambu %}fa-print{% else %}fa-network-wired{% endif %} text-gray-400"></i>
                                 <span class="truncate">{{ (lp.printer.name if lp.printer.name else lp.printer.host) | default(lp.printer.host) }}</span>
                             </div>
                             <div class="ui-badge ui-badge-brand animate-pulse">{{ t('status_printing') }}</div>
                         </div>
                         <div class="text-xs text-gray-600 truncate mb-3" title="{{ live_title }}">{{ live_title }}</div>
                         <div class="mt-auto">
+                            {% if is_bambu %}
+                            <div class="flex justify-between text-[10px] text-gray-500 font-semibold mb-1">
+                                <span class="flex items-center gap-1"><i class="fa-brands fa-buromobelexperte text-teal-500"></i> Bambu Cloud</span>
+                            </div>
+                            <div class="w-full bg-gray-100 rounded-full h-1.5 shadow-inner overflow-hidden">
+                                <div class="bg-teal-500 h-1.5 rounded-full relative overflow-hidden w-full" style="background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.25) 10px, rgba(255,255,255,0.25) 20px); animation: progress-stripes 1.5s linear infinite;"></div>
+                            </div>
+                            {% else %}
                             <div class="flex justify-between text-[10px] text-gray-500 font-semibold mb-1">
                                 <span>{{ live_progress | int }} %</span>
                                 {% if live_eta %}
@@ -74,6 +83,7 @@
                                     <div class="absolute inset-0 bg-white/20" style="background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.2) 10px, rgba(255,255,255,0.2) 20px); animation: progress-stripes 2s linear infinite;"></div>
                                 </div>
                             </div>
+                            {% endif %}
                         </div>
                     </div>
                     {% endfor %}
@@ -106,12 +116,11 @@
                 </div>
                 <div class="ui-kpi">
                     <div class="ui-label">{{ t('action_center') }}</div>
-                    <div class="text-3xl font-bold mt-2">{{ action_center.counts.low_stock + action_center.counts.overdue_projects + action_center.counts.unmapped_jobs + action_center.counts.printer_issues }}</div>
+                    <div class="text-3xl font-bold mt-2">{{ action_center.counts.low_stock + action_center.counts.overdue_projects + action_center.counts.unmapped_jobs }}</div>
                     <div class="text-sm text-gray-500 mt-2">
                         {{ action_center.counts.low_stock }} {{ t('overview_low_stock_short') }}
                         · {{ action_center.counts.overdue_projects }} {{ t('overview_due_short') }}
                         · {{ action_center.counts.unmapped_jobs }} {{ t('overview_mapping_short') }}
-                        · {{ action_center.counts.printer_issues }} {{ t('overview_sync_short') }}
                     </div>
                 </div>
             </div>
@@ -202,19 +211,26 @@
                     </div>
                     <div class="ui-card-soft p-4">
                         <div class="flex items-center justify-between mb-3">
-                            <span class="ui-badge ui-badge-critical"><i class="fa-solid fa-plug-circle-exclamation"></i> {{ t('overview_sync_title') }}</span>
-                            <span class="text-sm text-gray-500">{{ action_center.counts.printer_issues }}</span>
+                            <span class="ui-badge"><i class="fa-solid fa-clock-rotate-left"></i> {{ t('overview_recent_prints_title') }}</span>
+                            <a href="{{ url_for('bambu_jobs') }}" class="text-xs text-blue-600 hover:underline">{{ t('overview_see_all') }}</a>
                         </div>
                         <div class="space-y-2">
-                            {% for issue in action_center.printer_issues %}
-                            <a href="{{ url_for('settings') }}#printer-diagnostics" class="block rounded-xl border border-red-100 bg-white/70 px-3 py-2 hover:border-red-300 transition">
-                                <div class="font-semibold text-gray-800">{{ issue.name }}</div>
-                                <div class="text-xs text-gray-500">
-                                    {% if issue.status.error %}{{ issue.status.error }}{% elif issue.is_stale %}{{ t('overview_sync_stale') }}{% else %}{{ t('overview_sync_needs_check') }}{% endif %}
+                            {% for print in action_center.recent_prints %}
+                            <a href="{{ print.detail_url }}" class="block rounded-xl border border-gray-100 bg-white/70 px-3 py-2 hover:border-blue-200 transition">
+                                <div class="font-semibold text-gray-800 truncate">{{ print.title }}</div>
+                                <div class="flex items-center justify-between gap-1 mt-0.5">
+                                    <div class="text-xs text-gray-500 truncate">
+                                        <i class="fa-solid {% if print.source == 'bambu' %}fa-print{% else %}fa-network-wired{% endif %} mr-0.5"></i>
+                                        {{ print.printer_name or print.source }}
+                                    </div>
+                                    <div class="text-xs text-gray-400 whitespace-nowrap">
+                                        {% if print.weight_grams %}{{ '%.0f'|format(print.weight_grams) }} g · {% endif %}
+                                        {% if print.timestamp %}{{ print.timestamp.strftime('%d.%m') }}{% endif %}
+                                    </div>
                                 </div>
                             </a>
                             {% else %}
-                            <p class="text-sm text-gray-400">{{ t('overview_sync_ok') }}</p>
+                            <p class="text-sm text-gray-400">{{ t('overview_no_recent_prints') }}</p>
                             {% endfor %}
                         </div>
                     </div>

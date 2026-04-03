@@ -390,12 +390,51 @@ def build_action_center(now=None):
                 'is_stale': is_stale,
             })
 
+    # Recent completed print jobs (Bambu + Prusa) for the overview activity feed
+    recent_bambu = (
+        BambuPrintJob.query
+        .filter(BambuPrintJob.status == 'FINISH')
+        .order_by(BambuPrintJob.finished_at.desc().nullslast(), BambuPrintJob.synced_at.desc())
+        .limit(8)
+        .all()
+    )
+    recent_prusa = (
+        PrusaPrintJob.query
+        .filter(PrusaPrintJob.status == 'FINISHED')
+        .order_by(PrusaPrintJob.finished_at.desc().nullslast(), PrusaPrintJob.synced_at.desc())
+        .limit(8)
+        .all()
+    )
+    # Merge and sort by timestamp, keep latest 6
+    recent_prints = []
+    for job in recent_bambu:
+        recent_prints.append({
+            'source': 'bambu',
+            'title': job.model_name or job.external_id or f'Job #{job.id}',
+            'printer_name': job.printer_name,
+            'timestamp': job.finished_at or job.started_at or job.synced_at,
+            'weight_grams': job.weight_grams,
+            'detail_url': '/bambu',
+        })
+    for job in recent_prusa:
+        recent_prints.append({
+            'source': 'prusa',
+            'title': job.display_name or job.file_name or f'Job #{job.id}',
+            'printer_name': job.printer.name if getattr(job, 'printer', None) else job.printer_name,
+            'timestamp': job.finished_at or job.started_at or job.synced_at,
+            'weight_grams': job.weight_grams,
+            'detail_url': '/prusa',
+        })
+    recent_prints.sort(key=lambda x: x['timestamp'] or datetime.min, reverse=True)
+    recent_prints = recent_prints[:6]
+
     return {
         'low_stock': low_stock_rows[:6],
         'overdue_projects': overdue_projects,
         'unmapped_bambu': unmapped_bambu,
         'unmapped_prusa': unmapped_prusa,
         'printer_issues': printer_issues[:6],
+        'recent_prints': recent_prints,
         'counts': {
             'low_stock': len(low_stock_rows),
             'overdue_projects': len(overdue_projects),

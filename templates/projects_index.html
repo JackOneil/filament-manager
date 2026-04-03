@@ -116,11 +116,15 @@
                         <i class="fa-solid fa-chevron-left mr-1"></i>{{ t('prev_page') }}
                     </a>
                     <div class="flex items-center gap-1">
-                        {% for p in range(1, board['pagination'].pages + 1) %}
-                            {% if p == board['pagination'].page %}
-                            <span class="ui-badge ui-badge-brand">{{ p }}</span>
+                        {% for p in board['pagination'].page_list %}
+                            {% if p %}
+                                {% if p == board['pagination'].page %}
+                                <span class="ui-badge ui-badge-brand">{{ p }}</span>
+                                {% else %}
+                                <a href="{{ board['pagination'].page_urls[p] }}" class="ui-badge">{{ p }}</a>
+                                {% endif %}
                             {% else %}
-                            <a href="{{ board['pagination'].page_urls[p] }}" class="ui-badge">{{ p }}</a>
+                            <span class="px-1 text-gray-400">…</span>
                             {% endif %}
                         {% endfor %}
                     </div>
