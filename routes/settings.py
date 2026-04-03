@@ -14,7 +14,7 @@ from models import (
     BambuPrinter, BambuPrintJob, BambuJobMaterial, StoragePlacement, StorageShelf,
     PrusaPrinter, PrusaPrintJob,
 )
-from utils import build_action_center, decrypt_token, encrypt_token, format_tags, parse_sync_status, top_tags
+from utils import build_action_center, decrypt_token, encrypt_token, format_tags, parse_sync_status, remove_tag, top_tags
 
 
 def _filament_ref(filament):
@@ -175,6 +175,28 @@ def register(app):
                     if col and len(col.filaments) == 0:
                         db.session.delete(col)
                         app.logger.debug(f"Color deleted: {col.name}")
+
+                elif action == 'delete_filament_tag':
+                    tag_name = request.form.get('tag', '').strip()
+                    if tag_name:
+                        updated_count = 0
+                        for filament in Filament.query.all():
+                            new_tags = remove_tag(filament.tag_text, tag_name)
+                            if new_tags != format_tags(filament.tag_text):
+                                filament.tag_text = new_tags or None
+                                updated_count += 1
+                        app.logger.debug(f"Deleted filament tag '{tag_name}' from {updated_count} filaments")
+
+                elif action == 'delete_project_tag':
+                    tag_name = request.form.get('tag', '').strip()
+                    if tag_name:
+                        updated_count = 0
+                        for project in Project.query.all():
+                            new_tags = remove_tag(project.tag_text, tag_name)
+                            if new_tags != format_tags(project.tag_text):
+                                project.tag_text = new_tags or None
+                                updated_count += 1
+                        app.logger.debug(f"Deleted project tag '{tag_name}' from {updated_count} projects")
 
                 elif action == 'bambu_cloud_settings':
                     setting = AppSetting.query.first()

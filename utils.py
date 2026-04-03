@@ -68,6 +68,16 @@ def format_tags(raw_value):
     return ', '.join(parse_tags(raw_value))
 
 
+def remove_tag(raw_value, tag_to_remove):
+    tag_to_remove = ' '.join(str(tag_to_remove or '').strip().split()).lower()
+    if not tag_to_remove:
+        return format_tags(raw_value)
+    return ', '.join(
+        tag for tag in parse_tags(raw_value)
+        if tag.lower() != tag_to_remove
+    )
+
+
 def get_filament_tags(filament):
     return parse_tags(getattr(filament, 'tag_text', ''))
 

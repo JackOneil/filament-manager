@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.50.0] - 2026-04-03
+### Added
+- **Tag shortcuts from Settings:** Filament tags in Settings now open the dedicated `/filaments` page with the selected tag already applied as a filter, so the tag cloud doubles as a fast inventory entry point.
+
+### Changed
+- **Tag cleanup directly in Settings:** Both filament and project tags can now be removed directly from the Settings tag cloud. Removal updates every matching record case-insensitively while preserving the remaining tags.
+
 ## [1.49.0] - 2026-04-03
 ### Added
 - **Per-brand shop URL:** Each brand in Settings can now have an optional search URL template (e.g. `https://www.alzament.cz/search?q={query}`). This is used as a fallback buy button on filament cards when no direct per-filament shop link is set.

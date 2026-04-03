@@ -395,5 +395,109 @@ class ImportAtomicityTests(unittest.TestCase):
             self.assertIsNotNone(Filament.query.filter_by(name='Legacy Filament').first())
 
 
+class SettingsTagManagementTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp(prefix='filament-settings-tags-')
+        db_path = os.path.join(self.temp_dir, 'test.db')
+        self.app = create_app({
+            'TESTING': True,
+            'SQLALCHEMY_DATABASE_URI': f'sqlite:///{db_path}',
+            'PROJECT_UPLOAD_FOLDER': os.path.join(self.temp_dir, 'uploads'),
+            'WTF_CSRF_ENABLED': False,
+        })
+        self.client = self.app.test_client()
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_settings_show_clickable_filament_tag_filters(self):
+        with self.app.app_context():
+            brand = Brand.query.filter_by(name='Prusament').first()
+            color = Color.query.first()
+            material = Material.query.filter_by(name='PLA').first()
+            db.session.add(Filament(
+                name='Clickable Tag Filament',
+                brand_id=brand.id,
+                material_id=material.id,
+                color_id=color.id,
+                weight_total=1000,
+                weight_remaining=800,
+                price=500,
+                quantity=1,
+                tag_text='matte, prototype',
+            ))
+            db.session.commit()
+
+        response = self.client.get('/settings')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'/filaments?tag=matte', response.data)
+
+    def test_delete_filament_tag_removes_it_from_all_filaments(self):
+        with self.app.app_context():
+            brand = Brand.query.filter_by(name='Prusament').first()
+            color = Color.query.first()
+            material = Material.query.filter_by(name='PLA').first()
+            db.session.add_all([
+                Filament(
+                    name='Tag Delete A',
+                    brand_id=brand.id,
+                    material_id=material.id,
+                    color_id=color.id,
+                    weight_total=1000,
+                    weight_remaining=800,
+                    price=500,
+                    quantity=1,
+                    tag_text='matte, prototype',
+                ),
+                Filament(
+                    name='Tag Delete B',
+                    brand_id=brand.id,
+                    material_id=material.id,
+                    color_id=color.id,
+                    weight_total=1000,
+                    weight_remaining=700,
+                    price=550,
+                    quantity=1,
+                    tag_text='Matte, engineering',
+                ),
+            ])
+            db.session.commit()
+
+        response = self.client.post('/settings', data={
+            'action': 'delete_filament_tag',
+            'tag': 'matte',
+        }, follow_redirects=False)
+
+        self.assertEqual(response.status_code, 302)
+
+        with self.app.app_context():
+            tags_a = Filament.query.filter_by(name='Tag Delete A').first().tag_text
+            tags_b = Filament.query.filter_by(name='Tag Delete B').first().tag_text
+            self.assertEqual(tags_a, 'prototype')
+            self.assertEqual(tags_b, 'engineering')
+
+    def test_delete_project_tag_removes_it_from_all_projects(self):
+        with self.app.app_context():
+            db.session.add_all([
+                Project(name='Project A', tag_text='rush, client'),
+                Project(name='Project B', tag_text='Rush, internal'),
+            ])
+            db.session.commit()
+
+        response = self.client.post('/settings', data={
+            'action': 'delete_project_tag',
+            'tag': 'rush',
+        }, follow_redirects=False)
+
+        self.assertEqual(response.status_code, 302)
+
+        with self.app.app_context():
+            project_a = Project.query.filter_by(name='Project A').first()
+            project_b = Project.query.filter_by(name='Project B').first()
+            self.assertEqual(project_a.tag_text, 'client')
+            self.assertEqual(project_b.tag_text, 'internal')
+
+
 if __name__ == '__main__':
     unittest.main()
