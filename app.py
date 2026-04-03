@@ -37,7 +37,7 @@ from utils import get_settings
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.46.1'
+APP_VERSION = '1.49.0'
 
 csrf = CSRFProtect()
 
@@ -110,20 +110,7 @@ def _setup_database(app: Flask) -> None:
     with app.app_context():
         db.create_all()
 
-        if not Brand.query.first():
-            for name in ['Prusament', 'Hatchbox', 'eSUN', 'Sunlu', 'Polymaker', 'Overture', 'Spectrum', 'Fiberlogy']:
-                db.session.add(Brand(name=name))
-            for name in ['PLA', 'PETG', 'ABS', 'ASA', 'TPU', 'PC', 'Nylon']:
-                db.session.add(Material(name=name))
-            for name, hex_val in [
-                ('Černá', '#000000'), ('Bílá', '#FFFFFF'), ('Šedá', '#808080'),
-                ('Červená', '#FF0000'), ('Modrá', '#0000FF'), ('Zelená', '#00FF00'),
-                ('Žlutá', '#FFFF00'), ('Oranžová', '#FFA500'), ('Fialová', '#800080'),
-                ('Průhledná', '#edf2f7'), ('Stříbrná', '#C0C0C0'), ('Zlatá', '#FFD700'),
-            ]:
-                db.session.add(Color(name=name, hex_value=hex_val))
-            db.session.commit()
-
+        # ── Schema migrations (must run before any ORM queries) ──────────────
         _safe_alter(app, 'ALTER TABLE filament ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1')
         _safe_alter(app, 'ALTER TABLE filament ADD COLUMN min_stock_grams FLOAT NOT NULL DEFAULT 0')
         _safe_alter(app, 'ALTER TABLE filament ADD COLUMN max_stock_grams FLOAT NOT NULL DEFAULT 0')
@@ -162,6 +149,9 @@ def _setup_database(app: Flask) -> None:
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN bambu_region VARCHAR(10) NOT NULL DEFAULT 'global'")
         _safe_alter(app, "ALTER TABLE bambu_print_job ADD COLUMN cost_time INTEGER DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE project_link ADD COLUMN domain VARCHAR(100) DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE filament ADD COLUMN shop_url TEXT DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN reorder_shop_url TEXT DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE brand ADD COLUMN shop_url TEXT DEFAULT NULL")
 
         # PrusaLink integration — new tables are created by db.create_all() above;
         # these alters guard against columns added in future versions.
@@ -172,6 +162,21 @@ def _setup_database(app: Flask) -> None:
         _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN last_sync_status VARCHAR(255) DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE prusa_print_job ADD COLUMN progress FLOAT DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE prusa_print_job ADD COLUMN raw_payload TEXT DEFAULT NULL")
+
+        # ── Seed data (only runs once on fresh database) ─────────────────────
+        if not Brand.query.first():
+            for name in ['Prusament', 'Hatchbox', 'eSUN', 'Sunlu', 'Polymaker', 'Overture', 'Spectrum', 'Fiberlogy']:
+                db.session.add(Brand(name=name))
+            for name in ['PLA', 'PETG', 'ABS', 'ASA', 'TPU', 'PC', 'Nylon']:
+                db.session.add(Material(name=name))
+            for name, hex_val in [
+                ('Černá', '#000000'), ('Bílá', '#FFFFFF'), ('Šedá', '#808080'),
+                ('Červená', '#FF0000'), ('Modrá', '#0000FF'), ('Zelená', '#00FF00'),
+                ('Žlutá', '#FFFF00'), ('Oranžová', '#FFA500'), ('Fialová', '#800080'),
+                ('Průhledná', '#edf2f7'), ('Stříbrná', '#C0C0C0'), ('Zlatá', '#FFD700'),
+            ]:
+                db.session.add(Color(name=name, hex_value=hex_val))
+            db.session.commit()
 
         if not AppSetting.query.first():
             db.session.add(AppSetting(lang='cs', kwh_price=5.0, printer_power=150,

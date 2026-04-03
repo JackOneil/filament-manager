@@ -203,6 +203,7 @@ def register(app):
                 'spool_price': stock['spool_price'],
                 'spool_weight': filament.weight_total,
                 'reorder_alert_snoozed': bool(filament.reorder_alert_snoozed),
+                'shop_url': filament.shop_url or None,
             })
 
         forecast_rows.sort(
@@ -323,6 +324,7 @@ def register(app):
                 'quantity': fil.quantity,
             })
         color_palette = sorted(color_map.values(), key=lambda c: _hex_to_hsl_sort_key(c['hex_value']))
+        app_settings = AppSetting.query.first()
 
         return render_template(
             'stats.html',
@@ -338,4 +340,5 @@ def register(app):
             profitable_projects=profitable_projects[:15],
             reorder_status_label_key=_reorder_status_label_key,
             color_palette=color_palette,
+            app_settings=app_settings,
         )

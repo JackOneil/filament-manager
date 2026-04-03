@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.49.0] - 2026-04-03
+### Added
+- **Per-brand shop URL:** Each brand in Settings can now have an optional search URL template (e.g. `https://www.alzament.cz/search?q={query}`). This is used as a fallback buy button on filament cards when no direct per-filament shop link is set.
+- **Shop cart icon on inventory cards/list:** Every filament card and list row now shows a green shopping-cart icon in the quick-actions area. Priority: 1) direct filament `shop_url`, 2) brand search template, 3) global search template in Settings. If none is configured, the button is hidden.
+
+### Fixed
+- **Alza.cz search URL format:** Corrected Alza preset button to use `https://www.alza.cz/search.htm?exps={query}` (was `/hledani/{query}` which returned no results).
+- **Allegro preset changed to .cz:** Changed the preset shop button from `allegro.pl` to `allegro.cz` with the correct Czech domain URL.
+
+## [1.48.0] - 2026-04-05
+### Added
+- **Richer Bambu Cloud print info on overview:** Active printer cards now show material color swatches, material names, estimated weight usage, print duration (cost time), printer model, and job start time sourced from Bambu Cloud job data.
+- **Per-filament shop URL:** Each filament can now have an optional direct shop product link (`Shop URL`) set in its edit form. This link overrides the global search template when shown as a buy button on the Statistics low-stock widget.
+- **Global reorder shop URL template:** A new section in Settings lets you configure a default search URL template (e.g. `https://www.alza.cz/hledani/{query}`) with preset quick-set buttons for Alza.cz, Allegro.pl, Mironet.cz, and Amazon.de. Used as a fallback on the low-stock widget when no direct link is set.
+- **Buy/search button on low-stock widget:** Each reorder row on the Statistics page now shows a shopping-cart icon (direct link) or magnifying-glass icon (search template) for quick shop navigation.
+
+### Fixed
+- **Clipboard copy not working on HTTP:** The "copy reorder" button on the Statistics low-stock widget failed silently on non-HTTPS connections (clipboard API requires a secure context). Added a textarea+execCommand fallback that works regardless of protocol.
+
+## [1.47.0] - 2026-04-04
+### Added
+- **Color swatch in card view:** Inventory card view now shows a small colored circle swatch inline next to the color name for quick at-a-glance identification.
+- **Printer brand icons on overview:** Live printer cards on the overview page now show brand badges — teal "BAMBU" for Bambu Cloud jobs (with a teal icon), orange "PRUSA" for Prusa Network printers (with an orange icon). Progress bar for Prusa is now orange to match the brand.
+- **Calculator pre-fill from project:** The "Calculator" button in a project detail header now deep-links to the calculator with the first assigned filament pre-selected (via `?filament_id=X` query param). The calculator page reads this param and auto-fills the filament dropdown.
+- **Reorder copy-to-clipboard:** Each row in the low-stock / reorder recommendations widget on the Statistics page now has a copy button that writes `Filament Name × N spools` to the clipboard.
+- **Dark mode completion:** Fixed several components missing proper dark mode styling — body gradient (removed white top-fade), section/card edit bars in stats, all status chip colors (green/red/yellow/emerald/orange/teal), info banners, flash toast messages, and modal backgrounds.
+
+### Changed
+- **Stats – KPI section removed:** The entire draggable `section_kpi` (KPI summary) block has been removed from the Statistics page. The same data is already visible in the non-draggable Executive panel at the top of the page, making the section redundant.
+- **Overview – live printers idle state:** The "Active Printers" widget is now always rendered in the DOM (removes outer `{% if live_printers %}` guard), preserving its drag-drop position in localStorage even when no printers are printing. An idle empty state is shown when there are no active jobs.
+
 ## [1.46.1] - 2026-04-03
 ### Fixed
 - **Stats – duplicitní KPI odstranněno:** 4. karta v sekci `section_kpi` zobrazovala stejné „Upozornění na doobjednání“ jako fixní Denní řídcí přehled v horní části stránky. Karta je nyní nahrazena metrikou **Sledované filamenty** (celkový počet sledovaných filamentů + počet aktivních projektů), která nebyla nikde jinde zobrazena.

@@ -130,45 +130,6 @@
     </div>
 
     <!-- ══════════════════════════════════════════════════════════════ -->
-    <!-- SECTION: KPI summary -->
-    <!-- ══════════════════════════════════════════════════════════════ -->
-    <div class="stats-section" id="section_kpi" data-section-id="section_kpi">
-        <div class="section-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-            <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
-            <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('stats_kpi_section') }}</span>
-            <div class="ml-auto flex items-center gap-1">
-                <button onclick="moveSectionUp('section_kpi')" title="{{ t('stats_move_up') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-up text-xs"></i></button>
-                <button onclick="moveSectionDown('section_kpi')" title="{{ t('stats_move_down') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-down text-xs"></i></button>
-                <button onclick="hideCard('kpi_summary')" class="ml-1 text-xs text-red-500 hover:text-red-700 font-semibold flex items-center gap-1"><i class="fa-solid fa-eye-slash"></i> {{ t('stats_hide_widget') }}</button>
-            </div>
-        </div>
-        <div class="stats-card grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4" data-card-id="kpi_summary">
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-                <p class="text-sm text-gray-500">{{ t('stats_usage_period') }}</p>
-                <p class="text-3xl font-bold text-gray-800 mt-2">{{ summary.usage_total_period }} g</p>
-                <p class="text-xs text-gray-400 mt-1">{{ t('stats_usage_period_hint') }}</p>
-            </div>
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-                <p class="text-sm text-gray-500">{{ t('stats_purchase_period') }}</p>
-                <p class="text-3xl font-bold text-gray-800 mt-2">{{ summary.purchase_total_period }} g</p>
-                <p class="text-xs text-gray-400 mt-1">{{ t('stats_purchase_period_hint') }}</p>
-            </div>
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-                <p class="text-sm text-gray-500">{{ t('stats_daily_average') }}</p>
-                <p class="text-3xl font-bold text-gray-800 mt-2">{{ summary.avg_daily_usage_period }} g</p>
-                <p class="text-xs text-gray-400 mt-1">{{ t('stats_daily_average_hint') }}</p>
-            </div>
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-                <p class="text-sm text-gray-500">{{ t('stats_tracked_filaments') }}</p>
-                <p class="text-3xl font-bold text-gray-800 mt-2">{{ summary.tracked_filaments }}</p>
-                <p class="text-xs mt-1">
-                    <span class="text-blue-500 font-semibold">{{ summary.active_projects }} {{ t('stats_active_projects_short') }}</span>
-                </p>
-            </div>
-        </div>
-    </div>
-
-    <!-- ══════════════════════════════════════════════════════════════ -->
     <!-- SECTION: overview [low_stock | top_turnover | profitable] -->
     <!-- ══════════════════════════════════════════════════════════════ -->
     <div class="stats-section" id="section_overview" data-section-id="section_overview">
@@ -200,17 +161,39 @@
                 <h2 class="text-lg font-bold text-gray-800 mb-4">{{ t('inventory_low_stock_widget') }}</h2>
                 <div class="space-y-3">
                     {% for row in purchase_recommendations %}
-                    <a href="{{ url_for('filament_detail', id=row.filament_id) }}" class="flex items-center justify-between gap-3 text-sm hover:bg-gray-50 rounded-lg px-2 py-2 transition" data-row-index="{{ loop.index0 }}">
-                        <div>
-                            <div class="font-semibold text-gray-800">{{ row.filament_name }}</div>
-                            <div class="text-xs text-gray-400">{{ row.remaining }} g · min {{ row.min_stock }} g</div>
-                            <div class="text-xs text-gray-400">{{ row.recommended_spools }} ks × {{ row.spool_weight | round(0) }} g · {{ row.recommended_order_price }} {{ current_currency }}</div>
-                        </div>
-                        <div class="text-right">
-                            <div class="{% if row.reorder_status == 'critical' %}text-red-600{% else %}text-amber-600{% endif %} font-bold">{{ row.recommended_spools }} ks</div>
-                            <div class="text-xs text-gray-400">{{ row.recommended_order_grams }} g</div>
-                        </div>
-                    </a>
+                    <div class="flex items-center gap-2 text-sm hover:bg-gray-50 rounded-lg px-2 py-2 transition" data-row-index="{{ loop.index0 }}">
+                        <a href="{{ url_for('filament_detail', id=row.filament_id) }}" class="flex-1 flex items-center justify-between gap-2 min-w-0">
+                            <div class="min-w-0">
+                                <div class="font-semibold text-gray-800 truncate">{{ row.filament_name }}</div>
+                                <div class="text-xs text-gray-400">{{ row.remaining }} g · min {{ row.min_stock }} g</div>
+                                <div class="text-xs text-gray-400">{{ row.recommended_spools }} ks × {{ row.spool_weight | round(0) }} g · {{ row.recommended_order_price }} {{ current_currency }}</div>
+                            </div>
+                            <div class="text-right flex-shrink-0">
+                                <div class="{% if row.reorder_status == 'critical' %}text-red-600{% else %}text-amber-600{% endif %} font-bold">{{ row.recommended_spools }} ks</div>
+                                <div class="text-xs text-gray-400">{{ row.recommended_order_grams }} g</div>
+                            </div>
+                        </a>
+                        <button type="button"
+                                title="{{ t('stats_copy_reorder') }}"
+                                onclick="copyReorderText('{{ row.filament_name|e }}', {{ row.recommended_spools }}, this)"
+                                class="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition">
+                            <i class="fa-solid fa-copy text-xs"></i>
+                        </button>
+                        {% if row.shop_url %}
+                        <a href="{{ row.shop_url }}" target="_blank" rel="noopener noreferrer"
+                           title="{{ t('stats_open_shop') }}"
+                           class="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-green-600 hover:bg-green-50 transition">
+                            <i class="fa-solid fa-cart-shopping text-xs"></i>
+                        </a>
+                        {% elif app_settings and app_settings.reorder_shop_url %}
+                        <button type="button"
+                                title="{{ t('stats_search_shop') }}"
+                                onclick="openReorderShop('{{ row.filament_name|e }}', '{{ app_settings.reorder_shop_url|e }}')"
+                                class="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-green-600 hover:bg-green-50 transition">
+                            <i class="fa-solid fa-magnifying-glass text-xs"></i>
+                        </button>
+                        {% endif %}
+                    </div>
                     {% else %}
                     <p class="text-sm text-gray-400">{{ t('stats_no_recommendations') }}</p>
                     {% endfor %}
@@ -773,9 +756,44 @@ new Chart(document.getElementById('projectChart'), {
 });
 {% endif %}
 
+// ── Copy reorder text to clipboard ───────────────────────────────────────────
+function copyReorderText(name, spools, btn) {
+    const text = `${name} × ${spools}`;
+    const doFeedback = () => {
+        const icon = btn.querySelector('i');
+        icon.className = 'fa-solid fa-check text-xs';
+        btn.classList.add('text-green-600');
+        setTimeout(() => {
+            icon.className = 'fa-solid fa-copy text-xs';
+            btn.classList.remove('text-green-600');
+        }, 1500);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(doFeedback).catch(() => _clipboardFallback(text, doFeedback));
+    } else {
+        _clipboardFallback(text, doFeedback);
+    }
+}
+function _clipboardFallback(text, cb) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand('copy'); cb && cb(); } catch(e) {}
+    document.body.removeChild(ta);
+}
+
+// ── Open reorder shop search ──────────────────────────────────────────────────
+function openReorderShop(name, template) {
+    const url = template.replace('{query}', encodeURIComponent(name));
+    window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 // ── Layout persistence ────────────────────────────────────────────────────────
 const LAYOUT_KEY = 'stats_layout_v2';
-const DEFAULT_ORDER = ['section_kpi','section_overview','section_charts_primary','section_charts_secondary','section_tables','section_detail','section_colors'];
+const DEFAULT_ORDER = ['section_overview','section_charts_primary','section_charts_secondary','section_tables','section_detail','section_colors'];
 const DEFAULT_LIMITS = { low_stock: 5, top_turnover: 5, profitable_projects: 5, forecast_table: 10, purchase_recommendations: 10, project_usage: 8, purchase_log: 10 };
 
 let layout = loadLayout();

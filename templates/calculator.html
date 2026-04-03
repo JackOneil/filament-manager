@@ -300,6 +300,20 @@
                 }
             }
         });
+
+        // Pre-select filament from URL query param (?filament_id=X)
+        const urlParams = new URLSearchParams(window.location.search);
+        const preselect = urlParams.get('filament_id');
+        if (preselect) {
+            const opt = document.querySelector(`.filament-option[data-value="${preselect}"]`);
+            if (opt) {
+                const name = opt.querySelector('.font-bold').textContent;
+                const details = opt.querySelector('.text-sm').textContent;
+                hiddenInput.value = preselect;
+                searchInput.value = `${name} | ${details}`;
+                opt.classList.add('bg-green-100', 'border-l-4', 'border-green-500');
+            }
+        }
     });
 </script>
 {% endblock %}

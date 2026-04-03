@@ -327,6 +327,63 @@
         html.dark .text-green-600 { color: #10b981; }
         html.dark .text-green-700 { color: #059669; }
         html.dark .bg-gradient-to-b.from-blue-50 { background: linear-gradient(to bottom, #0c4a6e, #1f2937) !important; }
+
+        /* Dark mode: fix body gradient (white-top gradient looks bad on dark backgrounds) */
+        html.dark body {
+            background: var(--ui-bg) !important;
+        }
+
+        /* Dark mode: flash / toast messages */
+        html.dark .bg-red-50\/95 { background-color: rgba(127, 29, 29, 0.95) !important; }
+        html.dark .bg-green-50\/95 { background-color: rgba(6, 78, 59, 0.95) !important; }
+        html.dark .border-red-200 { border-color: #991b1b; }
+        html.dark .text-red-800 { color: #fca5a5; }
+        html.dark .text-green-800 { color: #6ee7b7; }
+        html.dark .text-red-500 { color: #f87171; }
+        html.dark .text-green-500 { color: #34d399; }
+
+        /* Dark mode: stats section-edit-bar and card-edit-bar */
+        html.dark .section-edit-bar,
+        html.dark .card-edit-bar {
+            background-color: rgba(30, 58, 138, 0.35) !important;
+            border-color: rgba(96, 165, 250, 0.25) !important;
+        }
+        html.dark .bg-blue-50 { background-color: rgba(30, 58, 138, 0.2); }
+        html.dark .border-blue-200 { border-color: rgba(96, 165, 250, 0.3); }
+        html.dark .text-blue-700 { color: #93c5fd; }
+        html.dark .hover\:bg-blue-50:hover { background-color: rgba(30, 58, 138, 0.3) !important; }
+
+        /* Dark mode: info / hint banners (yellow, amber) */
+        html.dark .bg-yellow-50 { background-color: rgba(120, 53, 15, 0.2); }
+        html.dark .border-yellow-200 { border-color: rgba(251, 191, 36, 0.3); }
+        html.dark .text-yellow-800 { color: #fde68a; }
+        html.dark .text-amber-600 { color: #fbbf24; }
+        html.dark .bg-amber-50 { background-color: rgba(120, 53, 15, 0.2); }
+
+        /* Dark mode: status bg chips */
+        html.dark .bg-green-100 { background-color: rgba(6, 78, 59, 0.3); }
+        html.dark .text-green-800 { color: #6ee7b7; }
+        html.dark .bg-red-100 { background-color: rgba(127, 29, 29, 0.3); }
+        html.dark .text-red-800 { color: #fca5a5; }
+        html.dark .bg-yellow-100 { background-color: rgba(120, 53, 15, 0.3); }
+        html.dark .text-yellow-800 { color: #fde68a; }
+        html.dark .bg-emerald-100 { background-color: rgba(6, 78, 59, 0.3); }
+        html.dark .text-emerald-700 { color: #34d399; }
+        html.dark .text-emerald-600 { color: #34d399; }
+        html.dark .bg-orange-100 { background-color: rgba(154, 52, 18, 0.3); }
+        html.dark .text-orange-700 { color: #fdba74; }
+        html.dark .text-orange-600 { color: #fdba74; }
+        html.dark .bg-teal-100 { background-color: rgba(19, 78, 74, 0.3); }
+        html.dark .text-teal-700 { color: #2dd4bf; }
+        html.dark .text-teal-600 { color: #2dd4bf; }
+
+        /* Dark mode: modals (backdrop + content) */
+        html.dark #useFilamentModal,
+        html.dark .modal-content,
+        html.dark [id*="Modal"] .bg-white {
+            background-color: #1f2937 !important;
+        }
+        html.dark .bg-black\/50 { background-color: rgba(0,0,0,0.7); }
     </style>
     <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>

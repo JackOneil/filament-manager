@@ -57,6 +57,12 @@
             </div>
         </div>
 
+        <div class="mb-8">
+            <label class="block text-gray-700 text-sm font-semibold mb-1">{{ t('filament_shop_url') }}</label>
+            <p class="text-xs text-gray-400 mb-2">{{ t('filament_shop_url_hint') }}</p>
+            <input type="url" name="shop_url" value="{{ filament.shop_url or '' }}" placeholder="https://www.alza.cz/..." class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
         <div class="flex justify-end pt-4 border-t border-gray-100">
             <a href="{{ url_for('filaments_index') }}" class="text-gray-500 font-semibold py-2 px-6 rounded-lg mr-2 hover:bg-gray-100 transition-colors">{{ t('cancel') }}</a>
             <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow transition-colors flex items-center gap-2">

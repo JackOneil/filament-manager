@@ -131,11 +131,16 @@
             <ul class="mb-6 text-sm flex-grow overflow-y-auto filter drop-shadow-sm space-y-2 pr-2" style="max-height: 250px;">
                 {% for b in brands %}
                 <li class="py-2 px-3 bg-gray-50 border border-gray-100 rounded flex justify-between group relative">
-                    <form method="POST" class="flex items-center gap-2 w-full pr-6">
+                    <form method="POST" class="flex flex-col gap-1 w-full pr-6">
                         <input type="hidden" name="action" value="edit_brand">
                         <input type="hidden" name="id" value="{{ b.id }}">
-                        <input type="text" name="name" value="{{ b.name }}" class="bg-transparent border-b border-transparent focus:border-blue-300 outline-none font-medium text-gray-700 w-full text-sm">
-                        <button type="submit" class="hidden group-hover:block text-blue-500 hover:text-blue-700 mx-1" title="{{ t('edit') }}"><i class="fa-solid fa-save"></i></button>
+                        <div class="flex items-center gap-2">
+                            <input type="text" name="name" value="{{ b.name }}" class="bg-transparent border-b border-transparent focus:border-blue-300 outline-none font-medium text-gray-700 w-full text-sm">
+                            <button type="submit" class="hidden group-hover:block text-blue-500 hover:text-blue-700 mx-1 flex-shrink-0" title="{{ t('edit') }}"><i class="fa-solid fa-save"></i></button>
+                        </div>
+                        <input type="url" name="shop_url" value="{{ b.shop_url or '' }}"
+                               placeholder="{{ t('brand_shop_url_placeholder') }}"
+                               class="bg-transparent border-b border-transparent focus:border-blue-200 outline-none text-gray-400 text-xs w-full">
                     </form>
                     <span class="text-gray-400 text-xs whitespace-nowrap pt-1 ml-1 {% if b.filaments|length == 0 %}group-hover:hidden{% endif %}">{{ b.filaments|length }}</span>
                     {% if b.filaments|length == 0 %}
@@ -277,6 +282,37 @@
             <div class="md:col-span-2">
                 <button type="submit"
                     class="bg-yellow-500 hover:bg-yellow-600 transition-colors text-white font-semibold py-2 px-5 rounded-lg text-sm shadow">
+                    <i class="fa-solid fa-save"></i> {{ t('save') }}
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Reorder shop URL -->
+    <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center gap-2 mb-4 border-b pb-3">
+            <i class="fa-solid fa-cart-shopping text-green-500"></i>
+            <h2 class="text-xl font-bold text-gray-800">{{ t('reorder_shop_settings_title') }}</h2>
+        </div>
+        <p class="text-sm text-gray-500 mb-4">{{ t('reorder_shop_settings_desc') }}</p>
+        <form method="POST" class="flex flex-col gap-4 max-w-xl">
+            <input type="hidden" name="action" value="reorder_shop_settings">
+            <div>
+                <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('reorder_shop_url_label') }}</label>
+                <input type="url" name="reorder_shop_url"
+                    value="{{ app_settings.reorder_shop_url if app_settings and app_settings.reorder_shop_url else '' }}"
+                    placeholder="https://www.alza.cz/search.htm?exps={query}"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none font-mono">
+                <p class="text-xs text-gray-400 mt-1.5">{{ t('reorder_shop_url_hint') }}</p>
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs">
+                <button type="button" onclick="document.querySelector('[name=reorder_shop_url]').value='https://www.alza.cz/search.htm?exps={query}'" class="ui-badge hover:bg-gray-100 cursor-pointer">Alza.cz</button>
+                <button type="button" onclick="document.querySelector('[name=reorder_shop_url]').value='https://allegro.cz/listing?string={query}'" class="ui-badge hover:bg-gray-100 cursor-pointer">Allegro.cz</button>
+                <button type="button" onclick="document.querySelector('[name=reorder_shop_url]').value='https://www.mironet.cz/search/?search={query}'" class="ui-badge hover:bg-gray-100 cursor-pointer">Mironet.cz</button>
+                <button type="button" onclick="document.querySelector('[name=reorder_shop_url]').value='https://www.amazon.de/s?k={query}'" class="ui-badge hover:bg-gray-100 cursor-pointer">Amazon.de</button>
+            </div>
+            <div>
+                <button type="submit" class="bg-green-500 hover:bg-green-600 transition-colors text-white font-semibold py-2 px-5 rounded-lg text-sm shadow">
                     <i class="fa-solid fa-save"></i> {{ t('save') }}
                 </button>
             </div>

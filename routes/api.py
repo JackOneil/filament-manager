@@ -78,9 +78,9 @@ def register(app):
             fil.tag_list = get_filament_tags(fil)
 
         if view_mode == 'card':
-            html = render_template('_filament_cards.html', filaments=filaments_paginated.items)
+            html = render_template('_filament_cards.html', filaments=filaments_paginated.items, app_settings=setting)
         else:
-            html = render_template('_filament_list_rows.html', filaments=filaments_paginated.items)
+            html = render_template('_filament_list_rows.html', filaments=filaments_paginated.items, app_settings=setting)
 
         return jsonify({
             'html': html,

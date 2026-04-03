@@ -141,6 +141,7 @@ def register(app):
                     if brand:
                         old = brand.name
                         brand.name = request.form['name']
+                        brand.shop_url = request.form.get('shop_url', '').strip() or None
                         app.logger.debug(f"Brand edited: {old} -> {brand.name}")
 
                 elif action == 'edit_material':
@@ -251,6 +252,12 @@ def register(app):
                         db.session.delete(printer)
                         app.logger.debug(f'Deleted PrusaLink printer: {printer.name}')
 
+                elif action == 'reorder_shop_settings':
+                    setting = AppSetting.query.first()
+                    url_raw = request.form.get('reorder_shop_url', '').strip()
+                    setting.reorder_shop_url = url_raw or None
+                    app.logger.debug(f'Reorder shop URL updated: {setting.reorder_shop_url}')
+
                 db.session.commit()
             except Exception as e:
                 db.session.rollback()
@@ -284,7 +291,7 @@ def register(app):
 
         data = {
             # ── Enumerations ───────────────────────────────────────────
-            'brands': [b.name for b in Brand.query.all()],
+            'brands': [{'name': b.name, 'shop_url': b.shop_url} for b in Brand.query.all()],
             'materials': [m.name for m in Material.query.all()],
             'colors': [{'name': c.name, 'hex_value': c.hex_value} for c in Color.query.all()],
 
@@ -303,6 +310,7 @@ def register(app):
                 'bambu_auto_sync_interval_minutes': setting.bambu_auto_sync_interval_minutes if setting else 60,
                 'bambu_last_sync_at': setting.bambu_last_sync_at.isoformat() if setting and setting.bambu_last_sync_at else None,
                 'bambu_last_sync_status': setting.bambu_last_sync_status if setting else None,
+                'reorder_shop_url': setting.reorder_shop_url if setting else None,
                 # bambu_token intentionally excluded for security
             } if setting else {},
 
@@ -327,6 +335,7 @@ def register(app):
                 'recommended_nozzle_temp': f.recommended_nozzle_temp,
                 'recommended_bed_temp': f.recommended_bed_temp,
                 'reorder_alert_snoozed': f.reorder_alert_snoozed,
+                'shop_url': f.shop_url,
             } for f in Filament.query.all()],
 
             # ── Movement history ───────────────────────────────────────
@@ -503,9 +512,15 @@ def register(app):
             data = _load_backup_payload(file)
             with db.session.begin():
                 # ── 1. Enumerations ────────────────────────────────────
-                for b_name in data.get('brands', []):
-                    if not Brand.query.filter_by(name=b_name).first():
-                        db.session.add(Brand(name=b_name))
+                for b_data in data.get('brands', []):
+                    b_name = b_data if isinstance(b_data, str) else b_data.get('name', '')
+                    if not b_name:
+                        continue
+                    existing = Brand.query.filter_by(name=b_name).first()
+                    if not existing:
+                        db.session.add(Brand(name=b_name, shop_url=b_data.get('shop_url') if isinstance(b_data, dict) else None))
+                    elif isinstance(b_data, dict) and b_data.get('shop_url'):
+                        existing.shop_url = b_data['shop_url']
 
                 for m_name in data.get('materials', []):
                     if not Material.query.filter_by(name=m_name).first():
@@ -535,6 +550,7 @@ def register(app):
                         setting.bambu_auto_sync_interval_minutes = s.get('bambu_auto_sync_interval_minutes', setting.bambu_auto_sync_interval_minutes)
                         setting.bambu_last_sync_at = datetime.fromisoformat(s['bambu_last_sync_at']) if s.get('bambu_last_sync_at') else setting.bambu_last_sync_at
                         setting.bambu_last_sync_status = s.get('bambu_last_sync_status', setting.bambu_last_sync_status)
+                        setting.reorder_shop_url = s.get('reorder_shop_url', setting.reorder_shop_url)
 
                 # ── 3. Filaments ───────────────────────────────────────
                 for f in data.get('filaments', []):
@@ -564,6 +580,7 @@ def register(app):
                                 recommended_nozzle_temp=f.get('recommended_nozzle_temp'),
                                 recommended_bed_temp=f.get('recommended_bed_temp'),
                                 reorder_alert_snoozed=f.get('reorder_alert_snoozed', False),
+                                shop_url=f.get('shop_url'),
                             ))
                             imported_filaments += 1
 

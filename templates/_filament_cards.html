@@ -22,9 +22,11 @@
             <div class="flex justify-between items-start">
                 <div>
                     <h2 class="text-xl font-bold text-gray-800 truncate" title="{{ fil.name }}">{{ fil.name }}</h2>
-                    <p class="text-sm font-semibold text-gray-500 mt-1">
-                        {{ fil.brand.name }} &bull; {{ fil.material.name }} &bull; {{ fil.color.name }}
-                        <span class="ml-2 text-blue-600">({{ fil.quantity }} {{ t('pieces') }})</span>
+                    <p class="text-sm font-semibold text-gray-500 mt-1 flex items-center gap-1.5 flex-wrap">
+                        {{ fil.brand.name }} &bull; {{ fil.material.name }} &bull;
+                        <span class="inline-block w-3 h-3 rounded-full flex-shrink-0 border border-gray-200 shadow-sm" style="background-color: {{ fil.color.hex_value }};"></span>
+                        {{ fil.color.name }}
+                        <span class="ml-1 text-blue-600">({{ fil.quantity }} {{ t('pieces') }})</span>
                     </p>
                     {% if fil.tag_list %}
                     <div class="flex flex-wrap gap-1 mt-2">
@@ -81,6 +83,13 @@
                     <form action="{{ url_for('delete', id=fil.id) }}" method="POST" onsubmit="return confirm('{{ t('delete_confirm') }}');">
                         <button type="submit" class="text-gray-400 hover:text-red-500 transition-colors"><i class="fa-solid fa-trash"></i></button>
                     </form>
+                    {% if fil.shop_url %}
+                    <a href="{{ fil.shop_url }}" target="_blank" rel="noopener noreferrer" title="{{ t('stats_open_shop') }}" class="text-green-500 hover:text-green-700 transition-colors"><i class="fa-solid fa-cart-shopping"></i></a>
+                    {% elif fil.brand.shop_url %}
+                    <button type="button" onclick="openReorderShop('{{ fil.name|e }}', '{{ fil.brand.shop_url|e }}')" title="{{ t('stats_search_shop') }}" class="text-green-500 hover:text-green-700 transition-colors"><i class="fa-solid fa-cart-shopping"></i></button>
+                    {% elif app_settings and app_settings.reorder_shop_url %}
+                    <button type="button" onclick="openReorderShop('{{ fil.name|e }}', '{{ app_settings.reorder_shop_url|e }}')" title="{{ t('stats_search_shop') }}" class="text-green-500 hover:text-green-700 transition-colors"><i class="fa-solid fa-cart-shopping"></i></button>
+                    {% endif %}
                 </div>
             </div>
         </div>

@@ -54,7 +54,11 @@
                 </div>
             </div>
             <div class="flex flex-wrap gap-2">
+                {% if project.filaments %}
+                <a href="{{ url_for('calculator') }}?filament_id={{ project.filaments[0].filament_id }}" class="ui-badge ui-badge-brand"><i class="fa-solid fa-calculator"></i> {{ t('calculator') }}</a>
+                {% else %}
                 <a href="{{ url_for('calculator') }}" class="ui-badge ui-badge-brand"><i class="fa-solid fa-calculator"></i> {{ t('calculator') }}</a>
+                {% endif %}
                 <a href="{{ url_for('project_edit', id=project.id) }}" class="ui-badge"><i class="fa-solid fa-pen"></i> {{ t('edit') }}</a>
                 <form method="POST" action="{{ url_for('project_delete', id=project.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');">
                     <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-trash"></i> {{ t('delete') }}</button>

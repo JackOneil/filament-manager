@@ -118,13 +118,27 @@ def _live_printers():
         fake_printer = SimpleNamespace(
             name=job.printer_name or 'Bambu Lab',
             host=job.printer_name or 'Bambu Lab',
+            printer_model=job.printer_model or None,
         )
+        # Collect material swatches from BambuJobMaterial rows
+        material_swatches = [
+            SimpleNamespace(
+                color_hex=m.color_hex or '#888888',
+                material_name=m.material_name or '?',
+                weight_grams=m.weight_grams,
+            )
+            for m in sorted((job.materials or []), key=lambda m: (m.ams_id or 0, m.tray_id or 0))
+        ]
         fake_job = SimpleNamespace(
             display_name=job.model_name,
             file_name=None,
             id=job.id,
             progress=None,   # No real-time progress for Bambu Cloud jobs
             finished_at=None,
+            weight_grams=job.weight_grams,
+            cost_time=job.cost_time,        # seconds
+            started_at=job.started_at,
+            material_swatches=material_swatches,
         )
         live.append({'printer': fake_printer, 'job': fake_job, 'type': 'bambu'})
 
@@ -227,6 +241,7 @@ def _inventory_page_context():
         'sort_direction': sort_direction,
         'stock_alerts': stock_alert_pool[:6],
         'stock_alert_count': len(stock_alert_pool),
+        'app_settings': setting,
     }
 
 
@@ -424,6 +439,7 @@ def register(app):
             filament.tag_text = format_tags(request.form.get('tag_text', filament.tag_text or ''))
             filament.min_stock_grams = max(request.form.get('min_stock_grams', filament.min_stock_grams, type=float) or 0.0, 0.0)
             filament.max_stock_grams = max(request.form.get('max_stock_grams', filament.max_stock_grams, type=float) or 0.0, 0.0)
+            filament.shop_url = request.form.get('shop_url', '').strip() or None
 
             weight_diff = filament.weight_remaining - old_weight
             if weight_diff > 0:

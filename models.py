@@ -5,6 +5,7 @@ from database import db
 class Brand(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
+    shop_url = db.Column(db.Text, nullable=True)
 
 
 class Color(db.Model):
@@ -40,6 +41,7 @@ class Filament(db.Model):
     recommended_nozzle_temp = db.Column(db.Integer, nullable=True)
     recommended_bed_temp = db.Column(db.Integer, nullable=True)
     reorder_alert_snoozed = db.Column(db.Boolean, nullable=False, default=False)
+    shop_url = db.Column(db.Text, nullable=True)
 
     brand = db.relationship('Brand', backref=db.backref('filaments', lazy=True))
     color = db.relationship('Color', backref=db.backref('filaments', lazy=True))
@@ -81,6 +83,7 @@ class AppSetting(db.Model):
     bambu_auto_sync_interval_minutes = db.Column(db.Integer, default=60)
     bambu_last_sync_at = db.Column(db.DateTime, nullable=True)
     bambu_last_sync_status = db.Column(db.String(255), nullable=True)
+    reorder_shop_url = db.Column(db.Text, nullable=True)
 
 
 class PrintHistory(db.Model):
