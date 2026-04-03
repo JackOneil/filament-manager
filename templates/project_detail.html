@@ -185,30 +185,6 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="ui-panel">
-                    <div class="flex items-center justify-between mb-4">
-                        <div>
-                            <div class="ui-label">{{ t('project_activity_title') }}</div>
-                            <h2 class="text-2xl font-bold mt-1">{{ t('project_activity_heading') }}</h2>
-                        </div>
-                    </div>
-                    <div class="space-y-3">
-                        {% for event in activity_events %}
-                        <div class="ui-card-soft p-4">
-                            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                                <div>
-                                    <div class="font-semibold text-gray-800">{{ event.label }}</div>
-                                    <div class="text-xs text-gray-500 mt-1">{{ event.created_at.strftime('%d.%m.%Y %H:%M') if event.created_at else '-' }}</div>
-                                </div>
-                                <div class="text-sm text-gray-500">{{ event.meta }}</div>
-                            </div>
-                        </div>
-                        {% else %}
-                        <p class="text-sm text-gray-400">{{ t('project_no_activity') }}</p>
-                        {% endfor %}
-                    </div>
-                </div>
             </div>
 
             <div x-show="workspaceTab === 'materials'" x-cloak class="space-y-4">

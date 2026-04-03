@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.45.4] - 2026-04-02
+### Fixed
+- **Statistics color palette link:** Clicking a color in the statistics palette now opens the dedicated filament list with the matching color filter instead of the overview page.
+- **Outdated inventory link audit:** Reviewed post-refactor navigation targets after splitting `/` and `/filaments`; no other stale filtered links remained outside the statistics palette.
+
+## [1.45.3] - 2026-04-02
+### Changed
+- **Projects board compacted:** Status columns on `/projects` now use denser cards, show 5 items per column, and paginate independently so the Kanban area stays readable.
+- **Project detail cleanup:** The duplicate activity block was removed from the overview tab, leaving activity history only in the dedicated `Activity & jobs` workspace tab.
+- **Dashboard edit button fix:** The active `Done editing` button now keeps readable light-theme hover styling on overview, projects, and statistics pages.
+- **Statistics navigation simplified:** The confusing `Sections` tab switcher was replaced with a stable quick-jump navigator, and all deeper statistics sections remain visible on the same page instead of hiding surrounding content.
+- **Projects due strip refined:** The `Termíny` widget now stays in a single compact row and shows only the nearest unfinished deadlines.
+- **Live printer reliability tightened:** The overview now shows only printers with fresh sync data and real progress information, so stale `Heating / preparing` states no longer linger there.
+
 ## [1.45.2] - 2026-04-02
 ### Changed
 - **Remembered filament view mode:** The `/filaments` page now keeps the selected card/list mode even after leaving the page and coming back later.

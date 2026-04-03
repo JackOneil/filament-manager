@@ -1,12 +1,13 @@
 """Inventory routes: listing, CRUD, spool management, and filament detail."""
 import math
+from datetime import datetime, timedelta
 
 from flask import render_template, request, redirect, url_for
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
 from database import db
-from models import AppSetting, BambuPrinter, PrusaPrinter, BambuJobMaterial, BambuPrintJob, PrusaPrintJob, Brand, Color, Filament, Material, MovementHistory, ProjectFilament, ProjectQuote
+from models import AppSetting, PrusaPrinter, BambuJobMaterial, BambuPrintJob, PrusaPrintJob, Brand, Color, Filament, Material, MovementHistory, ProjectFilament, ProjectQuote
 from utils import (
     build_action_center,
     build_filament_history_name as _display_filament_name,
@@ -86,19 +87,23 @@ def _inventory_stats(f_brand='', f_material='', f_color='', f_tag=''):
 
 
 def _live_printers():
-    bambu_printers_live = []
-    for printer in BambuPrinter.query.all():
-        job = BambuPrintJob.query.filter_by(device_id=printer.device_id).order_by(BambuPrintJob.started_at.desc().nullslast()).first()
-        if job and job.status == 'RUNNING':
-            bambu_printers_live.append({'printer': printer, 'job': job, 'type': 'bambu'})
-
     prusa_printers_live = []
+    freshness_cutoff = datetime.utcnow() - timedelta(minutes=15)
     for printer in PrusaPrinter.query.filter_by(enabled=True).all():
         job = PrusaPrintJob.query.filter_by(printer_id=printer.id).order_by(PrusaPrintJob.started_at.desc().nullslast()).first()
-        if job and job.status == 'PRINTING':
+        if (
+            job
+            and job.status == 'PRINTING'
+            and job.progress is not None
+            and job.progress > 0
+            and printer.last_success_at
+            and printer.last_success_at >= freshness_cutoff
+            and job.synced_at
+            and job.synced_at >= freshness_cutoff
+        ):
             prusa_printers_live.append({'printer': printer, 'job': job, 'type': 'prusa'})
 
-    return bambu_printers_live + prusa_printers_live
+    return prusa_printers_live
 
 
 def _inventory_page_context():

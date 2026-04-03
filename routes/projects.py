@@ -121,6 +121,22 @@ def _build_project_job_feed(project, setting, show_bambu_jobs, show_prusa_jobs):
     return items
 
 
+def _slice_page(items, page, per_page):
+    total = len(items)
+    pages = max(1, math.ceil(total / per_page)) if total else 1
+    page = min(max(page, 1), pages)
+    start = (page - 1) * per_page
+    return items[start:start + per_page], SimpleNamespace(
+        page=page,
+        pages=pages,
+        total=total,
+        has_prev=page > 1,
+        has_next=page < pages,
+        prev_num=page - 1 if page > 1 else 1,
+        next_num=page + 1 if page < pages else pages,
+    )
+
+
 def register(app):
     UPLOAD_FOLDER = app.config.get(
         'PROJECT_UPLOAD_FOLDER',
@@ -134,6 +150,7 @@ def register(app):
 
         sort_by = request.args.get('sort_by', 'due_date')
         page = request.args.get('page', 1, type=int)
+        kanban_per_page = 5
         setting = AppSetting.query.first()
         per_page = setting.items_per_page if setting and setting.items_per_page in [12, 24, 48, 96] else 12
         if sort_by == 'name':
@@ -167,12 +184,50 @@ def register(app):
             Project.created_at.desc(),
         ).all()
         project_metrics = {project.id: build_project_metrics(project, setting) for project in all_projects}
-        projects_by_status = {
+        all_projects_by_status = {
             'NEW': [project for project in all_projects if project.status == 'NEW'],
             'PRINTING': [project for project in all_projects if project.status == 'PRINTING'],
             'DONE': [project for project in all_projects if project.status == 'DONE'],
         }
-        upcoming_due = [project for project in all_projects if project.due_date][:8]
+        status_page_fields = {
+            'NEW': 'kanban_new_page',
+            'PRINTING': 'kanban_printing_page',
+            'DONE': 'kanban_done_page',
+        }
+        current_kanban_pages = {}
+        for status, field_name in status_page_fields.items():
+            items = all_projects_by_status[status]
+            page_num = request.args.get(field_name, 1, type=int)
+            _, pager = _slice_page(items, page_num, kanban_per_page)
+            current_kanban_pages[field_name] = pager.page
+
+        def _projects_index_url(**overrides):
+            params = {'sort_by': sort_by, 'page': page, **current_kanban_pages}
+            params.update(overrides)
+            return url_for('projects_index', **params)
+
+        projects_by_status = {}
+        for status, items in all_projects_by_status.items():
+            field_name = status_page_fields[status]
+            paged_items, pager = _slice_page(items, current_kanban_pages[field_name], kanban_per_page)
+            page_urls = {p: _projects_index_url(**{field_name: p}) for p in range(1, pager.pages + 1)}
+            projects_by_status[status] = {
+                'items': paged_items,
+                'total': len(items),
+                'pagination': SimpleNamespace(
+                    **pager.__dict__,
+                    prev_url=_projects_index_url(**{field_name: pager.prev_num}),
+                    next_url=_projects_index_url(**{field_name: pager.next_num}),
+                    page_urls=page_urls,
+                ),
+            }
+
+        upcoming_due = [project for project in all_projects if project.due_date and project.status != 'DONE'][:4]
+        project_page_urls = {
+            p: _projects_index_url(page=p)
+            for p in projects.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2)
+            if p
+        }
         return render_template(
             'projects_index.html',
             projects=projects,
@@ -181,6 +236,9 @@ def register(app):
             project_metrics=project_metrics,
             projects_by_status=projects_by_status,
             upcoming_due=upcoming_due,
+            project_page_urls=project_page_urls,
+            projects_prev_url=_projects_index_url(page=projects.prev_num),
+            projects_next_url=_projects_index_url(page=projects.next_num),
             now=datetime.utcnow(),
         )
 

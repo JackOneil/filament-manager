@@ -1,5 +1,5 @@
 # Filament Manager 🧵
-*Current version: **v1.45.2***
+*Current version: **v1.45.4***
 
 A minimalist and modern web application for tracking and managing 3D printer filaments.
 The application allows detailed tracking of weight balances, material costs, and also includes a calculator for a precise print cost estimation of a given model (in grams relative to the spool's total weight).
@@ -9,12 +9,12 @@ The application allows detailed tracking of weight balances, material costs, and
 - **Action Center:** The overview dashboard highlights the most important operational tasks at the top: low-stock filaments, overdue projects, unmapped printer jobs, and printer sync issues.
 - **Projects System:** Plan and track ongoing 3D prints as unified "Projects". Store details, client names, due dates, attached files, and links; compare estimate vs. actual material/time/margin; work from a tabbed workspace-oriented project detail; and reorder the project board widgets to match your workflow.
 - **Print Calculator:** Before starting a print enter the model weight from your slicer and the estimated print time. You instantly see how much the specific part will cost (including calculated electricity consumption). The page saves a **history of your previous calculations**.
-- **Statistics Dashboard:** A dual-mode dashboard: an executive overview for daily monitoring plus deeper switchable sections for planning, projects, and detail widgets. Layout customisation and saved browser-side presets are both supported.
+- **Statistics Dashboard:** A stable executive dashboard with top KPI cards, one dominant trend chart, saved browser-side presets, and all deeper planning/project/detail sections visible on the same page with quick-jump navigation.
 - **Storage Shelf Map:** Visualize where each spool lives on your physical shelves. Assign spools to named shelf slots, move or reorient them, and see stock levels at a glance on the shelf grid. Frequent filter combinations can be stored as saved views.
 - **Installation & Notifications:** Native PWA (Progressive Web App) support — easily install on your dashboard or mobile device. Elegant non-blocking Toast notifications via Alpine.js.
 - **Bambu Cloud Integration:** Sync print jobs from Bambu Lab printers. Assign jobs to projects and optionally deduct material usage directly from inventory.
 - **PrusaLink Integration:** Poll any Prusa printer on your local network via the PrusaLink REST API (no cloud account required). Add printers by IP address and API key; the background worker captures active and completed print jobs automatically.
-- **Live Connected Printers:** An instantly auto-updating "Live Printers" dashboard grid summarizing all connected (both Prusa and Bambu) print statuses, current temps, progress, estimation logs, etc.
+- **Live Connected Printers:** The overview highlights only printers with fresh, reliable live progress data, so stale or ambiguous preparation states do not linger on the dashboard.
 - **Movement History:** Full audit log of every filament weight change with reasons and timestamps.
 - **Custom Dictionaries:** Pre-configured with popular manufacturers, materials, and colors. Everything can be freely expanded, renamed, and safely deleted in the base Settings.
 - **Multi-Language Support:** Natively supports both English and Czech.

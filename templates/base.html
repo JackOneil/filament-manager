@@ -548,8 +548,8 @@
                 if (editMode) {
                     scope.classList.add('layout-edit-mode');
                     if (btn) {
-                        btn.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
-                        btn.classList.remove('bg-white', 'text-gray-700', 'border-gray-300');
+                        btn.classList.add('bg-blue-600', 'text-white', 'border-blue-600', 'hover:bg-blue-700');
+                        btn.classList.remove('bg-white', 'text-gray-700', 'border-gray-300', 'hover:bg-gray-50');
                     }
                     if (label) label.textContent = config.doneText;
                     if (hint) hint.classList.remove('hidden');
@@ -557,8 +557,8 @@
                 } else {
                     scope.classList.remove('layout-edit-mode');
                     if (btn) {
-                        btn.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
-                        btn.classList.add('bg-white', 'text-gray-700', 'border-gray-300');
+                        btn.classList.remove('bg-blue-600', 'text-white', 'border-blue-600', 'hover:bg-blue-700');
+                        btn.classList.add('bg-white', 'text-gray-700', 'border-gray-300', 'hover:bg-gray-50');
                     }
                     if (label) label.textContent = config.editText;
                     if (hint) hint.classList.add('hidden');
