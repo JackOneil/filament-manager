@@ -3,12 +3,13 @@ import math
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
-from flask import render_template, request, redirect, url_for
+from flask import abort, render_template, request, redirect, url_for
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
 from database import db
-from models import AppSetting, PrusaPrinter, BambuJobMaterial, BambuPrintJob, PrusaPrintJob, Brand, Color, Filament, Material, MovementHistory, ProjectFilament, ProjectQuote
+from auth import get_current_user, is_admin
+from models import AppSetting, PrusaPrinter, BambuJobMaterial, BambuPrintJob, PrusaPrintJob, Brand, Color, Filament, Material, MovementHistory, Notification, Project, ProjectComment, ProjectFilament, ProjectQuote
 from utils import (
     build_action_center,
     build_filament_history_name as _display_filament_name,
@@ -258,10 +259,60 @@ def _selected_filaments():
     return Filament.query.filter(Filament.id.in_(ids)).all()
 
 
+def _require_inventory_admin():
+    user = get_current_user()
+    if user and not is_admin(user):
+        abort(403)
+
+
+def _user_dashboard_context(user):
+    owned_projects = (
+        Project.query
+        .filter(Project.owner_user_id == user.id)
+        .order_by(Project.created_at.desc())
+        .all()
+    )
+    open_projects = [project for project in owned_projects if project.status not in ('DONE', 'REJECTED')]
+    pending_projects = [project for project in owned_projects if project.status == 'PENDING_APPROVAL']
+    approved_projects = [project for project in owned_projects if project.status in ('APPROVED', 'PRINTING')]
+    recent_comments = (
+        ProjectComment.query
+        .join(Project, Project.id == ProjectComment.project_id)
+        .filter(Project.owner_user_id == user.id)
+        .order_by(ProjectComment.created_at.desc())
+        .limit(6)
+        .all()
+    )
+    notifications = (
+        Notification.query
+        .filter_by(user_id=user.id)
+        .order_by(Notification.created_at.desc())
+        .limit(6)
+        .all()
+    )
+    latest_projects = owned_projects[:5]
+    return {
+        'owned_projects': owned_projects,
+        'open_projects_count': len(open_projects),
+        'pending_projects_count': len(pending_projects),
+        'approved_projects_count': len(approved_projects),
+        'done_projects_count': len([project for project in owned_projects if project.status == 'DONE']),
+        'recent_comments': recent_comments,
+        'recent_notifications': notifications,
+        'latest_projects': latest_projects,
+    }
+
+
 def register(app):
 
     @app.route('/')
     def index():
+        user = get_current_user()
+        if user and not is_admin(user):
+            return render_template(
+                'overview_user.html',
+                user_dashboard=_user_dashboard_context(user),
+            )
         return render_template(
             'overview.html',
             stats=_inventory_stats(),
@@ -271,10 +322,16 @@ def register(app):
 
     @app.route('/filaments')
     def filaments_index():
-        return render_template('index.html', **_inventory_page_context())
+        user = get_current_user()
+        inventory_read_only = bool(user and not is_admin(user))
+        context = _inventory_page_context()
+        if inventory_read_only:
+            return render_template('index_user.html', **context)
+        return render_template('index.html', inventory_read_only=False, **context)
 
     @app.route('/filament/<int:id>')
     def filament_detail(id):
+        _require_inventory_admin()
         from utils import collect_usage_windows
 
         filament = _build_filament_query().filter(Filament.id == id).first_or_404()
@@ -329,6 +386,7 @@ def register(app):
 
     @app.route('/filament/<int:id>/meta', methods=['POST'])
     def filament_update_meta(id):
+        _require_inventory_admin()
         filament = db.get_or_404(Filament, id)
         filament.tag_text = format_tags(request.form.get('tag_text', ''))
         filament.min_stock_grams = max(request.form.get('min_stock_grams', 0.0, type=float) or 0.0, 0.0)
@@ -345,6 +403,7 @@ def register(app):
 
     @app.route('/filament/<int:id>/toggle-reorder-snooze', methods=['POST'])
     def filament_toggle_reorder_snooze(id):
+        _require_inventory_admin()
         filament = db.get_or_404(Filament, id)
         filament.reorder_alert_snoozed = not bool(filament.reorder_alert_snoozed)
         db.session.commit()
@@ -352,6 +411,7 @@ def register(app):
 
     @app.route('/inventory/bulk', methods=['POST'])
     def inventory_bulk():
+        _require_inventory_admin()
         # Only the delete action is supported from the UI; validate explicitly
         # so an unexpected action never silently deletes filaments.
         action = request.form.get('action', '')
@@ -374,6 +434,7 @@ def register(app):
 
     @app.route('/add', methods=['GET', 'POST'])
     def add():
+        _require_inventory_admin()
         if request.method == 'POST':
             name = request.form.get('name', '').strip()
             try:
@@ -426,6 +487,7 @@ def register(app):
 
     @app.route('/edit/<int:id>', methods=['GET', 'POST'])
     def edit(id):
+        _require_inventory_admin()
         filament = db.get_or_404(Filament, id)
         if request.method == 'POST':
             old_weight = filament.weight_remaining
@@ -454,6 +516,7 @@ def register(app):
 
     @app.route('/use/<int:id>', methods=['POST'])
     def use_filament(id):
+        _require_inventory_admin()
         try:
             amount = float(request.form.get('amount', 0) or 0)
         except (TypeError, ValueError):
@@ -478,6 +541,7 @@ def register(app):
 
     @app.route('/add_spool/<int:id>', methods=['POST'])
     def add_spool(id):
+        _require_inventory_admin()
         filament = db.get_or_404(Filament, id)
         filament.quantity += 1
         filament.weight_remaining += filament.weight_total
@@ -487,6 +551,7 @@ def register(app):
 
     @app.route('/remove_spool/<int:id>', methods=['POST'])
     def remove_spool(id):
+        _require_inventory_admin()
         filament = db.get_or_404(Filament, id)
         if filament.quantity > 0:
             filament.quantity -= 1
@@ -501,6 +566,7 @@ def register(app):
 
     @app.route('/delete/<int:id>', methods=['POST'])
     def delete(id):
+        _require_inventory_admin()
         filament = db.get_or_404(Filament, id)
         log_movement(filament, 'remove', filament.weight_remaining, note='Deleted filament')
         ProjectFilament.query.filter_by(filament_id=filament.id).delete()

@@ -1,5 +1,5 @@
 # Filament Manager 🧵
-*Current version: **v1.50.0***
+*Current version: **v1.51.0***
 
 A minimalist and modern web application for tracking and managing 3D printer filaments.
 The application allows detailed tracking of weight balances, material costs, and also includes a calculator for a precise print cost estimation of a given model (in grams relative to the spool's total weight).
@@ -8,6 +8,7 @@ The application allows detailed tracking of weight balances, material costs, and
 - **Clean Overview + Dedicated Filament List:** The main page is now a focused operations overview, while `/filaments` holds the full stock browser with card/list views, progress bars, low-stock indicators, filtering, sorting, saved views, and remembered card/list mode.
 - **Action Center:** The overview dashboard highlights the most important operational tasks at the top: low-stock filaments, overdue projects, unmapped printer jobs, and printer sync issues.
 - **Projects System:** Plan and track ongoing 3D prints as unified "Projects". Store details, client names, due dates, attached files, and links; compare estimate vs. actual material/time/margin; work from a tabbed workspace-oriented project detail; and reorder the project board widgets to match your workflow.
+- **Multi-User Workspace:** Built-in authentication now supports multiple administrators, user self-registration, invite activation codes, per-section access rights, owned projects, project comments, and in-app notifications for status changes and new requests.
 - **Print Calculator:** Before starting a print enter the model weight from your slicer and the estimated print time. You instantly see how much the specific part will cost (including calculated electricity consumption). The page saves a **history of your previous calculations**.
 - **Statistics Dashboard:** A stable executive dashboard with top KPI cards, one dominant trend chart, saved browser-side presets, and all deeper planning/project/detail sections visible on the same page with quick-jump navigation.
 - **Storage Shelf Map:** Visualize where each spool lives on your physical shelves. Assign spools to named shelf slots, move or reorient them, and see stock levels at a glance on the shelf grid. Frequent filter combinations can be stored as saved views.

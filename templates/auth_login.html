@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-md mx-auto w-full">
+    <div class="ui-panel">
+        <div class="page-hero">
+            <h1>{{ t('auth_login') }}</h1>
+            <p>{{ t('auth_login_desc') }}</p>
+        </div>
+        <form method="POST" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('auth_email') }}</label>
+                <input type="email" name="email" required class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('auth_password') }}</label>
+                <input type="password" name="password" required class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
+            </div>
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-semibold transition">{{ t('auth_login') }}</button>
+        </form>
+        <div class="text-sm text-gray-500 mt-4">
+            <a href="{{ url_for('register_account') }}" class="text-blue-600 hover:underline">{{ t('auth_register') }}</a>
+            ·
+            <a href="{{ url_for('activate_invite') }}" class="text-blue-600 hover:underline">{{ t('auth_activate_invite') }}</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

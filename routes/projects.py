@@ -1,22 +1,40 @@
+import math
 import os
 import uuid
-import math
-from types import SimpleNamespace
 from datetime import datetime
-from flask import render_template, request, redirect, url_for, send_from_directory, flash
-from werkzeug.utils import secure_filename
+from types import SimpleNamespace
+
+from flask import abort, current_app, flash, redirect, render_template, request, send_from_directory, url_for
 from sqlalchemy.orm import joinedload
+from werkzeug.utils import secure_filename
+
+from auth import create_notification, get_current_user, is_admin
 from database import db
-from models import AppSetting, BambuJobMaterial, BambuPrintJob, MovementHistory, Project, ProjectFile, ProjectLink, ProjectFilament, ProjectQuote, PrusaPrintJob, PrusaPrinter, Filament
+from models import (
+    AppSetting,
+    BambuJobMaterial,
+    BambuPrintJob,
+    Filament,
+    Project,
+    ProjectComment,
+    ProjectFile,
+    ProjectFilament,
+    ProjectLink,
+    ProjectQuote,
+    PrusaPrintJob,
+    PrusaPrinter,
+    User,
+)
 from utils import build_project_metrics, format_tags
 
 
 ALLOWED_PROJECT_FILE_EXTENSIONS = {
     '3mf', 'stl', 'obj', 'amf', 'step', 'stp', 'gcode', 'gc', 'bgcode',
-    'jpg', 'jpeg', 'png', 'gif', 'webp'
+    'jpg', 'jpeg', 'png', 'gif', 'webp',
 }
 IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
-ALLOWED_PROJECT_STATUSES = {'NEW', 'PRINTING', 'DONE'}
+ALLOWED_PROJECT_STATUSES = {'NEW', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'PRINTING', 'DONE'}
+KANBAN_STATUSES = ('PENDING_APPROVAL', 'APPROVED', 'PRINTING', 'DONE')
 
 
 def _get_extension(filename):
@@ -30,7 +48,7 @@ def _is_allowed_project_file(filename):
 def _build_storage_name(project_id, filename):
     safe_name = secure_filename(filename)
     unique_id = uuid.uuid4().hex[:12]
-    return f"{project_id}_{unique_id}_{safe_name}"
+    return f'{project_id}_{unique_id}_{safe_name}'
 
 
 def _project_detail_redirect(project_id, tab='overview', **extra_params):
@@ -121,38 +139,127 @@ def _build_project_job_feed(project, setting, show_bambu_jobs, show_prusa_jobs):
     return items
 
 
-def _slice_page(items, page, per_page):
-    total = len(items)
-    pages = max(1, math.ceil(total / per_page)) if total else 1
-    page = min(max(page, 1), pages)
-    start = (page - 1) * per_page
-    return items[start:start + per_page], SimpleNamespace(
-        page=page,
-        pages=pages,
-        total=total,
-        has_prev=page > 1,
-        has_next=page < pages,
-        prev_num=page - 1 if page > 1 else 1,
-        next_num=page + 1 if page < pages else pages,
+def _project_scope():
+    user = get_current_user()
+    query = Project.query
+    if current_app.config.get('TESTING') and not current_app.config.get('AUTH_REQUIRED_IN_TESTS'):
+        return query
+    if is_admin(user):
+        owner_id = request.args.get('owner_id', type=int)
+        if owner_id:
+            query = query.filter(Project.owner_user_id == owner_id)
+        return query
+    if not user:
+        return query.filter(db.literal(False))
+    return query.filter(Project.owner_user_id == user.id)
+
+
+def _project_or_404(project_id):
+    project = (
+        Project.query
+        .options(joinedload(Project.owner), joinedload(Project.created_by))
+        .filter(Project.id == project_id)
+        .first_or_404()
     )
+    if current_app.config.get('TESTING') and not current_app.config.get('AUTH_REQUIRED_IN_TESTS'):
+        return project
+    user = get_current_user()
+    if is_admin(user):
+        return project
+    if not user or project.owner_user_id != user.id:
+        abort(404)
+    return project
+
+
+def _project_write_allowed(project):
+    user = get_current_user()
+    if current_app.config.get('TESTING') and not current_app.config.get('AUTH_REQUIRED_IN_TESTS'):
+        return True
+    return bool(user and (is_admin(user) or project.owner_user_id == user.id))
+
+
+def _require_project_admin():
+    if current_app.config.get('TESTING') and not current_app.config.get('AUTH_REQUIRED_IN_TESTS'):
+        return
+    if not is_admin():
+        abort(403)
+
+
+def _project_owner_choices():
+    if not is_admin():
+        return []
+    return User.query.filter_by(is_active=True).order_by(User.name.asc()).all()
+
+
+def _notify_project_created(project):
+    for admin in User.query.filter_by(role='admin', is_active=True).all():
+        if admin.notify_project_created:
+            create_notification(
+                admin,
+                f'Novy projekt: {project.name}',
+                'Byla vytvorena nova poptavka a ceka na schvaleni.',
+                url_for('project_detail', id=project.id),
+                kind='project',
+            )
+
+
+def _notify_project_status(project):
+    status_label = project.status
+    if project.owner and project.owner.notify_project_status_changed:
+        create_notification(
+            project.owner,
+            f'Projekt {project.name}',
+            f'Stav projektu byl zmenen na {status_label}.',
+            url_for('project_detail', id=project.id),
+            kind='project',
+        )
+    for admin in User.query.filter_by(role='admin', is_active=True).all():
+        if admin.notify_project_status_changed:
+            create_notification(
+                admin,
+                f'Projekt {project.name}',
+                f'Stav projektu byl zmenen na {status_label}.',
+                url_for('project_detail', id=project.id),
+                kind='project',
+            )
+
+
+def _notify_project_comment(project, author):
+    recipients = []
+    if project.owner and project.owner.id != author.id and project.owner.notify_project_comment:
+        recipients.append(project.owner)
+    for admin in User.query.filter_by(role='admin', is_active=True).all():
+        if admin.id != author.id and admin.notify_project_comment:
+            recipients.append(admin)
+    seen = set()
+    for recipient in recipients:
+        if recipient.id in seen:
+            continue
+        seen.add(recipient.id)
+        create_notification(
+            recipient,
+            f'Komentar u projektu {project.name}',
+            f'{author.name} pridal novy komentar.',
+            url_for('project_detail', id=project.id, tab='overview'),
+            kind='comment',
+        )
 
 
 def register(app):
-    UPLOAD_FOLDER = app.config.get(
+    upload_folder = app.config.get(
         'PROJECT_UPLOAD_FOLDER',
-        os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'uploads')
+        os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'uploads'),
     )
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    os.makedirs(upload_folder, exist_ok=True)
 
     @app.route('/projects')
     def projects_index():
-        from models import AppSetting
-
         sort_by = request.args.get('sort_by', 'due_date')
         page = request.args.get('page', 1, type=int)
         kanban_per_page = 5
         setting = AppSetting.query.first()
         per_page = setting.items_per_page if setting and setting.items_per_page in [12, 24, 48, 96] else 12
+        base_query = _project_scope()
 
         if sort_by == 'name':
             order_expr = [Project.name.asc()]
@@ -161,55 +268,47 @@ def register(app):
         elif sort_by == 'client':
             order_expr = [Project.client_name.asc()]
         elif sort_by == 'status':
-            order_expr = [Project.status.asc()]
-        elif sort_by == 'created':
-            order_expr = [Project.created_at.desc()]
+            order_expr = [Project.status.asc(), Project.created_at.desc()]
         else:
             order_expr = [Project.created_at.desc()]
 
-        # Canonical kanban ordering (due date first, then created)
         kanban_order = [
             db.case((Project.due_date == None, 1), else_=0),
             Project.due_date.asc(),
             Project.created_at.desc(),
         ]
 
-        # Table — DB paginated
-        projects = db.paginate(
-            Project.query.order_by(*order_expr),
-            page=page,
-            per_page=per_page,
-            error_out=False,
-        )
+        projects = db.paginate(base_query.order_by(*order_expr), page=page, per_page=per_page, error_out=False)
 
-        # Kanban — one DB paginated query per status column
         status_page_fields = {
-            'NEW': 'kanban_new_page',
+            'PENDING_APPROVAL': 'kanban_pending_page',
+            'APPROVED': 'kanban_approved_page',
             'PRINTING': 'kanban_printing_page',
             'DONE': 'kanban_done_page',
+            'REJECTED': 'kanban_rejected_page',
         }
 
         def _projects_index_url(**overrides):
             params = {
                 'sort_by': sort_by,
                 'page': page,
-                **{f: request.args.get(f, 1, type=int) for f in status_page_fields.values()},
+                'owner_id': request.args.get('owner_id', type=int),
+                **{field: request.args.get(field, 1, type=int) for field in status_page_fields.values()},
             }
             params.update(overrides)
-            return url_for('projects_index', **params)
+            return url_for('projects_index', **{k: v for k, v in params.items() if v})
 
         projects_by_status = {}
         for status, field_name in status_page_fields.items():
             status_page = max(request.args.get(field_name, 1, type=int), 1)
             pag = db.paginate(
-                Project.query.filter(Project.status == status).order_by(*kanban_order),
+                base_query.filter(Project.status == status).order_by(*kanban_order),
                 page=status_page,
                 per_page=kanban_per_page,
                 error_out=False,
             )
-            # Compact page list: show at most 7 page numbers with ellipsis
             page_list = list(pag.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2))
-            page_urls = {p: _projects_index_url(**{field_name: p}) for p in page_list if p}
+            page_urls = {value: _projects_index_url(**{field_name: value}) for value in page_list if value}
             projects_by_status[status] = {
                 'items': pag.items,
                 'total': pag.total,
@@ -228,27 +327,29 @@ def register(app):
                 ),
             }
 
-        # Compute metrics only for items that are actually rendered (kanban + table)
-        visible_ids = set(p.id for p in projects.items)
+        visible_ids = set(project.id for project in projects.items)
         for board in projects_by_status.values():
-            for p in board['items']:
-                visible_ids.add(p.id)
+            visible_ids.update(project.id for project in board['items'])
 
         if visible_ids:
-            visible_projects = Project.query.options(
-                joinedload(Project.filaments).joinedload(ProjectFilament.filament),
-                joinedload(Project.quotes),
-                joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.filament),
-                joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.materials),
-                joinedload(Project.prusa_jobs).joinedload(PrusaPrintJob.filament),
-            ).filter(Project.id.in_(visible_ids)).all()
-            project_metrics = {p.id: build_project_metrics(p, setting) for p in visible_projects}
+            visible_projects = (
+                _project_scope()
+                .options(
+                    joinedload(Project.filaments).joinedload(ProjectFilament.filament),
+                    joinedload(Project.quotes),
+                    joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.filament),
+                    joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.materials),
+                    joinedload(Project.prusa_jobs).joinedload(PrusaPrintJob.filament),
+                )
+                .filter(Project.id.in_(visible_ids))
+                .all()
+            )
+            project_metrics = {project.id: build_project_metrics(project, setting) for project in visible_projects}
         else:
             project_metrics = {}
 
-        # Upcoming due — direct DB query, no need to load everything
         upcoming_due = (
-            Project.query
+            base_query
             .filter(Project.due_date.is_not(None), Project.status != 'DONE')
             .order_by(Project.due_date.asc())
             .limit(4)
@@ -256,9 +357,9 @@ def register(app):
         )
 
         project_page_urls = {
-            p: _projects_index_url(page=p)
-            for p in projects.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2)
-            if p
+            value: _projects_index_url(page=value)
+            for value in projects.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2)
+            if value
         }
         return render_template(
             'projects_index.html',
@@ -271,88 +372,73 @@ def register(app):
             project_page_urls=project_page_urls,
             projects_prev_url=_projects_index_url(page=projects.prev_num) if projects.has_prev else '#',
             projects_next_url=_projects_index_url(page=projects.next_num) if projects.has_next else '#',
+            owner_choices=_project_owner_choices(),
+            selected_owner_id=request.args.get('owner_id', type=int),
             now=datetime.utcnow(),
         )
 
     @app.route('/projects/create', methods=['GET', 'POST'])
     def project_create():
+        user = get_current_user()
         if request.method == 'POST':
             name = request.form.get('name', '').strip()
             description = request.form.get('description', '').strip()
-            client_name = request.form.get('client_name', '').strip()
+            client_name = user.name if user and not is_admin(user) else request.form.get('client_name', '').strip()
             due_date_str = request.form.get('due_date', '').strip()
-            estimated_print_time = request.form.get('estimated_print_time', 0, type=int)
             hours = request.form.get('print_hours', 0, type=int)
             minutes = request.form.get('print_minutes', 0, type=int)
-            if hours > 0 or minutes > 0:
-                estimated_print_time = hours * 60 + minutes
-
-            due_date = None
-            if due_date_str:
-                due_date = datetime.strptime(due_date_str, '%Y-%m-%d')
-
-            new_project = Project(
+            estimated_print_time = hours * 60 + minutes if hours > 0 or minutes > 0 else 0
+            due_date = datetime.strptime(due_date_str, '%Y-%m-%d') if due_date_str else None
+            project = Project(
                 name=name,
                 description=description,
                 client_name=client_name,
                 due_date=due_date,
                 estimated_print_time=estimated_print_time,
                 tag_text=format_tags(request.form.get('tag_text', '')),
+                owner_user_id=user.id if user else None,
+                created_by_user_id=user.id if user else None,
+                status='APPROVED' if is_admin(user) else 'PENDING_APPROVAL',
             )
-            db.session.add(new_project)
+            db.session.add(project)
+            db.session.flush()
+            if not is_admin(user):
+                _notify_project_created(project)
             db.session.commit()
-            app.logger.debug(f"Created new project: {name}")
-            return redirect(url_for('project_detail', id=new_project.id))
-
-        return render_template('project_create.html')
+            return redirect(url_for('project_detail', id=project.id))
+        return render_template(
+            'project_create.html',
+            is_admin_user=is_admin(user),
+            default_client_name=user.name if user and not is_admin(user) else '',
+        )
 
     @app.route('/projects/<int:id>', methods=['GET'])
     def project_detail(id):
-        project = Project.query.options(
-            joinedload(Project.files),
-            joinedload(Project.links),
-            joinedload(Project.quotes),
-            joinedload(Project.movements),
-            joinedload(Project.filaments)
-            .joinedload(ProjectFilament.filament)
-            .joinedload(Filament.color),
-            joinedload(Project.filaments)
-            .joinedload(ProjectFilament.filament)
-            .joinedload(Filament.brand),
-            joinedload(Project.filaments)
-            .joinedload(ProjectFilament.filament)
-            .joinedload(Filament.material),
-            joinedload(Project.bambu_jobs)
-            .joinedload(BambuPrintJob.filament)
-            .joinedload(Filament.color),
-            joinedload(Project.bambu_jobs)
-            .joinedload(BambuPrintJob.filament)
-            .joinedload(Filament.brand),
-            joinedload(Project.bambu_jobs)
-            .joinedload(BambuPrintJob.filament)
-            .joinedload(Filament.material),
-            joinedload(Project.bambu_jobs)
-            .joinedload(BambuPrintJob.materials)
-            .joinedload(BambuJobMaterial.filament)
-            .joinedload(Filament.color),
-            joinedload(Project.bambu_jobs)
-            .joinedload(BambuPrintJob.materials)
-            .joinedload(BambuJobMaterial.filament)
-            .joinedload(Filament.brand),
-            joinedload(Project.bambu_jobs)
-            .joinedload(BambuPrintJob.materials),
-            joinedload(Project.prusa_jobs)
-            .joinedload(PrusaPrintJob.printer),
-            joinedload(Project.prusa_jobs)
-            .joinedload(PrusaPrintJob.filament)
-            .joinedload(Filament.color),
-            joinedload(Project.prusa_jobs)
-            .joinedload(PrusaPrintJob.filament)
-            .joinedload(Filament.brand),
-            joinedload(Project.prusa_jobs)
-            .joinedload(PrusaPrintJob.filament)
-            .joinedload(Filament.material),
-        ).filter(Project.id == id).first_or_404()
+        _project_or_404(id)
+        project = (
+            Project.query
+            .options(
+                joinedload(Project.owner),
+                joinedload(Project.created_by),
+                joinedload(Project.files),
+                joinedload(Project.links),
+                joinedload(Project.quotes),
+                joinedload(Project.comments).joinedload(ProjectComment.user),
+                joinedload(Project.filaments).joinedload(ProjectFilament.filament).joinedload(Filament.color),
+                joinedload(Project.filaments).joinedload(ProjectFilament.filament).joinedload(Filament.brand),
+                joinedload(Project.filaments).joinedload(ProjectFilament.filament).joinedload(Filament.material),
+                joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.filament).joinedload(Filament.color),
+                joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.filament).joinedload(Filament.brand),
+                joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.filament).joinedload(Filament.material),
+                joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.materials).joinedload(BambuJobMaterial.filament),
+                joinedload(Project.prusa_jobs).joinedload(PrusaPrintJob.printer),
+                joinedload(Project.prusa_jobs).joinedload(PrusaPrintJob.filament).joinedload(Filament.color),
+                joinedload(Project.prusa_jobs).joinedload(PrusaPrintJob.filament).joinedload(Filament.brand),
+                joinedload(Project.prusa_jobs).joinedload(PrusaPrintJob.filament).joinedload(Filament.material),
+            )
+            .filter(Project.id == id)
+            .first_or_404()
+        )
         filaments = Filament.query.order_by(Filament.name.asc()).all()
         setting = AppSetting.query.first()
         show_bambu_jobs = bool(setting and setting.bambu_token)
@@ -360,10 +446,9 @@ def register(app):
         active_tab = request.args.get('tab', 'overview')
         if active_tab not in {'overview', 'materials', 'files', 'jobs'}:
             active_tab = 'overview'
+
         project_metrics = build_project_metrics(project, setting)
-        images = []
-        model_files = []
-        other_files = []
+        images, model_files, other_files = [], [], []
         for project_file in project.files:
             ext = _get_extension(project_file.filename)
             if ext in IMAGE_EXTENSIONS:
@@ -376,11 +461,11 @@ def register(app):
         next_actions = []
         if project.due_date and project.due_date < datetime.utcnow() and project.status != 'DONE':
             next_actions.append('overdue')
-        if not project.filaments:
+        if is_admin() and not project.filaments:
             next_actions.append('plan_filaments')
-        if project_metrics['has_quote'] is False:
+        if is_admin() and project_metrics['has_quote'] is False:
             next_actions.append('create_quote')
-        if any(not row.is_used for row in project.filaments):
+        if is_admin() and any(not row.is_used for row in project.filaments):
             next_actions.append('consume_planned')
         if show_prusa_jobs and any(job.project_id is None or job.filament_id is None for job in getattr(project, 'prusa_jobs', [])):
             next_actions.append('map_prusa_jobs')
@@ -389,14 +474,8 @@ def register(app):
             for job in getattr(project, 'bambu_jobs', [])
         ):
             next_actions.append('map_bambu_jobs')
+
         activity_events = []
-        for movement in sorted(project.movements, key=lambda item: item.created_at or datetime.min, reverse=True):
-            activity_events.append({
-                'created_at': movement.created_at,
-                'label': movement.note or movement.action_type.replace('_', ' ').title(),
-                'meta': f"{movement.weight:.1f} g · {movement.currency}",
-                'kind': 'movement',
-            })
         for quote in sorted(project.quotes, key=lambda item: item.created_at or datetime.min, reverse=True):
             activity_events.append({
                 'created_at': quote.created_at,
@@ -410,6 +489,13 @@ def register(app):
                 'label': f'File uploaded: {project_file.filename}',
                 'meta': _get_extension(project_file.filename).upper() or 'FILE',
                 'kind': 'file',
+            })
+        for comment in sorted(project.comments, key=lambda item: item.created_at or datetime.min, reverse=True):
+            activity_events.append({
+                'created_at': comment.created_at,
+                'label': f'Comment: {(comment.body or "")[:60]}',
+                'meta': comment.user.name if comment.user else '-',
+                'kind': 'comment',
             })
         activity_events.sort(key=lambda item: item['created_at'] or datetime.min, reverse=True)
 
@@ -432,14 +518,14 @@ def register(app):
         )
         filaments_json = [
             {
-                'id': f.id,
-                'name': f.name,
-                'brand': f.brand.name if f.brand else '',
-                'material': f.material.name if f.material else '',
-                'color_hex': f.color.hex_value if f.color else '#cccccc',
-                'remaining': int(f.weight_remaining),
+                'id': filament.id,
+                'name': filament.name,
+                'brand': filament.brand.name if filament.brand else '',
+                'material': filament.material.name if filament.material else '',
+                'color_hex': filament.color.hex_value if filament.color else '#cccccc',
+                'remaining': int(filament.weight_remaining),
             }
-            for f in filaments
+            for filament in filaments
         ]
         return render_template(
             'project_detail.html',
@@ -459,39 +545,37 @@ def register(app):
             show_prusa_jobs=show_prusa_jobs,
             job_feed=job_feed_page,
             jobs_pagination=jobs_pagination,
+            project_comments=sorted(project.comments, key=lambda item: item.created_at or datetime.min, reverse=True),
+            can_edit_project=_project_write_allowed(project),
+            can_manage_project=is_admin(),
         )
 
     @app.route('/projects/<int:id>/edit', methods=['GET', 'POST'])
     def project_edit(id):
-        project = db.get_or_404(Project, id)
+        project = _project_or_404(id)
+        if not _project_write_allowed(project):
+            abort(403)
         if request.method == 'POST':
             project.name = request.form.get('name', '').strip()
             project.description = request.form.get('description', '').strip()
             project.client_name = request.form.get('client_name', '').strip()
             project.tag_text = format_tags(request.form.get('tag_text', ''))
             due_date_str = request.form.get('due_date', '').strip()
-            project.estimated_print_time = request.form.get('estimated_print_time', 0, type=int)
             hours = request.form.get('print_hours', 0, type=int)
             minutes = request.form.get('print_minutes', 0, type=int)
-            if hours > 0 or minutes > 0:
-                project.estimated_print_time = hours * 60 + minutes
-
-            if due_date_str:
-                project.due_date = datetime.strptime(due_date_str, '%Y-%m-%d')
-            else:
-                project.due_date = None
-
+            project.estimated_print_time = hours * 60 + minutes if hours > 0 or minutes > 0 else 0
+            project.due_date = datetime.strptime(due_date_str, '%Y-%m-%d') if due_date_str else None
             db.session.commit()
             return redirect(url_for('project_detail', id=project.id))
-
-        return render_template('project_edit.html', project=project, project_tags=format_tags(project.tag_text))
+        return render_template('project_edit.html', project=project, project_tags=format_tags(project.tag_text), can_manage_project=is_admin())
 
     @app.route('/projects/<int:id>/delete', methods=['POST'])
     def project_delete(id):
-        project = db.get_or_404(Project, id)
-        for f in project.files:
+        project = _project_or_404(id)
+        _require_project_admin()
+        for item in project.files:
             try:
-                os.remove(f.filepath)
+                os.remove(item.filepath)
             except OSError:
                 pass
         db.session.delete(project)
@@ -500,33 +584,28 @@ def register(app):
 
     @app.route('/projects/<int:id>/upload', methods=['POST'])
     def project_upload_file(id):
-        project = db.get_or_404(Project, id)
+        project = _project_or_404(id)
+        if not _project_write_allowed(project):
+            abort(403)
         if 'file' not in request.files:
             return _project_detail_redirect(id, 'files')
-        
         files = request.files.getlist('file')
         uploaded_any = False
         for file in files:
             if file.filename == '':
                 continue
-
             if not _is_allowed_project_file(file.filename):
                 flash('project_file_type_not_allowed', 'error')
                 continue
-
             original_filename = secure_filename(file.filename)
             if not original_filename:
                 flash('project_file_type_not_allowed', 'error')
                 continue
-
             stored_filename = _build_storage_name(project.id, original_filename)
-            filepath = os.path.join(UPLOAD_FOLDER, stored_filename)
+            filepath = os.path.join(upload_folder, stored_filename)
             file.save(filepath)
-
-            pf = ProjectFile(project_id=project.id, filename=original_filename, filepath=filepath)
-            db.session.add(pf)
+            db.session.add(ProjectFile(project_id=project.id, filename=original_filename, filepath=filepath))
             uploaded_any = True
-        
         if uploaded_any:
             db.session.commit()
         else:
@@ -535,61 +614,67 @@ def register(app):
 
     @app.route('/projects/<int:id>/download/<int:file_id>')
     def project_download_file(id, file_id):
-        pf = db.get_or_404(ProjectFile, file_id)
-        if pf.project_id != id:
-            return "Unauthorized", 401
-        # Guard against path traversal: ensure the stored path is inside UPLOAD_FOLDER
-        real_path = os.path.realpath(pf.filepath)
-        real_folder = os.path.realpath(UPLOAD_FOLDER)
+        _project_or_404(id)
+        project_file = db.get_or_404(ProjectFile, file_id)
+        if project_file.project_id != id:
+            return 'Unauthorized', 401
+        real_path = os.path.realpath(project_file.filepath)
+        real_folder = os.path.realpath(upload_folder)
         if not real_path.startswith(real_folder + os.sep):
-            return "Forbidden", 403
-        directory = os.path.dirname(pf.filepath)
-        filename = os.path.basename(pf.filepath)
-        return send_from_directory(directory, filename, as_attachment=True, download_name=pf.filename)
+            return 'Forbidden', 403
+        return send_from_directory(
+            os.path.dirname(project_file.filepath),
+            os.path.basename(project_file.filepath),
+            as_attachment=True,
+            download_name=project_file.filename,
+        )
 
     @app.route('/projects/<int:id>/view_file/<int:file_id>/<filename>')
     def project_view_file(id, file_id, filename):
-        pf = db.get_or_404(ProjectFile, file_id)
-        if pf.project_id != id:
-            return "Unauthorized", 401
-        real_path = os.path.realpath(pf.filepath)
-        real_folder = os.path.realpath(UPLOAD_FOLDER)
+        _project_or_404(id)
+        project_file = db.get_or_404(ProjectFile, file_id)
+        if project_file.project_id != id:
+            return 'Unauthorized', 401
+        real_path = os.path.realpath(project_file.filepath)
+        real_folder = os.path.realpath(upload_folder)
         if not real_path.startswith(real_folder + os.sep):
-            return "Forbidden", 403
-        directory = os.path.dirname(pf.filepath)
-        filename = os.path.basename(pf.filepath)
-        return send_from_directory(directory, filename, as_attachment=False)
+            return 'Forbidden', 403
+        return send_from_directory(os.path.dirname(project_file.filepath), os.path.basename(project_file.filepath), as_attachment=False)
 
     @app.route('/projects/<int:id>/image/<int:file_id>')
     def project_image_file(id, file_id):
-        pf = db.get_or_404(ProjectFile, file_id)
-        if pf.project_id != id or _get_extension(pf.filename) not in IMAGE_EXTENSIONS:
-            return "Unauthorized", 401
-        # Guard against path traversal
-        real_path = os.path.realpath(pf.filepath)
-        real_folder = os.path.realpath(UPLOAD_FOLDER)
+        _project_or_404(id)
+        project_file = db.get_or_404(ProjectFile, file_id)
+        if project_file.project_id != id or _get_extension(project_file.filename) not in IMAGE_EXTENSIONS:
+            return 'Unauthorized', 401
+        real_path = os.path.realpath(project_file.filepath)
+        real_folder = os.path.realpath(upload_folder)
         if not real_path.startswith(real_folder + os.sep):
-            return "Forbidden", 403
-        directory = os.path.dirname(pf.filepath)
-        filename = os.path.basename(pf.filepath)
-        return send_from_directory(directory, filename, as_attachment=False)
+            return 'Forbidden', 403
+        return send_from_directory(os.path.dirname(project_file.filepath), os.path.basename(project_file.filepath), as_attachment=False)
 
     @app.route('/projects/<int:id>/delete_file/<int:file_id>', methods=['POST'])
     def project_delete_file(id, file_id):
-        pf = db.get_or_404(ProjectFile, file_id)
-        if pf.project_id == id:
+        project = _project_or_404(id)
+        if not _project_write_allowed(project):
+            abort(403)
+        project_file = db.get_or_404(ProjectFile, file_id)
+        if project_file.project_id == id:
             try:
-                os.remove(pf.filepath)
+                os.remove(project_file.filepath)
             except OSError:
                 pass
-            db.session.delete(pf)
+            db.session.delete(project_file)
             db.session.commit()
         return _project_detail_redirect(id, 'files')
 
     @app.route('/projects/<int:id>/add_link', methods=['POST'])
     def project_add_link(id):
         from utils import fetch_link_metadata, is_safe_external_url
-        project = db.get_or_404(Project, id)
+
+        project = _project_or_404(id)
+        if not _project_write_allowed(project):
+            abort(403)
         url = request.form.get('url', '').strip()
         name = request.form.get('name', '').strip()
         if url:
@@ -597,21 +682,23 @@ def register(app):
                 flash('project_link_invalid', 'error')
                 return _project_detail_redirect(id, 'files')
             meta = fetch_link_metadata(url)
-            link = ProjectLink(
-                project_id=project.id, 
-                url=url, 
+            db.session.add(ProjectLink(
+                project_id=project.id,
+                url=url,
                 name=name,
                 og_title=meta['og_title'],
                 og_image=meta['og_image'],
                 og_description=meta['og_description'],
-                domain=meta['domain']
-            )
-            db.session.add(link)
+                domain=meta['domain'],
+            ))
             db.session.commit()
         return _project_detail_redirect(id, 'files')
 
     @app.route('/projects/<int:id>/delete_link/<int:link_id>', methods=['POST'])
     def project_delete_link(id, link_id):
+        project = _project_or_404(id)
+        if not _project_write_allowed(project):
+            abort(403)
         link = db.get_or_404(ProjectLink, link_id)
         if link.project_id == id:
             db.session.delete(link)
@@ -621,6 +708,10 @@ def register(app):
     @app.route('/projects/<int:id>/refresh_link/<int:link_id>', methods=['POST'])
     def project_refresh_link(id, link_id):
         from utils import fetch_link_metadata, is_safe_external_url
+
+        project = _project_or_404(id)
+        if not _project_write_allowed(project):
+            abort(403)
         link = db.get_or_404(ProjectLink, link_id)
         if link.project_id == id and is_safe_external_url(link.url):
             meta = fetch_link_metadata(link.url)
@@ -633,72 +724,88 @@ def register(app):
 
     @app.route('/projects/<int:id>/add_filament', methods=['POST'])
     def project_add_filament(id):
-        project = db.get_or_404(Project, id)
+        project = _project_or_404(id)
+        _require_project_admin()
         filament_id = request.form.get('filament_id', type=int)
         estimated_weight = request.form.get('estimated_weight', 0.0, type=float)
         if filament_id and estimated_weight > 0:
-            pf = ProjectFilament(project_id=project.id, filament_id=filament_id, estimated_weight=estimated_weight)
-            db.session.add(pf)
+            db.session.add(ProjectFilament(project_id=project.id, filament_id=filament_id, estimated_weight=estimated_weight))
             db.session.commit()
         return _project_detail_redirect(id, 'materials')
 
     @app.route('/projects/<int:id>/remove_filament/<int:pf_id>', methods=['POST'])
     def project_remove_filament(id, pf_id):
-        pf = db.get_or_404(ProjectFilament, pf_id)
-        if pf.project_id == id:
-            db.session.delete(pf)
+        _project_or_404(id)
+        _require_project_admin()
+        project_filament = db.get_or_404(ProjectFilament, pf_id)
+        if project_filament.project_id == id:
+            db.session.delete(project_filament)
             db.session.commit()
         return _project_detail_redirect(id, 'materials')
 
     @app.route('/projects/<int:id>/update_filament/<int:pf_id>', methods=['POST'])
     def project_update_filament(id, pf_id):
-        pf = db.get_or_404(ProjectFilament, pf_id)
-        if pf.project_id == id:
+        _project_or_404(id)
+        _require_project_admin()
+        project_filament = db.get_or_404(ProjectFilament, pf_id)
+        if project_filament.project_id == id:
             new_weight = request.form.get('estimated_weight', 0.0, type=float)
             if new_weight > 0:
-                pf.estimated_weight = new_weight
+                project_filament.estimated_weight = new_weight
                 db.session.commit()
         return _project_detail_redirect(id, 'materials')
 
     @app.route('/projects/<int:id>/status', methods=['POST'])
     def project_status(id):
-        project = db.get_or_404(Project, id)
+        project = _project_or_404(id)
+        _require_project_admin()
         new_status = request.form.get('status', project.status)
         if new_status not in ALLOWED_PROJECT_STATUSES:
             flash('project_status_invalid', 'error')
             return redirect(url_for('project_detail', id=id))
         project.status = new_status
+        _notify_project_status(project)
         db.session.commit()
         return redirect(url_for('project_detail', id=id))
 
     @app.route('/projects/<int:id>/consume/<int:pf_id>', methods=['POST'])
     def project_consume_filament(id, pf_id):
         from utils import log_movement
-        import math
-        pf = db.get_or_404(ProjectFilament, pf_id)
-        if pf.project_id == id and not pf.is_used:
-            filament = pf.filament
-            amount = pf.estimated_weight
-            
+
+        _project_or_404(id)
+        _require_project_admin()
+        project_filament = db.get_or_404(ProjectFilament, pf_id)
+        if project_filament.project_id == id and not project_filament.is_used:
+            filament = project_filament.filament
             old_weight = filament.weight_remaining
-            filament.weight_remaining -= amount
+            filament.weight_remaining -= project_filament.estimated_weight
             if filament.weight_remaining < 0:
                 filament.weight_remaining = 0
             actual_amount = old_weight - filament.weight_remaining
-
             if filament.weight_total > 0:
                 expected_quantity = math.ceil(filament.weight_remaining / filament.weight_total)
                 if expected_quantity < filament.quantity:
                     filament.quantity = expected_quantity
-                    
-            pf.is_used = True
+            project_filament.is_used = True
             log_movement(
                 filament,
                 'remove',
                 actual_amount,
-                project_id=pf.project_id,
-                note=f'Project consume: {pf.project.name if pf.project else ""}'.strip(),
+                project_id=project_filament.project_id,
+                note=f'Project consume: {project_filament.project.name if project_filament.project else ""}'.strip(),
             )
             db.session.commit()
-            
         return _project_detail_redirect(id, 'materials')
+
+    @app.route('/projects/<int:id>/comments', methods=['POST'])
+    def project_add_comment(id):
+        project = _project_or_404(id)
+        if not _project_write_allowed(project):
+            abort(403)
+        user = get_current_user()
+        body = request.form.get('body', '').strip()
+        if user and body:
+            db.session.add(ProjectComment(project_id=project.id, user_id=user.id, body=body))
+            _notify_project_comment(project, user)
+            db.session.commit()
+        return _project_detail_redirect(id, 'overview')

@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="page-hero">
+        <h1>{{ t('auth_account') }}</h1>
+        <p>{{ t('account_desc') }}</p>
+    </div>
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <form method="POST" class="ui-panel space-y-4">
+            <input type="hidden" name="action" value="profile">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('auth_name') }}</label>
+                <input type="text" name="name" value="{{ user.name }}" class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
+            </div>
+            <div class="text-sm text-gray-500">{{ user.email }}</div>
+            <div class="grid grid-cols-1 gap-2 text-sm">
+                <label class="ui-card-soft px-3 py-2 flex items-center gap-2"><input type="checkbox" name="notify_project_created" {% if user.notify_project_created %}checked{% endif %}><span>{{ t('notify_project_created') }}</span></label>
+                <label class="ui-card-soft px-3 py-2 flex items-center gap-2"><input type="checkbox" name="notify_project_status_changed" {% if user.notify_project_status_changed %}checked{% endif %}><span>{{ t('notify_project_status_changed') }}</span></label>
+                <label class="ui-card-soft px-3 py-2 flex items-center gap-2"><input type="checkbox" name="notify_project_comment" {% if user.notify_project_comment %}checked{% endif %}><span>{{ t('notify_project_comment') }}</span></label>
+            </div>
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-semibold transition">{{ t('save_changes') }}</button>
+        </form>
+        <form method="POST" class="ui-panel space-y-4">
+            <input type="hidden" name="action" value="password">
+            <div class="ui-label">{{ t('auth_password_change') }}</div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('auth_current_password') }}</label>
+                <input type="password" name="current_password" class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('auth_new_password') }}</label>
+                <input type="password" name="new_password" minlength="8" class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
+            </div>
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-semibold transition">{{ t('account_password_update') }}</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

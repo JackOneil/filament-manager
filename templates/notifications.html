@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+    <div class="page-hero">
+        <div class="flex items-center justify-between gap-4">
+            <div>
+                <h1>{{ t('notifications_nav') }}</h1>
+                <p>{{ t('notifications_desc') }}</p>
+            </div>
+            <form method="POST" action="{{ url_for('notification_mark_all_read') }}">
+                <button type="submit" class="ui-badge ui-badge-brand">{{ t('notifications_mark_all_read') }}</button>
+            </form>
+        </div>
+    </div>
+    <div class="space-y-3">
+        {% for notification in notifications %}
+        <div class="ui-panel flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+                <div class="flex items-center gap-2">
+                    <div class="font-semibold">{{ notification.title }}</div>
+                    {% if not notification.is_read %}
+                    <span class="ui-badge ui-badge-brand">{{ t('notifications_unread') }}</span>
+                    {% endif %}
+                </div>
+                <div class="text-sm text-gray-500 mt-1">{{ notification.body or '' }}</div>
+                <div class="text-xs text-gray-400 mt-2">{{ notification.created_at.strftime('%d.%m.%Y %H:%M') if notification.created_at else '' }}</div>
+            </div>
+            <div class="flex items-center gap-2">
+                {% if notification.link %}
+                <a href="{{ notification.link }}" class="ui-badge">{{ t('project_detail') }}</a>
+                {% endif %}
+                {% if not notification.is_read %}
+                <form method="POST" action="{{ url_for('notification_mark_read', id=notification.id) }}">
+                    <button type="submit" class="ui-badge ui-badge-brand">{{ t('notifications_mark_read') }}</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="ui-panel text-gray-500">{{ t('notifications_empty') }}</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

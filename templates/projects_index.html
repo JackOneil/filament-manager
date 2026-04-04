@@ -12,6 +12,17 @@
                 <a href="{{ url_for('project_create') }}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2 w-fit">
                     <i class="fa-solid fa-plus"></i> {{ t('project_create') }}
                 </a>
+                {% if owner_choices %}
+                <form method="GET" class="flex items-center gap-2">
+                    <input type="hidden" name="sort_by" value="{{ sort_by }}">
+                    <select name="owner_id" onchange="this.form.submit()" class="border border-gray-300 rounded-xl px-3 py-2.5 bg-white">
+                        <option value="">{{ t('project_owner_filter_all') }}</option>
+                        {% for owner in owner_choices %}
+                        <option value="{{ owner.id }}" {% if selected_owner_id == owner.id %}selected{% endif %}>{{ owner.name }}</option>
+                        {% endfor %}
+                    </select>
+                </form>
+                {% endif %}
                 <button id="projectsEditBtn" onclick="toggleProjectsEditMode()"
                         class="px-4 py-2 rounded-full text-sm font-semibold border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-all flex items-center gap-2">
                     <i class="fa-solid fa-pen-to-square"></i>
@@ -44,10 +55,16 @@
                     <a href="{{ url_for('project_detail', id=project.id) }}" class="ui-card-soft p-3 hover:border-blue-300 transition flex-1 min-w-0">
                         <div class="flex items-center justify-between gap-3">
                             <div class="font-semibold text-gray-800 truncate">{{ project.name }}</div>
-                            {% if project.status == 'DONE' %}
-                            <span class="ui-badge ui-badge-success">{{ t('status_done') }}</span>
-                            {% elif project.status == 'PRINTING' %}
-                            <span class="ui-badge ui-badge-brand">{{ t('status_printing') }}</span>
+                        {% if project.status == 'PENDING_APPROVAL' %}
+                        <span class="ui-badge ui-badge-warning">{{ t('status_pending_approval') }}</span>
+                        {% elif project.status == 'APPROVED' %}
+                        <span class="ui-badge ui-badge-brand">{{ t('status_approved') }}</span>
+                        {% elif project.status == 'REJECTED' %}
+                        <span class="ui-badge ui-badge-critical">{{ t('status_rejected') }}</span>
+                        {% elif project.status == 'DONE' %}
+                        <span class="ui-badge ui-badge-success">{{ t('status_done') }}</span>
+                        {% elif project.status == 'PRINTING' %}
+                        <span class="ui-badge ui-badge-brand">{{ t('status_printing') }}</span>
                             {% else %}
                             <span class="ui-badge">{{ t('status_new') }}</span>
                             {% endif %}
@@ -87,6 +104,9 @@
                             <div class="min-w-0">
                                 <div class="font-semibold text-gray-800 text-sm truncate">{{ project.name }}</div>
                                 <div class="text-xs text-gray-500 mt-1 truncate">{{ project.client_name or t('project_client_missing_label') }}</div>
+                                {% if project.owner %}
+                                <div class="text-[11px] text-gray-400 mt-1 truncate">{{ t('project_owner') }}: {{ project.owner.name }}</div>
+                                {% endif %}
                             </div>
                             {% if project.due_date %}
                             <div class="text-[11px] font-semibold {% if project.due_date < now and project.status != 'DONE' %}text-red-600{% else %}text-gray-400{% endif %}">
@@ -179,6 +199,9 @@
                             <tr>
                                 <td>
                                     <a href="{{ url_for('project_detail', id=p.id) }}" class="font-semibold text-blue-600 hover:underline">{{ p.name }}</a>
+                                    {% if p.owner %}
+                                    <div class="text-xs text-gray-500 mt-1">{{ t('project_owner') }}: {{ p.owner.name }}</div>
+                                    {% endif %}
                                     {% if p.tag_text %}
                                     <div class="flex flex-wrap gap-1 mt-2">
                                         {% for tag in p.tag_text.split(',')[:3] %}
@@ -192,7 +215,13 @@
                                 <td>{{ p.client_name or '-' }}</td>
                                 <td>{{ p.due_date.strftime('%d.%m.%Y') if p.due_date else '-' }}</td>
                                 <td>
-                                    {% if p.status == 'DONE' %}
+                                    {% if p.status == 'PENDING_APPROVAL' %}
+                                    <span class="ui-badge ui-badge-warning">{{ t('status_pending_approval') }}</span>
+                                    {% elif p.status == 'APPROVED' %}
+                                    <span class="ui-badge ui-badge-brand">{{ t('status_approved') }}</span>
+                                    {% elif p.status == 'REJECTED' %}
+                                    <span class="ui-badge ui-badge-critical">{{ t('status_rejected') }}</span>
+                                    {% elif p.status == 'DONE' %}
                                     <span class="ui-badge ui-badge-success">{{ t('status_done') }}</span>
                                     {% elif p.status == 'PRINTING' %}
                                     <span class="ui-badge ui-badge-brand">{{ t('status_printing') }}</span>

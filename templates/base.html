@@ -165,6 +165,46 @@
         .nav-pill:hover {
             background: rgba(255,255,255,0.14);
         }
+        .nav-menu-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+            padding: 0.7rem 0.95rem;
+            border-radius: 9999px;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            font-weight: 700;
+            transition: background-color 150ms ease;
+        }
+        .nav-menu-button:hover {
+            background: rgba(255,255,255,0.18);
+        }
+        .nav-menu-panel {
+            background: rgba(255,255,255,0.98);
+            color: #0f172a;
+            border-radius: 1rem;
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+        }
+        .nav-menu-link {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.9rem 1rem;
+            border-radius: 0.9rem;
+            color: #0f172a;
+            transition: background-color 150ms ease, color 150ms ease;
+        }
+        .nav-menu-link:hover {
+            background: rgba(37, 99, 235, 0.08);
+            color: #1d4ed8;
+        }
+        .nav-menu-note {
+            font-size: 0.74rem;
+            color: #64748b;
+            margin-top: 0.2rem;
+        }
         .page-hero {
             display: flex;
             flex-direction: column;
@@ -384,6 +424,17 @@
             background-color: #1f2937 !important;
         }
         html.dark .bg-black\/50 { background-color: rgba(0,0,0,0.7); }
+        html.dark .nav-menu-panel {
+            background: rgba(17, 24, 39, 0.98);
+            color: #f3f4f6;
+            border-color: rgba(75, 85, 99, 0.9);
+        }
+        html.dark .nav-menu-link { color: #f3f4f6; }
+        html.dark .nav-menu-link:hover {
+            background: rgba(59, 130, 246, 0.18);
+            color: #93c5fd;
+        }
+        html.dark .nav-menu-note { color: #94a3b8; }
     </style>
     <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>
@@ -393,71 +444,161 @@
             <a href="{{ url_for('index') }}" class="text-xl md:text-2xl font-bold flex items-center gap-2">
                 <i class="fa-solid fa-layer-group"></i> {{ t('title') }}
             </a>
-            
-            <!-- Mobile Menu Button -->
+
             <button id="mobile-menu-btn" class="md:hidden flex items-center p-2 rounded hover:bg-blue-700 transition" aria-label="Toggle Menu">
                 <i class="fa-solid fa-bars text-xl"></i>
             </button>
+            <div id="nav-links" class="hidden w-full md:flex md:w-auto flex-col md:flex-row md:items-center mt-4 md:mt-0 space-y-4 md:space-y-0 md:gap-4 pb-2 md:pb-0">
+                {% if current_user %}
+                <div class="flex flex-col md:flex-row md:items-center gap-3 w-full md:w-auto">
+                    {% if auth_has_section_access('overview') or auth_is_admin(current_user) %}
+                    <div class="relative" x-data="{ open: false }">
+                        <button type="button" @click="open = !open" class="nav-menu-button w-full md:w-auto">
+                            <i class="fa-solid fa-boxes-stacked"></i> {{ t('inventory_nav') }}
+                            <i class="fa-solid fa-chevron-down text-xs opacity-70"></i>
+                        </button>
+                        <div x-show="open" x-cloak @click.outside="open = false" class="nav-menu-panel mt-2 md:absolute md:left-0 md:top-full md:w-80 p-3 space-y-2">
+                            <a href="{{ url_for('index') }}" class="nav-menu-link">
+                                <span><i class="fa-solid fa-house mr-2"></i>{{ t('overview') }}<div class="nav-menu-note">{{ t('nav_inventory_overview_note') }}</div></span>
+                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                            </a>
+                            {% if auth_has_section_access('filaments') or auth_is_admin(current_user) %}
+                            <a href="{{ url_for('filaments_index') }}" class="nav-menu-link">
+                                <span><i class="fa-solid fa-layer-group mr-2"></i>{{ t('filaments_nav') }}<div class="nav-menu-note">{{ t('nav_filaments_note') }}</div></span>
+                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                            </a>
+                            {% endif %}
+                            {% if auth_has_section_access('storage') or auth_is_admin(current_user) %}
+                            <a href="{{ url_for('storage') }}" class="nav-menu-link">
+                                <span><i class="fa-solid fa-warehouse mr-2"></i>{{ t('storage_nav') }}<div class="nav-menu-note">{{ t('nav_storage_note') }}</div></span>
+                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                            </a>
+                            {% endif %}
+                            {% if auth_has_section_access('history') or auth_is_admin(current_user) %}
+                            <a href="{{ url_for('history') }}" class="nav-menu-link">
+                                <span><i class="fa-solid fa-clock-rotate-left mr-2"></i>{{ t('movement_history') }}<div class="nav-menu-note">{{ t('nav_history_note') }}</div></span>
+                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
 
-            <!-- Navigation Links -->
-            <div id="nav-links" class="hidden w-full md:flex md:w-auto flex-col md:flex-row md:items-start mt-4 md:mt-0 space-y-4 md:space-y-0 md:gap-6 pb-2 md:pb-0">
-                <div class="flex flex-col gap-2 border-b border-blue-500 md:border-0 pb-3 md:pb-0">
-                    <span class="nav-group-label">{{ t('inventory_nav') }}</span>
-                    <div class="flex flex-col md:flex-row gap-2">
-                        <a href="{{ url_for('index') }}" class="nav-pill"><i class="fa-solid fa-house"></i> {{ t('overview') }}</a>
-                        <a href="{{ url_for('filaments_index') }}" class="nav-pill"><i class="fa-solid fa-layer-group"></i> {{ t('filaments_nav') }}</a>
-                        <a href="{{ url_for('storage') }}" class="nav-pill"><i class="fa-solid fa-warehouse"></i> {{ t('storage_nav') }}</a>
-                        <a href="{{ url_for('history') }}" class="nav-pill"><i class="fa-solid fa-clock-rotate-left"></i> {{ t('movement_history') }}</a>
+                    {% if auth_has_section_access('projects') or auth_is_admin(current_user) %}
+                    <div class="relative" x-data="{ open: false }">
+                        <button type="button" @click="open = !open" class="nav-menu-button w-full md:w-auto">
+                            <i class="fa-solid fa-diagram-project"></i> {{ t('projects') }}
+                            <i class="fa-solid fa-chevron-down text-xs opacity-70"></i>
+                        </button>
+                        <div x-show="open" x-cloak @click.outside="open = false" class="nav-menu-panel mt-2 md:absolute md:left-0 md:top-full md:w-80 p-3 space-y-2">
+                            <a href="{{ url_for('projects_index') }}" class="nav-menu-link">
+                                <span><i class="fa-solid fa-diagram-project mr-2"></i>{{ t('projects') }}<div class="nav-menu-note">{{ t('nav_projects_note') }}</div></span>
+                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                            </a>
+                            <a href="{{ url_for('project_create') }}" class="nav-menu-link">
+                                <span><i class="fa-solid fa-plus mr-2"></i>{{ t('project_create') }}<div class="nav-menu-note">{{ t('nav_project_create_note') }}</div></span>
+                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                            </a>
+                            {% if auth_has_section_access('calculator') or auth_is_admin(current_user) %}
+                            <a href="{{ url_for('calculator') }}" class="nav-menu-link">
+                                <span><i class="fa-solid fa-calculator mr-2"></i>{{ t('calculator') }}<div class="nav-menu-note">{{ t('nav_calculator_note') }}</div></span>
+                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                            </a>
+                            {% endif %}
+                        </div>
                     </div>
-                </div>
-                <div class="flex flex-col gap-2 border-b border-blue-500 md:border-0 pb-3 md:pb-0">
-                    <span class="nav-group-label">{{ t('projects') }}</span>
-                    <div class="flex flex-col md:flex-row gap-2">
-                        <a href="{{ url_for('projects_index') }}" class="nav-pill"><i class="fa-solid fa-diagram-project"></i> {{ t('projects') }}</a>
-                        <a href="{{ url_for('calculator') }}" class="nav-pill"><i class="fa-solid fa-calculator"></i> {{ t('calculator') }}</a>
-                    </div>
-                </div>
-                <div class="flex flex-col gap-2 border-b border-blue-500 md:border-0 pb-3 md:pb-0">
-                    <span class="nav-group-label">{{ t('printers_nav') }}</span>
-                    <div class="flex flex-col md:flex-row gap-2">
-                        {% if nav_bambu_enabled %}
-                        <a href="{{ url_for('bambu_jobs') }}" class="nav-pill"><i class="fa-solid fa-print"></i> {{ t('bambu_jobs') }}</a>
-                        {% endif %}
-                        {% if nav_prusa_enabled %}
-                        <a href="{{ url_for('prusa_jobs') }}" class="nav-pill"><i class="fa-solid fa-3d-print"></i> {{ t('prusa_jobs') }}</a>
-                        {% endif %}
-                        {% if not nav_bambu_enabled and not nav_prusa_enabled %}
-                        <a href="{{ url_for('settings') }}#bambu-cloud" class="nav-pill"><i class="fa-solid fa-plug-circle-plus"></i> {{ t('settings') }}</a>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="flex flex-col gap-2 border-b border-blue-500 md:border-0 pb-3 md:pb-0">
-                    <span class="nav-group-label">{{ t('analytics_nav') }}</span>
-                    <div class="flex flex-col md:flex-row gap-2 items-start md:items-center">
-                        <a href="{{ url_for('stats') }}" class="nav-pill"><i class="fa-solid fa-chart-column"></i> {{ t('stats_nav') }}</a>
-                    </div>
-                </div>
-                <div class="flex flex-col gap-2">
-                    <span class="nav-group-label">{{ t('settings') }}</span>
-                    <div class="flex flex-col md:flex-row gap-2 items-start md:items-center">
-                        <a href="{{ url_for('settings') }}" class="nav-pill"><i class="fa-solid fa-cog"></i> {{ t('settings') }}</a>
+                    {% endif %}
 
-                        <!-- Theme Toggle Button - Mobile -->
+                    {% if auth_has_section_access('printers') or auth_is_admin(current_user) %}
+                    <div class="relative" x-data="{ open: false }">
+                        <button type="button" @click="open = !open" class="nav-menu-button w-full md:w-auto">
+                            <i class="fa-solid fa-print"></i> {{ t('printers_nav') }}
+                            <i class="fa-solid fa-chevron-down text-xs opacity-70"></i>
+                        </button>
+                        <div x-show="open" x-cloak @click.outside="open = false" class="nav-menu-panel mt-2 md:absolute md:left-0 md:top-full md:w-80 p-3 space-y-2">
+                            {% if nav_bambu_enabled %}
+                            <a href="{{ url_for('bambu_jobs') }}" class="nav-menu-link">
+                                <span><i class="fa-solid fa-print mr-2"></i>{{ t('bambu_jobs') }}<div class="nav-menu-note">{{ t('nav_bambu_note') }}</div></span>
+                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                            </a>
+                            {% endif %}
+                            {% if nav_prusa_enabled %}
+                            <a href="{{ url_for('prusa_jobs') }}" class="nav-menu-link">
+                                <span><i class="fa-solid fa-3d-print mr-2"></i>{{ t('prusa_jobs') }}<div class="nav-menu-note">{{ t('nav_prusa_note') }}</div></span>
+                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                            </a>
+                            {% endif %}
+                            {% if not nav_bambu_enabled and not nav_prusa_enabled and (auth_has_section_access('settings') or auth_is_admin(current_user)) %}
+                            <a href="{{ url_for('settings') }}#bambu-cloud" class="nav-menu-link">
+                                <span><i class="fa-solid fa-plug-circle-plus mr-2"></i>{{ t('settings') }}<div class="nav-menu-note">{{ t('nav_printers_setup_note') }}</div></span>
+                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if auth_has_section_access('stats') or auth_is_admin(current_user) or auth_has_section_access('settings') or auth_is_admin(current_user) %}
+                    <div class="relative" x-data="{ open: false }">
+                        <button type="button" @click="open = !open" class="nav-menu-button w-full md:w-auto">
+                            <i class="fa-solid fa-compass"></i> {{ t('nav_admin_tools') if auth_is_admin(current_user) else t('settings') }}
+                            <i class="fa-solid fa-chevron-down text-xs opacity-70"></i>
+                        </button>
+                        <div x-show="open" x-cloak @click.outside="open = false" class="nav-menu-panel mt-2 md:absolute md:right-0 md:top-full md:w-80 p-3 space-y-2">
+                            {% if auth_has_section_access('stats') or auth_is_admin(current_user) %}
+                            <a href="{{ url_for('stats') }}" class="nav-menu-link">
+                                <span><i class="fa-solid fa-chart-column mr-2"></i>{{ t('stats_nav') }}<div class="nav-menu-note">{{ t('nav_stats_note') }}</div></span>
+                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                            </a>
+                            {% endif %}
+                            {% if auth_has_section_access('users') or auth_is_admin(current_user) %}
+                            <a href="{{ url_for('users_index') }}" class="nav-menu-link">
+                                <span><i class="fa-solid fa-users-gear mr-2"></i>{{ t('users_nav') }}<div class="nav-menu-note">{{ t('nav_users_note') }}</div></span>
+                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                            </a>
+                            {% endif %}
+                            {% if auth_has_section_access('settings') or auth_is_admin(current_user) %}
+                            <a href="{{ url_for('settings') }}" class="nav-menu-link">
+                                <span><i class="fa-solid fa-cog mr-2"></i>{{ t('settings') }}<div class="nav-menu-note">{{ t('nav_settings_note') }}</div></span>
+                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="flex flex-col md:flex-row gap-2 items-start md:items-center md:ml-2">
+                        <a href="{{ url_for('notifications_index') }}" class="nav-pill">
+                            <i class="fa-solid fa-bell"></i>
+                            <span>{% if nav_notifications_unread %}{{ nav_notifications_unread }}{% else %}{{ t('notifications_nav') }}{% endif %}</span>
+                        </a>
+                        <a href="{{ url_for('account_settings') }}" class="nav-pill"><i class="fa-solid fa-user"></i> {{ current_user.name }}</a>
                         <form method="POST" action="{{ url_for('toggle_theme') }}" class="block md:hidden py-1">
                             <button type="submit" class="nav-pill" title="{{ t('theme') }}">
                                 <i class="fa-solid {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
                                 {% if theme == 'dark' %}{{ t('light_theme') }}{% else %}{{ t('dark_theme') }}{% endif %}
                             </button>
                         </form>
-                        
-                        <!-- Theme Toggle for Desktop -->
                         <form method="POST" action="{{ url_for('toggle_theme') }}" class="hidden md:block">
                             <button type="submit" class="nav-pill" title="{{ t('theme') }}">
                                 <i class="fa-solid {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
                             </button>
                         </form>
+                        <form method="POST" action="{{ url_for('logout') }}">
+                            <button type="submit" class="nav-pill"><i class="fa-solid fa-right-from-bracket"></i> {{ t('auth_logout') }}</button>
+                        </form>
                     </div>
                 </div>
+                {% else %}
+                <div class="flex flex-col gap-2">
+                    <span class="nav-group-label">{{ t('auth_account') }}</span>
+                    <div class="flex flex-col md:flex-row gap-2 items-start md:items-center">
+                        <a href="{{ url_for('login') }}" class="nav-pill"><i class="fa-solid fa-right-to-bracket"></i> {{ t('auth_login') }}</a>
+                        <a href="{{ url_for('register_account') }}" class="nav-pill"><i class="fa-solid fa-user-plus"></i> {{ t('auth_register') }}</a>
+                        <a href="{{ url_for('activate_invite') }}" class="nav-pill"><i class="fa-solid fa-key"></i> {{ t('auth_activate_invite') }}</a>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </nav>

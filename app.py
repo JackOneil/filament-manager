@@ -26,18 +26,20 @@ from sqlalchemy import text
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from database import db
+from auth import init_app as init_auth, get_current_user, has_section_access, is_admin
 from models import (
     Brand, Color, Material, AppSetting, Filament, 
     MovementHistory, PrintHistory, Project, ProjectFile, 
     ProjectLink, ProjectFilament, ProjectQuote, StorageShelf, StoragePlacement,
     BambuPrinter, BambuPrintJob, BambuJobMaterial,
     PrusaPrinter, PrusaPrintJob,
+    User, UserInvite, Notification, ProjectComment,
 )  # noqa: F401
 from utils import get_settings
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.50.0'
+APP_VERSION = '1.52.0'
 
 csrf = CSRFProtect()
 
@@ -69,6 +71,7 @@ def create_app(test_config=None) -> Flask:
 
     db.init_app(app)
     csrf.init_app(app)
+    init_auth(app)
     register_all(app)
 
     @app.context_processor
@@ -97,6 +100,9 @@ def create_app(test_config=None) -> Flask:
             app_version=APP_VERSION,
             nav_bambu_enabled=nav_bambu_enabled,
             nav_prusa_enabled=nav_prusa_enabled,
+            current_user=get_current_user(),
+            auth_has_section_access=has_section_access,
+            auth_is_admin=is_admin,
         )
 
     _setup_database(app)
@@ -143,6 +149,8 @@ def _setup_database(app: Flask) -> None:
         _safe_alter(app, 'ALTER TABLE movement_history ADD COLUMN project_id INTEGER DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE movement_history ADD COLUMN bambu_job_id INTEGER DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE movement_history ADD COLUMN note TEXT DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE project ADD COLUMN owner_user_id INTEGER DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE project ADD COLUMN created_by_user_id INTEGER DEFAULT NULL')
 
         # Bambu Lab Cloud integration
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN bambu_token TEXT DEFAULT NULL")
@@ -162,6 +170,22 @@ def _setup_database(app: Flask) -> None:
         _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN last_sync_status VARCHAR(255) DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE prusa_print_job ADD COLUMN progress FLOAT DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE prusa_print_job ADD COLUMN raw_payload TEXT DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE user ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user'")
+        _safe_alter(app, 'ALTER TABLE user ADD COLUMN section_permissions TEXT DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE user ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1')
+        _safe_alter(app, 'ALTER TABLE user ADD COLUMN notify_project_created BOOLEAN NOT NULL DEFAULT 1')
+        _safe_alter(app, 'ALTER TABLE user ADD COLUMN notify_project_status_changed BOOLEAN NOT NULL DEFAULT 1')
+        _safe_alter(app, 'ALTER TABLE user ADD COLUMN notify_project_comment BOOLEAN NOT NULL DEFAULT 1')
+        _safe_alter(app, 'ALTER TABLE user ADD COLUMN last_login_at DATETIME DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE user_invite ADD COLUMN email VARCHAR(255) DEFAULT NULL')
+        _safe_alter(app, "ALTER TABLE user_invite ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user'")
+        _safe_alter(app, 'ALTER TABLE user_invite ADD COLUMN section_permissions TEXT DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE user_invite ADD COLUMN is_used BOOLEAN NOT NULL DEFAULT 0')
+        _safe_alter(app, 'ALTER TABLE user_invite ADD COLUMN expires_at DATETIME DEFAULT NULL')
+        _safe_alter(app, "ALTER TABLE notification ADD COLUMN kind VARCHAR(50) NOT NULL DEFAULT 'info'")
+        _safe_alter(app, 'ALTER TABLE notification ADD COLUMN body TEXT DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE notification ADD COLUMN link VARCHAR(500) DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE notification ADD COLUMN is_read BOOLEAN NOT NULL DEFAULT 0')
 
         # ── Seed data (only runs once on fresh database) ─────────────────────
         if not Brand.query.first():

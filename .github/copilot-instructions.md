@@ -72,6 +72,7 @@ When a user asks for modifications to the project, you must follow and automatic
    - **Never use Flask Blueprints.** Blueprints require `url_for("blueprint.route_name")` prefixes in all templates and have caused breakage in this project.
    - When adding a new route, add it inside the appropriate `routes/*.py` file inside its `register(app)` function, or create a new `routes/feature.py` with a `register(app)` function and call it from `routes/__init__.py`.
    - `url_for("index")`, `url_for("add")`, etc. work as-is in templates — no prefix needed.
+   - **Authentication note:** The project now has a session-based multi-user layer. New sections or mutations must be assigned to the correct access bucket (`overview`, `filaments`, `projects`, `history`, `storage`, `calculator`, `printers`, `stats`, `settings`, `users`) in `auth.py`, and project routes must respect project ownership for non-admin users.
 
 4. **Frontend State Rule (Alpine.js)**
    - Inventory page state (filters, sort, view mode) is managed by the Alpine.js component `inventoryApp()` defined in the `<script>` block of `templates/index.html`.

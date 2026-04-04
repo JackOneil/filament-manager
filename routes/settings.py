@@ -12,7 +12,7 @@ from models import (
     Brand, Color, Material, AppSetting, Filament, MovementHistory,
     PrintHistory, Project, ProjectFile, ProjectLink, ProjectFilament, ProjectQuote,
     BambuPrinter, BambuPrintJob, BambuJobMaterial, StoragePlacement, StorageShelf,
-    PrusaPrinter, PrusaPrintJob,
+    PrusaPrinter, PrusaPrintJob, ProjectComment, User, UserInvite, Notification,
 )
 from utils import build_action_center, decrypt_token, encrypt_token, format_tags, parse_sync_status, remove_tag, top_tags
 
@@ -88,6 +88,26 @@ def _load_backup_payload(uploaded_file):
     if filename.endswith('.gz') or raw_bytes[:2] == b'\x1f\x8b':
         raw_bytes = gzip.decompress(raw_bytes)
     return json.loads(raw_bytes.decode('utf-8'))
+
+
+def _user_ref(user):
+    if not user:
+        return None
+    return {'email': user.email, 'name': user.name}
+
+
+def _resolve_user_ref(ref):
+    if not ref:
+        return None
+    email = (ref.get('email') or '').strip().lower()
+    name = (ref.get('name') or '').strip()
+    if email:
+        user = User.query.filter_by(email=email).first()
+        if user:
+            return user
+    if name:
+        return User.query.filter_by(name=name).first()
+    return None
 
 
 def register(app):
@@ -393,6 +413,8 @@ def register(app):
                 'estimated_print_time': proj.estimated_print_time,
                 'due_date': proj.due_date.isoformat() if proj.due_date else None,
                 'created_at': proj.created_at.isoformat() if proj.created_at else None,
+                'owner': _user_ref(proj.owner),
+                'created_by': _user_ref(proj.created_by),
                 'files': [_project_file_payload(pf) for pf in proj.files],
                 'links': [{
                     'url': pl.url,
@@ -422,7 +444,45 @@ def register(app):
                     'currency': quote.currency,
                     'created_at': quote.created_at.isoformat() if quote.created_at else None,
                 } for quote in proj.quotes],
+                'comments': [{
+                    'user': _user_ref(comment.user),
+                    'body': comment.body,
+                    'created_at': comment.created_at.isoformat() if comment.created_at else None,
+                } for comment in proj.comments],
             } for proj in Project.query.order_by(Project.created_at).all()],
+
+            'users': [{
+                'email': user.email,
+                'name': user.name,
+                'password_hash': user.password_hash,
+                'role': user.role,
+                'section_permissions': user.section_permissions,
+                'is_active': user.is_active,
+                'notify_project_created': user.notify_project_created,
+                'notify_project_status_changed': user.notify_project_status_changed,
+                'notify_project_comment': user.notify_project_comment,
+                'created_at': user.created_at.isoformat() if user.created_at else None,
+            } for user in User.query.order_by(User.created_at).all()],
+
+            'user_invites': [{
+                'email': invite.email,
+                'code': invite.code,
+                'role': invite.role,
+                'section_permissions': invite.section_permissions,
+                'is_used': invite.is_used,
+                'created_at': invite.created_at.isoformat() if invite.created_at else None,
+                'expires_at': invite.expires_at.isoformat() if invite.expires_at else None,
+            } for invite in UserInvite.query.order_by(UserInvite.created_at).all()],
+
+            'notifications': [{
+                'user': _user_ref(notification.user),
+                'kind': notification.kind,
+                'title': notification.title,
+                'body': notification.body,
+                'link': notification.link,
+                'is_read': notification.is_read,
+                'created_at': notification.created_at.isoformat() if notification.created_at else None,
+            } for notification in Notification.query.order_by(Notification.created_at).all()],
 
             # ── Bambu integration ──────────────────────────────────────
             'bambu_printers': [{
@@ -574,6 +634,43 @@ def register(app):
                         setting.bambu_last_sync_status = s.get('bambu_last_sync_status', setting.bambu_last_sync_status)
                         setting.reorder_shop_url = s.get('reorder_shop_url', setting.reorder_shop_url)
 
+                # ── 2b. Users, invites, notifications ────────────────
+                for user_data in data.get('users', []):
+                    email = (user_data.get('email') or '').strip().lower()
+                    if not email:
+                        continue
+                    existing_user = User.query.filter_by(email=email).first()
+                    if not existing_user:
+                        existing_user = User(
+                            email=email,
+                            name=user_data.get('name', email),
+                            password_hash=user_data.get('password_hash', ''),
+                            role=user_data.get('role', 'user'),
+                            section_permissions=user_data.get('section_permissions'),
+                            is_active=user_data.get('is_active', True),
+                            notify_project_created=user_data.get('notify_project_created', True),
+                            notify_project_status_changed=user_data.get('notify_project_status_changed', True),
+                            notify_project_comment=user_data.get('notify_project_comment', True),
+                            created_at=datetime.fromisoformat(user_data['created_at']) if user_data.get('created_at') else datetime.utcnow(),
+                        )
+                        db.session.add(existing_user)
+
+                db.session.flush()
+
+                for invite_data in data.get('user_invites', []):
+                    code = invite_data.get('code')
+                    if not code or UserInvite.query.filter_by(code=code).first():
+                        continue
+                    db.session.add(UserInvite(
+                        email=invite_data.get('email'),
+                        code=code,
+                        role=invite_data.get('role', 'user'),
+                        section_permissions=invite_data.get('section_permissions'),
+                        is_used=invite_data.get('is_used', False),
+                        created_at=datetime.fromisoformat(invite_data['created_at']) if invite_data.get('created_at') else datetime.utcnow(),
+                        expires_at=datetime.fromisoformat(invite_data['expires_at']) if invite_data.get('expires_at') else None,
+                    ))
+
                 # ── 3. Filaments ───────────────────────────────────────
                 for f in data.get('filaments', []):
                     b = Brand.query.filter_by(name=f.get('brand')).first()
@@ -636,6 +733,8 @@ def register(app):
                             estimated_print_time=proj_data.get('estimated_print_time', 0),
                             due_date=datetime.fromisoformat(proj_data['due_date']) if proj_data.get('due_date') else None,
                             created_at=datetime.fromisoformat(proj_data['created_at']) if proj_data.get('created_at') else datetime.utcnow(),
+                            owner_user_id=_resolve_user_ref(proj_data.get('owner')).id if _resolve_user_ref(proj_data.get('owner')) else None,
+                            created_by_user_id=_resolve_user_ref(proj_data.get('created_by')).id if _resolve_user_ref(proj_data.get('created_by')) else None,
                         )
                         db.session.add(proj)
                         db.session.flush()
@@ -719,6 +818,22 @@ def register(app):
                                 final_price=quote_data.get('final_price', 0),
                                 currency=quote_data.get('currency', 'CZK'),
                                 created_at=quote_ts,
+                            ))
+
+                    for comment_data in proj_data.get('comments', []):
+                        comment_ts = datetime.fromisoformat(comment_data['created_at']) if comment_data.get('created_at') else datetime.utcnow()
+                        existing_comment = ProjectComment.query.filter_by(
+                            project_id=proj.id,
+                            body=comment_data.get('body', ''),
+                            created_at=comment_ts,
+                        ).first()
+                        comment_user = _resolve_user_ref(comment_data.get('user'))
+                        if not existing_comment:
+                            db.session.add(ProjectComment(
+                                project_id=proj.id,
+                                user_id=comment_user.id if comment_user else None,
+                                body=comment_data.get('body', ''),
+                                created_at=comment_ts,
                             ))
 
                 # ── 6. Bambu printers ─────────────────────────────────
@@ -883,6 +998,27 @@ def register(app):
                         filament_id=fil.id if fil else None,
                         project_id=proj.id if proj else None,
                     ))
+
+                for notification_data in data.get('notifications', []):
+                    notification_ts = datetime.fromisoformat(notification_data['created_at']) if notification_data.get('created_at') else datetime.utcnow()
+                    notification_user = _resolve_user_ref(notification_data.get('user'))
+                    if not notification_user:
+                        continue
+                    exists_notification = Notification.query.filter_by(
+                        user_id=notification_user.id,
+                        title=notification_data.get('title', ''),
+                        created_at=notification_ts,
+                    ).first()
+                    if not exists_notification:
+                        db.session.add(Notification(
+                            user_id=notification_user.id,
+                            kind=notification_data.get('kind', 'info'),
+                            title=notification_data.get('title', ''),
+                            body=notification_data.get('body'),
+                            link=notification_data.get('link'),
+                            is_read=notification_data.get('is_read', False),
+                            created_at=notification_ts,
+                        ))
 
             app.logger.debug(f"Import finished: {imported_filaments} filaments, projects and Bambu jobs processed.")
         except Exception as e:

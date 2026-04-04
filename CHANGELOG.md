@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.51.0] - 2026-04-04
+### Added
+- **Multi-user authentication:** Added login, logout, self-registration, invite activation codes, account settings, notification inbox, and administrator user management.
+- **Project ownership and collaboration:** Projects now support owners, creator tracking, approval statuses (`PENDING_APPROVAL`, `APPROVED`, `REJECTED`), per-project comments, and in-app notifications for new requests, status changes, and discussion updates.
+- **Backup coverage for user workspace:** Export/import now includes users, invites, notifications, project ownership, and project comments so the new collaboration layer is part of full backups.
+
+### Changed
+- **Role-based access control:** Administrators keep full read/write access, while regular users are limited to permitted sections and only their own projects.
+- **Projects UX:** The project list now supports owner filtering for administrators, and project detail screens adapt actions based on whether the viewer is an administrator or the project owner.
+
 ## [1.50.0] - 2026-04-03
 ### Added
 - **Tag shortcuts from Settings:** Filament tags in Settings now open the dedicated `/filaments` page with the selected tag already applied as a filter, so the tag cloud doubles as a fast inventory entry point.

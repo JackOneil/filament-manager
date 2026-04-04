@@ -1,6 +1,7 @@
 """AJAX API routes for dynamic filtering/sorting without page reload."""
 from flask import request, render_template, jsonify
 from sqlalchemy.orm import joinedload
+from auth import get_current_user, is_admin
 from database import db
 from models import Filament, Brand, AppSetting
 from utils import collect_usage_windows, compute_stock_status, get_filament_tags
@@ -10,6 +11,8 @@ def register(app):
 
     @app.route('/api/filaments-list')
     def api_filaments_list():
+        user = get_current_user()
+        inventory_read_only = bool(user and not is_admin(user))
         filaments_query = Filament.query.options(
             joinedload(Filament.brand),
             joinedload(Filament.material),
@@ -22,7 +25,7 @@ def register(app):
         f_tag = request.args.get('tag', '').strip()
         sort_by = request.args.get('sort_by', 'name')
         sort_direction = request.args.get('sort_direction', 'asc')
-        view_mode = request.args.get('view', 'card')
+        view_mode = 'list' if inventory_read_only else request.args.get('view', 'card')
 
         if sort_direction not in ['asc', 'desc']:
             sort_direction = 'asc'
@@ -78,9 +81,19 @@ def register(app):
             fil.tag_list = get_filament_tags(fil)
 
         if view_mode == 'card':
-            html = render_template('_filament_cards.html', filaments=filaments_paginated.items, app_settings=setting)
+            html = render_template(
+                '_filament_cards.html',
+                filaments=filaments_paginated.items,
+                app_settings=setting,
+                inventory_read_only=inventory_read_only,
+            )
         else:
-            html = render_template('_filament_list_rows.html', filaments=filaments_paginated.items, app_settings=setting)
+            html = render_template(
+                '_filament_list_rows.html',
+                filaments=filaments_paginated.items,
+                app_settings=setting,
+                inventory_read_only=inventory_read_only,
+            )
 
         return jsonify({
             'html': html,

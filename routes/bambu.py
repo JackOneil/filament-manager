@@ -30,7 +30,7 @@ _STATUS_MAP = {
     1: 'RUNNING',
     2: 'FINISH',      # Bambu Cloud: 2 = successfully finished (start→end delta ≈ costTime)
     3: 'FAILED',
-    4: 'RUNNING',     # Bambu Cloud: 4 = currently printing (API sets endTime placeholder ~6s after start)
+    4: 'PAUSED',
     5: 'PREPARE',
     6: 'SLICING',
     7: 'CANCELLED',

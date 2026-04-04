@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+    <div class="page-hero">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+                <h1>{{ t('user_dashboard_title') }}</h1>
+                <p>{{ t('user_dashboard_desc') }}</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <a href="{{ url_for('project_create') }}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl shadow font-bold transition-colors">
+                    <i class="fa-solid fa-plus"></i> {{ t('project_create') }}
+                </a>
+                <a href="{{ url_for('projects_index') }}" class="ui-badge ui-badge-brand">
+                    <i class="fa-solid fa-diagram-project"></i> {{ t('projects') }}
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div class="ui-kpi">
+            <div class="ui-label">{{ t('user_dashboard_total_projects') }}</div>
+            <div class="text-3xl font-bold mt-2">{{ user_dashboard.owned_projects|length }}</div>
+        </div>
+        <div class="ui-kpi">
+            <div class="ui-label">{{ t('user_dashboard_pending_projects') }}</div>
+            <div class="text-3xl font-bold mt-2">{{ user_dashboard.pending_projects_count }}</div>
+        </div>
+        <div class="ui-kpi">
+            <div class="ui-label">{{ t('user_dashboard_active_projects') }}</div>
+            <div class="text-3xl font-bold mt-2">{{ user_dashboard.approved_projects_count }}</div>
+        </div>
+        <div class="ui-kpi">
+            <div class="ui-label">{{ t('user_dashboard_done_projects') }}</div>
+            <div class="text-3xl font-bold mt-2">{{ user_dashboard.done_projects_count }}</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-6">
+        <section class="ui-panel">
+            <div class="flex items-center justify-between gap-4 mb-4">
+                <div>
+                    <div class="ui-label">{{ t('projects') }}</div>
+                    <h2 class="text-2xl font-bold mt-1">{{ t('user_dashboard_projects_heading') }}</h2>
+                </div>
+                <a href="{{ url_for('projects_index') }}" class="ui-badge">{{ t('overview_see_all') }}</a>
+            </div>
+            <div class="space-y-3">
+                {% for project in user_dashboard.latest_projects %}
+                <a href="{{ url_for('project_detail', id=project.id) }}" class="ui-card-soft block p-4 hover:border-blue-300 transition">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="font-semibold text-gray-800 truncate">{{ project.name }}</div>
+                            <div class="text-sm text-gray-500 mt-1 truncate">{{ project.client_name or t('project_client_missing_label') }}</div>
+                        </div>
+                        {% if project.status == 'PENDING_APPROVAL' %}
+                        <span class="ui-badge ui-badge-warning">{{ t('status_pending_approval') }}</span>
+                        {% elif project.status == 'APPROVED' %}
+                        <span class="ui-badge ui-badge-brand">{{ t('status_approved') }}</span>
+                        {% elif project.status == 'REJECTED' %}
+                        <span class="ui-badge ui-badge-critical">{{ t('status_rejected') }}</span>
+                        {% elif project.status == 'PRINTING' %}
+                        <span class="ui-badge ui-badge-brand">{{ t('status_printing') }}</span>
+                        {% elif project.status == 'DONE' %}
+                        <span class="ui-badge ui-badge-success">{{ t('status_done') }}</span>
+                        {% else %}
+                        <span class="ui-badge">{{ t('status_new') }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="text-xs text-gray-400 mt-3">
+                        {% if project.due_date %}{{ project.due_date.strftime('%d.%m.%Y') }}{% else %}{{ t('projects_no_due_date') }}{% endif %}
+                    </div>
+                </a>
+                {% else %}
+                <div class="ui-card-soft p-4 text-gray-500">{{ t('user_dashboard_projects_empty') }}</div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <div class="space-y-6">
+            <section class="ui-panel">
+                <div class="ui-label">{{ t('project_comments_title') }}</div>
+                <h2 class="text-2xl font-bold mt-1 mb-4">{{ t('user_dashboard_comments_heading') }}</h2>
+                <div class="space-y-3">
+                    {% for comment in user_dashboard.recent_comments %}
+                    <a href="{{ url_for('project_detail', id=comment.project_id) }}" class="ui-card-soft block p-4 hover:border-blue-300 transition">
+                        <div class="font-semibold text-gray-800">{{ comment.project.name if comment.project else t('projects') }}</div>
+                        <div class="text-sm text-gray-600 mt-2">{{ comment.body[:140] }}{% if comment.body|length > 140 %}…{% endif %}</div>
+                        <div class="text-xs text-gray-400 mt-2">{{ comment.created_at.strftime('%d.%m.%Y %H:%M') if comment.created_at else '' }}</div>
+                    </a>
+                    {% else %}
+                    <div class="ui-card-soft p-4 text-gray-500">{{ t('user_dashboard_comments_empty') }}</div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="ui-panel">
+                <div class="flex items-center justify-between gap-4 mb-4">
+                    <div>
+                        <div class="ui-label">{{ t('notifications_nav') }}</div>
+                        <h2 class="text-2xl font-bold mt-1">{{ t('user_dashboard_notifications_heading') }}</h2>
+                    </div>
+                    <a href="{{ url_for('notifications_index') }}" class="ui-badge">{{ t('overview_see_all') }}</a>
+                </div>
+                <div class="space-y-3">
+                    {% for notification in user_dashboard.recent_notifications %}
+                    <a href="{{ notification.link or url_for('notifications_index') }}" class="ui-card-soft block p-4 hover:border-blue-300 transition">
+                        <div class="font-semibold text-gray-800">{{ notification.title }}</div>
+                        {% if notification.body %}
+                        <div class="text-sm text-gray-600 mt-2">{{ notification.body }}</div>
+                        {% endif %}
+                        <div class="text-xs text-gray-400 mt-2">{{ notification.created_at.strftime('%d.%m.%Y %H:%M') if notification.created_at else '' }}</div>
+                    </a>
+                    {% else %}
+                    <div class="ui-card-soft p-4 text-gray-500">{{ t('notifications_empty') }}</div>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -32,7 +32,13 @@
                 <div>
                     <div class="flex flex-wrap items-center gap-2">
                         <h1>{{ project.name }}</h1>
-                        {% if project.status == 'NEW' %}
+                        {% if project.status == 'PENDING_APPROVAL' %}
+                        <span class="ui-badge ui-badge-warning">{{ t('status_pending_approval') }}</span>
+                        {% elif project.status == 'APPROVED' %}
+                        <span class="ui-badge ui-badge-brand">{{ t('status_approved') }}</span>
+                        {% elif project.status == 'REJECTED' %}
+                        <span class="ui-badge ui-badge-critical">{{ t('status_rejected') }}</span>
+                        {% elif project.status == 'NEW' %}
                         <span class="ui-badge">{{ t('status_new') }}</span>
                         {% elif project.status == 'PRINTING' %}
                         <span class="ui-badge ui-badge-brand">{{ t('status_printing') }}</span>
@@ -50,6 +56,7 @@
                     <p>
                         {{ project.client_name or t('project_client_missing_label') }}
                         {% if project.due_date %} · {{ project.due_date.strftime('%d.%m.%Y') }}{% endif %}
+                        {% if project.owner %} · {{ t('project_owner') }}: {{ project.owner.name }}{% endif %}
                     </p>
                 </div>
             </div>
@@ -59,10 +66,14 @@
                 {% else %}
                 <a href="{{ url_for('calculator') }}" class="ui-badge ui-badge-brand"><i class="fa-solid fa-calculator"></i> {{ t('calculator') }}</a>
                 {% endif %}
+                {% if can_edit_project %}
                 <a href="{{ url_for('project_edit', id=project.id) }}" class="ui-badge"><i class="fa-solid fa-pen"></i> {{ t('edit') }}</a>
+                {% endif %}
+                {% if can_manage_project %}
                 <form method="POST" action="{{ url_for('project_delete', id=project.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');">
                     <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-trash"></i> {{ t('delete') }}</button>
                 </form>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -86,8 +97,12 @@
                         </div>
                     </div>
                 </div>
+                {% if can_manage_project %}
                 <form method="POST" action="{{ url_for('project_status', id=project.id) }}" class="mt-4 flex gap-2">
                     <select name="status" class="flex-1 border border-gray-300 rounded-xl px-3 py-2.5 focus:ring-2 outline-none">
+                        <option value="PENDING_APPROVAL" {% if project.status == 'PENDING_APPROVAL' %}selected{% endif %}>{{ t('status_pending_approval') }}</option>
+                        <option value="APPROVED" {% if project.status == 'APPROVED' %}selected{% endif %}>{{ t('status_approved') }}</option>
+                        <option value="REJECTED" {% if project.status == 'REJECTED' %}selected{% endif %}>{{ t('status_rejected') }}</option>
                         <option value="NEW" {% if project.status == 'NEW' %}selected{% endif %}>{{ t('status_new') }}</option>
                         <option value="PRINTING" {% if project.status == 'PRINTING' %}selected{% endif %}>{{ t('status_printing') }}</option>
                         <option value="DONE" {% if project.status == 'DONE' %}selected{% endif %}>{{ t('status_done') }}</option>
@@ -96,6 +111,9 @@
                         <i class="fa-solid fa-check"></i>
                     </button>
                 </form>
+                {% else %}
+                <div class="text-sm text-gray-500 mt-4">{{ t('project_status_user_hint') }}</div>
+                {% endif %}
             </div>
 
             <div class="ui-panel">
@@ -189,6 +207,27 @@
                         </div>
                     </div>
                 </div>
+                <div class="ui-panel">
+                    <div class="ui-label">{{ t('project_comments_title') }}</div>
+                    <h2 class="text-2xl font-bold mt-1 mb-4">{{ t('project_comments_heading') }}</h2>
+                    <form method="POST" action="{{ url_for('project_add_comment', id=project.id) }}" class="ui-card-soft p-4 mb-4 space-y-3">
+                        <textarea name="body" rows="3" required class="w-full border border-gray-300 rounded-xl px-4 py-3" placeholder="{{ t('project_comment_placeholder') }}"></textarea>
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-semibold transition">{{ t('project_add_comment') }}</button>
+                    </form>
+                    <div class="space-y-3">
+                        {% for comment in project_comments %}
+                        <div class="ui-card-soft p-4">
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="font-semibold">{{ comment.user.name if comment.user else t('project_comment_unknown_user') }}</div>
+                                <div class="text-xs text-gray-400">{{ comment.created_at.strftime('%d.%m.%Y %H:%M') if comment.created_at else '' }}</div>
+                            </div>
+                            <div class="text-sm text-gray-700 whitespace-pre-wrap mt-2">{{ comment.body }}</div>
+                        </div>
+                        {% else %}
+                        <div class="text-sm text-gray-500">{{ t('project_comments_empty') }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
 
             <div x-show="workspaceTab === 'materials'" x-cloak class="space-y-4">
@@ -201,6 +240,7 @@
                         <a href="{{ url_for('calculator') }}" class="ui-badge ui-badge-brand"><i class="fa-solid fa-plus"></i> {{ t('quote_create_from_calculator') }}</a>
                     </div>
 
+                    {% if can_manage_project %}
                     <form method="POST" action="{{ url_for('project_add_filament', id=project.id) }}" class="ui-card-soft p-4 mb-4" x-data="projectFilamentPicker()">
                         <div class="grid grid-cols-1 xl:grid-cols-[1fr_140px_auto] gap-3 items-end">
                             <div class="relative" @click.outside="open = false">
@@ -233,6 +273,7 @@
                             </button>
                         </div>
                     </form>
+                    {% endif %}
 
                     <div class="space-y-3">
                         {% for pf in project.filaments %}
@@ -249,19 +290,26 @@
                                     </div>
                                 </div>
                                 <div class="flex flex-wrap gap-2 items-center">
+                                    {% if can_manage_project %}
                                     <button type="button" @click="editing = !editing" class="ui-badge"><i class="fa-solid fa-pen"></i> {{ t('edit') }}</button>
+                                    {% endif %}
                                     {% if pf.is_used %}
                                     <span class="ui-badge ui-badge-success"><i class="fa-solid fa-check-double"></i> {{ t('status_done') }}</span>
                                     {% else %}
+                                    {% if can_manage_project %}
                                     <form method="POST" action="{{ url_for('project_consume_filament', id=project.id, pf_id=pf.id) }}">
                                         <button type="submit" class="ui-badge ui-badge-brand"><i class="fa-solid fa-box-open"></i> {{ t('project_consume') }}</button>
                                     </form>
                                     {% endif %}
+                                    {% endif %}
+                                    {% if can_manage_project %}
                                     <form method="POST" action="{{ url_for('project_remove_filament', id=project.id, pf_id=pf.id) }}" onsubmit="return confirm('{{ t('delete') }}?')">
                                         <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-xmark"></i> {{ t('delete') }}</button>
                                     </form>
+                                    {% endif %}
                                 </div>
                             </div>
+                            {% if can_manage_project %}
                             <form x-show="editing" x-cloak method="POST" action="{{ url_for('project_update_filament', id=project.id, pf_id=pf.id) }}" class="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
                                 <label class="text-xs text-gray-500 font-semibold flex-shrink-0">{{ t('estimated_weight') }}:</label>
                                 <input type="number" step="1" min="1" name="estimated_weight" value="{{ pf.estimated_weight | int }}" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none w-28">
@@ -272,6 +320,7 @@
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
                             </form>
+                            {% endif %}
                         </div>
                         {% else %}
                         <p class="text-sm text-gray-400">{{ t('project_no_filaments') }}</p>

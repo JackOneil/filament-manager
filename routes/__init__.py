@@ -4,6 +4,7 @@ Each module exposes a register(app) function that attaches routes directly onto
 the Flask app — no Blueprints, so url_for('endpoint') works in templates as-is.
 """
 from routes.inventory import register as register_inventory
+from routes.auth import register as register_auth
 from routes.api import register as register_api
 from routes.calculator import register as register_calculator
 from routes.history import register as register_history
@@ -17,6 +18,7 @@ from routes.pwa import register as register_pwa
 
 
 def register_all(app):
+    register_auth(app)
     register_inventory(app)
     register_api(app)
     register_calculator(app)

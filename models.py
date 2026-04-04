@@ -2,6 +2,45 @@ from datetime import datetime
 from database import db
 
 
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    name = db.Column(db.String(120), nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(20), nullable=False, default='user')  # admin, user
+    section_permissions = db.Column(db.Text, nullable=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    notify_project_created = db.Column(db.Boolean, nullable=False, default=True)
+    notify_project_status_changed = db.Column(db.Boolean, nullable=False, default=True)
+    notify_project_comment = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_login_at = db.Column(db.DateTime, nullable=True, index=True)
+
+
+class UserInvite(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(255), nullable=True, index=True)
+    code = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    role = db.Column(db.String(20), nullable=False, default='user')
+    section_permissions = db.Column(db.Text, nullable=True)
+    is_used = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=True)
+
+
+class Notification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False, index=True)
+    kind = db.Column(db.String(50), nullable=False, default='info')
+    title = db.Column(db.String(255), nullable=False)
+    body = db.Column(db.Text, nullable=True)
+    link = db.Column(db.String(500), nullable=True)
+    is_read = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    user = db.relationship('User', backref=db.backref('notifications', lazy=True, cascade='all, delete-orphan'))
+
+
 class Brand(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
@@ -122,8 +161,24 @@ class Project(db.Model):
     due_date = db.Column(db.DateTime, nullable=True)
     client_name = db.Column(db.String(100), nullable=True)
     estimated_print_time = db.Column(db.Integer, default=0) # in minutes
-    status = db.Column(db.String(20), default='NEW') # NEW, PRINTING, DONE
+    status = db.Column(db.String(20), default='NEW') # PENDING_APPROVAL, APPROVED, REJECTED, PRINTING, DONE
     tag_text = db.Column(db.Text, nullable=True)
+    owner_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, index=True)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, index=True)
+
+    owner = db.relationship('User', foreign_keys=[owner_user_id], backref=db.backref('owned_projects', lazy=True))
+    created_by = db.relationship('User', foreign_keys=[created_by_user_id], backref=db.backref('created_projects', lazy=True))
+
+
+class ProjectComment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='CASCADE'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True, index=True)
+    body = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    project = db.relationship('Project', backref=db.backref('comments', lazy=True, cascade='all, delete-orphan'))
+    user = db.relationship('User', backref=db.backref('project_comments', lazy=True))
 
 
 class ProjectFile(db.Model):
