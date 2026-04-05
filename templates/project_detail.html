@@ -443,8 +443,8 @@
                     <h2 class="text-2xl font-bold mt-1 mb-4">{{ t('project_links_heading') }}</h2>
                     <form method="POST" action="{{ url_for('project_add_link', id=project.id) }}" class="ui-card-soft p-4 mb-4">
                         <div class="grid grid-cols-1 md:grid-cols-[1fr_220px_auto] gap-3">
-                            <input type="url" name="url" placeholder="https://…" required class="border border-gray-300 rounded-xl px-4 py-2.5">
-                            <input type="text" name="name" placeholder="{{ t('project_link_name_placeholder') }}" class="border border-gray-300 rounded-xl px-4 py-2.5">
+                            <input type="url" name="url" placeholder="https://…" required class="border border-gray-300 rounded-xl px-4 py-2.5 bg-white text-gray-900">
+                            <input type="text" name="name" placeholder="{{ t('project_link_name_placeholder') }}" class="border border-gray-300 rounded-xl px-4 py-2.5 bg-white text-gray-900">
                             <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold transition">{{ t('add_link') }}</button>
                         </div>
                     </form>

@@ -193,9 +193,10 @@ def _inventory_page_context():
         filaments_query = filaments_query.order_by(order_expr.asc())
 
     page = request.args.get('page', 1, type=int)
-    default_per_page = setting.items_per_page if setting else 12
+    allowed_per_page = [12, 24, 48, 96]
+    default_per_page = setting.items_per_page if setting and setting.items_per_page in allowed_per_page else 12
     per_page = request.args.get('per_page', default_per_page, type=int)
-    if per_page not in [12, 24, 48, 96]:
+    if per_page not in allowed_per_page:
         per_page = default_per_page
 
     stats = _inventory_stats(f_brand, f_material, f_color, f_tag)
@@ -238,6 +239,7 @@ def _inventory_page_context():
         'tag_options': tag_options,
         'view_mode': view_mode,
         'per_page': per_page,
+        'per_page_options': allowed_per_page,
         'sort_by': sort_by,
         'sort_direction': sort_direction,
         'stock_alerts': stock_alert_pool[:6],

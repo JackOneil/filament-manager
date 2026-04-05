@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.52.1] - 2026-04-05
+### Changed
+- **User filament pagination upgraded:** The regular-user filament list now has a dedicated records-per-page selector, numbered pagination links, and a remembered per-page preference so larger catalogs stay usable over time.
+- **Project create dark-mode cleanup:** The read-only `Klient` block on the new-project form now uses neutral shared surface colors, keeping the text readable in dark mode.
+
+### Fixed
+- **Bambu page refresh loop:** The `hide failed` preference no longer triggers unnecessary URL rewrites on page load, which stopped the repeated self-refreshing behavior on the Bambu print history page.
+
 ## [1.51.0] - 2026-04-04
 ### Added
 - **Multi-user authentication:** Added login, logout, self-registration, invite activation codes, account settings, notification inbox, and administrator user management.

@@ -20,7 +20,7 @@ import logging
 import threading
 import time
 from datetime import datetime, timedelta
-from flask import Flask
+from flask import Flask, render_template
 from flask_wtf.csrf import CSRFProtect
 from sqlalchemy import text
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -39,7 +39,7 @@ from utils import get_settings
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.52.0'
+APP_VERSION = '1.52.1'
 
 csrf = CSRFProtect()
 
@@ -104,6 +104,10 @@ def create_app(test_config=None) -> Flask:
             auth_has_section_access=has_section_access,
             auth_is_admin=is_admin,
         )
+
+    @app.errorhandler(403)
+    def forbidden(_error):
+        return render_template('error_403.html'), 403
 
     _setup_database(app)
     _start_bambu_sync_worker(app)

@@ -21,10 +21,10 @@
             <input type="text" name="client_name" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
         </div>
         {% else %}
-        <div class="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
-            <div class="text-sm font-semibold text-blue-900">{{ t('project_client') }}</div>
-            <div class="text-sm text-blue-800 mt-1">{{ default_client_name }}</div>
-            <p class="text-xs text-blue-700 mt-2">{{ t('project_create_user_hint') }}</p>
+        <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark-surface-muted">
+            <div class="text-sm font-semibold text-slate-900 dark-text-primary">{{ t('project_client') }}</div>
+            <div class="text-sm text-slate-700 mt-1 dark-text-primary">{{ default_client_name }}</div>
+            <p class="text-xs text-slate-600 mt-2 dark-text-secondary">{{ t('project_create_user_hint') }}</p>
         </div>
         {% endif %}
 

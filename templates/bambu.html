@@ -78,6 +78,7 @@
         <span class="mx-1 text-gray-300">|</span>
         <a id="toggle-hide-failed"
            href="{{ url_for('bambu_jobs', filter=job_filter or None, filament_id=active_filament_id) if hide_failed else url_for('bambu_jobs', filter=job_filter or None, filament_id=active_filament_id, hide_failed=1) }}"
+           data-next-hide-failed="{{ '0' if hide_failed else '1' }}"
            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors
                   {% if hide_failed %}bg-red-100 text-red-700 hover:bg-red-200{% else %}bg-gray-100 text-gray-500 hover:bg-gray-200{% endif %}">
             <i class="fa-solid {% if hide_failed %}fa-eye-slash{% else %}fa-eye{% endif %} text-xs"></i>
@@ -665,18 +666,32 @@ async function doSync() {
     var KEY = 'bambu_hide_failed';
     var btn = document.getElementById('toggle-hide-failed');
     if (!btn) return;
-    var hiddenNow = {{ 'true' if hide_failed else 'false' }};
-    if (hiddenNow) {
-        localStorage.setItem(KEY, '1');
-    } else {
-        localStorage.removeItem(KEY);
-    }
-    /* On fresh navigation (no hide_failed in URL), restore preference */
+    btn.addEventListener('click', function() {
+        localStorage.setItem(KEY, btn.dataset.nextHideFailed || '0');
+    });
     var params = new URLSearchParams(window.location.search);
-    if (!params.has('hide_failed') && localStorage.getItem(KEY) === '1') {
-        params.set('hide_failed', '1');
-        window.location.replace(window.location.pathname + '?' + params.toString());
+    var stored = localStorage.getItem(KEY);
+    var hiddenNow = {{ 'true' if hide_failed else 'false' }};
+
+    /* Explicit URL state wins and becomes the remembered preference. */
+    if (params.has('hide_failed')) {
+        localStorage.setItem(KEY, '1');
+        return;
     }
+
+    /* On fresh navigation (no hide_failed in URL), restore remembered preference. */
+    if (stored === '1') {
+        params.set('hide_failed', '1');
+        var targetQuery = params.toString();
+        var targetUrl = window.location.pathname + (targetQuery ? '?' + targetQuery : '');
+        var currentUrl = window.location.pathname + window.location.search;
+        if (targetUrl !== currentUrl) {
+            window.location.replace(targetUrl);
+            return;
+        }
+    }
+
+    localStorage.setItem(KEY, hiddenNow ? '1' : '0');
 })();
 </script>
 {% endblock %}

@@ -8,13 +8,16 @@
     </div>
 
     <div class="ui-panel">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
             <div>
                 <div class="text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">{{ t('brand') }}</div>
                 <form method="GET">
                     <input type="hidden" name="material" value="{{ f_material }}">
                     <input type="hidden" name="color" value="{{ f_color }}">
                     <input type="hidden" name="tag" value="{{ f_tag }}">
+                    <input type="hidden" name="sort_by" value="{{ sort_by }}">
+                    <input type="hidden" name="sort_direction" value="{{ sort_direction }}">
+                    <input type="hidden" name="per_page" value="{{ per_page }}">
                     <select name="brand" onchange="this.form.submit()" class="w-full rounded-xl border border-gray-300 px-4 py-2.5">
                         <option value="">{{ t('filter_all') }}</option>
                         {% for brand in brands %}
@@ -29,6 +32,9 @@
                     <input type="hidden" name="brand" value="{{ f_brand }}">
                     <input type="hidden" name="color" value="{{ f_color }}">
                     <input type="hidden" name="tag" value="{{ f_tag }}">
+                    <input type="hidden" name="sort_by" value="{{ sort_by }}">
+                    <input type="hidden" name="sort_direction" value="{{ sort_direction }}">
+                    <input type="hidden" name="per_page" value="{{ per_page }}">
                     <select name="material" onchange="this.form.submit()" class="w-full rounded-xl border border-gray-300 px-4 py-2.5">
                         <option value="">{{ t('filter_all') }}</option>
                         {% for material in materials %}
@@ -43,6 +49,9 @@
                     <input type="hidden" name="brand" value="{{ f_brand }}">
                     <input type="hidden" name="material" value="{{ f_material }}">
                     <input type="hidden" name="tag" value="{{ f_tag }}">
+                    <input type="hidden" name="sort_by" value="{{ sort_by }}">
+                    <input type="hidden" name="sort_direction" value="{{ sort_direction }}">
+                    <input type="hidden" name="per_page" value="{{ per_page }}">
                     <select name="color" onchange="this.form.submit()" class="w-full rounded-xl border border-gray-300 px-4 py-2.5">
                         <option value="">{{ t('filter_all') }}</option>
                         {% for color in colors %}
@@ -58,12 +67,29 @@
                     <input type="hidden" name="material" value="{{ f_material }}">
                     <input type="hidden" name="color" value="{{ f_color }}">
                     <input type="hidden" name="tag" value="{{ f_tag }}">
+                    <input type="hidden" name="per_page" value="{{ per_page }}">
                     <select name="sort_by" onchange="this.form.submit()" class="w-full rounded-xl border border-gray-300 px-4 py-2.5">
                         <option value="name" {% if sort_by == 'name' %}selected{% endif %}>{{ t('sort_name') }}</option>
                         <option value="brand" {% if sort_by == 'brand' %}selected{% endif %}>{{ t('sort_brand') }}</option>
                         <option value="pieces" {% if sort_by == 'pieces' %}selected{% endif %}>{{ t('sort_pieces') }}</option>
                         <option value="remaining" {% if sort_by == 'remaining' %}selected{% endif %}>{{ t('sort_remaining') }}</option>
                         <option value="capacity" {% if sort_by == 'capacity' %}selected{% endif %}>{{ t('sort_capacity') }}</option>
+                    </select>
+                </form>
+            </div>
+            <div>
+                <div class="text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">{{ t('per_page') }}</div>
+                <form method="GET">
+                    <input type="hidden" name="brand" value="{{ f_brand }}">
+                    <input type="hidden" name="material" value="{{ f_material }}">
+                    <input type="hidden" name="color" value="{{ f_color }}">
+                    <input type="hidden" name="tag" value="{{ f_tag }}">
+                    <input type="hidden" name="sort_by" value="{{ sort_by }}">
+                    <input type="hidden" name="sort_direction" value="{{ sort_direction }}">
+                    <select id="user-filaments-per-page" name="per_page" onchange="changeUserFilamentsPerPage(this.value)" class="w-full rounded-xl border border-gray-300 px-4 py-2.5">
+                        {% for option in per_page_options %}
+                        <option value="{{ option }}" {% if per_page == option %}selected{% endif %}>{{ option }}</option>
+                        {% endfor %}
                     </select>
                 </form>
             </div>
@@ -83,7 +109,6 @@
                         <th class="py-3 pr-4">{{ t('pieces') }}</th>
                         <th class="py-3 pr-4">{{ t('remaining') }}</th>
                         <th class="py-3 pr-4">{{ t('capacity') }}</th>
-                        <th class="py-3 text-right">{{ t('detail') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -101,11 +126,10 @@
                         <td class="py-3 pr-4 text-gray-600">{{ fil.quantity }}</td>
                         <td class="py-3 pr-4 text-gray-600">{{ fil.weight_remaining | int }} g</td>
                         <td class="py-3 pr-4 text-gray-600">{{ (fil.quantity * fil.weight_total) | int }} g</td>
-                        <td class="py-3 text-right text-gray-400">{{ t('users_filaments_no_detail') }}</td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="8" class="py-10 text-center text-gray-500">{{ t('no_filaments') }}</td>
+                        <td colspan="7" class="py-10 text-center text-gray-500">{{ t('no_filaments') }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -114,16 +138,49 @@
         {% if filaments.pages > 1 %}
         <div class="flex items-center justify-between gap-3 border-t border-gray-200 px-4 py-4">
             <div class="text-sm text-gray-500">{{ t('users_filaments_page_status').format(page=filaments.page, pages=filaments.pages, total=filaments.total) }}</div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap justify-end">
                 {% if filaments.has_prev %}
-                <a href="{{ url_for('filaments_index', page=filaments.prev_num, brand=f_brand, material=f_material, color=f_color, tag=f_tag, sort_by=sort_by, sort_direction=sort_direction) }}" class="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm">{{ t('prev_page') }}</a>
+                <a href="{{ url_for('filaments_index', page=filaments.prev_num, per_page=per_page, brand=f_brand, material=f_material, color=f_color, tag=f_tag, sort_by=sort_by, sort_direction=sort_direction) }}" class="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm">{{ t('prev_page') }}</a>
                 {% endif %}
+                {% for p in filaments.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                    {% if p %}
+                    <a href="{{ url_for('filaments_index', page=p, per_page=per_page, brand=f_brand, material=f_material, color=f_color, tag=f_tag, sort_by=sort_by, sort_direction=sort_direction) }}" class="px-3 py-1 rounded text-sm {% if p == filaments.page %}bg-blue-600 text-white{% else %}bg-gray-100 hover:bg-gray-200 text-gray-700{% endif %}">{{ p }}</a>
+                    {% else %}
+                    <span class="px-2 text-sm text-gray-400">…</span>
+                    {% endif %}
+                {% endfor %}
                 {% if filaments.has_next %}
-                <a href="{{ url_for('filaments_index', page=filaments.next_num, brand=f_brand, material=f_material, color=f_color, tag=f_tag, sort_by=sort_by, sort_direction=sort_direction) }}" class="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm">{{ t('next_page') }}</a>
+                <a href="{{ url_for('filaments_index', page=filaments.next_num, per_page=per_page, brand=f_brand, material=f_material, color=f_color, tag=f_tag, sort_by=sort_by, sort_direction=sort_direction) }}" class="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm">{{ t('next_page') }}</a>
                 {% endif %}
             </div>
         </div>
         {% endif %}
     </div>
 </div>
+<script>
+function changeUserFilamentsPerPage(value) {
+    localStorage.setItem('user_filaments_per_page', value);
+    const params = new URLSearchParams(window.location.search);
+    params.set('per_page', value);
+    params.delete('page');
+    window.location.href = '{{ url_for("filaments_index") }}?' + params.toString();
+}
+
+(function() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('per_page')) {
+        localStorage.setItem('user_filaments_per_page', params.get('per_page'));
+        return;
+    }
+    const saved = localStorage.getItem('user_filaments_per_page');
+    if (!saved) return;
+    const target = new URLSearchParams(window.location.search);
+    target.set('per_page', saved);
+    const targetUrl = '{{ url_for("filaments_index") }}?' + target.toString();
+    const currentUrl = window.location.pathname + window.location.search;
+    if (target.toString() && targetUrl !== currentUrl) {
+        window.location.replace(targetUrl);
+    }
+})();
+</script>
 {% endblock %}

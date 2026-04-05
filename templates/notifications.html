@@ -9,12 +9,13 @@
                 <p>{{ t('notifications_desc') }}</p>
             </div>
             <form method="POST" action="{{ url_for('notification_mark_all_read') }}">
+                <input type="hidden" name="page" value="{{ notifications.page }}">
                 <button type="submit" class="ui-badge ui-badge-brand">{{ t('notifications_mark_all_read') }}</button>
             </form>
         </div>
     </div>
     <div class="space-y-3">
-        {% for notification in notifications %}
+        {% for notification in notifications.items %}
         <div class="ui-panel flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
                 <div class="flex items-center gap-2">
@@ -32,6 +33,7 @@
                 {% endif %}
                 {% if not notification.is_read %}
                 <form method="POST" action="{{ url_for('notification_mark_read', id=notification.id) }}">
+                    <input type="hidden" name="page" value="{{ notifications.page }}">
                     <button type="submit" class="ui-badge ui-badge-brand">{{ t('notifications_mark_read') }}</button>
                 </form>
                 {% endif %}
@@ -41,5 +43,16 @@
         <div class="ui-panel text-gray-500">{{ t('notifications_empty') }}</div>
         {% endfor %}
     </div>
+    {% if notifications.pages > 1 %}
+    <div class="flex items-center justify-center gap-2">
+        {% if notifications.has_prev %}
+        <a href="{{ url_for('notifications_index', page=notifications.prev_num) }}" class="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm">{{ t('prev_page') }}</a>
+        {% endif %}
+        <span class="text-sm text-gray-500">{{ t('notifications_page_status').format(page=notifications.page, pages=notifications.pages, total=notifications.total) }}</span>
+        {% if notifications.has_next %}
+        <a href="{{ url_for('notifications_index', page=notifications.next_num) }}" class="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm">{{ t('next_page') }}</a>
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

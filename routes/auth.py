@@ -258,11 +258,15 @@ def register(app):
     @require_login
     def notifications_index():
         user = get_current_user()
-        notifications = (
+        page = request.args.get('page', 1, type=int)
+        notifications = db.paginate(
             Notification.query
             .filter_by(user_id=user.id)
             .order_by(Notification.created_at.desc())
-            .all()
+            ,
+            page=page,
+            per_page=20,
+            error_out=False,
         )
         return render_template('notifications.html', notifications=notifications)
 
@@ -275,7 +279,8 @@ def register(app):
             abort(404)
         notification.is_read = True
         db.session.commit()
-        return redirect(request.form.get('next') or url_for('notifications_index'))
+        next_page = request.form.get('page', 1, type=int)
+        return redirect(request.form.get('next') or url_for('notifications_index', page=next_page))
 
     @app.route('/notifications/read-all', methods=['POST'])
     @require_login
@@ -283,7 +288,8 @@ def register(app):
         user = get_current_user()
         Notification.query.filter_by(user_id=user.id, is_read=False).update({'is_read': True})
         db.session.commit()
-        return redirect(url_for('notifications_index'))
+        next_page = request.form.get('page', 1, type=int)
+        return redirect(url_for('notifications_index', page=next_page))
 
     @app.context_processor
     def inject_auth_nav():

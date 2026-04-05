@@ -78,6 +78,16 @@
             border: 1px solid var(--ui-border);
             border-radius: 0.9rem;
         }
+        .dark-surface-muted {
+            background: var(--ui-surface-soft);
+            border-color: var(--ui-border);
+        }
+        .dark-text-primary {
+            color: var(--ui-text);
+        }
+        .dark-text-secondary {
+            color: var(--ui-text-muted);
+        }
         .ui-kpi {
             padding: 1.25rem;
             border-radius: 1rem;
@@ -261,6 +271,8 @@
         html.dark input[type="email"],
         html.dark input[type="password"],
         html.dark input[type="search"],
+        html.dark input[type="url"],
+        html.dark input[type="date"],
         html.dark textarea,
         html.dark select {
             background-color: #1f2937;
@@ -273,6 +285,8 @@
         html.dark input[type="email"]:focus,
         html.dark input[type="password"]:focus,
         html.dark input[type="search"]:focus,
+        html.dark input[type="url"]:focus,
+        html.dark input[type="date"]:focus,
         html.dark textarea:focus,
         html.dark select:focus {
             background-color: #1f2937;
@@ -392,6 +406,16 @@
         html.dark .border-blue-200 { border-color: rgba(96, 165, 250, 0.3); }
         html.dark .text-blue-700 { color: #93c5fd; }
         html.dark .hover\:bg-blue-50:hover { background-color: rgba(30, 58, 138, 0.3) !important; }
+        html.dark .bg-white\/70 { background-color: rgba(17, 24, 39, 0.72) !important; }
+        html.dark .border-amber-100 { border-color: rgba(251, 191, 36, 0.28) !important; }
+        html.dark .border-red-100 { border-color: rgba(248, 113, 113, 0.28) !important; }
+        html.dark .border-blue-100 { border-color: rgba(96, 165, 250, 0.28) !important; }
+        html.dark .hover\:border-amber-300:hover { border-color: rgba(251, 191, 36, 0.5) !important; }
+        html.dark .hover\:border-red-300:hover { border-color: rgba(248, 113, 113, 0.5) !important; }
+        html.dark .hover\:border-blue-300:hover { border-color: rgba(96, 165, 250, 0.5) !important; }
+        html.dark input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1) brightness(1.2);
+        }
 
         /* Dark mode: info / hint banners (yellow, amber) */
         html.dark .bg-yellow-50 { background-color: rgba(120, 53, 15, 0.2); }
