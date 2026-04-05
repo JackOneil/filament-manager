@@ -138,9 +138,10 @@
                             <input type="text" name="name" value="{{ b.name }}" class="bg-transparent border-b border-transparent focus:border-blue-300 outline-none font-medium text-gray-700 w-full text-sm">
                             <button type="submit" class="hidden group-hover:block text-blue-500 hover:text-blue-700 mx-1 flex-shrink-0" title="{{ t('edit') }}"><i class="fa-solid fa-save"></i></button>
                         </div>
-                        <input type="url" name="shop_url" value="{{ b.shop_url or '' }}"
+                        <input type="text" name="shop_url" value="{{ b.shop_url or '' }}"
                                placeholder="{{ t('brand_shop_url_placeholder') }}"
                                class="bg-transparent border-b border-transparent focus:border-blue-200 outline-none text-gray-400 text-xs w-full">
+                        <p class="text-[10px] text-gray-300 mt-0.5">{{ t('brand_shop_url_hint') }}</p>
                     </form>
                     <span class="text-gray-400 text-xs whitespace-nowrap pt-1 ml-1 {% if b.filaments|length == 0 %}group-hover:hidden{% endif %}">{{ b.filaments|length }}</span>
                     {% if b.filaments|length == 0 %}
@@ -299,7 +300,7 @@
             <input type="hidden" name="action" value="reorder_shop_settings">
             <div>
                 <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('reorder_shop_url_label') }}</label>
-                <input type="url" name="reorder_shop_url"
+                <input type="text" name="reorder_shop_url"
                     value="{{ app_settings.reorder_shop_url if app_settings and app_settings.reorder_shop_url else '' }}"
                     placeholder="https://www.alza.cz/search.htm?exps={query}"
                     class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none font-mono">

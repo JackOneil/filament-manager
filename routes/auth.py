@@ -16,6 +16,7 @@ from auth import (
     recent_notifications,
     require_admin,
     require_login,
+    safe_redirect_target,
     serialize_permissions,
     unread_notifications_count,
     user_permissions,
@@ -54,9 +55,9 @@ def register(app):
             password = request.form.get('password', '')
             user = User.query.filter_by(email=email).first()
             if user and verify_password(user, password) and user.is_active:
-                login_user(user)
+                login_user(user, plain_password=password)
                 flash('auth_login_success', 'success')
-                return redirect(request.args.get('next') or url_for('index'))
+                return redirect(safe_redirect_target(request.args.get('next'), fallback_endpoint='index'))
             flash('auth_login_failed', 'error')
         return render_template('auth_login.html', user_count=User.query.count())
 
@@ -94,7 +95,7 @@ def register(app):
             )
             db.session.add(user)
             db.session.commit()
-            login_user(user)
+            login_user(user, plain_password=password)
             flash('auth_register_success', 'success')
             return redirect(url_for('index'))
         return render_template('auth_register.html', bootstrap_admin=(existing_users == 0))
@@ -127,7 +128,7 @@ def register(app):
             invite.is_used = True
             db.session.add(user)
             db.session.commit()
-            login_user(user)
+            login_user(user, plain_password=password)
             flash('auth_register_success', 'success')
             return redirect(url_for('index'))
         return render_template('auth_activate.html', invite=invite)

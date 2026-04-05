@@ -893,7 +893,7 @@ function closeUseFilamentModal() {
 
 // ── Open reorder shop search ──────────────────────────────────────────────────
 function openReorderShop(name, template) {
-    const url = template.replace('{query}', encodeURIComponent(name));
+    const url = template.replace(/\{[^}]+\}/g, encodeURIComponent(name));
     window.open(url, '_blank', 'noopener,noreferrer');
 }
 

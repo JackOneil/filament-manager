@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.52.2] - 2026-04-05
+### Added
+- **Initial remaining weight field on Add Filament form:** Users can now set a custom starting weight when adding a partially used spool (e.g. spool capacity 1000 g but only 500 g remaining). This avoids polluting usage statistics with a phantom subtract operation. The field is optional — when left empty, remaining weight defaults to full capacity × quantity.
+
+### Fixed
+- **Brand shop URL placeholder not substituted:** The `{query}` placeholder in Brand shop URLs (e.g. `https://allegro.cz/search?q={query}`) was only matched literally — typos like `{querry}` or `{search}` were passed through unchanged. Now any `{…}` placeholder is replaced with the filament name. Also added a visible hint text under the Brand shop URL input and changed input type from `url` to `text` to prevent HTML5 validation errors on template URLs.
+
+### Changed
+- **`README.md` rewritten:** Professional structure with feature overview, tech stack table, project tree, quick-start guide, upgrade/backup instructions, test commands, and roadmap status.
+- **`.github/copilot-instructions.md` consolidated:** Merged architecture overview, data flow diagrams, dependency tables, and security layer from a separate `INSTRUCTIONS.md` into the existing copilot instructions. Removed `INSTRUCTIONS.md` from root. Fixed outdated stats section count (6, not 7). Updated backup schema table to cover all current models. Unified language to English.
+
+### Security
+- **Password storage hardened:** Password hashing is now explicitly generated with the modern `scrypt` scheme instead of relying on framework defaults.
+- **Login redirect hardening:** The `next` parameter after login is now restricted to same-origin targets only, blocking open-redirect style abuse.
+- **Session and cookie hardening:** Login/logout now rotate the session state, session cookies are explicitly marked `HttpOnly` and `SameSite=Lax`, and the secure flag is enabled automatically behind a reverse proxy.
+- **Response security headers:** Added safe default headers including `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, and conditional HSTS on secure requests.
+
 ## [1.52.1] - 2026-04-05
 ### Changed
 - **User filament pagination upgraded:** The regular-user filament list now has a dedicated records-per-page selector, numbered pagination links, and a remembered per-page preference so larger catalogs stay usable over time.

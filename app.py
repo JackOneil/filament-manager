@@ -39,7 +39,7 @@ from utils import get_settings
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.52.1'
+APP_VERSION = '1.52.2'
 
 csrf = CSRFProtect()
 
@@ -61,6 +61,10 @@ def create_app(test_config=None) -> Flask:
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024
     app.config['PROJECT_UPLOAD_FOLDER'] = os.path.join(db_dir, 'uploads')
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_SECURE'] = bool(os.environ.get('BEHIND_PROXY'))
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=14)
     # Increase SQLite busy-timeout to reduce 'database is locked' errors under load.
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'connect_args': {'timeout': 30},
@@ -109,10 +113,29 @@ def create_app(test_config=None) -> Flask:
     def forbidden(_error):
         return render_template('error_403.html'), 403
 
+    @app.after_request
+    def add_security_headers(response):
+        response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+        response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+        response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+        response.headers.setdefault('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
+        if request_is_secure(response):
+            response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+        return response
+
     _setup_database(app)
     _start_bambu_sync_worker(app)
     _start_prusa_sync_worker(app)
     return app
+
+
+def request_is_secure(response) -> bool:
+    try:
+        from flask import request
+        forwarded_proto = request.headers.get('X-Forwarded-Proto', '')
+        return bool(request.is_secure or forwarded_proto == 'https')
+    except RuntimeError:
+        return False
 
 
 def _setup_database(app: Flask) -> None:

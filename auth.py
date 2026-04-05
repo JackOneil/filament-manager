@@ -2,6 +2,7 @@ import json
 import secrets
 from datetime import datetime, timedelta
 from functools import wraps
+from urllib.parse import urljoin, urlsplit
 
 from flask import abort, current_app, flash, g, redirect, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -185,7 +186,13 @@ def has_section_access(section, write=False, user=None):
 
 
 def hash_password(password):
-    return generate_password_hash(password)
+    return generate_password_hash(password, method='scrypt')
+
+
+def password_needs_rehash(password_hash):
+    if not password_hash:
+        return True
+    return not str(password_hash).startswith('scrypt:')
 
 
 def verify_password(user, password):
@@ -194,15 +201,35 @@ def verify_password(user, password):
     return check_password_hash(user.password_hash, password)
 
 
-def login_user(user):
+def is_safe_redirect_target(target):
+    if not target:
+        return False
+    ref_url = urlsplit(request.host_url)
+    test_url = urlsplit(urljoin(request.host_url, target))
+    return (
+        test_url.scheme in {'http', 'https'}
+        and ref_url.netloc == test_url.netloc
+    )
+
+
+def safe_redirect_target(target, fallback_endpoint='index'):
+    if is_safe_redirect_target(target):
+        return target
+    return url_for(fallback_endpoint)
+
+
+def login_user(user, plain_password=None):
+    session.clear()
     user.last_login_at = datetime.utcnow()
+    if plain_password and password_needs_rehash(user.password_hash):
+        user.password_hash = hash_password(plain_password)
     db.session.commit()
     session['user_id'] = user.id
     session.permanent = True
 
 
 def logout_user():
-    session.pop('user_id', None)
+    session.clear()
 
 
 def require_login(view):

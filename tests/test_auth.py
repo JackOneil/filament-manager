@@ -4,7 +4,7 @@ import tempfile
 import unittest
 
 from app import create_app
-from auth import hash_password
+from auth import hash_password, password_needs_rehash
 from database import db
 from models import Filament, Brand, Color, Material, Notification, Project, User
 
@@ -66,6 +66,12 @@ class AuthAccessTests(unittest.TestCase):
         response = self.client.get('/projects', follow_redirects=False)
         self.assertEqual(response.status_code, 302)
         self.assertIn('/login', response.headers['Location'])
+
+    def test_passwords_are_hashed_with_modern_scheme(self):
+        hashed = hash_password('password123')
+        self.assertNotEqual(hashed, 'password123')
+        self.assertTrue(hashed.startswith('scrypt:'))
+        self.assertFalse(password_needs_rehash(hashed))
 
     def test_user_sees_only_owned_projects(self):
         self.login('user@example.com')
@@ -222,3 +228,19 @@ class AuthAccessTests(unittest.TestCase):
         self.assertEqual(response_page_2.status_code, 200)
         self.assertIn('Strana 1 z 2', html_page_1)
         self.assertIn('Strana 2 z 2', html_page_2)
+
+    def test_login_rejects_external_next_redirect(self):
+        response = self.client.post(
+            '/login?next=https://evil.example/phish',
+            data={'email': 'user@example.com', 'password': 'password123'},
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers['Location'], '/')
+
+    def test_security_headers_are_present(self):
+        response = self.client.get('/login')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get('X-Content-Type-Options'), 'nosniff')
+        self.assertEqual(response.headers.get('X-Frame-Options'), 'SAMEORIGIN')
+        self.assertEqual(response.headers.get('Referrer-Policy'), 'strict-origin-when-cross-origin')
