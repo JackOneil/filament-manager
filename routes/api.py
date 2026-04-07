@@ -3,7 +3,7 @@ from flask import request, render_template, jsonify
 from sqlalchemy.orm import joinedload
 from auth import get_current_user, is_admin
 from database import db
-from models import Filament, Brand, AppSetting
+from models import Filament, Brand, AppSetting, Project, PrusaPrinter, BambuPrinter
 from utils import collect_usage_windows, compute_stock_status, get_filament_tags
 
 
@@ -102,3 +102,77 @@ def register(app):
             'has_next': filaments_paginated.has_next,
             'has_prev': filaments_paginated.has_prev,
         })
+
+    @app.route('/api/search')
+    def api_search():
+        from flask import url_for
+        q = request.args.get('q', '').strip()
+        if not q:
+            return jsonify({'results': []})
+            
+        results = []
+        user = get_current_user()
+        is_adm = is_admin(user) if user else False
+        
+        # 1. Filaments
+        fil_query = Filament.query.options(
+            joinedload(Filament.brand), joinedload(Filament.material), joinedload(Filament.color)
+        ).filter(
+            db.or_(
+                Filament.name.ilike(f'%{q}%'),
+                Filament.tag_text.ilike(f'%{q}%')
+            )
+        ).limit(10).all()
+        
+        for f in fil_query:
+            results.append({
+                'id': f'fil_{f.id}', 'type': 'filament', 'title': f.name,
+                'subtitle': f"{f.brand.name if f.brand else ''} · {f.material.name if f.material else ''}",
+                'url': url_for('filament_detail', id=f.id) if is_adm else url_for('filaments_index', tag=f.name),
+                'icon': 'fa-solid fa-layer-group', 'color': f.color.hex_value if f.color else '#cbd5e1'
+            })
+            
+        # 2. Projects
+        proj_query = Project.query.filter(
+            db.or_(
+                Project.name.ilike(f'%{q}%'),
+                Project.client_name.ilike(f'%{q}%'),
+                Project.tag_text.ilike(f'%{q}%')
+            )
+        )
+        if not is_adm and user:
+            proj_query = proj_query.filter(Project.owner_user_id == user.id)
+            
+        for p in proj_query.limit(10).all():
+            results.append({
+                'id': f'proj_{p.id}', 'type': 'project', 'title': p.name,
+                'subtitle': p.client_name or '... klienta neuveden',
+                'url': url_for('project_detail', id=p.id),
+                'icon': 'fa-solid fa-diagram-project', 'color': '#3b82f6'
+            })
+            
+        # 3. Printers
+        if is_adm:
+            prusa_query = PrusaPrinter.query.filter(
+                db.or_(PrusaPrinter.name.ilike(f'%{q}%'), PrusaPrinter.printer_model.ilike(f'%{q}%'))
+            ).limit(5).all()
+            for p in prusa_query:
+                results.append({
+                    'id': f'prusa_{p.id}', 'type': 'printer', 'title': p.name,
+                    'subtitle': f"Prusa {p.printer_model or ''}",
+                    'url': url_for('prusa_jobs'),
+                    'icon': 'fa-solid fa-network-wired', 'color': '#f97316'
+                })
+                
+            bambu_query = BambuPrinter.query.filter(
+                db.or_(BambuPrinter.name.ilike(f'%{q}%'), BambuPrinter.printer_model.ilike(f'%{q}%'))
+            ).limit(5).all()
+            for b in bambu_query:
+                results.append({
+                    'id': f'bambu_{b.id}', 'type': 'printer', 'title': b.name,
+                    'subtitle': f"Bambu {b.printer_model or ''}",
+                    'url': url_for('bambu_jobs'),
+                    'icon': 'fa-solid fa-cloud', 'color': '#14b8a6'
+                })
+                
+        return jsonify({'results': results})

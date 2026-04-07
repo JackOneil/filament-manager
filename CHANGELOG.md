@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- **Global Command Palette:** Added a global search layer (Ctrl+K) accessible from anywhere to instantly navigate through filaments, projects, and printers.
+- **Configurable Dashboard Widgets:** The overview page now supports resizable widgets (1 to 4 columns wide) to let users build a custom dashboard grid.
+- **Dashboard Widget Visibility:** Introduced a widget picker panel in the layout edit mode, allowing users to show or hide individual widget blocks based on their preference.
+- **New Dashboard Widgets:** Added widgets for "Spotřeba za posledních 7 dní" (7-day activity sparkline), "Nadcházející termíny" (upcoming project deadlines), and "Nejpoužívanější filamenty" (top turnover filaments).
 - **Configurable navigation palette:** Settings now include a new interface palette selector for the main menu and top app shell, with multiple color moods for the navigation area.
 
 ### Changed
+- **Navigation Redesign:** The entire application layout has been modernized to use a collapsed left sidebar that expands on hover (saving horizontal space) and a bottom tab bar for mobile screens, replacing the traditional top navigation.
 - **Main navigation compacted:** The top app bar now uses a denser layout with smaller vertical padding, tighter menu pills, and a more compact brand block so it takes less space on the screen.
 - **Main navigation motion reduced:** Removed the dropdown/menu animation from the main navigation to keep the header calmer and visually cleaner.
 - **Header branding simplified:** Removed the extra descriptive subtitle text from the main menu brand block.

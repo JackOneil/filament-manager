@@ -178,6 +178,43 @@ def _overview_focus(action_center, live_printers, now=None):
         .all()
     )
 
+    from utils import collect_usage_windows
+    
+    upcoming_deadlines = (
+        Project.query
+        .filter(
+            Project.status.in_(active_statuses),
+            Project.due_date.is_not(None),
+            Project.due_date >= today_start,
+        )
+        .order_by(Project.due_date.asc(), Project.created_at.desc())
+        .limit(6)
+        .all()
+    )
+
+    seven_days_ago = datetime.combine(now.date() - timedelta(days=6), datetime.min.time())
+    recent_movements = MovementHistory.query.filter(
+        MovementHistory.action_type.in_(('remove', 'bambu_print')),
+        MovementHistory.created_at >= seven_days_ago
+    ).all()
+    
+    usage_7d = [0.0] * 7
+    for row in recent_movements:
+        if row.weight:
+            row_date = (row.created_at or now).date()
+            days_ago = (now.date() - row_date).days
+            if 0 <= days_ago < 7:
+                 usage_7d[6 - days_ago] += row.weight
+                 
+    usage_windows = collect_usage_windows(Filament.query.all(), now=now)
+    top_turnover_month = []
+    for f in Filament.query.all():
+         usage = usage_windows.get(f.id, {}).get('usage_30', 0.0)
+         if usage > 0:
+             top_turnover_month.append({'filament': f, 'usage': usage})
+    top_turnover_month.sort(key=lambda x: x['usage'], reverse=True)
+    top_turnover_month = top_turnover_month[:5]
+
     urgent_items = []
     for item in action_center['low_stock'][:2]:
         urgent_items.append({
@@ -214,7 +251,10 @@ def _overview_focus(action_center, live_printers, now=None):
         'printing_total': sum(1 for project in active_projects if project.status == 'PRINTING'),
         'live_total': len(live_printers),
         'due_today': due_today,
+        'upcoming_deadlines': upcoming_deadlines,
         'active_projects': active_projects,
+        'usage_7d': usage_7d,
+        'top_turnover_month': top_turnover_month,
     }
 
 
