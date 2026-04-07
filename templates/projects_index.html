@@ -15,6 +15,9 @@
                 {% if owner_choices %}
                 <form method="GET" class="flex items-center gap-2">
                     <input type="hidden" name="sort_by" value="{{ sort_by }}">
+                    {% if client_filter %}
+                    <input type="hidden" name="client" value="{{ client_filter }}">
+                    {% endif %}
                     <select name="owner_id" onchange="this.form.submit()" class="border border-gray-300 rounded-xl px-3 py-2.5 bg-white">
                         <option value="">{{ t('project_owner_filter_all') }}</option>
                         {% for owner in owner_choices %}
@@ -174,9 +177,14 @@
                         <h2 class="text-xl font-bold mt-1">{{ t('projects_table_heading') }}</h2>
                     </div>
                     <div class="flex flex-wrap gap-2">
-                        <a href="{{ url_for('projects_index', sort_by='name') }}" class="ui-badge {% if sort_by == 'name' %}ui-badge-brand{% endif %}">{{ t('project_name') }}</a>
-                        <a href="{{ url_for('projects_index', sort_by='due_date') }}" class="ui-badge {% if sort_by == 'due_date' %}ui-badge-brand{% endif %}">{{ t('project_due_date') }}</a>
-                        <a href="{{ url_for('projects_index', sort_by='status') }}" class="ui-badge {% if sort_by == 'status' %}ui-badge-brand{% endif %}">{{ t('project_status') }}</a>
+                        {% if client_filter %}
+                        <a href="{{ projects_index_url(client=None, page=1) }}" class="ui-badge ui-badge-warning">
+                            <i class="fa-solid fa-filter-circle-xmark"></i> {{ t('filter_reset') }}
+                        </a>
+                        {% endif %}
+                        <a href="{{ projects_sort_urls['name'] }}" class="ui-badge {% if sort_by == 'name' %}ui-badge-brand{% endif %}">{{ t('project_name') }}</a>
+                        <a href="{{ projects_sort_urls['due_date'] }}" class="ui-badge {% if sort_by == 'due_date' %}ui-badge-brand{% endif %}">{{ t('project_due_date') }}</a>
+                        <a href="{{ projects_sort_urls['status'] }}" class="ui-badge {% if sort_by == 'status' %}ui-badge-brand{% endif %}">{{ t('project_status') }}</a>
                     </div>
                 </div>
                 <div class="overflow-x-auto">
@@ -203,16 +211,32 @@
                                     <div class="text-xs text-gray-500 mt-1">{{ t('project_owner') }}: {{ p.owner.name }}</div>
                                     {% endif %}
                                     {% if p.tag_text %}
-                                    <div class="flex flex-wrap gap-1 mt-2">
-                                        {% for tag in p.tag_text.split(',')[:3] %}
+                                    {% set tags = p.tag_text.split(',') %}
+                                    {% set ns = namespace(total=0) %}
+                                    {% for tag in tags %}
                                         {% if tag.strip() %}
-                                        <span class="ui-badge">{{ tag.strip() }}</span>
+                                            {% set ns.total = ns.total + 1 %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    <div class="flex flex-nowrap items-center gap-1 mt-2 overflow-hidden h-6">
+                                        {% for tag in tags[:2] %}
+                                        {% if tag.strip() %}
+                                        <span class="ui-badge max-w-28 truncate">{{ tag.strip() }}</span>
                                         {% endif %}
                                         {% endfor %}
+                                        {% if ns.total > 2 %}
+                                        <span class="ui-badge shrink-0">+{{ ns.total - 2 }}</span>
+                                        {% endif %}
                                     </div>
                                     {% endif %}
                                 </td>
-                                <td>{{ p.client_name or '-' }}</td>
+                                <td>
+                                    {% if p.client_name %}
+                                    <a href="{{ projects_index_url(client=p.client_name, page=1) }}" class="text-blue-600 hover:underline">{{ p.client_name }}</a>
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
                                 <td>{{ p.due_date.strftime('%d.%m.%Y') if p.due_date else '-' }}</td>
                                 <td>
                                     {% if p.status == 'PENDING_APPROVAL' %}

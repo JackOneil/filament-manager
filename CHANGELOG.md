@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+- **Configurable navigation palette:** Settings now include a new interface palette selector for the main menu and top app shell, with multiple color moods for the navigation area.
+
+### Changed
+- **Main navigation compacted:** The top app bar now uses a denser layout with smaller vertical padding, tighter menu pills, and a more compact brand block so it takes less space on the screen.
+- **Main navigation motion reduced:** Removed the dropdown/menu animation from the main navigation to keep the header calmer and visually cleaner.
+- **Header branding simplified:** Removed the extra descriptive subtitle text from the main menu brand block.
+
+## [1.52.3] - 2026-04-07
+### Changed
+- **User table headers are now clickable for sorting:** All columns in the user overview table (Name, Email, Role, Created, Last login, Status) are now clickable links that toggle ascending/descending sort. Active sort direction is indicated with up/down arrow icons. The Status column is now also a sortable field.
+
+### Fixed
+- **Status column sorting:** The user list now supports sorting by account active/inactive status, with null values handled consistently.
+
 ## [1.52.2] - 2026-04-05
 ### Added
 - **Initial remaining weight field on Add Filament form:** Users can now set a custom starting weight when adding a partially used spool (e.g. spool capacity 1000 g but only 500 g remaining). This avoids polluting usage statistics with a phantom subtract operation. The field is optional — when left empty, remaining weight defaults to full capacity × quantity.

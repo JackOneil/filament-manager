@@ -113,6 +113,7 @@ class AppSetting(db.Model):
     currency = db.Column(db.String(10), default='CZK')
     debug_logging = db.Column(db.Boolean, default=False)
     theme = db.Column(db.String(10), default='light')
+    nav_palette = db.Column(db.String(20), default='teal')
     view_mode = db.Column(db.String(10), default='card')
     items_per_page = db.Column(db.Integer, default=12)
     # Bambu Lab Cloud integration

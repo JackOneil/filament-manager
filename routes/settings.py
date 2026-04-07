@@ -147,6 +147,14 @@ def register(app):
                     setting.items_per_page = int(request.form['items_per_page'])
                     app.logger.debug(f"Items per page changed to: {setting.items_per_page}")
 
+                elif action == 'nav_palette':
+                    setting = AppSetting.query.first()
+                    palette = request.form.get('nav_palette', 'teal').strip().lower()
+                    if palette not in {'teal', 'slate', 'ocean', 'sunset'}:
+                        palette = 'teal'
+                    setting.nav_palette = palette
+                    app.logger.debug(f"Navigation palette changed to: {setting.nav_palette}")
+
                 elif action == 'debug_logging':
                     setting = AppSetting.query.first()
                     setting.debug_logging = request.form.get('debug_logging') == 'on'
@@ -342,6 +350,7 @@ def register(app):
                 'lang': setting.lang if setting else 'cs',
                 'currency': setting.currency if setting else 'CZK',
                 'theme': setting.theme if setting else 'light',
+                'nav_palette': setting.nav_palette if setting and setting.nav_palette else 'teal',
                 'view_mode': setting.view_mode if setting else 'card',
                 'items_per_page': setting.items_per_page if setting else 12,
                 'kwh_price': setting.kwh_price if setting else 5.0,
@@ -622,6 +631,7 @@ def register(app):
                         setting.lang = s.get('lang', setting.lang)
                         setting.currency = s.get('currency', setting.currency)
                         setting.theme = s.get('theme', setting.theme)
+                        setting.nav_palette = s.get('nav_palette', setting.nav_palette)
                         setting.view_mode = s.get('view_mode', setting.view_mode)
                         setting.items_per_page = s.get('items_per_page', setting.items_per_page)
                         setting.kwh_price = s.get('kwh_price', setting.kwh_price)

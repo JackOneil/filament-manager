@@ -114,12 +114,31 @@
                     <table class="min-w-full text-sm">
                         <thead>
                             <tr class="text-left text-gray-500 border-b border-gray-200">
-                                <th class="py-3 pr-4">{{ t('auth_name') }}</th>
-                                <th class="py-3 pr-4">{{ t('auth_email') }}</th>
-                                <th class="py-3 pr-4">{{ t('users_role') }}</th>
-                                <th class="py-3 pr-4">{{ t('users_created_at') }}</th>
-                                <th class="py-3 pr-4">{{ t('users_last_login_at') }}</th>
-                                <th class="py-3 pr-4">{{ t('users_status') }}</th>
+                                {% set sort_fields = [
+                                    ('name', 'auth_name'),
+                                    ('email', 'auth_email'),
+                                    ('role', 'users_role'),
+                                    ('created_at', 'users_created_at'),
+                                    ('last_login_at', 'users_last_login_at'),
+                                    ('is_active', 'users_status'),
+                                ] %}
+                                {% for field, label_key in sort_fields %}
+                                <th class="py-3 pr-4">
+                                    <a href="{{ url_for('users_index', q=filters.q, role=filters.role, status=filters.status, sort_by=field, sort_direction='asc' if (filters.sort_by == field and filters.sort_direction != 'asc') else 'desc') }}"
+                                       class="inline-flex items-center gap-1 hover:text-gray-800 transition-colors">
+                                        {{ t(label_key) }}
+                                        {% if filters.sort_by == field %}
+                                            {% if filters.sort_direction == 'asc' %}
+                                                <i class="fas fa-sort-up text-gray-700"></i>
+                                            {% else %}
+                                                <i class="fas fa-sort-down text-gray-700"></i>
+                                            {% endif %}
+                                        {% else %}
+                                            <i class="fas fa-sort text-gray-300"></i>
+                                        {% endif %}
+                                    </a>
+                                </th>
+                                {% endfor %}
                                 <th class="py-3 text-right">{{ t('detail') }}</th>
                             </tr>
                         </thead>

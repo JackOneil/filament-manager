@@ -173,9 +173,10 @@ def register(app):
             'created_at': User.created_at,
             'last_login_at': User.last_login_at,
             'role': User.role,
+            'is_active': User.is_active,
         }
         order_expr = sort_map.get(sort_by, User.created_at)
-        if sort_by == 'role':
+        if sort_by in ('role', 'is_active'):
             users_query = users_query.order_by(order_expr.desc() if sort_direction == 'desc' else order_expr.asc(), User.name.asc())
         else:
             null_rank = db.case((order_expr.is_(None), 1), else_=0)

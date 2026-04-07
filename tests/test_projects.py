@@ -111,3 +111,19 @@ class ProjectSortingTests(unittest.TestCase):
         self.assertIn('Paged Project 00', html)
         self.assertNotIn('Paged Project 12', html)
         self.assertIn('?sort_by=name&amp;page=2', html)
+
+    def test_project_client_is_rendered_as_filter_link(self):
+        with self.app.app_context():
+            db.session.add(Project(name='Client Filter Project', client_name='ACME Studio'))
+            db.session.commit()
+
+        response = self.client.get('/projects?sort_by=name')
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode('utf-8')
+        self.assertIn('>ACME Studio</a>', html)
+        self.assertIn('?sort_by=name&amp;page=1&amp;client=ACME+Studio', html)
+
+        filtered_response = self.client.get('/projects?sort_by=name&client=ACME+Studio')
+        self.assertEqual(filtered_response.status_code, 200)
+        filtered_html = filtered_response.data.decode('utf-8')
+        self.assertIn('Zrušit filtry', filtered_html)

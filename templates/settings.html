@@ -98,6 +98,18 @@
                     </form>
 
                     <form method="POST" class="flex flex-col gap-1.5 border border-gray-100 bg-gray-50 p-3 rounded-lg shadow-sm">
+                        <input type="hidden" name="action" value="nav_palette">
+                        <label class="font-semibold text-gray-600 text-sm flex items-center gap-2"><i class="fa-solid fa-swatchbook text-gray-400 w-4 text-center"></i> {{ t('nav_palette_label') }}:</label>
+                        <select name="nav_palette" onchange="this.form.submit()" class="border-gray-300 rounded px-2 py-1 text-sm focus:ring-blue-500 w-full outline-none">
+                            <option value="teal" {% if not app_settings or app_settings.nav_palette == 'teal' %}selected{% endif %}>{{ t('nav_palette_teal') }}</option>
+                            <option value="slate" {% if app_settings and app_settings.nav_palette == 'slate' %}selected{% endif %}>{{ t('nav_palette_slate') }}</option>
+                            <option value="ocean" {% if app_settings and app_settings.nav_palette == 'ocean' %}selected{% endif %}>{{ t('nav_palette_ocean') }}</option>
+                            <option value="sunset" {% if app_settings and app_settings.nav_palette == 'sunset' %}selected{% endif %}>{{ t('nav_palette_sunset') }}</option>
+                        </select>
+                        <p class="text-xs text-gray-400 mt-1">{{ t('nav_palette_desc') }}</p>
+                    </form>
+
+                    <form method="POST" class="flex flex-col gap-1.5 border border-gray-100 bg-gray-50 p-3 rounded-lg shadow-sm">
                         <input type="hidden" name="action" value="items_per_page">
                         <label class="font-semibold text-gray-600 text-sm flex items-center gap-2"><i class="fa-solid fa-list-ol text-gray-400 w-4 text-center"></i> {{ t('items_per_page') }}:</label>
                         <select name="items_per_page" onchange="this.form.submit()" class="border-gray-300 rounded px-2 py-1 text-sm focus:ring-blue-500 w-full outline-none">
@@ -138,10 +150,19 @@
                             <input type="text" name="name" value="{{ b.name }}" class="bg-transparent border-b border-transparent focus:border-blue-300 outline-none font-medium text-gray-700 w-full text-sm">
                             <button type="submit" class="hidden group-hover:block text-blue-500 hover:text-blue-700 mx-1 flex-shrink-0" title="{{ t('edit') }}"><i class="fa-solid fa-save"></i></button>
                         </div>
-                        <input type="text" name="shop_url" value="{{ b.shop_url or '' }}"
-                               placeholder="{{ t('brand_shop_url_placeholder') }}"
-                               class="bg-transparent border-b border-transparent focus:border-blue-200 outline-none text-gray-400 text-xs w-full">
-                        <p class="text-[10px] text-gray-300 mt-0.5">{{ t('brand_shop_url_hint') }}</p>
+                        <details class="group/details">
+                            <div class="flex items-center gap-2">
+                                <input type="text" name="shop_url" value="{{ b.shop_url or '' }}"
+                                       placeholder="{{ t('brand_shop_url_placeholder') }}"
+                                       class="bg-transparent border-b border-transparent focus:border-blue-200 outline-none text-gray-400 text-xs w-full min-w-0">
+                                <summary class="list-none cursor-pointer text-gray-300 hover:text-blue-500 transition-colors flex-shrink-0" title="{{ t('brand_shop_url_hint') }}">
+                                    <i class="fa-solid fa-circle-info text-xs"></i>
+                                </summary>
+                            </div>
+                            <div class="hidden group-open/details:block mt-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-[11px] leading-4 text-blue-800">
+                                {{ t('brand_shop_url_hint') }}
+                            </div>
+                        </details>
                     </form>
                     <span class="text-gray-400 text-xs whitespace-nowrap pt-1 ml-1 {% if b.filaments|length == 0 %}group-hover:hidden{% endif %}">{{ b.filaments|length }}</span>
                     {% if b.filaments|length == 0 %}

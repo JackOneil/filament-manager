@@ -665,33 +665,23 @@ async function doSync() {
 (function() {
     var KEY = 'bambu_hide_failed';
     var btn = document.getElementById('toggle-hide-failed');
-    if (!btn) return;
-    btn.addEventListener('click', function() {
-        localStorage.setItem(KEY, btn.dataset.nextHideFailed || '0');
-    });
     var params = new URLSearchParams(window.location.search);
-    var stored = localStorage.getItem(KEY);
     var hiddenNow = {{ 'true' if hide_failed else 'false' }};
 
-    /* Explicit URL state wins and becomes the remembered preference. */
-    if (params.has('hide_failed')) {
-        localStorage.setItem(KEY, '1');
+    if (!btn) {
+        localStorage.setItem(KEY, hiddenNow ? '1' : '0');
         return;
     }
 
-    /* On fresh navigation (no hide_failed in URL), restore remembered preference. */
-    if (stored === '1') {
-        params.set('hide_failed', '1');
-        var targetQuery = params.toString();
-        var targetUrl = window.location.pathname + (targetQuery ? '?' + targetQuery : '');
-        var currentUrl = window.location.pathname + window.location.search;
-        if (targetUrl !== currentUrl) {
-            window.location.replace(targetUrl);
-            return;
-        }
-    }
+    btn.addEventListener('click', function() {
+        localStorage.setItem(KEY, btn.dataset.nextHideFailed || '0');
+    });
 
-    localStorage.setItem(KEY, hiddenNow ? '1' : '0');
+    if (params.has('hide_failed')) {
+        localStorage.setItem(KEY, params.get('hide_failed') === '1' ? '1' : '0');
+    } else {
+        localStorage.setItem(KEY, hiddenNow ? '1' : '0');
+    }
 })();
 </script>
 {% endblock %}

@@ -260,6 +260,10 @@ def register(app):
         setting = AppSetting.query.first()
         per_page = setting.items_per_page if setting and setting.items_per_page in [12, 24, 48, 96] else 12
         base_query = _project_scope()
+        client_filter = request.args.get('client', '').strip()
+
+        if client_filter:
+            base_query = base_query.filter(Project.client_name.ilike(f'%{client_filter}%'))
 
         if sort_by == 'name':
             order_expr = [Project.name.asc()]
@@ -293,6 +297,7 @@ def register(app):
                 'sort_by': sort_by,
                 'page': page,
                 'owner_id': request.args.get('owner_id', type=int),
+                'client': client_filter or None,
                 **{field: request.args.get(field, 1, type=int) for field in status_page_fields.values()},
             }
             params.update(overrides)
@@ -365,6 +370,7 @@ def register(app):
             'projects_index.html',
             projects=projects,
             sort_by=sort_by,
+            client_filter=client_filter,
             per_page=per_page,
             project_metrics=project_metrics,
             projects_by_status=projects_by_status,
@@ -372,6 +378,12 @@ def register(app):
             project_page_urls=project_page_urls,
             projects_prev_url=_projects_index_url(page=projects.prev_num) if projects.has_prev else '#',
             projects_next_url=_projects_index_url(page=projects.next_num) if projects.has_next else '#',
+            projects_sort_urls={
+                'name': _projects_index_url(sort_by='name', page=1),
+                'due_date': _projects_index_url(sort_by='due_date', page=1),
+                'status': _projects_index_url(sort_by='status', page=1),
+            },
+            projects_index_url=_projects_index_url,
             owner_choices=_project_owner_choices(),
             selected_owner_id=request.args.get('owner_id', type=int),
             now=datetime.utcnow(),

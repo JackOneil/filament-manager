@@ -6,21 +6,46 @@
     <meta name="theme-color" content="#2563eb">
     <link rel="manifest" href="{{ url_for('pwa.manifest') }}">
     <title>{{ t('title') }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+                    },
+                },
+            },
+        };
+    </script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         [x-cloak] { display: none !important; }
         :root {
-            --ui-bg: #f3f4f6;
-            --ui-surface: #ffffff;
-            --ui-surface-soft: #f8fafc;
-            --ui-border: #e5e7eb;
-            --ui-border-strong: #cbd5e1;
-            --ui-text: #111827;
-            --ui-text-muted: #6b7280;
-            --ui-brand: #2563eb;
-            --ui-brand-soft: #dbeafe;
+            --ui-bg: #eef4ff;
+            --ui-bg-accent: rgba(14, 165, 233, 0.10);
+            --ui-surface: rgba(255, 255, 255, 0.88);
+            --ui-surface-strong: rgba(255, 255, 255, 0.97);
+            --ui-surface-soft: rgba(248, 250, 252, 0.92);
+            --ui-border: rgba(148, 163, 184, 0.22);
+            --ui-border-strong: rgba(100, 116, 139, 0.35);
+            --ui-text: #0f172a;
+            --ui-text-muted: #64748b;
+            --ui-brand: #0f766e;
+            --ui-brand-strong: #115e59;
+            --ui-brand-soft: rgba(13, 148, 136, 0.12);
+            --ui-brand-ring: rgba(13, 148, 136, 0.18);
+            --ui-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+            --ui-shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.05);
+            --nav-grad-start: rgba(15, 23, 42, 0.84);
+            --nav-grad-end: rgba(15, 118, 110, 0.78);
+            --nav-accent-soft: rgba(94, 234, 212, 0.18);
+            --nav-accent-border: rgba(94, 234, 212, 0.28);
+            --nav-accent-text: #d1fae5;
             --status-critical-bg: #fef2f2;
             --status-critical-text: #b91c1c;
             --status-critical-border: #fecaca;
@@ -32,15 +57,26 @@
             --status-success-border: #a7f3d0;
         }
         html.dark {
-            --ui-bg: #0f172a;
-            --ui-surface: #111827;
-            --ui-surface-soft: #1f2937;
-            --ui-border: #374151;
-            --ui-border-strong: #4b5563;
-            --ui-text: #f3f4f6;
+            --ui-bg: #07111f;
+            --ui-bg-accent: rgba(45, 212, 191, 0.08);
+            --ui-surface: rgba(15, 23, 42, 0.78);
+            --ui-surface-strong: rgba(15, 23, 42, 0.94);
+            --ui-surface-soft: rgba(30, 41, 59, 0.82);
+            --ui-border: rgba(148, 163, 184, 0.16);
+            --ui-border-strong: rgba(148, 163, 184, 0.24);
+            --ui-text: #e5eefb;
             --ui-text-muted: #94a3b8;
-            --ui-brand: #60a5fa;
-            --ui-brand-soft: rgba(96, 165, 250, 0.16);
+            --ui-brand: #5eead4;
+            --ui-brand-strong: #99f6e4;
+            --ui-brand-soft: rgba(45, 212, 191, 0.12);
+            --ui-brand-ring: rgba(94, 234, 212, 0.18);
+            --ui-shadow: 0 20px 50px rgba(2, 8, 23, 0.42);
+            --ui-shadow-soft: 0 12px 34px rgba(2, 8, 23, 0.28);
+            --nav-grad-start: rgba(8, 15, 27, 0.88);
+            --nav-grad-end: rgba(15, 118, 110, 0.30);
+            --nav-accent-soft: rgba(94, 234, 212, 0.14);
+            --nav-accent-border: rgba(94, 234, 212, 0.20);
+            --nav-accent-text: #ccfbf1;
             --status-critical-bg: rgba(127, 29, 29, 0.35);
             --status-critical-text: #fca5a5;
             --status-critical-border: rgba(248, 113, 113, 0.3);
@@ -51,12 +87,25 @@
             --status-success-text: #6ee7b7;
             --status-success-border: rgba(16, 185, 129, 0.28);
         }
+        html {
+            scroll-behavior: smooth;
+        }
         body {
             background:
-                radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 30%),
-                linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 25%),
+                radial-gradient(circle at top left, rgba(14, 165, 233, 0.18), transparent 30%),
+                radial-gradient(circle at top right, rgba(13, 148, 136, 0.12), transparent 28%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 28%),
                 var(--ui-bg);
             color: var(--ui-text);
+            font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+            min-height: 100vh;
+        }
+        html.dark body {
+            background:
+                radial-gradient(circle at top left, rgba(45, 212, 191, 0.10), transparent 28%),
+                radial-gradient(circle at top right, rgba(56, 189, 248, 0.08), transparent 26%),
+                linear-gradient(180deg, rgba(15, 23, 42, 0.3), transparent 24%),
+                var(--ui-bg) !important;
         }
         .ui-card,
         .ui-panel,
@@ -64,19 +113,30 @@
         .ui-table-shell {
             background: var(--ui-surface);
             border: 1px solid var(--ui-border);
-            border-radius: 1rem;
-            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+            border-radius: 1.15rem;
+            box-shadow: var(--ui-shadow-soft);
+            backdrop-filter: blur(18px);
         }
         .ui-panel {
             padding: 1.5rem;
         }
         .ui-filter-panel {
-            padding: 1rem 1.25rem;
+            padding: 1.1rem 1.3rem;
         }
         .ui-card-soft {
             background: var(--ui-surface-soft);
             border: 1px solid var(--ui-border);
-            border-radius: 0.9rem;
+            border-radius: 1rem;
+        }
+        .ui-card-hover,
+        .ui-panel-hover {
+            transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background-color 180ms ease;
+        }
+        .ui-card-hover:hover,
+        .ui-panel-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--ui-shadow);
+            border-color: var(--ui-border-strong);
         }
         .dark-surface-muted {
             background: var(--ui-surface-soft);
@@ -90,18 +150,19 @@
         }
         .ui-kpi {
             padding: 1.25rem;
-            border-radius: 1rem;
-            background: linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.92));
+            border-radius: 1.15rem;
+            background: linear-gradient(180deg, rgba(255,255,255,0.78), rgba(255,255,255,0.98));
             border: 1px solid var(--ui-border);
-            box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05);
+            box-shadow: var(--ui-shadow-soft);
+            backdrop-filter: blur(18px);
         }
         html.dark .ui-kpi {
-            background: linear-gradient(180deg, rgba(17,24,39,0.95), rgba(17,24,39,0.85));
+            background: linear-gradient(180deg, rgba(15,23,42,0.88), rgba(15,23,42,0.72));
         }
         .ui-label {
             font-size: 0.72rem;
-            font-weight: 700;
-            letter-spacing: 0.08em;
+            font-weight: 800;
+            letter-spacing: 0.14em;
             text-transform: uppercase;
             color: var(--ui-text-muted);
         }
@@ -109,13 +170,18 @@
             display: inline-flex;
             align-items: center;
             gap: 0.35rem;
-            padding: 0.35rem 0.7rem;
+            padding: 0.42rem 0.78rem;
             border-radius: 9999px;
             border: 1px solid var(--ui-border);
             background: var(--ui-surface-soft);
             color: var(--ui-text);
             font-size: 0.72rem;
             font-weight: 700;
+            transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
+        }
+        .ui-badge:hover {
+            transform: translateY(-1px);
+            border-color: var(--ui-border-strong);
         }
         .ui-badge-critical {
             background: var(--status-critical-bg);
@@ -135,7 +201,60 @@
         .ui-badge-brand {
             background: var(--ui-brand-soft);
             color: var(--ui-brand);
-            border-color: rgba(37, 99, 235, 0.18);
+            border-color: var(--ui-brand-ring);
+        }
+        .ui-input,
+        .ui-select,
+        .ui-textarea {
+            width: 100%;
+            border-radius: 0.95rem;
+            border: 1px solid var(--ui-border);
+            background: var(--ui-surface-strong);
+            color: var(--ui-text);
+            padding: 0.72rem 0.95rem;
+            transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+        }
+        .ui-input:focus,
+        .ui-select:focus,
+        .ui-textarea:focus {
+            outline: none;
+            border-color: var(--ui-brand);
+            box-shadow: 0 0 0 4px var(--ui-brand-ring);
+        }
+        .ui-button-primary,
+        .ui-button-secondary,
+        .ui-button-ghost {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+            border-radius: 9999px;
+            font-weight: 700;
+            transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+        }
+        .ui-button-primary {
+            background: linear-gradient(135deg, var(--ui-brand), var(--ui-brand-strong));
+            color: white;
+            padding: 0.78rem 1.15rem;
+            box-shadow: 0 14px 30px rgba(13, 148, 136, 0.18);
+        }
+        .ui-button-secondary {
+            background: var(--ui-surface-strong);
+            border: 1px solid var(--ui-border);
+            color: var(--ui-text);
+            padding: 0.72rem 1rem;
+            box-shadow: var(--ui-shadow-soft);
+        }
+        .ui-button-ghost {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--ui-text-muted);
+            padding: 0.72rem 1rem;
+        }
+        .ui-button-primary:hover,
+        .ui-button-secondary:hover,
+        .ui-button-ghost:hover {
+            transform: translateY(-1px);
         }
         .ui-table {
             width: 100%;
@@ -156,6 +275,118 @@
         .ui-table tbody tr:hover {
             background: rgba(148, 163, 184, 0.08);
         }
+        .app-shell {
+            width: min(1500px, calc(100vw - 2rem));
+            margin: 0 auto;
+        }
+        .app-topbar {
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            padding: 0.5rem 0 0.2rem;
+        }
+        .app-topbar-inner {
+            background: linear-gradient(135deg, var(--nav-grad-start), var(--nav-grad-end));
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+            backdrop-filter: blur(18px);
+            border-radius: 1.2rem;
+            padding: 0.7rem 0.85rem;
+        }
+        html.dark .app-topbar-inner {
+            background: linear-gradient(135deg, var(--nav-grad-start), var(--nav-grad-end));
+            border-color: rgba(148, 163, 184, 0.14);
+        }
+        .app-brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.9rem;
+            min-width: 0;
+        }
+        .app-brand-mark {
+            width: 2.2rem;
+            height: 2.2rem;
+            border-radius: 0.8rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, rgba(94, 234, 212, 0.24), rgba(255,255,255,0.08));
+            border: 1px solid rgba(255,255,255,0.14);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+        }
+        .app-brand-overline {
+            font-size: 0.65rem;
+            font-weight: 800;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: rgba(226, 232, 240, 0.72);
+        }
+        .app-brand-title {
+            color: white;
+            font-size: 1rem;
+            font-weight: 800;
+            line-height: 1.1;
+        }
+        .app-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .app-search-trigger {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.7rem;
+            min-width: 14rem;
+            padding: 0.56rem 0.78rem;
+            border-radius: 9999px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.10);
+            color: rgba(241, 245, 249, 0.92);
+        }
+        .app-search-trigger:hover {
+            background: rgba(255,255,255,0.12);
+            border-color: rgba(255,255,255,0.18);
+        }
+        .app-search-kbd {
+            margin-left: auto;
+            border-radius: 9999px;
+            border: 1px solid rgba(255,255,255,0.14);
+            background: rgba(255,255,255,0.08);
+            padding: 0.15rem 0.45rem;
+            font-size: 0.68rem;
+            color: rgba(255,255,255,0.70);
+        }
+        .app-nav-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.7rem;
+        }
+        .nav-menu-button,
+        .nav-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+            padding: 0.56rem 0.78rem;
+            border-radius: 9999px;
+            background: rgba(255,255,255,0.08);
+            color: white;
+            font-weight: 700;
+            border: 1px solid rgba(255,255,255,0.08);
+            line-height: 1;
+        }
+        .nav-menu-button:hover,
+        .nav-pill:hover {
+            background: rgba(255,255,255,0.13);
+            border-color: rgba(255,255,255,0.14);
+        }
+        .nav-pill-active,
+        .nav-menu-button-active {
+            background: var(--nav-accent-soft);
+            border-color: var(--nav-accent-border);
+            color: var(--nav-accent-text);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+        }
         .nav-group-label {
             font-size: 0.68rem;
             font-weight: 700;
@@ -163,72 +394,166 @@
             text-transform: uppercase;
             color: rgba(219, 234, 254, 0.8);
         }
-        .nav-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 0.8rem;
-            border-radius: 9999px;
-            color: white;
-            transition: background-color 150ms ease, color 150ms ease;
-        }
-        .nav-pill:hover {
-            background: rgba(255,255,255,0.14);
-        }
-        .nav-menu-button {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.55rem;
-            padding: 0.7rem 0.95rem;
-            border-radius: 9999px;
-            background: rgba(255,255,255,0.1);
-            color: white;
-            font-weight: 700;
-            transition: background-color 150ms ease;
-        }
-        .nav-menu-button:hover {
-            background: rgba(255,255,255,0.18);
-        }
         .nav-menu-panel {
-            background: rgba(255,255,255,0.98);
-            color: #0f172a;
-            border-radius: 1rem;
-            border: 1px solid rgba(148, 163, 184, 0.22);
-            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+            background: var(--ui-surface-strong);
+            color: var(--ui-text);
+            border-radius: 1.2rem;
+            border: 1px solid var(--ui-border);
+            box-shadow: var(--ui-shadow);
+            backdrop-filter: blur(18px);
         }
         .nav-menu-link {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 1rem;
-            padding: 0.9rem 1rem;
-            border-radius: 0.9rem;
-            color: #0f172a;
-            transition: background-color 150ms ease, color 150ms ease;
+            padding: 0.78rem 0.9rem;
+            border-radius: 1rem;
+            color: var(--ui-text);
         }
         .nav-menu-link:hover {
-            background: rgba(37, 99, 235, 0.08);
-            color: #1d4ed8;
+            background: var(--ui-brand-soft);
+            color: var(--ui-brand-strong);
         }
         .nav-menu-note {
             font-size: 0.74rem;
-            color: #64748b;
+            color: var(--ui-text-muted);
             margin-top: 0.2rem;
+        }
+        .app-page {
+            padding: 1rem 0 2rem;
+        }
+        .app-surface {
+            position: relative;
+            padding: 1.2rem;
+            border-radius: 1.8rem;
+            background: linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,255,255,0.08));
+            border: 1px solid rgba(255,255,255,0.18);
+            box-shadow: 0 30px 60px rgba(15, 23, 42, 0.10);
+        }
+        html.dark .app-surface {
+            background: linear-gradient(180deg, rgba(15,23,42,0.34), rgba(15,23,42,0.18));
+            border-color: rgba(148,163,184,0.08);
+            box-shadow: 0 30px 60px rgba(2, 8, 23, 0.30);
         }
         .page-hero {
             display: flex;
             flex-direction: column;
-            gap: 0.5rem;
-            margin-bottom: 1.5rem;
+            gap: 0.7rem;
+            margin-bottom: 1.8rem;
         }
         .page-hero h1 {
-            font-size: 1.875rem;
-            line-height: 2.25rem;
+            font-size: clamp(2rem, 4vw, 2.8rem);
+            line-height: 1.05;
             font-weight: 800;
             color: var(--ui-text);
+            letter-spacing: -0.04em;
         }
         .page-hero p {
             color: var(--ui-text-muted);
+            font-size: 1rem;
+            max-width: 52rem;
+        }
+        .ui-empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.85rem;
+            text-align: center;
+            min-height: 12rem;
+            padding: 2.25rem 1.5rem;
+            background: var(--ui-surface);
+            border: 1px dashed var(--ui-border-strong);
+            border-radius: 1.35rem;
+            color: var(--ui-text-muted);
+            backdrop-filter: blur(16px);
+        }
+        .ui-command-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 60;
+            background: rgba(15, 23, 42, 0.42);
+            backdrop-filter: blur(10px);
+        }
+        .ui-command-panel {
+            width: min(42rem, calc(100vw - 1.5rem));
+            max-height: min(80vh, 42rem);
+            overflow: hidden;
+            border-radius: 1.6rem;
+            border: 1px solid var(--ui-border);
+            background: var(--ui-surface-strong);
+            box-shadow: var(--ui-shadow);
+            backdrop-filter: blur(22px);
+        }
+        .ui-command-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.9rem 1rem;
+            border-radius: 1rem;
+            transition: background-color 180ms ease, transform 180ms ease, color 180ms ease;
+        }
+        .ui-command-item:hover {
+            background: var(--ui-brand-soft);
+            color: var(--ui-brand-strong);
+            transform: translateY(-1px);
+        }
+        .ui-command-item-note {
+            color: var(--ui-text-muted);
+            font-size: 0.82rem;
+            margin-top: 0.15rem;
+        }
+        [data-animate] {
+            animation: page-enter 360ms ease both;
+        }
+        .ui-skeleton {
+            position: relative;
+            overflow: hidden;
+        }
+        .ui-skeleton::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent);
+            transform: translateX(-100%);
+            animation: shimmer 1.8s infinite;
+        }
+        html.dark .ui-skeleton::after {
+            background: linear-gradient(90deg, transparent, rgba(148,163,184,0.18), transparent);
+        }
+        @keyframes page-enter {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        @keyframes shimmer {
+            to {
+                transform: translateX(100%);
+            }
+        }
+        @media (max-width: 767px) {
+            .app-shell {
+                width: min(100vw - 1rem, 1500px);
+            }
+            .app-topbar-inner {
+                border-radius: 1.05rem;
+                padding: 0.7rem;
+            }
+            .app-search-trigger {
+                min-width: 0;
+                width: 100%;
+            }
+            .app-surface {
+                padding: 0.85rem;
+                border-radius: 1.35rem;
+            }
         }
         .dashboard-widget {
             position: relative;
@@ -382,11 +707,6 @@
         html.dark .text-green-700 { color: #059669; }
         html.dark .bg-gradient-to-b.from-blue-50 { background: linear-gradient(to bottom, #0c4a6e, #1f2937) !important; }
 
-        /* Dark mode: fix body gradient (white-top gradient looks bad on dark backgrounds) */
-        html.dark body {
-            background: var(--ui-bg) !important;
-        }
-
         /* Dark mode: flash / toast messages */
         html.dark .bg-red-50\/95 { background-color: rgba(127, 29, 29, 0.95) !important; }
         html.dark .bg-green-50\/95 { background-color: rgba(6, 78, 59, 0.95) !important; }
@@ -460,192 +780,251 @@
         }
         html.dark .nav-menu-note { color: #94a3b8; }
     </style>
+    <style>
+        {% if nav_palette == 'slate' %}
+        :root {
+            --nav-grad-start: rgba(15, 23, 42, 0.88);
+            --nav-grad-end: rgba(51, 65, 85, 0.82);
+            --nav-accent-soft: rgba(203, 213, 225, 0.14);
+            --nav-accent-border: rgba(203, 213, 225, 0.20);
+            --nav-accent-text: #e2e8f0;
+        }
+        {% elif nav_palette == 'ocean' %}
+        :root {
+            --nav-grad-start: rgba(8, 47, 73, 0.90);
+            --nav-grad-end: rgba(3, 105, 161, 0.82);
+            --nav-accent-soft: rgba(125, 211, 252, 0.16);
+            --nav-accent-border: rgba(125, 211, 252, 0.24);
+            --nav-accent-text: #e0f2fe;
+        }
+        {% elif nav_palette == 'sunset' %}
+        :root {
+            --nav-grad-start: rgba(67, 20, 7, 0.92);
+            --nav-grad-end: rgba(180, 83, 9, 0.80);
+            --nav-accent-soft: rgba(253, 186, 116, 0.16);
+            --nav-accent-border: rgba(253, 186, 116, 0.24);
+            --nav-accent-text: #ffedd5;
+        }
+        {% endif %}
+    </style>
     <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>
-<body class="bg-gray-100 font-sans text-gray-800 flex flex-col min-h-screen">
-    <nav class="bg-blue-600 text-white shadow-lg relative z-20">
-        <div class="container mx-auto px-6 py-4 flex flex-wrap justify-between items-center gap-4">
-            <a href="{{ url_for('index') }}" class="text-xl md:text-2xl font-bold flex items-center gap-2">
-                <i class="fa-solid fa-layer-group"></i> {{ t('title') }}
-            </a>
-
-            <button id="mobile-menu-btn" class="md:hidden flex items-center p-2 rounded hover:bg-blue-700 transition" aria-label="Toggle Menu">
-                <i class="fa-solid fa-bars text-xl"></i>
-            </button>
-            <div id="nav-links" class="hidden w-full md:flex md:w-auto flex-col md:flex-row md:items-center mt-4 md:mt-0 space-y-4 md:space-y-0 md:gap-4 pb-2 md:pb-0">
-                {% if current_user %}
-                <div class="flex flex-col md:flex-row md:items-center gap-3 w-full md:w-auto">
-                    {% if auth_has_section_access('overview') or auth_is_admin(current_user) %}
-                    <div class="relative" x-data="{ open: false }">
-                        <button type="button" @click="open = !open" class="nav-menu-button w-full md:w-auto">
-                            <i class="fa-solid fa-boxes-stacked"></i> {{ t('inventory_nav') }}
-                            <i class="fa-solid fa-chevron-down text-xs opacity-70"></i>
-                        </button>
-                        <div x-show="open" x-cloak @click.outside="open = false" class="nav-menu-panel mt-2 md:absolute md:left-0 md:top-full md:w-80 p-3 space-y-2">
-                            <a href="{{ url_for('index') }}" class="nav-menu-link">
-                                <span><i class="fa-solid fa-house mr-2"></i>{{ t('overview') }}<div class="nav-menu-note">{{ t('nav_inventory_overview_note') }}</div></span>
-                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
-                            </a>
-                            {% if auth_has_section_access('filaments') or auth_is_admin(current_user) %}
-                            <a href="{{ url_for('filaments_index') }}" class="nav-menu-link">
-                                <span><i class="fa-solid fa-layer-group mr-2"></i>{{ t('filaments_nav') }}<div class="nav-menu-note">{{ t('nav_filaments_note') }}</div></span>
-                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
-                            </a>
-                            {% endif %}
-                            {% if auth_has_section_access('storage') or auth_is_admin(current_user) %}
-                            <a href="{{ url_for('storage') }}" class="nav-menu-link">
-                                <span><i class="fa-solid fa-warehouse mr-2"></i>{{ t('storage_nav') }}<div class="nav-menu-note">{{ t('nav_storage_note') }}</div></span>
-                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
-                            </a>
-                            {% endif %}
-                            {% if auth_has_section_access('history') or auth_is_admin(current_user) %}
-                            <a href="{{ url_for('history') }}" class="nav-menu-link">
-                                <span><i class="fa-solid fa-clock-rotate-left mr-2"></i>{{ t('movement_history') }}<div class="nav-menu-note">{{ t('nav_history_note') }}</div></span>
-                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
-                            </a>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    {% if auth_has_section_access('projects') or auth_is_admin(current_user) %}
-                    <div class="relative" x-data="{ open: false }">
-                        <button type="button" @click="open = !open" class="nav-menu-button w-full md:w-auto">
-                            <i class="fa-solid fa-diagram-project"></i> {{ t('projects') }}
-                            <i class="fa-solid fa-chevron-down text-xs opacity-70"></i>
-                        </button>
-                        <div x-show="open" x-cloak @click.outside="open = false" class="nav-menu-panel mt-2 md:absolute md:left-0 md:top-full md:w-80 p-3 space-y-2">
-                            <a href="{{ url_for('projects_index') }}" class="nav-menu-link">
-                                <span><i class="fa-solid fa-diagram-project mr-2"></i>{{ t('projects') }}<div class="nav-menu-note">{{ t('nav_projects_note') }}</div></span>
-                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
-                            </a>
-                            <a href="{{ url_for('project_create') }}" class="nav-menu-link">
-                                <span><i class="fa-solid fa-plus mr-2"></i>{{ t('project_create') }}<div class="nav-menu-note">{{ t('nav_project_create_note') }}</div></span>
-                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
-                            </a>
-                            {% if auth_has_section_access('calculator') or auth_is_admin(current_user) %}
-                            <a href="{{ url_for('calculator') }}" class="nav-menu-link">
-                                <span><i class="fa-solid fa-calculator mr-2"></i>{{ t('calculator') }}<div class="nav-menu-note">{{ t('nav_calculator_note') }}</div></span>
-                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
-                            </a>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    {% if auth_has_section_access('printers') or auth_is_admin(current_user) %}
-                    <div class="relative" x-data="{ open: false }">
-                        <button type="button" @click="open = !open" class="nav-menu-button w-full md:w-auto">
-                            <i class="fa-solid fa-print"></i> {{ t('printers_nav') }}
-                            <i class="fa-solid fa-chevron-down text-xs opacity-70"></i>
-                        </button>
-                        <div x-show="open" x-cloak @click.outside="open = false" class="nav-menu-panel mt-2 md:absolute md:left-0 md:top-full md:w-80 p-3 space-y-2">
-                            {% if nav_bambu_enabled %}
-                            <a href="{{ url_for('bambu_jobs') }}" class="nav-menu-link">
-                                <span><i class="fa-solid fa-print mr-2"></i>{{ t('bambu_jobs') }}<div class="nav-menu-note">{{ t('nav_bambu_note') }}</div></span>
-                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
-                            </a>
-                            {% endif %}
-                            {% if nav_prusa_enabled %}
-                            <a href="{{ url_for('prusa_jobs') }}" class="nav-menu-link">
-                                <span><i class="fa-solid fa-3d-print mr-2"></i>{{ t('prusa_jobs') }}<div class="nav-menu-note">{{ t('nav_prusa_note') }}</div></span>
-                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
-                            </a>
-                            {% endif %}
-                            {% if not nav_bambu_enabled and not nav_prusa_enabled and (auth_has_section_access('settings') or auth_is_admin(current_user)) %}
-                            <a href="{{ url_for('settings') }}#bambu-cloud" class="nav-menu-link">
-                                <span><i class="fa-solid fa-plug-circle-plus mr-2"></i>{{ t('settings') }}<div class="nav-menu-note">{{ t('nav_printers_setup_note') }}</div></span>
-                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
-                            </a>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    {% if auth_has_section_access('stats') or auth_is_admin(current_user) or auth_has_section_access('settings') or auth_is_admin(current_user) %}
-                    <div class="relative" x-data="{ open: false }">
-                        <button type="button" @click="open = !open" class="nav-menu-button w-full md:w-auto">
-                            <i class="fa-solid fa-compass"></i> {{ t('nav_admin_tools') if auth_is_admin(current_user) else t('settings') }}
-                            <i class="fa-solid fa-chevron-down text-xs opacity-70"></i>
-                        </button>
-                        <div x-show="open" x-cloak @click.outside="open = false" class="nav-menu-panel mt-2 md:absolute md:right-0 md:top-full md:w-80 p-3 space-y-2">
-                            {% if auth_has_section_access('stats') or auth_is_admin(current_user) %}
-                            <a href="{{ url_for('stats') }}" class="nav-menu-link">
-                                <span><i class="fa-solid fa-chart-column mr-2"></i>{{ t('stats_nav') }}<div class="nav-menu-note">{{ t('nav_stats_note') }}</div></span>
-                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
-                            </a>
-                            {% endif %}
-                            {% if auth_has_section_access('users') or auth_is_admin(current_user) %}
-                            <a href="{{ url_for('users_index') }}" class="nav-menu-link">
-                                <span><i class="fa-solid fa-users-gear mr-2"></i>{{ t('users_nav') }}<div class="nav-menu-note">{{ t('nav_users_note') }}</div></span>
-                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
-                            </a>
-                            {% endif %}
-                            {% if auth_has_section_access('settings') or auth_is_admin(current_user) %}
-                            <a href="{{ url_for('settings') }}" class="nav-menu-link">
-                                <span><i class="fa-solid fa-cog mr-2"></i>{{ t('settings') }}<div class="nav-menu-note">{{ t('nav_settings_note') }}</div></span>
-                                <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
-                            </a>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    <div class="flex flex-col md:flex-row gap-2 items-start md:items-center md:ml-2">
-                        <a href="{{ url_for('notifications_index') }}" class="nav-pill">
-                            <i class="fa-solid fa-bell"></i>
-                            <span>{% if nav_notifications_unread %}{{ nav_notifications_unread }}{% else %}{{ t('notifications_nav') }}{% endif %}</span>
+<body x-data="appShell()" x-init="init()" class="flex flex-col min-h-screen">
+    {% set endpoint = request.endpoint or '' %}
+    <header class="app-topbar">
+        <div class="app-shell">
+            <div class="app-topbar-inner">
+                <div class="flex flex-col gap-4">
+                    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                        <a href="{{ url_for('index') }}" class="app-brand min-w-0">
+                            <span class="app-brand-mark text-white text-lg"><i class="fa-solid fa-layer-group"></i></span>
+                            <span class="min-w-0">
+                                <span class="app-brand-overline">Filament OS</span>
+                                <span class="app-brand-title block truncate">{{ t('title') }}</span>
+                            </span>
                         </a>
-                        <a href="{{ url_for('account_settings') }}" class="nav-pill"><i class="fa-solid fa-user"></i> {{ current_user.name }}</a>
-                        <form method="POST" action="{{ url_for('toggle_theme') }}" class="block md:hidden py-1">
-                            <button type="submit" class="nav-pill" title="{{ t('theme') }}">
-                                <i class="fa-solid {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
-                                {% if theme == 'dark' %}{{ t('light_theme') }}{% else %}{{ t('dark_theme') }}{% endif %}
+                        <div class="app-toolbar">
+                            {% if current_user %}
+                            <button type="button" @click="openCommand()" class="app-search-trigger">
+                                <i class="fa-solid fa-magnifying-glass text-sm opacity-80"></i>
+                                <span class="truncate text-sm">{{ t('nav_search_placeholder') }}</span>
+                                <span class="app-search-kbd">{{ t('nav_shortcut') }}</span>
                             </button>
-                        </form>
-                        <form method="POST" action="{{ url_for('toggle_theme') }}" class="hidden md:block">
-                            <button type="submit" class="nav-pill" title="{{ t('theme') }}">
-                                <i class="fa-solid {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
+                            {% endif %}
+                            <button type="button" class="nav-menu-button md:hidden" @click="mobileOpen = !mobileOpen" :aria-expanded="mobileOpen.toString()" aria-label="{{ t('nav_mobile_menu') }}">
+                                <i class="fa-solid" :class="mobileOpen ? 'fa-xmark' : 'fa-bars'"></i>
                             </button>
-                        </form>
-                        <form method="POST" action="{{ url_for('logout') }}">
-                            <button type="submit" class="nav-pill"><i class="fa-solid fa-right-from-bracket"></i> {{ t('auth_logout') }}</button>
-                        </form>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                        {% if current_user %}
+                        <div class="app-nav-grid" :class="mobileOpen ? 'flex' : 'hidden md:flex'">
+                            {% if auth_has_section_access('overview') or auth_is_admin(current_user) %}
+                            <div class="relative" x-data="{ open: false }">
+                                <button type="button" @click="open = !open" class="nav-menu-button" :class="{ 'nav-menu-button-active': ['index', 'filaments_index', 'storage', 'history'].includes('{{ endpoint }}') }">
+                                    <i class="fa-solid fa-boxes-stacked"></i> {{ t('inventory_nav') }}
+                                    <i class="fa-solid fa-chevron-down text-xs opacity-70"></i>
+                                </button>
+                                <div x-show="open" x-cloak @click.outside="open = false" class="nav-menu-panel mt-2 md:absolute md:left-0 md:top-full md:w-80 p-3 space-y-2">
+                                    <a href="{{ url_for('index') }}" class="nav-menu-link">
+                                        <span><i class="fa-solid fa-house mr-2"></i>{{ t('overview') }}<div class="nav-menu-note">{{ t('nav_inventory_overview_note') }}</div></span>
+                                        <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                                    </a>
+                                    {% if auth_has_section_access('filaments') or auth_is_admin(current_user) %}
+                                    <a href="{{ url_for('filaments_index') }}" class="nav-menu-link">
+                                        <span><i class="fa-solid fa-layer-group mr-2"></i>{{ t('filaments_nav') }}<div class="nav-menu-note">{{ t('nav_filaments_note') }}</div></span>
+                                        <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if auth_has_section_access('storage') or auth_is_admin(current_user) %}
+                                    <a href="{{ url_for('storage') }}" class="nav-menu-link">
+                                        <span><i class="fa-solid fa-warehouse mr-2"></i>{{ t('storage_nav') }}<div class="nav-menu-note">{{ t('nav_storage_note') }}</div></span>
+                                        <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if auth_has_section_access('history') or auth_is_admin(current_user) %}
+                                    <a href="{{ url_for('history') }}" class="nav-menu-link">
+                                        <span><i class="fa-solid fa-clock-rotate-left mr-2"></i>{{ t('movement_history') }}<div class="nav-menu-note">{{ t('nav_history_note') }}</div></span>
+                                        <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {% if auth_has_section_access('projects') or auth_is_admin(current_user) %}
+                            <div class="relative" x-data="{ open: false }">
+                                <button type="button" @click="open = !open" class="nav-menu-button" :class="{ 'nav-menu-button-active': ['projects_index', 'project_create', 'project_detail', 'project_edit', 'calculator'].includes('{{ endpoint }}') }">
+                                    <i class="fa-solid fa-diagram-project"></i> {{ t('projects') }}
+                                    <i class="fa-solid fa-chevron-down text-xs opacity-70"></i>
+                                </button>
+                                <div x-show="open" x-cloak @click.outside="open = false" class="nav-menu-panel mt-2 md:absolute md:left-0 md:top-full md:w-80 p-3 space-y-2">
+                                    <a href="{{ url_for('projects_index') }}" class="nav-menu-link">
+                                        <span><i class="fa-solid fa-diagram-project mr-2"></i>{{ t('projects') }}<div class="nav-menu-note">{{ t('nav_projects_note') }}</div></span>
+                                        <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                                    </a>
+                                    <a href="{{ url_for('project_create') }}" class="nav-menu-link">
+                                        <span><i class="fa-solid fa-plus mr-2"></i>{{ t('project_create') }}<div class="nav-menu-note">{{ t('nav_project_create_note') }}</div></span>
+                                        <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                                    </a>
+                                    {% if auth_has_section_access('calculator') or auth_is_admin(current_user) %}
+                                    <a href="{{ url_for('calculator') }}" class="nav-menu-link">
+                                        <span><i class="fa-solid fa-calculator mr-2"></i>{{ t('calculator') }}<div class="nav-menu-note">{{ t('nav_calculator_note') }}</div></span>
+                                        <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {% if auth_has_section_access('printers') or auth_is_admin(current_user) %}
+                            <div class="relative" x-data="{ open: false }">
+                                <button type="button" @click="open = !open" class="nav-menu-button" :class="{ 'nav-menu-button-active': ['bambu_jobs', 'prusa_jobs'].includes('{{ endpoint }}') }">
+                                    <i class="fa-solid fa-print"></i> {{ t('printers_nav') }}
+                                    <i class="fa-solid fa-chevron-down text-xs opacity-70"></i>
+                                </button>
+                                <div x-show="open" x-cloak @click.outside="open = false" class="nav-menu-panel mt-2 md:absolute md:left-0 md:top-full md:w-80 p-3 space-y-2">
+                                    {% if nav_bambu_enabled %}
+                                    <a href="{{ url_for('bambu_jobs') }}" data-bambu-remember-hide-failed="1" data-base-href="{{ url_for('bambu_jobs') }}" class="nav-menu-link">
+                                        <span><i class="fa-solid fa-print mr-2"></i>{{ t('bambu_jobs') }}<div class="nav-menu-note">{{ t('nav_bambu_note') }}</div></span>
+                                        <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if nav_prusa_enabled %}
+                                    <a href="{{ url_for('prusa_jobs') }}" class="nav-menu-link">
+                                        <span><i class="fa-solid fa-3d-print mr-2"></i>{{ t('prusa_jobs') }}<div class="nav-menu-note">{{ t('nav_prusa_note') }}</div></span>
+                                        <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if not nav_bambu_enabled and not nav_prusa_enabled and (auth_has_section_access('settings') or auth_is_admin(current_user)) %}
+                                    <a href="{{ url_for('settings') }}#bambu-cloud" class="nav-menu-link">
+                                        <span><i class="fa-solid fa-plug-circle-plus mr-2"></i>{{ t('settings') }}<div class="nav-menu-note">{{ t('nav_printers_setup_note') }}</div></span>
+                                        <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {% if auth_has_section_access('stats') or auth_is_admin(current_user) or auth_has_section_access('settings') or auth_is_admin(current_user) %}
+                            <div class="relative" x-data="{ open: false }">
+                                <button type="button" @click="open = !open" class="nav-menu-button" :class="{ 'nav-menu-button-active': ['stats', 'users_index', 'settings'].includes('{{ endpoint }}') }">
+                                    <i class="fa-solid fa-compass"></i> {{ t('nav_admin_tools') if auth_is_admin(current_user) else t('settings') }}
+                                    <i class="fa-solid fa-chevron-down text-xs opacity-70"></i>
+                                </button>
+                                <div x-show="open" x-cloak @click.outside="open = false" class="nav-menu-panel mt-2 md:absolute md:right-0 md:top-full md:w-80 p-3 space-y-2">
+                                    {% if auth_has_section_access('stats') or auth_is_admin(current_user) %}
+                                    <a href="{{ url_for('stats') }}" class="nav-menu-link">
+                                        <span><i class="fa-solid fa-chart-column mr-2"></i>{{ t('stats_nav') }}<div class="nav-menu-note">{{ t('nav_stats_note') }}</div></span>
+                                        <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if auth_has_section_access('users') or auth_is_admin(current_user) %}
+                                    <a href="{{ url_for('users_index') }}" class="nav-menu-link">
+                                        <span><i class="fa-solid fa-users-gear mr-2"></i>{{ t('users_nav') }}<div class="nav-menu-note">{{ t('nav_users_note') }}</div></span>
+                                        <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                                    </a>
+                                    {% endif %}
+                                    {% if auth_has_section_access('settings') or auth_is_admin(current_user) %}
+                                    <a href="{{ url_for('settings') }}" class="nav-menu-link">
+                                        <span><i class="fa-solid fa-cog mr-2"></i>{{ t('settings') }}<div class="nav-menu-note">{{ t('nav_settings_note') }}</div></span>
+                                        <i class="fa-solid fa-arrow-right text-xs opacity-50"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
+                        <div class="flex flex-wrap items-center gap-2" :class="mobileOpen ? 'flex' : 'hidden md:flex'">
+                            {% if current_user %}
+                            <a href="{{ url_for('notifications_index') }}" class="nav-pill {% if endpoint == 'notifications_index' %}nav-pill-active{% endif %}">
+                                <i class="fa-solid fa-bell"></i>
+                                <span>{% if nav_notifications_unread %}{{ nav_notifications_unread }}{% else %}{{ t('notifications_nav') }}{% endif %}</span>
+                            </a>
+                            <a href="{{ url_for('account_settings') }}" class="nav-pill {% if endpoint == 'account_settings' %}nav-pill-active{% endif %}">
+                                <i class="fa-solid fa-user"></i> {{ current_user.name }}
+                            </a>
+                            <form method="POST" action="{{ url_for('toggle_theme') }}">
+                                <button type="submit" class="nav-pill" title="{{ t('theme') }}">
+                                    <i class="fa-solid {% if theme == 'dark' %}fa-sun{% else %}fa-moon{% endif %}"></i>
+                                    <span class="md:hidden">{% if theme == 'dark' %}{{ t('light_theme') }}{% else %}{{ t('dark_theme') }}{% endif %}</span>
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ url_for('logout') }}">
+                                <button type="submit" class="nav-pill"><i class="fa-solid fa-right-from-bracket"></i> {{ t('auth_logout') }}</button>
+                            </form>
+                            {% else %}
+                            <div class="flex flex-wrap items-center gap-2">
+                                <a href="{{ url_for('login') }}" class="nav-pill"><i class="fa-solid fa-right-to-bracket"></i> {{ t('auth_login') }}</a>
+                                <a href="{{ url_for('register_account') }}" class="nav-pill"><i class="fa-solid fa-user-plus"></i> {{ t('auth_register') }}</a>
+                                <a href="{{ url_for('activate_invite') }}" class="nav-pill"><i class="fa-solid fa-key"></i> {{ t('auth_activate_invite') }}</a>
+                            </div>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
-                {% else %}
-                <div class="flex flex-col gap-2">
-                    <span class="nav-group-label">{{ t('auth_account') }}</span>
-                    <div class="flex flex-col md:flex-row gap-2 items-start md:items-center">
-                        <a href="{{ url_for('login') }}" class="nav-pill"><i class="fa-solid fa-right-to-bracket"></i> {{ t('auth_login') }}</a>
-                        <a href="{{ url_for('register_account') }}" class="nav-pill"><i class="fa-solid fa-user-plus"></i> {{ t('auth_register') }}</a>
-                        <a href="{{ url_for('activate_invite') }}" class="nav-pill"><i class="fa-solid fa-key"></i> {{ t('auth_activate_invite') }}</a>
-                    </div>
-                </div>
-                {% endif %}
             </div>
         </div>
-    </nav>
+    </header>
     <script>
-        // Toggle mobile menu visibility
-        const btn = document.getElementById('mobile-menu-btn');
-        const menu = document.getElementById('nav-links');
-        
-        btn.addEventListener('click', () => {
-            menu.classList.toggle('hidden');
-            menu.classList.toggle('flex');
-            
-            const icon = btn.querySelector('i');
-            if(menu.classList.contains('hidden')) {
-                icon.classList.remove('fa-times');
-                icon.classList.add('fa-bars');
-            } else {
-                icon.classList.remove('fa-bars');
-                icon.classList.add('fa-times');
-            }
-        });
-    </script>
-    <script>
+        function appShell() {
+            return {
+                mobileOpen: false,
+                commandOpen: false,
+                query: '',
+                init() {
+                    document.addEventListener('keydown', (event) => {
+                        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+                            event.preventDefault();
+                            this.openCommand();
+                        }
+                        if (event.key === 'Escape') {
+                            this.commandOpen = false;
+                        }
+                    });
+                },
+                openCommand() {
+                    this.commandOpen = true;
+                    this.$nextTick(() => {
+                        const input = this.$refs.commandInput;
+                        if (input) input.focus();
+                    });
+                },
+                get hasResults() {
+                    return this.filteredItems.length > 0;
+                },
+                get filteredItems() {
+                    const q = this.query.trim().toLowerCase();
+                    return (this.$refs.commandItems ? JSON.parse(this.$refs.commandItems.textContent || '[]') : []).filter((item) => {
+                        if (!q) return true;
+                        return [item.label, item.note, item.section].join(' ').toLowerCase().includes(q);
+                    });
+                },
+            };
+        }
         function createWidgetLayoutManager(config) {
             const container = document.getElementById(config.containerId);
             if (!container) {
@@ -880,7 +1259,92 @@
             };
         })();
     </script>
-    <div class="container mx-auto px-4 sm:px-6 py-4 sm:py-8 flex-grow overflow-x-hidden">
+    {% if current_user %}
+    <script type="application/json" x-ref="commandItems">[
+        {% set comma = joiner(',') %}
+        {% if auth_has_section_access('overview') or auth_is_admin(current_user) %}
+        {{ comma() }}{{ {'label': t('overview'), 'note': t('nav_inventory_overview_note'), 'href': url_for('index'), 'icon': 'fa-house', 'section': t('inventory_nav')}|tojson }}
+        {% endif %}
+        {% if auth_has_section_access('filaments') or auth_is_admin(current_user) %}
+        {{ comma() }}{{ {'label': t('filaments_nav'), 'note': t('nav_filaments_note'), 'href': url_for('filaments_index'), 'icon': 'fa-layer-group', 'section': t('inventory_nav')}|tojson }}
+        {% endif %}
+        {% if auth_has_section_access('storage') or auth_is_admin(current_user) %}
+        {{ comma() }}{{ {'label': t('storage_nav'), 'note': t('nav_storage_note'), 'href': url_for('storage'), 'icon': 'fa-warehouse', 'section': t('inventory_nav')}|tojson }}
+        {% endif %}
+        {% if auth_has_section_access('history') or auth_is_admin(current_user) %}
+        {{ comma() }}{{ {'label': t('movement_history'), 'note': t('nav_history_note'), 'href': url_for('history'), 'icon': 'fa-clock-rotate-left', 'section': t('inventory_nav')}|tojson }}
+        {% endif %}
+        {% if auth_has_section_access('projects') or auth_is_admin(current_user) %}
+        {{ comma() }}{{ {'label': t('projects'), 'note': t('nav_projects_note'), 'href': url_for('projects_index'), 'icon': 'fa-diagram-project', 'section': t('projects')}|tojson }}
+        {{ comma() }}{{ {'label': t('project_create'), 'note': t('nav_project_create_note'), 'href': url_for('project_create'), 'icon': 'fa-plus', 'section': t('projects')}|tojson }}
+        {% endif %}
+        {% if auth_has_section_access('calculator') or auth_is_admin(current_user) %}
+        {{ comma() }}{{ {'label': t('calculator'), 'note': t('nav_calculator_note'), 'href': url_for('calculator'), 'icon': 'fa-calculator', 'section': t('projects')}|tojson }}
+        {% endif %}
+        {% if nav_bambu_enabled %}
+        {{ comma() }}{{ {'label': t('bambu_jobs'), 'note': t('nav_bambu_note'), 'href': url_for('bambu_jobs'), 'icon': 'fa-print', 'section': t('printers_nav')}|tojson }}
+        {% endif %}
+        {% if nav_prusa_enabled %}
+        {{ comma() }}{{ {'label': t('prusa_jobs'), 'note': t('nav_prusa_note'), 'href': url_for('prusa_jobs'), 'icon': 'fa-cube', 'section': t('printers_nav')}|tojson }}
+        {% endif %}
+        {% if auth_has_section_access('stats') or auth_is_admin(current_user) %}
+        {{ comma() }}{{ {'label': t('stats_nav'), 'note': t('nav_stats_note'), 'href': url_for('stats'), 'icon': 'fa-chart-column', 'section': t('nav_admin_tools')}|tojson }}
+        {% endif %}
+        {% if auth_has_section_access('settings') or auth_is_admin(current_user) %}
+        {{ comma() }}{{ {'label': t('settings'), 'note': t('nav_settings_note'), 'href': url_for('settings'), 'icon': 'fa-cog', 'section': t('nav_admin_tools')}|tojson }}
+        {% endif %}
+        {% if auth_has_section_access('users') or auth_is_admin(current_user) %}
+        {{ comma() }}{{ {'label': t('users_nav'), 'note': t('nav_users_note'), 'href': url_for('users_index'), 'icon': 'fa-users-gear', 'section': t('nav_admin_tools')}|tojson }}
+        {% endif %}
+        {{ comma() }}{{ {'label': t('notifications_nav'), 'note': t('nav_notifications_note'), 'href': url_for('notifications_index'), 'icon': 'fa-bell', 'section': t('auth_account')}|tojson }}
+        {{ comma() }}{{ {'label': t('auth_account'), 'note': t('nav_account_note'), 'href': url_for('account_settings'), 'icon': 'fa-user', 'section': t('auth_account')}|tojson }}
+    ]</script>
+    <div x-show="commandOpen" x-cloak class="ui-command-backdrop flex items-start justify-center px-3 pt-[10vh]" @click.self="commandOpen = false">
+        <div class="ui-command-panel" @click.stop>
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center gap-3">
+                    <span class="w-10 h-10 rounded-2xl bg-[var(--ui-brand-soft)] text-[var(--ui-brand)] flex items-center justify-center">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </span>
+                    <div class="flex-1">
+                        <input x-ref="commandInput" x-model="query" type="search" placeholder="{{ t('nav_search_placeholder') }}" class="ui-input border-0 shadow-none px-0 py-0 bg-transparent">
+                        <div class="text-sm text-gray-500 mt-1">{{ t('nav_search_hint') }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-3 overflow-y-auto max-h-[60vh]">
+                <template x-if="hasResults">
+                    <div class="space-y-2">
+                        <template x-for="item in filteredItems" :key="item.href">
+                            <a :href="item.href" class="ui-command-item">
+                                <div class="flex items-start gap-3 min-w-0">
+                                    <span class="w-10 h-10 rounded-2xl bg-[var(--ui-brand-soft)] text-[var(--ui-brand)] flex items-center justify-center flex-shrink-0">
+                                        <i class="fa-solid" :class="item.icon"></i>
+                                    </span>
+                                    <div class="min-w-0">
+                                        <div class="font-semibold truncate" x-text="item.label"></div>
+                                        <div class="ui-command-item-note truncate" x-text="item.note"></div>
+                                    </div>
+                                </div>
+                                <span class="ui-badge" x-text="item.section"></span>
+                            </a>
+                        </template>
+                    </div>
+                </template>
+                <template x-if="!hasResults">
+                    <div class="ui-empty-state min-h-[10rem]">
+                        <i class="fa-solid fa-compass text-3xl opacity-40"></i>
+                        <div class="font-semibold">{{ t('nav_search_empty') }}</div>
+                        <div class="text-sm">{{ t('nav_search_hint') }}</div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    <main class="app-page flex-grow overflow-x-hidden">
+        <div class="app-shell">
+            <div class="app-surface">
         {% with flashes = get_flashed_messages(with_categories=true) %}
             {% if flashes %}
                 <div class="fixed top-20 right-4 z-50 flex flex-col gap-3 w-full max-w-sm px-4 sm:px-0 pointer-events-none">
@@ -913,10 +1377,15 @@
             {% endif %}
         {% endwith %}
         {% block content %}{% endblock %}
-    </div>
-    <footer class="bg-gray-800 text-gray-400 py-4 mt-auto">
-        <div class="container mx-auto text-center text-sm font-mono">
-            v{{ app_version }}
+            </div>
+        </div>
+    </main>
+    <footer class="pb-6 mt-auto">
+        <div class="app-shell">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 text-sm text-slate-500">
+                <div>{{ t('nav_shell_subtitle') }}</div>
+                <div class="font-mono">v{{ app_version }}</div>
+            </div>
         </div>
     </footer>
     <!-- PWA Service Worker Registration -->
@@ -932,6 +1401,32 @@
                     });
             });
         }
+    </script>
+    <script>
+        (function () {
+            var KEY = 'bambu_hide_failed';
+
+            function applyRememberedBambuFilters() {
+                var hideFailed = localStorage.getItem(KEY) === '1';
+                document.querySelectorAll('[data-bambu-remember-hide-failed]').forEach(function (link) {
+                    var baseHref = link.dataset.baseHref || link.getAttribute('href');
+                    if (!baseHref) return;
+                    var url = new URL(baseHref, window.location.origin);
+                    if (hideFailed) {
+                        url.searchParams.set('hide_failed', '1');
+                    } else {
+                        url.searchParams.delete('hide_failed');
+                    }
+                    link.setAttribute('href', url.pathname + url.search + url.hash);
+                });
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', applyRememberedBambuFilters);
+            } else {
+                applyRememberedBambuFilters();
+            }
+        })();
     </script>
 </body>
 </html>
