@@ -5,7 +5,7 @@
     <div class="page-hero">
         <div class="flex items-center justify-between gap-4">
             <div>
-                <h1>{{ t('notifications_nav') }}</h1>
+                <h1 class="page-title"><span class="page-title-icon"><i class="fa-solid fa-bell"></i></span><span>{{ t('notifications_nav') }}</span></h1>
                 <p>{{ t('notifications_desc') }}</p>
             </div>
             <form method="POST" action="{{ url_for('notification_mark_all_read') }}">

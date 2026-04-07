@@ -442,6 +442,32 @@
             gap: 0.7rem;
             margin-bottom: 1.8rem;
         }
+        .page-shell {
+            width: 100%;
+            max-width: 80rem;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        .page-title {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.85rem;
+        }
+        .page-title-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 0.95rem;
+            border: 1px solid var(--ui-brand-ring);
+            background: var(--ui-brand-soft);
+            color: var(--ui-brand);
+            box-shadow: var(--ui-shadow-soft);
+            flex-shrink: 0;
+        }
         .page-hero h1 {
             font-size: clamp(2rem, 4vw, 2.8rem);
             line-height: 1.05;
@@ -570,6 +596,12 @@
             display: none;
         }
         .layout-edit-mode .dashboard-edit-bar {
+            display: flex;
+        }
+        .size-controls {
+            display: none;
+        }
+        .layout-edit-mode .size-controls {
             display: flex;
         }
         html.dark body {
@@ -862,6 +894,13 @@
             </a>
             {% endif %}
 
+            {% if auth_has_section_access('calculator') or auth_is_admin(current_user) %}
+            <a href="{{ url_for('calculator') }}" class="flex items-center px-4 py-3 text-[var(--ui-text)] hover:bg-[var(--ui-brand-soft)] hover:text-[var(--ui-brand-strong)] transition-colors whitespace-nowrap {% if endpoint == 'calculator' %}bg-[var(--ui-brand-soft)] text-[var(--ui-brand-strong)] border-r-2 border-[var(--ui-brand-strong)]{% endif %}" title="{{ t('calculator') }}">
+                <i class="fa-solid fa-calculator text-lg w-8 text-center flex-shrink-0"></i>
+                <span class="ml-2 font-semibold opacity-0 group-[.pinned]:opacity-100 transition-opacity">{{ t('calculator') }}</span>
+            </a>
+            {% endif %}
+
             {% if nav_bambu_enabled %}
             <a href="{{ url_for('bambu_jobs') }}" data-bambu-remember-hide-failed="1" data-base-href="{{ url_for('bambu_jobs') }}" class="flex items-center px-4 py-3 text-[var(--ui-text)] hover:bg-[var(--ui-brand-soft)] hover:text-[var(--ui-brand-strong)] transition-colors whitespace-nowrap {% if endpoint == 'bambu_jobs' %}bg-[var(--ui-brand-soft)] text-[var(--ui-brand-strong)] border-r-2 border-[var(--ui-brand-strong)]{% endif %}" title="{{ t('bambu_jobs') }}">
                 <i class="fa-solid fa-cloud text-lg w-8 text-center flex-shrink-0"></i>
@@ -873,6 +912,13 @@
             <a href="{{ url_for('stats') }}" class="flex items-center px-4 py-3 text-[var(--ui-text)] hover:bg-[var(--ui-brand-soft)] hover:text-[var(--ui-brand-strong)] transition-colors whitespace-nowrap {% if endpoint == 'stats' %}bg-[var(--ui-brand-soft)] text-[var(--ui-brand-strong)] border-r-2 border-[var(--ui-brand-strong)]{% endif %}" title="{{ t('stats_nav') }}">
                 <i class="fa-solid fa-chart-column text-lg w-8 text-center flex-shrink-0"></i>
                 <span class="ml-2 font-semibold opacity-0 group-[.pinned]:opacity-100 transition-opacity">{{ t('stats_nav') }}</span>
+            </a>
+            {% endif %}
+
+            {% if auth_has_section_access('users') or auth_is_admin(current_user) %}
+            <a href="{{ url_for('users_index') }}" class="flex items-center px-4 py-3 text-[var(--ui-text)] hover:bg-[var(--ui-brand-soft)] hover:text-[var(--ui-brand-strong)] transition-colors whitespace-nowrap {% if endpoint in ['users_index', 'user_detail'] %}bg-[var(--ui-brand-soft)] text-[var(--ui-brand-strong)] border-r-2 border-[var(--ui-brand-strong)]{% endif %}" title="{{ t('users_nav') }}">
+                <i class="fa-solid fa-users-gear text-lg w-8 text-center flex-shrink-0"></i>
+                <span class="ml-2 font-semibold opacity-0 group-[.pinned]:opacity-100 transition-opacity">{{ t('users_nav') }}</span>
             </a>
             {% endif %}
         </nav>
@@ -957,12 +1003,22 @@
                 <a href="{{ url_for('storage') }}" class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
                     <i class="fa-solid fa-warehouse text-blue-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('storage_nav') }}</span>
                 </a>
+                {% if auth_has_section_access('calculator') or auth_is_admin(current_user) %}
+                <a href="{{ url_for('calculator') }}" class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
+                    <i class="fa-solid fa-calculator text-emerald-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('calculator') }}</span>
+                </a>
+                {% endif %}
                 <a href="{{ url_for('stats') }}" class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
                     <i class="fa-solid fa-chart-column text-indigo-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('stats_nav') }}</span>
                 </a>
                 <a href="{{ url_for('settings') }}" class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
                     <i class="fa-solid fa-cog text-gray-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('settings') }}</span>
                 </a>
+                {% if auth_has_section_access('users') or auth_is_admin(current_user) %}
+                <a href="{{ url_for('users_index') }}" class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
+                    <i class="fa-solid fa-users-gear text-sky-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('users_nav') }}</span>
+                </a>
+                {% endif %}
                 <a href="{{ url_for('account_settings') }}" class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
                     <i class="fa-solid fa-user text-emerald-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('auth_account') }}</span>
                 </a>
@@ -1015,10 +1071,10 @@
             
             <div class="flex items-center gap-3">
                 {% if current_user %}
-                <button type="button" @click="openCommand()" class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm text-gray-500 transition-colors w-48 shadow-sm">
-                    <i class="fa-solid fa-magnifying-glass opacity-70"></i>
+                <button type="button" @click="openCommand()" class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-blue-400 hover:ring-1 hover:ring-blue-400 text-sm text-gray-600 dark:text-gray-300 transition-all w-52 shadow-sm group">
+                    <i class="fa-solid fa-magnifying-glass text-gray-400 group-hover:text-blue-500 transition-colors"></i>
                     <span class="flex-1 text-left truncate">{{ t('nav_search_placeholder') }}</span>
-                    <kbd class="hidden sm:inline-block px-1.5 py-0.5 text-[0.7rem] bg-gray-100 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600 font-mono">Ctrl K</kbd>
+                    <kbd class="hidden sm:inline-block px-1.5 py-0.5 text-[0.65rem] bg-gray-50 text-gray-400 dark:bg-gray-700 dark:text-gray-400 rounded border border-gray-200 dark:border-gray-600 font-mono group-hover:border-blue-300 group-hover:text-blue-500 transition-colors">Ctrl K</kbd>
                 </button>
                 <button type="button" @click="openCommand()" class="sm:hidden p-2 text-gray-500 hover:text-[var(--ui-brand)]">
                     <i class="fa-solid fa-magnifying-glass"></i>
@@ -1179,20 +1235,48 @@
                 localStorage.setItem(config.storageKey, JSON.stringify(layout));
             }
 
+            function clearSizeClasses(item) {
+                item.className = item.className
+                    .replace(/\bxl:col-span-\d+\b/g, '')
+                    .replace(/\bmd:col-span-\d+\b/g, '')
+                    .replace(/\bcol-span-\d+\b/g, '')
+                    .replace(/\s{2,}/g, ' ')
+                    .trim();
+            }
+
+            function sizeOptions() {
+                return config.sizeOptions || [1, 2, 4];
+            }
+
+            function spanClass(size) {
+                return `col-span-1 md:col-span-${Math.min(size, 2)} xl:col-span-${size}`;
+            }
+
             function applyLayout() {
                 const map = {};
                 items().forEach((item) => { 
                     const id = item.dataset.widgetId;
                     map[id] = item; 
                     
-                    // Apply saved sizes
-                    if (layout.sizes && layout.sizes[id]) {
-                        item.className = item.className.replace(/xl:col-span-\d/g, '').replace(/md:col-span-\d/g, '').replace(/col-span-\d/g, '');
-                        item.className += ' ' + layout.sizes[id];
+                    if (!item.dataset.defaultSpanClass) {
+                        const defaults = [];
+                        const className = item.className || '';
+                        const base = className.match(/\bcol-span-\d+\b/);
+                        const md = className.match(/\bmd:col-span-\d+\b/);
+                        const xl = className.match(/\bxl:col-span-\d+\b/);
+                        if (base) defaults.push(base[0]);
+                        if (md) defaults.push(md[0]);
+                        if (xl) defaults.push(xl[0]);
+                        item.dataset.defaultSpanClass = defaults.join(' ');
                     }
-                    
-                    
-                    // Handle visibility
+
+                    clearSizeClasses(item);
+                    if (layout.sizes && layout.sizes[id]) {
+                        item.classList.add(...layout.sizes[id].split(/\s+/).filter(Boolean));
+                    } else if (item.dataset.defaultSpanClass) {
+                        item.classList.add(...item.dataset.defaultSpanClass.split(/\s+/).filter(Boolean));
+                    }
+
                     if (layout.visibility && layout.visibility[id] === false) {
                         item.style.display = editMode ? 'block' : 'none';
                         if (editMode) item.classList.add('opacity-50');
@@ -1200,28 +1284,41 @@
                         item.style.display = 'block';
                         item.classList.remove('opacity-50');
                     }
-                    
-                    // Add size controls to edit bar if not exists
 
                     const bar = item.querySelector('.dashboard-edit-bar');
                     if (bar && !bar.querySelector('.size-controls')) {
                         const wrap = document.createElement('div');
-                        wrap.className = "size-controls hidden md:flex items-center gap-1 bg-white border border-blue-200 rounded px-1 ml-2 text-xs shadow-sm";
-                        [1, 2, 4].forEach(sz => {
+                        wrap.className = "size-controls items-center gap-1 bg-white border border-blue-200 rounded px-1 ml-2 text-xs shadow-sm";
+                        sizeOptions().forEach(sz => {
                             const btn = document.createElement('button');
+                            btn.type = 'button';
                             btn.textContent = sz;
                             btn.title = sz + ' x';
-                            btn.className = "w-5 h-5 flex items-center justify-center hover:bg-blue-50 text-blue-700 font-mono rounded";
-                            btn.onclick = () => {
-                                let span = `col-span-1 md:col-span-${Math.min(sz, 2)} xl:col-span-${sz}`;
-                                item.className = item.className.replace(/xl:col-span-\d/g, '').replace(/md:col-span-\d/g, '').replace(/col-span-\d/g, '') + ' ' + span;
+                            btn.dataset.sizeValue = String(sz);
+                            btn.className = "w-6 h-6 flex items-center justify-center hover:bg-blue-50 text-blue-700 font-mono rounded transition";
+                            btn.onclick = (event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                const span = spanClass(sz);
                                 layout.sizes[id] = span;
+                                applyLayout();
                                 saveLayout();
                             };
                             wrap.appendChild(btn);
                         });
                         bar.insertBefore(wrap, bar.querySelector('.ml-auto'));
                     }
+
+                    const currentSpanClass = layout.sizes[id] || item.dataset.defaultSpanClass || spanClass(1);
+                    const controlButtons = item.querySelectorAll('.size-controls [data-size-value]');
+                    controlButtons.forEach((btn) => {
+                        const btnSize = Number(btn.dataset.sizeValue || 0);
+                        const isActive = currentSpanClass === spanClass(btnSize);
+                        btn.classList.toggle('bg-blue-600', isActive);
+                        btn.classList.toggle('text-white', isActive);
+                        btn.classList.toggle('shadow-sm', isActive);
+                        btn.classList.toggle('text-blue-700', !isActive);
+                    });
                 });
                 layout.order.forEach((id) => {
                     if (map[id]) {

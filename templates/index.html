@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
-<div x-data="inventoryApp()">
+<div class="page-shell" x-data="inventoryApp()">
 <div class="page-hero">
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-            <h1>{{ t('filaments_nav') }}</h1>
+            <h1 class="page-title"><span class="page-title-icon"><i class="fa-solid fa-layer-group"></i></span><span>{{ t('filaments_nav') }}</span></h1>
             <p>{{ t('filaments_desc') }}</p>
         </div>
         <div class="flex flex-wrap gap-3">

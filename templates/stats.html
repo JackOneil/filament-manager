@@ -8,27 +8,29 @@
 .section-edit-bar, .card-edit-bar { display: none; }
 .edit-mode .section-edit-bar { display: flex; }
 .edit-mode .card-edit-bar { display: flex; }
+.card-size-controls { display: none; }
+.edit-mode .card-size-controls { display: flex; }
 </style>
-<div class="max-w-7xl mx-auto space-y-6" id="stats-page" x-data="statsDashboard()">
-    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-800 flex items-center gap-3">
-                <i class="fa-solid fa-chart-line text-blue-600"></i> {{ t('stats_title') }}
-            </h1>
-            <p class="text-gray-500 mt-2">{{ t('stats_desc') }}</p>
-        </div>
-        <div class="flex flex-wrap gap-2 items-center">
-            {% for option in [7, 30, 90, 180] %}
-            <a href="{{ url_for('stats', days=option) }}"
-               class="px-4 py-2 rounded-full text-sm font-semibold transition-colors {% if days == option %}bg-blue-600 text-white shadow{% else %}bg-white border border-gray-200 text-gray-600 hover:bg-gray-50{% endif %}">
-                {{ option }} {{ t('stats_days_suffix') }}
-            </a>
-            {% endfor %}
-            <button id="editModeBtn" onclick="toggleEditMode()"
-                    class="px-4 py-2 rounded-full text-sm font-semibold border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-all flex items-center gap-2">
-                <i class="fa-solid fa-pen-to-square"></i>
-                <span id="editModeBtnLabel">{{ t('stats_edit_layout') }}</span>
-            </button>
+<div class="page-shell" id="stats-page" x-data="statsDashboard()">
+    <div class="page-hero">
+        <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+            <div>
+                <h1 class="page-title"><span class="page-title-icon"><i class="fa-solid fa-chart-line"></i></span><span>{{ t('stats_title') }}</span></h1>
+                <p>{{ t('stats_desc') }}</p>
+            </div>
+            <div class="flex flex-wrap gap-2 items-center">
+                {% for option in [7, 30, 90, 180] %}
+                <a href="{{ url_for('stats', days=option) }}"
+                   class="px-4 py-2 rounded-full text-sm font-semibold transition-colors {% if days == option %}bg-blue-600 text-white shadow{% else %}bg-white border border-gray-200 text-gray-600 hover:bg-gray-50{% endif %}">
+                    {{ option }} {{ t('stats_days_suffix') }}
+                </a>
+                {% endfor %}
+                <button id="editModeBtn" onclick="toggleEditMode()"
+                        class="px-4 py-2 rounded-full text-sm font-semibold border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                    <span id="editModeBtnLabel">{{ t('stats_edit_layout') }}</span>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -802,8 +804,8 @@ let editMode = false;
 function loadLayout() {
     try {
         const s = JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}');
-        return { order: s.order || [...DEFAULT_ORDER], hidden: s.hidden || [], limits: { ...DEFAULT_LIMITS, ...(s.limits || {}) } };
-    } catch { return { order: [...DEFAULT_ORDER], hidden: [], limits: { ...DEFAULT_LIMITS } }; }
+        return { order: s.order || [...DEFAULT_ORDER], hidden: s.hidden || [], limits: { ...DEFAULT_LIMITS, ...(s.limits || {}) }, sizes: s.sizes || {} };
+    } catch { return { order: [...DEFAULT_ORDER], hidden: [], limits: { ...DEFAULT_LIMITS }, sizes: {} }; }
 }
 
 function saveLayout() {
@@ -819,11 +821,95 @@ function applyOrder() {
 }
 
 function applyVisibility() {
-    layout.hidden.forEach(cardId => {
-        const el = document.querySelector(`[data-card-id="${cardId}"]`);
-        if (el) el.classList.add('hidden');
+    document.querySelectorAll('.stats-card').forEach((card) => {
+        const cardId = card.dataset.cardId;
+        card.classList.toggle('hidden', layout.hidden.includes(cardId));
     });
     updateEmptySections();
+}
+
+function clearCardSizeClasses(card) {
+    card.className = card.className
+        .replace(/\bxl:col-span-\d+\b/g, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+}
+
+function getCardSizeOptions(card) {
+    const grid = card.parentElement;
+    if (!grid) return [1];
+    const className = grid.className || '';
+    const xlColsMatch = className.match(/xl:grid-cols-(\d+)/);
+    const xlCols = xlColsMatch ? parseInt(xlColsMatch[1], 10) : 1;
+    return Array.from({ length: Math.max(xlCols, 1) }, (_, idx) => idx + 1);
+}
+
+function getDefaultCardSize(card) {
+    if (!card) return 1;
+    if (!card.dataset.defaultXlSpan) {
+        const match = (card.className || '').match(/\bxl:col-span-(\d+)\b/);
+        card.dataset.defaultXlSpan = match ? match[1] : '1';
+    }
+    return parseInt(card.dataset.defaultXlSpan, 10) || 1;
+}
+
+function applyCardSize(cardId, size) {
+    const card = document.querySelector(`[data-card-id="${cardId}"]`);
+    if (!card) return;
+    clearCardSizeClasses(card);
+    const defaultSize = getDefaultCardSize(card);
+    const nextSize = parseInt(size || defaultSize, 10) || defaultSize;
+    if (nextSize > 1) {
+        card.classList.add(`xl:col-span-${nextSize}`);
+    }
+    const controls = card.querySelectorAll('.card-size-controls [data-size-value]');
+    controls.forEach((btn) => {
+        const isActive = parseInt(btn.dataset.sizeValue || '0', 10) === nextSize;
+        btn.classList.toggle('bg-blue-600', isActive);
+        btn.classList.toggle('text-white', isActive);
+        btn.classList.toggle('shadow-sm', isActive);
+        btn.classList.toggle('text-blue-700', !isActive);
+    });
+}
+
+function setCardSize(cardId, size) {
+    const card = document.querySelector(`[data-card-id="${cardId}"]`);
+    if (!card) return;
+    const defaultSize = getDefaultCardSize(card);
+    if (parseInt(size, 10) === defaultSize) {
+        delete layout.sizes[cardId];
+    } else {
+        layout.sizes[cardId] = parseInt(size, 10);
+    }
+    applyCardSize(cardId, layout.sizes[cardId] || defaultSize);
+    saveLayout();
+}
+
+function initCardSizeControls() {
+    document.querySelectorAll('.stats-card').forEach((card) => {
+        const cardId = card.dataset.cardId;
+        const bar = card.querySelector('.card-edit-bar');
+        if (!cardId || !bar || bar.querySelector('.card-size-controls')) return;
+        const options = getCardSizeOptions(card);
+        if (options.length <= 1) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'card-size-controls items-center gap-1 bg-white border border-blue-200 rounded px-1 text-xs shadow-sm';
+        options.forEach((size) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.dataset.sizeValue = String(size);
+            btn.textContent = String(size);
+            btn.title = `${size}x`;
+            btn.className = 'w-6 h-6 flex items-center justify-center hover:bg-blue-50 text-blue-700 font-mono rounded transition';
+            btn.onclick = (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setCardSize(cardId, size);
+            };
+            wrap.appendChild(btn);
+        });
+        bar.insertBefore(wrap, bar.querySelector('.ml-auto'));
+    });
 }
 
 function updateEmptySections() {
@@ -836,6 +922,14 @@ function updateEmptySections() {
 
 function applyLimits() {
     Object.entries(layout.limits).forEach(([id, lim]) => applyCardLimit(id, lim));
+}
+
+function applySizes() {
+    document.querySelectorAll('.stats-card').forEach((card) => {
+        const cardId = card.dataset.cardId;
+        const size = layout.sizes[cardId] || getDefaultCardSize(card);
+        applyCardSize(cardId, size);
+    });
 }
 
 function applyCardLimit(cardId, limit) {
@@ -993,9 +1087,11 @@ function disableDrag() {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+    initCardSizeControls();
     applyOrder();
     applyVisibility();
     applyLimits();
+    applySizes();
     updateRestorePanel();
 });
 </script>

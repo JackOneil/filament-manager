@@ -1,32 +1,31 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="max-w-7xl mx-auto space-y-6">
+<div class="page-shell">
 
     {# ── Page header ─────────────────────────────────────────────────────── #}
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2 pb-4 border-b border-gray-200">
-        <div class="flex items-center gap-3">
-            <i class="fa-solid fa-3d-print text-3xl text-orange-500"></i>
+    <div class="page-hero">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-                <h1 class="text-3xl font-bold text-gray-800">{{ t('prusa_jobs_title') }}</h1>
-                <p class="text-gray-500 mt-1 text-sm">{{ t('prusa_jobs_desc') }}</p>
+                <h1 class="page-title"><span class="page-title-icon"><i class="fa-solid fa-3d-print"></i></span><span>{{ t('prusa_jobs_title') }}</span></h1>
+                <p>{{ t('prusa_jobs_desc') }}</p>
             </div>
-        </div>
-        <div class="flex items-center gap-3 flex-wrap">
-            {% if printers %}
-            <div class="flex items-center gap-2 flex-wrap">
-                {% for printer in printers %}
-                <button id="sync-btn-{{ printer.id }}" onclick="doSync({{ printer.id }}, '{{ printer.name|e }}')"
-                    class="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 transition-colors text-white font-semibold px-4 py-2 rounded-lg shadow text-sm">
-                    <i class="fa-solid fa-rotate" id="sync-icon-{{ printer.id }}"></i>
-                    <span id="sync-label-{{ printer.id }}">{{ printer.name }}</span>
-                </button>
-                {% endfor %}
+            <div class="flex items-center gap-3 flex-wrap">
+                {% if printers %}
+                <div class="flex items-center gap-2 flex-wrap">
+                    {% for printer in printers %}
+                    <button id="sync-btn-{{ printer.id }}" onclick="doSync({{ printer.id }}, '{{ printer.name|e }}')"
+                        class="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 transition-colors text-white font-semibold px-4 py-2 rounded-lg shadow text-sm">
+                        <i class="fa-solid fa-rotate" id="sync-icon-{{ printer.id }}"></i>
+                        <span id="sync-label-{{ printer.id }}">{{ printer.name }}</span>
+                    </button>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <a href="{{ url_for('settings') }}#prusa-printers"
+                   class="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 transition-colors text-gray-700 font-semibold px-4 py-2 rounded-lg text-sm">
+                    <i class="fa-solid fa-cog"></i> {{ t('settings') }}
+                </a>
             </div>
-            {% endif %}
-            <a href="{{ url_for('settings') }}#prusa-printers"
-               class="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 transition-colors text-gray-700 font-semibold px-4 py-2 rounded-lg text-sm">
-                <i class="fa-solid fa-cog"></i> {{ t('settings') }}
-            </a>
         </div>
     </div>
 

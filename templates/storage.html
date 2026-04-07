@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="max-w-7xl mx-auto space-y-6" x-data="storageBoard(window.storageBoardConfig)">
+<div class="page-shell" x-data="storageBoard(window.storageBoardConfig)">
     <div class="page-hero">
         <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
             <div>
-                <h1><i class="fa-solid fa-warehouse text-slate-600"></i> {{ t('storage_title') }}</h1>
+                <h1 class="page-title"><span class="page-title-icon"><i class="fa-solid fa-warehouse"></i></span><span>{{ t('storage_title') }}</span></h1>
                 <p>{{ t('storage_desc') }}</p>
             </div>
         </div>
