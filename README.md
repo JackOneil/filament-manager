@@ -38,7 +38,7 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 - **Progressive Web App** — Install on desktop or mobile device with offline-capable shell.
 - **Dark Mode** — Full dark theme support with per-user persistence.
 - **Bilingual** — Complete Czech and English translations (700+ keys).
-- **Full Backup / Restore** — Compressed `.json.gz` export of the entire application state including uploaded files. Import from compressed or legacy plain JSON.
+- **Full Backup / Restore** — Compressed `.tar.gz` export with `manifest.json` plus real uploaded project files stored directly in the archive. Import also supports older `.json.gz` and legacy plain JSON backups.
 - **Toast Notifications** — Non-blocking pop-up notifications with auto-dismiss via Alpine.js.
 - **Custom Dictionaries** — Pre-seeded brands, materials, and colors. All freely expandable, renamable, and safely deletable.
 
@@ -165,9 +165,9 @@ Schema migrations run automatically on startup via `_safe_alter()` — no manual
 
 ### Automatic (recommended)
 
-Use the built-in **Settings → Export** function to download a compressed `.json.gz` backup of the entire application state, including uploaded project files.
+Use the built-in **Settings → Export** function to download a compressed `.tar.gz` backup of the entire application state, including uploaded project files stored directly in the archive.
 
-Restore via **Settings → Import** (accepts both `.json.gz` and legacy `.json` formats).
+Restore via **Settings → Import** (accepts `.tar.gz`, older `.json.gz`, and legacy `.json` formats).
 
 ### Manual
 

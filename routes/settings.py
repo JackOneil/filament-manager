@@ -1,9 +1,11 @@
 """Settings, export/import, and theme routes."""
 import base64
 import gzip
+import io
 import json
 import logging
 import os
+import tarfile
 import uuid
 from flask import render_template, request, redirect, url_for, Response
 from werkzeug.utils import secure_filename
@@ -65,11 +67,13 @@ def _project_file_payload(project_file):
         'filename': project_file.filename,
         'filepath': project_file.filepath,
         'uploaded_at': project_file.uploaded_at.isoformat() if project_file.uploaded_at else None,
+        'archive_path': None,
         'content_b64': None,
     }
     if project_file.filepath and os.path.isfile(project_file.filepath):
-        with open(project_file.filepath, 'rb') as handle:
-            payload['content_b64'] = base64.b64encode(handle.read()).decode('ascii')
+        safe_name = secure_filename(project_file.filename or '') or f'project_file_{uuid.uuid4().hex[:8]}'
+        stamp = ''.join(ch for ch in (payload['uploaded_at'] or '') if ch.isdigit())[:14] or uuid.uuid4().hex[:12]
+        payload['archive_path'] = f'uploads/{project_file.project_id}/{stamp}_{safe_name}'
     return payload
 
 
@@ -79,15 +83,32 @@ def _build_import_file_path(upload_folder, project_id, filename, uploaded_at_tex
     return os.path.join(upload_folder, f'{project_id}_{stamp}_{safe_name}')
 
 
-def _load_backup_payload(uploaded_file):
+def _load_backup_package(uploaded_file):
     raw_bytes = uploaded_file.read()
     if not raw_bytes:
-        return {}
+        return {}, {}
+
+    try:
+        with tarfile.open(fileobj=io.BytesIO(raw_bytes), mode='r:*') as archive:
+            manifest_member = archive.extractfile('manifest.json')
+            if manifest_member is None:
+                raise ValueError('Backup archive is missing manifest.json')
+            data = json.loads(manifest_member.read().decode('utf-8'))
+            attachments = {}
+            for member in archive.getmembers():
+                if not member.isfile() or member.name == 'manifest.json':
+                    continue
+                extracted = archive.extractfile(member)
+                if extracted is not None:
+                    attachments[member.name] = extracted.read()
+            return data, attachments
+    except (tarfile.TarError, ValueError):
+        pass
 
     filename = (uploaded_file.filename or '').lower()
     if filename.endswith('.gz') or raw_bytes[:2] == b'\x1f\x8b':
         raw_bytes = gzip.decompress(raw_bytes)
-    return json.loads(raw_bytes.decode('utf-8'))
+    return json.loads(raw_bytes.decode('utf-8')), {}
 
 
 def _user_ref(user):
@@ -340,6 +361,10 @@ def register(app):
         setting = AppSetting.query.first()
 
         data = {
+            'backup_meta': {
+                'format_version': 2,
+                'packaging': 'tar.gz',
+            },
             # ── Enumerations ───────────────────────────────────────────
             'brands': [{'name': b.name, 'shop_url': b.shop_url} for b in Brand.query.all()],
             'materials': [m.name for m in Material.query.all()],
@@ -581,12 +606,25 @@ def register(app):
             f"{len(data['projects'])} projects, "
             f"{len(data['bambu_jobs'])} Bambu jobs"
         )
-        compressed = gzip.compress(
-            json.dumps(data, ensure_ascii=False, separators=(',', ':')).encode('utf-8'),
-            compresslevel=9,
-        )
-        response = Response(compressed, mimetype='application/gzip')
-        response.headers['Content-Disposition'] = 'attachment; filename=filament_backup.json.gz'
+        archive_buffer = io.BytesIO()
+        manifest_bytes = json.dumps(data, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+        with tarfile.open(fileobj=archive_buffer, mode='w:gz') as archive:
+            manifest_info = tarfile.TarInfo('manifest.json')
+            manifest_info.size = len(manifest_bytes)
+            archive.addfile(manifest_info, io.BytesIO(manifest_bytes))
+            for project in data.get('projects', []):
+                for file_data in project.get('files', []):
+                    archive_path = file_data.get('archive_path')
+                    source_path = file_data.get('filepath')
+                    if not archive_path or not source_path or not os.path.isfile(source_path):
+                        continue
+                    with open(source_path, 'rb') as handle:
+                        content = handle.read()
+                    file_info = tarfile.TarInfo(archive_path)
+                    file_info.size = len(content)
+                    archive.addfile(file_info, io.BytesIO(content))
+        response = Response(archive_buffer.getvalue(), mimetype='application/gzip')
+        response.headers['Content-Disposition'] = 'attachment; filename=filament_backup.tar.gz'
         return response
 
     @app.route('/import', methods=['POST'])
@@ -600,7 +638,7 @@ def register(app):
         upload_folder = app.config.get('PROJECT_UPLOAD_FOLDER')
         os.makedirs(upload_folder, exist_ok=True)
         try:
-            data = _load_backup_payload(file)
+            data, backup_files = _load_backup_package(file)
             with db.session.begin():
                 # ── 1. Enumerations ────────────────────────────────────
                 for b_data in data.get('brands', []):
@@ -760,8 +798,13 @@ def register(app):
                         ).first()
                         if not exists_file:
                             filepath = file_data.get('filepath', '')
+                            archive_path = file_data.get('archive_path')
                             content_b64 = file_data.get('content_b64')
-                            if content_b64:
+                            if archive_path and archive_path in backup_files:
+                                filepath = _build_import_file_path(upload_folder, proj.id, file_data.get('filename', ''), file_data.get('uploaded_at'))
+                                with open(filepath, 'wb') as handle:
+                                    handle.write(backup_files[archive_path])
+                            elif content_b64:
                                 filepath = _build_import_file_path(upload_folder, proj.id, file_data.get('filename', ''), file_data.get('uploaded_at'))
                                 with open(filepath, 'wb') as handle:
                                     handle.write(base64.b64decode(content_b64))

@@ -701,7 +701,7 @@
             </div>
             
             <form action="{{ url_for('import_data') }}" method="POST" enctype="multipart/form-data" class="bg-gray-50 rounded-lg p-5 border border-dashed border-gray-200 text-center flex flex-col justify-center items-center">
-                <input type="file" name="file" accept=".json,.json.gz,.gz" class="mb-4 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer" required title="{{ t('import_hint') }}">
+                <input type="file" name="file" accept=".tar.gz,.json,.json.gz,.gz" class="mb-4 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer" required title="{{ t('import_hint') }}">
                 <button type="submit" class="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 transition-colors text-white font-bold py-3 px-6 rounded-lg text-sm shadow" onclick="return confirm('{{ t('import_confirm') }}');">
                     <i class="fa-solid fa-upload mr-1"></i> {{ t('import_db') }}
                 </button>

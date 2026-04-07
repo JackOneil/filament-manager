@@ -3,6 +3,7 @@ import gzip
 import json
 import os
 import shutil
+import tarfile
 import tempfile
 import unittest
 
@@ -14,14 +15,52 @@ from models import (
 )
 
 
-def decode_backup_response(response):
-    payload = response.data
-    if response.headers.get('Content-Type') == 'application/gzip' or payload[:2] == b'\x1f\x8b':
+def unpack_backup_bytes(payload):
+    try:
+        with tarfile.open(fileobj=io.BytesIO(payload), mode='r:*') as archive:
+            manifest = archive.extractfile('manifest.json')
+            if manifest is None:
+                raise AssertionError('Backup archive missing manifest.json')
+            data = json.loads(manifest.read().decode('utf-8'))
+            files = {}
+            for member in archive.getmembers():
+                if not member.isfile() or member.name == 'manifest.json':
+                    continue
+                extracted = archive.extractfile(member)
+                if extracted is not None:
+                    files[member.name] = extracted.read()
+            return data, files
+    except tarfile.TarError:
+        pass
+
+    if payload[:2] == b'\x1f\x8b':
         payload = gzip.decompress(payload)
-    return json.loads(payload.decode('utf-8'))
+    return json.loads(payload.decode('utf-8')), {}
 
 
-def encode_backup_payload(payload):
+def unpack_backup_response(response):
+    return unpack_backup_bytes(response.data)
+
+
+def decode_backup_response(response):
+    data, _ = unpack_backup_response(response)
+    return data
+
+
+def encode_backup_payload(payload, files=None):
+    if files:
+        archive_bytes = io.BytesIO()
+        manifest_bytes = json.dumps(payload).encode('utf-8')
+        with tarfile.open(fileobj=archive_bytes, mode='w:gz') as archive:
+            manifest_info = tarfile.TarInfo('manifest.json')
+            manifest_info.size = len(manifest_bytes)
+            archive.addfile(manifest_info, io.BytesIO(manifest_bytes))
+            for path, content in files.items():
+                info = tarfile.TarInfo(path)
+                info.size = len(content)
+                archive.addfile(info, io.BytesIO(content))
+        archive_bytes.seek(0)
+        return archive_bytes
     return io.BytesIO(gzip.compress(json.dumps(payload).encode('utf-8')))
 
 
@@ -123,8 +162,8 @@ class ImportAtomicityTests(unittest.TestCase):
 
         export_response = self.client.get('/export')
         self.assertEqual(export_response.status_code, 200)
-        self.assertEqual(export_response.headers.get('Content-Disposition'), 'attachment; filename=filament_backup.json.gz')
-        exported = decode_backup_response(export_response)
+        self.assertEqual(export_response.headers.get('Content-Disposition'), 'attachment; filename=filament_backup.tar.gz')
+        exported, exported_files = unpack_backup_response(export_response)
         self.assertEqual(exported['projects'][0]['quotes'][0]['final_price'], 80.6)
 
         with self.app.app_context():
@@ -133,7 +172,7 @@ class ImportAtomicityTests(unittest.TestCase):
 
         import_response = self.client.post(
             '/import',
-            data={'file': (encode_backup_payload(exported), 'backup.json.gz')},
+            data={'file': (encode_backup_payload(exported, exported_files), 'backup.tar.gz')},
             content_type='multipart/form-data',
             follow_redirects=False,
         )
@@ -194,7 +233,11 @@ class ImportAtomicityTests(unittest.TestCase):
             ))
             db.session.commit()
 
-        exported = decode_backup_response(self.client.get('/export'))
+        exported, exported_files = unpack_backup_response(self.client.get('/export'))
+        self.assertEqual(exported['projects'][0]['files'][0]['content_b64'], None)
+        archive_path = exported['projects'][0]['files'][0]['archive_path']
+        self.assertIn(archive_path, exported_files)
+        self.assertEqual(exported_files[archive_path], b'3mf-backup-content')
 
         with self.app.app_context():
             db.drop_all()
@@ -202,7 +245,7 @@ class ImportAtomicityTests(unittest.TestCase):
 
         response = self.client.post(
             '/import',
-            data={'file': (encode_backup_payload(exported), 'backup.json.gz')},
+            data={'file': (encode_backup_payload(exported, exported_files), 'backup.tar.gz')},
             content_type='multipart/form-data',
             follow_redirects=False,
         )
@@ -253,7 +296,7 @@ class ImportAtomicityTests(unittest.TestCase):
             ))
             db.session.commit()
 
-        exported = decode_backup_response(self.client.get('/export'))
+        exported, exported_files = unpack_backup_response(self.client.get('/export'))
         self.assertEqual(exported['storage_shelves'][0]['name'], 'Rack A')
         self.assertEqual(exported['storage_placements'][0]['slot_index'], 4)
 
@@ -263,7 +306,7 @@ class ImportAtomicityTests(unittest.TestCase):
 
         response = self.client.post(
             '/import',
-            data={'file': (encode_backup_payload(exported), 'backup.json.gz')},
+            data={'file': (encode_backup_payload(exported, exported_files), 'backup.tar.gz')},
             content_type='multipart/form-data',
             follow_redirects=False,
         )
@@ -335,7 +378,7 @@ class ImportAtomicityTests(unittest.TestCase):
             ))
             db.session.commit()
 
-        exported = decode_backup_response(self.client.get('/export'))
+        exported, exported_files = unpack_backup_response(self.client.get('/export'))
 
         with self.app.app_context():
             db.drop_all()
@@ -343,7 +386,7 @@ class ImportAtomicityTests(unittest.TestCase):
 
         response = self.client.post(
             '/import',
-            data={'file': (encode_backup_payload(exported), 'backup.json.gz')},
+            data={'file': (encode_backup_payload(exported, exported_files), 'backup.tar.gz')},
             content_type='multipart/form-data',
             follow_redirects=False,
         )
