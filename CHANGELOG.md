@@ -6,10 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.53.0] - 2026-04-07
 ### Added
 - **Global Command Palette:** Added a global search layer (Ctrl+K) accessible from anywhere to instantly navigate through filaments, projects, and printers.
 - **Configurable Dashboard Widgets:** The overview page now supports resizable widgets (1 to 4 columns wide) to let users build a custom dashboard grid.
 - **Dashboard Widget Visibility:** Introduced a widget picker panel in the layout edit mode, allowing users to show or hide individual widget blocks based on their preference.
+- **Statistics card sizing:** The statistics dashboard edit mode now also supports per-card width selection, so individual cards can be expanded to better fit the chosen layout.
 - **New Dashboard Widgets:** Added widgets for "Spotřeba za posledních 7 dní" (7-day activity sparkline), "Nadcházející termíny" (upcoming project deadlines), and "Nejpoužívanější filamenty" (top turnover filaments).
 - **Configurable navigation palette:** Settings now include a new interface palette selector for the main menu and top app shell, with multiple color moods for the navigation area.
 
@@ -17,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Navigation Redesign:** The entire application layout has been modernized to use a collapsed left sidebar that expands on hover (saving horizontal space) and a bottom tab bar for mobile screens, replacing the traditional top navigation.
 - **Main navigation compacted:** The top app bar now uses a denser layout with smaller vertical padding, tighter menu pills, and a more compact brand block so it takes less space on the screen.
 - **Main navigation motion reduced:** Removed the dropdown/menu animation from the main navigation to keep the header calmer and visually cleaner.
+- **Page header consistency:** Main application pages now use a unified content shell and a consistent title header with icons, so sections like Projects, Storage, Statistics, Bambu, and Prusa align visually.
 - **Header branding simplified:** Removed the extra descriptive subtitle text from the main menu brand block.
 - **Overview upgraded into a command center:** The admin homepage now surfaces urgent items, projects due today, and the active project queue in a stronger operations-first layout above the existing widgets.
 - **Project detail turned into a richer workspace:** Project pages now open with a progress-first workspace header, visible status timeline, clearer delivery signals, and a sticky right-side next-action panel.
@@ -25,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Filaments page runtime error:** Restored the missing `Counter` import used by the new inventory highlight aggregation so `/filaments` no longer fails with HTTP 500.
+- **Missing navigation entries:** Restored `Calculator` and `Users` in the main sidebar and mobile menu, where they had remained available in the command palette but disappeared from the visible navigation.
 
 ## [1.52.3] - 2026-04-07
 ### Changed
