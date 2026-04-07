@@ -47,6 +47,92 @@
     </div>
 </div>
 
+<div class="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-4 mb-6">
+    <div class="ui-panel">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
+            <div>
+                <div class="ui-label">{{ t('inventory_focus_title') }}</div>
+                <h2 class="text-2xl font-bold mt-2">{{ t('inventory_focus_heading') }}</h2>
+                <p class="text-sm text-gray-500 mt-2">{{ t('inventory_focus_desc') }}</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <span class="ui-badge ui-badge-critical"><i class="fa-solid fa-triangle-exclamation"></i> {{ inventory_highlights.critical_count }} {{ t('inventory_focus_critical') }}</span>
+                <span class="ui-badge ui-badge-warning"><i class="fa-solid fa-gauge-low"></i> {{ inventory_highlights.warning_count }} {{ t('inventory_focus_warning') }}</span>
+                <span class="ui-badge ui-badge-success"><i class="fa-solid fa-circle-check"></i> {{ inventory_highlights.stable_count }} {{ t('inventory_focus_stable') }}</span>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="ui-card-soft p-4">
+                <div class="ui-label">{{ t('inventory_low_stock_widget') }}</div>
+                <div class="space-y-3 mt-3">
+                    {% for fil in stock_alerts[:3] %}
+                    <a href="{{ url_for('filament_detail', id=fil.id) }}" class="flex items-center gap-3 rounded-2xl border border-white/70 bg-white/80 px-3 py-3 hover:border-red-200 transition">
+                        <span class="w-10 h-10 rounded-2xl border border-gray-200 shadow-sm flex-shrink-0" style="background: linear-gradient(135deg, {{ fil.color.hex_value or '#cbd5e1' }}, rgba(255,255,255,0.65));"></span>
+                        <span class="min-w-0 flex-1">
+                            <span class="block font-semibold text-gray-800 truncate">{{ fil.name }}</span>
+                            <span class="block text-xs {% if fil.stock_metrics.status == 'critical' %}text-red-600{% else %}text-amber-600{% endif %} mt-1">{{ fil.stock_metrics.remaining | int }} g · {{ t('stats_recommend_buy') }} {{ fil.stock_metrics.recommended_grams }} g</span>
+                        </span>
+                    </a>
+                    {% else %}
+                    <div class="text-sm text-gray-400">{{ t('overview_all_clear') }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="ui-card-soft p-4">
+                <div class="ui-label">{{ t('inventory_top_turnover_widget') }}</div>
+                <div class="space-y-3 mt-3">
+                    {% for fil in inventory_highlights.top_turnover %}
+                    <a href="{{ url_for('filament_detail', id=fil.id) }}" class="flex items-center justify-between gap-3 rounded-2xl border border-white/70 bg-white/80 px-3 py-3 hover:border-blue-200 transition">
+                        <div class="min-w-0">
+                            <div class="font-semibold text-gray-800 truncate">{{ fil.name }}</div>
+                            <div class="text-xs text-gray-500 mt-1">{{ fil.brand.name }} · {{ fil.material.name }}</div>
+                        </div>
+                        <div class="text-right flex-shrink-0">
+                            <div class="font-semibold text-blue-700">{{ fil.stock_metrics.usage_30 | round(0) | int }} g</div>
+                            <div class="text-xs text-gray-400">30d</div>
+                        </div>
+                    </a>
+                    {% else %}
+                    <div class="text-sm text-gray-400">{{ t('inventory_focus_no_turnover') }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ui-panel">
+        <div class="ui-label">{{ t('inventory_color_mix_title') }}</div>
+        <h2 class="text-2xl font-bold mt-2">{{ t('inventory_color_mix_heading') }}</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
+            {% for item in inventory_highlights.color_mix %}
+            <div class="ui-card-soft p-4">
+                <div class="w-full h-14 rounded-2xl border border-white/70 shadow-sm" style="background: linear-gradient(135deg, {{ item.hex }}, color-mix(in srgb, {{ item.hex }} 60%, white));"></div>
+                <div class="font-semibold text-gray-800 mt-3 truncate">{{ item.name }}</div>
+                <div class="text-xs text-gray-500 mt-1">{{ item.count }} {{ t('pieces') }}</div>
+            </div>
+            {% else %}
+            <div class="col-span-full text-sm text-gray-400">{{ t('no_results') }}</div>
+            {% endfor %}
+        </div>
+        <div class="ui-card-soft p-4 mt-4">
+            <div class="ui-label">{{ t('inventory_focus_stable') }}</div>
+            <div class="space-y-2 mt-3">
+                {% for fil in inventory_highlights.healthy_pool %}
+                <a href="{{ url_for('filament_detail', id=fil.id) }}" class="flex items-center justify-between gap-3 rounded-xl border border-white/70 bg-white/80 px-3 py-2.5 hover:border-emerald-200 transition">
+                    <div class="min-w-0">
+                        <div class="font-semibold text-gray-800 truncate">{{ fil.name }}</div>
+                        <div class="text-xs text-gray-500 mt-1">{{ fil.brand.name }} · {{ fil.material.name }}</div>
+                    </div>
+                    <div class="text-sm font-semibold text-emerald-700">{{ fil.weight_remaining | int }} g</div>
+                </a>
+                {% else %}
+                <div class="text-sm text-gray-400">{{ t('no_results') }}</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
 {% if stock_alerts %}
 <div class="ui-panel mb-6">
     <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
@@ -278,8 +364,8 @@
 {% if view_mode == 'card' %}
     {% for fil in filaments.items %}
         <!-- KARTY POHLED -->
-        <div class="bg-white rounded-lg shadow-md border border-gray-100 overflow-hidden relative">
-            <div class="h-2 w-full absolute top-0 left-0" style="background-color: {{ fil.color.hex_value }};"></div>
+        <div class="ui-panel !p-0 overflow-hidden relative">
+            <div class="h-2.5 w-full absolute top-0 left-0" style="background: linear-gradient(90deg, {{ fil.color.hex_value or '#94a3b8' }}, color-mix(in srgb, {{ fil.color.hex_value or '#94a3b8' }} 60%, white));"></div>
             {% set capacity_all = fil.quantity * fil.weight_total %}
             {% if capacity_all > 0 %}
                 {% set pct = (fil.weight_remaining / capacity_all * 100) | round | int %}
@@ -287,25 +373,29 @@
                 {% set pct = 0 %}
             {% endif %}
             {% if fil.quantity == 0 or pct < 20 %}
-            <div class="absolute top-2 right-2 text-xs font-bold px-2 py-1 rounded shadow-md {% if fil.quantity == 0 %}bg-red-600 text-white{% else %}bg-orange-500 text-white{% endif %}">
+            <div class="absolute top-3 right-3 text-xs font-bold px-2.5 py-1 rounded-full shadow-md {% if fil.quantity == 0 %}bg-red-600 text-white{% else %}bg-orange-500 text-white{% endif %}">
                 {% if fil.quantity == 0 %}{{ t('out_of_stock') }}{% else %}{{ t('low_stock') }}{% endif %}
             </div>
             {% endif %}
             {% if fil.reorder_alert_snoozed %}
-            <div class="absolute top-2 left-2 text-gray-400" title="{{ t('reorder_alert_is_snoozed') }}">
+            <div class="absolute top-3 left-3 text-gray-400" title="{{ t('reorder_alert_is_snoozed') }}">
                 <i class="fa-solid fa-bell-slash text-sm"></i>
             </div>
             {% endif %}
-            <div class="p-6">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <h2 class="text-xl font-bold text-gray-800 truncate" title="{{ fil.name }}">{{ fil.name }}</h2>
-                        <p class="text-sm font-semibold text-gray-500 mt-1 flex items-center gap-1.5 flex-wrap">
+            <div class="p-6 pt-7">
+                <div class="flex justify-between items-start gap-4">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-3">
+                            <span class="w-12 h-12 rounded-2xl border border-gray-200 shadow-sm flex-shrink-0" style="background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.7), transparent 38%), linear-gradient(135deg, {{ fil.color.hex_value or '#cbd5e1' }}, color-mix(in srgb, {{ fil.color.hex_value or '#cbd5e1' }} 65%, white));"></span>
+                            <div class="min-w-0">
+                                <h2 class="text-xl font-bold text-gray-800 truncate" title="{{ fil.name }}">{{ fil.name }}</h2>
+                                <p class="text-sm font-semibold text-gray-500 mt-1 flex items-center gap-1.5 flex-wrap">
                             {{ fil.brand.name }} &bull; {{ fil.material.name }} &bull;
                             <span class="inline-block w-3 h-3 rounded-full flex-shrink-0 border border-gray-200 shadow-sm" style="background-color: {{ fil.color.hex_value }};"></span>
                             {{ fil.color.name }}
-                            <span class="ml-1 text-blue-600">({{ fil.quantity }} {{ t('pieces') }})</span>
-                        </p>
+                                </p>
+                            </div>
+                        </div>
                         {% if fil.tag_list %}
                         <div class="flex flex-wrap gap-1 mt-2">
                             {% for tag in fil.tag_list[:3] %}
@@ -314,23 +404,38 @@
                         </div>
                         {% endif %}
                     </div>
-                    <span class="px-2 py-1 text-xs font-bold rounded shadow-sm
+                    <span class="px-2.5 py-1 text-xs font-bold rounded-full shadow-sm
                         {% if pct > 50 %}bg-green-100 text-green-800
                         {% elif pct > 20 %}bg-yellow-100 text-yellow-800
                         {% else %}bg-red-100 text-red-800{% endif %}">
                         {{ pct }} %
                     </span>
                 </div>
-                
+
+                <div class="grid grid-cols-3 gap-3 mt-5">
+                    <div class="ui-card-soft p-3">
+                        <div class="text-xs uppercase tracking-[0.16em] text-gray-400 font-semibold">{{ t('pieces') }}</div>
+                        <div class="text-lg font-bold mt-2 text-gray-800">{{ fil.quantity }}</div>
+                    </div>
+                    <div class="ui-card-soft p-3">
+                        <div class="text-xs uppercase tracking-[0.16em] text-gray-400 font-semibold">{{ t('remaining') }}</div>
+                        <div class="text-lg font-bold mt-2 text-gray-800">{{ fil.weight_remaining | int }} g</div>
+                    </div>
+                    <div class="ui-card-soft p-3">
+                        <div class="text-xs uppercase tracking-[0.16em] text-gray-400 font-semibold">{{ t('capacity') }}</div>
+                        <div class="text-lg font-bold mt-2 text-gray-800">{{ capacity_all | int }} g</div>
+                    </div>
+                </div>
+
                 <div class="mt-5">
-                    <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden shadow-inner">
-                      <div class="h-3 rounded-full transition-all duration-500
+                    <div class="flex justify-between text-sm text-gray-600 font-medium mb-2">
+                        <span>{{ t('inventory_card_stock_state') }}</span>
+                        <span>{{ pct }}%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3.5 overflow-hidden shadow-inner">
+                      <div class="h-3.5 rounded-full transition-all duration-500
                         {% if pct > 50 %}bg-green-500{% elif pct > 20 %}bg-yellow-500{% else %}bg-red-500{% endif %}" 
                         style="width: {{ pct }}%"></div>
-                    </div>
-                    <div class="flex justify-between text-sm mt-2 text-gray-600 font-medium">
-                        <span>{{ t('remaining') }}: {{ fil.weight_remaining | int }} g</span>
-                        <span>{{ t('capacity') }}: {{ capacity_all | int }} g</span>
                     </div>
                     {% if fil.stock_metrics.min_stock > 0 %}
                     <div class="text-xs mt-2 {% if fil.stock_metrics.status == 'critical' %}text-red-600{% elif fil.stock_metrics.status == 'warning' %}text-amber-600{% else %}text-gray-400{% endif %}">
@@ -348,7 +453,7 @@
                         <input type="number" name="amount" min="1" max="{{ fil.weight_remaining }}" step="0.1" placeholder="g" class="w-20 border rounded px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
                         <button type="submit" class="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-200 transition-colors text-xs px-3 py-1.5 rounded whitespace-nowrap font-semibold">{{ t('subtract_usage') }}</button>
                     </form>
-                    
+
                     <div class="flex gap-4 pt-2 xl:pt-0">
                         <form action="{{ url_for('add_spool', id=fil.id) }}" method="POST">
                             <button type="submit" title="{{ t('add_spool') }}" class="text-green-500 hover:text-green-700 transition-colors"><i class="fa-solid fa-plus-circle"></i></button>

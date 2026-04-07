@@ -23,6 +23,106 @@
         </div>
     </div>
 
+    <section class="ui-panel overflow-hidden relative">
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(45,212,191,0.18),transparent_38%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.12),transparent_34%)] pointer-events-none"></div>
+        <div class="relative space-y-5">
+            <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
+                <div class="max-w-2xl">
+                    <div class="ui-label">{{ t('overview_command_center_title') }}</div>
+                    <h2 class="text-3xl font-bold mt-2 tracking-tight">{{ t('overview_command_center_heading') }}</h2>
+                    <p class="text-sm text-gray-500 mt-3">{{ t('overview_command_center_desc') }}</p>
+                </div>
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 xl:min-w-[520px]">
+                    <div class="ui-card-soft p-4">
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-red-500">{{ t('overview_command_center_urgent') }}</div>
+                        <div class="text-3xl font-bold mt-2">{{ overview_focus.urgent_total }}</div>
+                        <div class="text-sm text-gray-500 mt-2">{{ t('overview_action_center_desc') }}</div>
+                        <div class="space-y-2 mt-3">
+                            {% for item in overview_focus.urgent_items %}
+                            <a href="{{ item.url }}" class="flex items-center justify-between gap-3 rounded-xl border border-white/70 bg-white/80 px-3 py-2 hover:border-red-200 transition">
+                                <span class="min-w-0">
+                                    <span class="block text-sm font-semibold text-gray-800 truncate">{{ item.title }}</span>
+                                    <span class="block text-xs {% if item.tone == 'critical' %}text-red-600{% else %}text-amber-600{% endif %} mt-1">{{ item.meta }}</span>
+                                </span>
+                                <span class="w-2.5 h-2.5 rounded-full {% if item.tone == 'critical' %}bg-red-500{% else %}bg-amber-400{% endif %} flex-shrink-0"></span>
+                            </a>
+                            {% else %}
+                            <div class="text-xs text-gray-400">{{ t('overview_all_clear') }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="ui-card-soft p-4">
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-500">{{ t('overview_command_center_due_today') }}</div>
+                        <div class="text-3xl font-bold mt-2">{{ overview_focus.due_today_total }}</div>
+                        <div class="text-sm text-gray-500 mt-2">{{ t('projects_due_calendar_title') }}</div>
+                    </div>
+                    <div class="ui-card-soft p-4">
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-sky-600">{{ t('overview_command_center_active') }}</div>
+                        <div class="text-3xl font-bold mt-2">{{ overview_focus.active_total }}</div>
+                        <div class="text-sm text-gray-500 mt-2">{{ overview_focus.printing_total }} {{ t('status_printing')|lower }}</div>
+                    </div>
+                    <div class="ui-card-soft p-4">
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600">{{ t('overview_live_printers_title') }}</div>
+                        <div class="text-3xl font-bold mt-2">{{ overview_focus.live_total }}</div>
+                        <div class="text-sm text-gray-500 mt-2">{{ t('overview_recent_prints_title') }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-4">
+                <div class="ui-card-soft p-5">
+                    <div class="flex items-center justify-between gap-3 mb-4">
+                        <div>
+                            <div class="ui-label">{{ t('overview_command_center_due_today') }}</div>
+                            <div class="text-xl font-bold mt-1">{{ t('overview_command_center_today_queue') }}</div>
+                        </div>
+                        <a href="{{ url_for('projects_index') }}" class="ui-badge ui-badge-brand"><i class="fa-solid fa-diagram-project"></i> {{ t('projects') }}</a>
+                    </div>
+                    <div class="space-y-3">
+                        {% for project in overview_focus.due_today %}
+                        <a href="{{ url_for('project_detail', id=project.id) }}" class="flex items-center justify-between gap-4 rounded-2xl border border-white/60 bg-white/80 px-4 py-3 hover:border-amber-200 transition">
+                            <div class="min-w-0">
+                                <div class="font-semibold text-gray-800 truncate">{{ project.name }}</div>
+                                <div class="text-sm text-gray-500 mt-1">
+                                    {{ project.client_name or t('project_client_missing_label') }}
+                                    {% if project.owner %} · {{ project.owner.name }}{% endif %}
+                                </div>
+                            </div>
+                            <div class="text-right flex-shrink-0">
+                                <div class="ui-badge {% if project.status == 'PRINTING' %}ui-badge-brand{% elif project.status == 'PENDING_APPROVAL' %}ui-badge ui-badge-warning{% else %}ui-badge{% endif %}">{{ t('status_' ~ project.status|lower) }}</div>
+                                <div class="text-xs text-amber-600 font-semibold mt-2">{{ project.due_date.strftime('%d.%m.%Y') }}</div>
+                            </div>
+                        </a>
+                        {% else %}
+                        <div class="rounded-2xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-400">{{ t('overview_command_center_no_due_today') }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="ui-card-soft p-5">
+                    <div class="ui-label">{{ t('overview_command_center_active') }}</div>
+                    <div class="text-xl font-bold mt-1 mb-4">{{ t('overview_command_center_focus_projects') }}</div>
+                    <div class="space-y-3">
+                        {% for project in overview_focus.active_projects %}
+                        <a href="{{ url_for('project_detail', id=project.id) }}" class="block rounded-2xl border border-white/60 bg-white/80 px-4 py-3 hover:border-blue-200 transition">
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="font-semibold text-gray-800 truncate">{{ project.name }}</div>
+                                <span class="ui-badge {% if project.status == 'PRINTING' %}ui-badge-brand{% elif project.status == 'PENDING_APPROVAL' %}ui-badge-warning{% else %}ui-badge{% endif %}">{{ t('status_' ~ project.status|lower) }}</span>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-2">
+                                {{ project.client_name or t('project_client_missing_label') }}
+                                {% if project.due_date %} · {{ project.due_date.strftime('%d.%m.%Y') }}{% endif %}
+                            </div>
+                        </a>
+                        {% else %}
+                        <div class="rounded-2xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-400">{{ t('overview_all_clear') }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <div id="overviewEditHint" class="hidden bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 text-sm text-blue-700">
         <i class="fa-solid fa-arrows-up-down-left-right"></i>
         <span>{{ t('stats_drag_hint') }}</span>

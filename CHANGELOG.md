@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Main navigation compacted:** The top app bar now uses a denser layout with smaller vertical padding, tighter menu pills, and a more compact brand block so it takes less space on the screen.
 - **Main navigation motion reduced:** Removed the dropdown/menu animation from the main navigation to keep the header calmer and visually cleaner.
 - **Header branding simplified:** Removed the extra descriptive subtitle text from the main menu brand block.
+- **Overview upgraded into a command center:** The admin homepage now surfaces urgent items, projects due today, and the active project queue in a stronger operations-first layout above the existing widgets.
+- **Project detail turned into a richer workspace:** Project pages now open with a progress-first workspace header, visible status timeline, clearer delivery signals, and a sticky right-side next-action panel.
+- **Inventory visuals strengthened:** The filament inventory now highlights stock risks, turnover, and color mix before the filter area, and the card view uses stronger color swatches, compact stock metrics, and clearer quick actions.
+- **Command center urgency card clarified:** The `Hoří teď` block now shows a concrete shortlist of urgent stock, project, or printer issues instead of only a summary number.
+
+### Fixed
+- **Filaments page runtime error:** Restored the missing `Counter` import used by the new inventory highlight aggregation so `/filaments` no longer fails with HTTP 500.
 
 ## [1.52.3] - 2026-04-07
 ### Changed

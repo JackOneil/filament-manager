@@ -78,8 +78,134 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 xl:grid-cols-[340px_minmax(0,1fr)] gap-6">
-        <aside class="space-y-4 xl:sticky xl:top-6 self-start">
+    {% set status_flow = ['NEW', 'PENDING_APPROVAL', 'APPROVED', 'PRINTING', 'DONE'] %}
+    {% set current_idx = status_flow.index(project.status) if project.status in status_flow else -1 %}
+    {% set workspace_progress = project_metrics.completion_ratio %}
+    {% if project.status == 'DONE' %}
+        {% set workspace_progress = 100 %}
+    {% elif project.status == 'PRINTING' and workspace_progress < 76 %}
+        {% set workspace_progress = 76 %}
+    {% elif project.status == 'APPROVED' and workspace_progress < 54 %}
+        {% set workspace_progress = 54 %}
+    {% elif project.status == 'PENDING_APPROVAL' and workspace_progress < 24 %}
+        {% set workspace_progress = 24 %}
+    {% elif project.status == 'NEW' and workspace_progress < 10 %}
+        {% set workspace_progress = 10 %}
+    {% endif %}
+
+    <div class="ui-panel overflow-hidden relative">
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.14),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(45,212,191,0.12),transparent_30%)] pointer-events-none"></div>
+        <div class="relative space-y-5">
+            <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
+                <div>
+                    <div class="ui-label">{{ t('project_workspace_progress') }}</div>
+                    <h2 class="text-3xl font-bold mt-2">{{ t('project_workspace_heading') }}</h2>
+                    <p class="text-sm text-gray-500 mt-3">{{ t('project_workspace_progress_desc') }}</p>
+                </div>
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 xl:min-w-[520px]">
+                    <div class="ui-card-soft p-4">
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">{{ t('project_workspace_progress') }}</div>
+                        <div class="text-3xl font-bold mt-2">{{ workspace_progress }}%</div>
+                        <div class="text-sm text-gray-500 mt-2">{{ project_metrics.completed_plans }}/{{ project_metrics.planned_items }} {{ t('project_summary_materials')|lower }}</div>
+                    </div>
+                    <div class="ui-card-soft p-4">
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-500">{{ t('project_workspace_deadline') }}</div>
+                        <div class="text-lg font-bold mt-2">{{ project.due_date.strftime('%d.%m.%Y') if project.due_date else '-' }}</div>
+                        <div class="text-sm text-gray-500 mt-2">{{ t('project_status') }}: {{ t('status_' ~ project.status|lower) }}</div>
+                    </div>
+                    <div class="ui-card-soft p-4">
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600">{{ t('quote_project_title') }}</div>
+                        <div class="text-lg font-bold mt-2">
+                            {% if project_metrics.quote_price is not none %}{{ project_metrics.quote_price }} {{ current_currency }}{% else %}-{% endif %}
+                        </div>
+                        <div class="text-sm text-gray-500 mt-2">{{ t('project_workspace_quote_state') }}</div>
+                    </div>
+                    <div class="ui-card-soft p-4">
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-sky-600">{{ t('project_workspace_next_step') }}</div>
+                        <div class="text-lg font-bold mt-2">
+                            {% if next_actions and next_actions[0] == 'overdue' %}{{ t('project_action_overdue_title') }}
+                            {% elif next_actions and next_actions[0] == 'plan_filaments' %}{{ t('project_action_plan_filaments_title') }}
+                            {% elif next_actions and next_actions[0] == 'create_quote' %}{{ t('project_action_quote_title') }}
+                            {% elif next_actions and next_actions[0] == 'consume_planned' %}{{ t('project_action_consume_title') }}
+                            {% elif next_actions and next_actions[0] == 'map_bambu_jobs' %}{{ t('project_action_bambu_title') }}
+                            {% elif next_actions and next_actions[0] == 'map_prusa_jobs' %}{{ t('project_action_prusa_title') }}
+                            {% else %}{{ t('project_actions_complete') }}{% endif %}
+                        </div>
+                        <div class="text-sm text-gray-500 mt-2">{{ t('project_next_actions') }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <div class="flex items-center justify-between text-sm font-semibold text-gray-500">
+                    <span>{{ t('project_workspace_progress') }}</span>
+                    <span>{{ workspace_progress }}%</span>
+                </div>
+                <div class="w-full h-3 rounded-full bg-slate-200/80 overflow-hidden">
+                    <div class="h-full rounded-full bg-[linear-gradient(90deg,#0f766e_0%,#14b8a6_45%,#3b82f6_100%)]" style="width: {{ workspace_progress }}%"></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-5 gap-3">
+                {% for status in status_flow %}
+                {% set is_completed = current_idx >= loop.index0 %}
+                {% set is_current = project.status == status %}
+                <div class="rounded-2xl border px-4 py-4 {% if is_current %}border-blue-300 bg-blue-50/80{% elif is_completed %}border-emerald-200 bg-emerald-50/70{% else %}border-gray-200 bg-white/70{% endif %}">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs font-semibold uppercase tracking-[0.18em] {% if is_current %}text-blue-700{% elif is_completed %}text-emerald-700{% else %}text-gray-400{% endif %}">{{ loop.index }}</span>
+                        <span class="w-8 h-8 rounded-full flex items-center justify-center {% if is_current %}bg-blue-600 text-white{% elif is_completed %}bg-emerald-500 text-white{% else %}bg-gray-100 text-gray-400{% endif %}">
+                            <i class="fa-solid {% if is_completed %}fa-check{% else %}fa-circle-dot{% endif %} text-xs"></i>
+                        </span>
+                    </div>
+                    <div class="font-semibold mt-4 {% if is_current %}text-blue-900{% else %}text-gray-800{% endif %}">{{ t('status_' ~ status|lower) }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% if project.status == 'REJECTED' %}
+            <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <strong>{{ t('status_rejected') }}</strong> · {{ t('project_workspace_rejected_note') }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6">
+        <aside class="space-y-4 xl:sticky xl:top-6 self-start xl:order-2">
+            <div class="ui-panel overflow-hidden relative">
+                <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.16),transparent_34%)] pointer-events-none"></div>
+                <div class="relative">
+                    <div class="ui-label">{{ t('project_workspace_next_step') }}</div>
+                    <h2 class="text-2xl font-bold mt-2">{{ t('project_next_actions') }}</h2>
+                    <div class="space-y-2 mt-4">
+                        {% for action in next_actions %}
+                        <div class="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm">
+                            {% if action == 'overdue' %}
+                            <div class="font-semibold text-red-600">{{ t('project_action_overdue_title') }}</div>
+                            <div class="text-gray-500 mt-1">{{ t('project_action_overdue_desc') }}</div>
+                            {% elif action == 'plan_filaments' %}
+                            <div class="font-semibold">{{ t('project_action_plan_filaments_title') }}</div>
+                            <div class="text-gray-500 mt-1">{{ t('project_action_plan_filaments_desc') }}</div>
+                            {% elif action == 'create_quote' %}
+                            <div class="font-semibold">{{ t('project_action_quote_title') }}</div>
+                            <div class="text-gray-500 mt-1">{{ t('project_action_quote_desc') }}</div>
+                            {% elif action == 'consume_planned' %}
+                            <div class="font-semibold">{{ t('project_action_consume_title') }}</div>
+                            <div class="text-gray-500 mt-1">{{ t('project_action_consume_desc') }}</div>
+                            {% elif action == 'map_bambu_jobs' %}
+                            <div class="font-semibold">{{ t('project_action_bambu_title') }}</div>
+                            <div class="text-gray-500 mt-1">{{ t('project_action_bambu_desc') }}</div>
+                            {% elif action == 'map_prusa_jobs' %}
+                            <div class="font-semibold">{{ t('project_action_prusa_title') }}</div>
+                            <div class="text-gray-500 mt-1">{{ t('project_action_prusa_desc') }}</div>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{{ t('project_actions_complete') }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
             <div class="ui-panel">
                 <div class="ui-label">{{ t('project_status') }}</div>
                 <div class="text-2xl font-bold mt-2">{{ t('status_' ~ project.status|lower) }}</div>
@@ -146,39 +272,9 @@
                 </div>
             </div>
 
-            <div class="ui-panel">
-                <div class="ui-label">{{ t('project_next_actions') }}</div>
-                <div class="space-y-2 mt-4">
-                    {% for action in next_actions %}
-                    <div class="ui-card-soft p-3 text-sm">
-                        {% if action == 'overdue' %}
-                        <div class="font-semibold text-red-600">{{ t('project_action_overdue_title') }}</div>
-                        <div class="text-gray-500 mt-1">{{ t('project_action_overdue_desc') }}</div>
-                        {% elif action == 'plan_filaments' %}
-                        <div class="font-semibold">{{ t('project_action_plan_filaments_title') }}</div>
-                        <div class="text-gray-500 mt-1">{{ t('project_action_plan_filaments_desc') }}</div>
-                        {% elif action == 'create_quote' %}
-                        <div class="font-semibold">{{ t('project_action_quote_title') }}</div>
-                        <div class="text-gray-500 mt-1">{{ t('project_action_quote_desc') }}</div>
-                        {% elif action == 'consume_planned' %}
-                        <div class="font-semibold">{{ t('project_action_consume_title') }}</div>
-                        <div class="text-gray-500 mt-1">{{ t('project_action_consume_desc') }}</div>
-                        {% elif action == 'map_bambu_jobs' %}
-                        <div class="font-semibold">{{ t('project_action_bambu_title') }}</div>
-                        <div class="text-gray-500 mt-1">{{ t('project_action_bambu_desc') }}</div>
-                        {% elif action == 'map_prusa_jobs' %}
-                        <div class="font-semibold">{{ t('project_action_prusa_title') }}</div>
-                        <div class="text-gray-500 mt-1">{{ t('project_action_prusa_desc') }}</div>
-                        {% endif %}
-                    </div>
-                    {% else %}
-                    <div class="ui-card-soft p-3 text-sm text-gray-500">{{ t('project_actions_complete') }}</div>
-                    {% endfor %}
-                </div>
-            </div>
         </aside>
 
-        <section class="space-y-4">
+        <section class="space-y-4 xl:order-1">
             <div class="ui-panel">
                 <div class="flex flex-wrap gap-2">
                     <button type="button" @click="setTab('overview')" :class="workspaceTab === 'overview' ? 'ui-badge ui-badge-brand' : 'ui-badge'">{{ t('project_workspace_tab_overview') }}</button>

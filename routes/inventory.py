@@ -1,5 +1,6 @@
 """Inventory routes: listing, CRUD, spool management, and filament detail."""
 import math
+from collections import Counter
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
@@ -146,6 +147,77 @@ def _live_printers():
     return live
 
 
+def _overview_focus(action_center, live_printers, now=None):
+    now = now or datetime.utcnow()
+    today_start = datetime(now.year, now.month, now.day)
+    tomorrow_start = today_start + timedelta(days=1)
+    active_statuses = ('NEW', 'PENDING_APPROVAL', 'APPROVED', 'PRINTING')
+
+    due_today = (
+        Project.query
+        .filter(
+            Project.status != 'DONE',
+            Project.due_date.is_not(None),
+            Project.due_date >= today_start,
+            Project.due_date < tomorrow_start,
+        )
+        .order_by(Project.due_date.asc(), Project.created_at.desc())
+        .limit(4)
+        .all()
+    )
+    active_projects = (
+        Project.query
+        .filter(Project.status.in_(active_statuses))
+        .order_by(
+            db.case((Project.status == 'PRINTING', 0), (Project.status == 'APPROVED', 1), else_=2),
+            db.case((Project.due_date.is_(None), 1), else_=0),
+            Project.due_date.asc(),
+            Project.created_at.desc(),
+        )
+        .limit(6)
+        .all()
+    )
+
+    urgent_items = []
+    for item in action_center['low_stock'][:2]:
+        urgent_items.append({
+            'title': item['filament'].name,
+            'meta': f"{int(item['recommended_grams'] or 0)} g",
+            'url': url_for('filament_detail', id=item['filament'].id),
+            'tone': 'critical' if item['status'] == 'critical' else 'warning',
+        })
+    for project in action_center['overdue_projects'][:2]:
+        urgent_items.append({
+            'title': project.name,
+            'meta': project.due_date.strftime('%d.%m.%Y') if project.due_date else '-',
+            'url': url_for('project_detail', id=project.id),
+            'tone': 'critical',
+        })
+    for issue in action_center['printer_issues'][:1]:
+        urgent_items.append({
+            'title': issue['name'],
+            'meta': 'sync',
+            'url': url_for('settings') + '#printer-diagnostics',
+            'tone': 'warning',
+        })
+
+    return {
+        'urgent_total': (
+            int(action_center['counts']['low_stock'] or 0)
+            + int(action_center['counts']['overdue_projects'] or 0)
+            + int(action_center['counts']['unmapped_jobs'] or 0)
+            + len(action_center['printer_issues'])
+        ),
+        'urgent_items': urgent_items[:4],
+        'due_today_total': len(due_today),
+        'active_total': Project.query.filter(Project.status.in_(active_statuses)).count(),
+        'printing_total': sum(1 for project in active_projects if project.status == 'PRINTING'),
+        'live_total': len(live_printers),
+        'due_today': due_today,
+        'active_projects': active_projects,
+    }
+
+
 def _inventory_page_context():
     from utils import collect_usage_windows
 
@@ -226,6 +298,31 @@ def _inventory_page_context():
         ),
     )
 
+    visible_filaments = list(filaments_paginated.items)
+    critical_count = sum(1 for fil in visible_filaments if fil.stock_metrics['status'] == 'critical')
+    warning_count = sum(1 for fil in visible_filaments if fil.stock_metrics['status'] == 'warning')
+    stable_count = sum(1 for fil in visible_filaments if fil.stock_metrics['status'] == 'stable')
+
+    color_counts = Counter()
+    for fil in visible_filaments:
+        color_name = fil.color.name if fil.color else '-'
+        color_hex = fil.color.hex_value if fil.color and fil.color.hex_value else '#cbd5e1'
+        color_counts[(color_name, color_hex)] += max(int(fil.quantity or 0), 1)
+    color_mix = [
+        {'name': name, 'hex': hex_value, 'count': count}
+        for (name, hex_value), count in color_counts.most_common(6)
+    ]
+    top_turnover = sorted(
+        [fil for fil in visible_filaments if fil.stock_metrics['usage_30'] > 0],
+        key=lambda fil: (fil.stock_metrics['usage_30'], fil.weight_remaining),
+        reverse=True,
+    )[:3]
+    healthy_pool = sorted(
+        [fil for fil in visible_filaments if fil.stock_metrics['status'] == 'stable'],
+        key=lambda fil: ((fil.weight_remaining or 0), (fil.quantity or 0)),
+        reverse=True,
+    )[:3]
+
     return {
         'filaments': filaments_paginated,
         'stats': stats,
@@ -244,6 +341,15 @@ def _inventory_page_context():
         'sort_direction': sort_direction,
         'stock_alerts': stock_alert_pool[:6],
         'stock_alert_count': len(stock_alert_pool),
+        'inventory_highlights': {
+            'critical_count': critical_count,
+            'warning_count': warning_count,
+            'stable_count': stable_count,
+            'tagged_count': sum(1 for fil in visible_filaments if fil.tag_list),
+            'color_mix': color_mix,
+            'top_turnover': top_turnover,
+            'healthy_pool': healthy_pool,
+        },
         'app_settings': setting,
     }
 
@@ -315,11 +421,14 @@ def register(app):
                 'overview_user.html',
                 user_dashboard=_user_dashboard_context(user),
             )
+        action_center = build_action_center()
+        live_printers = _live_printers()
         return render_template(
             'overview.html',
             stats=_inventory_stats(),
-            action_center=build_action_center(),
-            live_printers=_live_printers(),
+            action_center=action_center,
+            live_printers=live_printers,
+            overview_focus=_overview_focus(action_center, live_printers),
         )
 
     @app.route('/filaments')
