@@ -13,7 +13,7 @@
         <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
             <div>
                 <div class="ui-label">Printer Diagnostics</div>
-                <h2 class="text-2xl font-bold mt-1">Sync stav a akční centrum</h2>
+                <h2 class="text-2xl font-bold mt-1">{{ t('settings_sync_action_center') }}</h2>
             </div>
             <div class="flex flex-wrap gap-2">
                 <span class="ui-badge {% if action_center.counts.printer_issues %}ui-badge-critical{% else %}ui-badge-success{% endif %}">
@@ -33,10 +33,10 @@
                     </form>
                 </div>
                 <div class="text-sm text-gray-500 mt-3">
-                    {% if app_settings and app_settings.bambu_last_sync_at %}Last sync: {{ app_settings.bambu_last_sync_at.strftime('%d.%m.%Y %H:%M') }}{% else %}Zatím neproběhla synchronizace.{% endif %}
+                    {% if app_settings and app_settings.bambu_last_sync_at %}Last sync: {{ app_settings.bambu_last_sync_at.strftime('%d.%m.%Y %H:%M') }}{% else %}{{ t('bambu_no_sync_yet') }}{% endif %}
                 </div>
                 <div class="text-sm mt-2 {% if bambu_sync_status.error %}text-red-600{% else %}text-gray-500{% endif %}">
-                    {% if bambu_sync_status.error %}{{ bambu_sync_status.error }}{% elif bambu_sync_status.ok %}Added {{ bambu_sync_status.added }}, updated {{ bambu_sync_status.updated }}, skipped {{ bambu_sync_status.skipped }}{% else %}Bez dat o stavu.{% endif %}
+                    {% if bambu_sync_status.error %}{{ bambu_sync_status.error }}{% elif bambu_sync_status.ok %}Added {{ bambu_sync_status.added }}, updated {{ bambu_sync_status.updated }}, skipped {{ bambu_sync_status.skipped }}{% else %}{{ t('settings_no_status_data') }}{% endif %}
                 </div>
             </div>
             <div class="ui-card-soft p-4 xl:col-span-2">
@@ -49,7 +49,7 @@
                             <div class="font-semibold text-gray-800">{{ printer.name }}</div>
                             <div class="text-sm text-gray-500">{{ printer.host }}</div>
                             <div class="text-xs mt-1 {% if sync and sync.error %}text-red-600{% else %}text-gray-400{% endif %}">
-                                {% if printer.last_sync_at %}Last sync {{ printer.last_sync_at.strftime('%d.%m.%Y %H:%M') }}{% else %}Bez synchronizace{% endif %}
+                                {% if printer.last_sync_at %}Last sync {{ printer.last_sync_at.strftime('%d.%m.%Y %H:%M') }}{% else %}{{ t('prusa_no_sync_yet') }}{% endif %}
                                 {% if printer.last_success_at %} · success {{ printer.last_success_at.strftime('%d.%m.%Y %H:%M') }}{% endif %}
                                 {% if sync and sync.error %} · {{ sync.error }}{% endif %}
                             </div>
@@ -59,7 +59,7 @@
                         </form>
                     </div>
                     {% else %}
-                    <p class="text-sm text-gray-400">Žádné Prusa tiskárny nejsou nakonfigurované.</p>
+                    <p class="text-sm text-gray-400">{{ t('prusa_no_printers') }}</p>
                     {% endfor %}
                 </div>
             </div>
@@ -493,7 +493,7 @@
                         <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('prusa_printer_alias') }} *</label>
                         <input type="text" name="name" required
                             class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
-                            placeholder="Např. Prusa MK4 v dílně">
+                            placeholder="{{ t('prusa_printer_name_placeholder') }}">
                     </div>
                     <div>
                         <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('prusa_printer_host') }} *</label>
@@ -512,7 +512,7 @@
                         <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('prusa_printer_notes') }}</label>
                         <input type="text" name="notes"
                             class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
-                            placeholder="Volitelná poznámka">
+                            placeholder="{{ t('prusa_notes_placeholder') }}">
                     </div>
                     <div class="flex gap-3">
                         <button type="submit"
@@ -547,12 +547,12 @@
                                 {% endif %}
                                 <span class="block text-xs text-gray-400 font-mono mt-0.5">{{ pp.host }}</span>
                                 {% if not pp.enabled %}
-                                <span class="text-xs text-amber-600 font-semibold">⏸ Deaktivováno</span>
+                                <span class="text-xs text-amber-600 font-semibold">{{ t('printer_deactivated') }}</span>
                                 {% endif %}
                             </div>
                             <div class="flex items-center gap-1 flex-wrap">
                                 <button type="button"
-                                    @click="testing = true; testResult = null; fetch('/prusa/printer/{{ pp.id }}/test', {method:'POST'}).then(r=>r.json()).then(d=>{testing=false; testResult=d;}).catch(()=>{testing=false; testResult={ok:false,error:'Nelze se připojit'};})"
+                                    @click="testing = true; testResult = null; fetch('/prusa/printer/{{ pp.id }}/test', {method:'POST'}).then(r=>r.json()).then(d=>{testing=false; testResult=d;}).catch(()=>{testing=false; testResult={ok:false,error:'{{ t('prusa_cannot_connect') }}'};})
                                     class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold px-3 py-1.5 rounded-lg transition-colors">
                                     <i class="fa-solid" :class="testing ? 'fa-spinner fa-spin' : 'fa-plug'"></i>
                                     <span x-show="!testing">{{ t('prusa_test_connection') }}</span>

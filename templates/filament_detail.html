@@ -83,7 +83,7 @@
                     {% if filament.quality_profile %}<div><span class="font-semibold text-gray-700">Profile:</span> <span class="text-gray-500">{{ filament.quality_profile }}</span></div>{% endif %}
                     {% if filament.quality_notes %}<div><span class="font-semibold text-gray-700">Notes:</span> <span class="text-gray-500">{{ filament.quality_notes }}</span></div>{% endif %}
                     {% if not filament.quality_drying and not filament.quality_profile and not filament.quality_notes %}
-                    <div class="text-gray-400">Doplň sušení, profil a poznámky pro rychlejší opakované použití.</div>
+                    <div class="text-gray-400">{{ t('quality_fill_hint') }}</div>
                     {% endif %}
                 </div>
             </div>
@@ -102,13 +102,13 @@
                 </div>
                 <div class="ui-card-soft p-4">
                     <div class="ui-label">Drying & Adhesion</div>
-                    <div class="text-sm text-gray-500 mt-2">{{ filament.quality_drying or 'Bez poznámky k sušení.' }}</div>
-                    <div class="text-sm text-gray-500 mt-2">{{ filament.quality_adhesion or 'Bez poznámky k přilnavosti.' }}</div>
+                    <div class="text-sm text-gray-500 mt-2">{{ filament.quality_drying or t('quality_no_drying') }}</div>
+                    <div class="text-sm text-gray-500 mt-2">{{ filament.quality_adhesion or t('quality_no_adhesion') }}</div>
                 </div>
                 <div class="ui-card-soft p-4">
                     <div class="ui-label">Stringing & Notes</div>
-                    <div class="text-sm text-gray-500 mt-2">{{ filament.quality_stringing or 'Bez poznámky ke stringingu.' }}</div>
-                    <div class="text-sm text-gray-500 mt-2">{{ filament.quality_notes or 'Bez obecných poznámek.' }}</div>
+                    <div class="text-sm text-gray-500 mt-2">{{ filament.quality_stringing or t('quality_no_stringing') }}</div>
+                    <div class="text-sm text-gray-500 mt-2">{{ filament.quality_notes or t('quality_no_notes') }}</div>
                 </div>
             </div>
             <form method="POST" action="{{ url_for('filament_update_meta', id=filament.id) }}" class="space-y-4">

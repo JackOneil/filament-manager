@@ -25,7 +25,7 @@
 
     <section class="ui-panel overflow-hidden relative" id="overviewVisibilityPanel" class="hidden">
         <div class="p-2 w-full">
-            <h3 class="font-bold text-gray-800 mb-3 ml-2"><i class="fa-solid fa-eye text-blue-500 mr-2"></i>{{ t('stats_widget_visibility') | default('Zobrazení widgetů') }}</h3>
+            <h3 class="font-bold text-gray-800 mb-3 ml-2"><i class="fa-solid fa-eye text-blue-500 mr-2"></i>{{ t('stats_widget_visibility') }}</h3>
             <div class="visibility-toggles flex flex-wrap gap-2">
                <!-- Auto-populated by createWidgetLayoutManager via syncVisibility -->
             </div>
@@ -444,15 +444,15 @@
         <section class="dashboard-widget xl:col-span-2 col-span-1" data-widget-id="upcoming_deadlines">
             <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                 <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
-                <span class="text-sm font-semibold text-gray-700 ml-1">Nadcházející termíny</span>
+                <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('overview_widget_upcoming_deadlines') }}</span>
                 <div class="ml-auto flex items-center gap-1">
                     <button onclick="moveOverviewWidgetUp('upcoming_deadlines')" title="{{ t('stats_move_up') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-up text-xs"></i></button>
                     <button onclick="moveOverviewWidgetDown('upcoming_deadlines')" title="{{ t('stats_move_down') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-down text-xs"></i></button>
                 </div>
             </div>
             <div class="ui-panel h-full">
-                <div class="ui-label">Termíny</div>
-                <h2 class="text-xl font-bold mb-4">Nadcházející projekty</h2>
+                <div class="ui-label">{{ t('overview_deadlines_label') }}</div>
+                <h2 class="text-xl font-bold mb-4">{{ t('overview_upcoming_projects_title') }}</h2>
                 <div class="space-y-3">
                    {% for project in overview_focus.upcoming_deadlines %}
                    <a href="{{ url_for('project_detail', id=project.id) }}" class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-blue-200 transition bg-white/50">
@@ -463,7 +463,7 @@
                        </div>
                    </a>
                    {% else %}
-                   <div class="text-sm text-gray-400">Žádné termíny v nejbližší době</div>
+                   <div class="text-sm text-gray-400">{{ t('overview_no_deadlines') }}</div>
                    {% endfor %}
                 </div>
             </div>
@@ -472,15 +472,15 @@
         <section class="dashboard-widget xl:col-span-2 col-span-1" data-widget-id="usage_7d">
             <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                 <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
-                <span class="text-sm font-semibold text-gray-700 ml-1">Spotřeba 7 dní</span>
+                <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('overview_widget_usage_7d') }}</span>
                 <div class="ml-auto flex items-center gap-1">
                     <button onclick="moveOverviewWidgetUp('usage_7d')" title="{{ t('stats_move_up') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-up text-xs"></i></button>
                     <button onclick="moveOverviewWidgetDown('usage_7d')" title="{{ t('stats_move_down') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-down text-xs"></i></button>
                 </div>
             </div>
             <div class="ui-panel h-full flex flex-col">
-                <div class="ui-label">Aktivita</div>
-                <h2 class="text-xl font-bold mb-4">Spotřeba za posledních 7 dní</h2>
+                <div class="ui-label">{{ t('overview_activity_label') }}</div>
+                <h2 class="text-xl font-bold mb-4">{{ t('overview_usage_7d_title') }}</h2>
                 <div class="flex-1 flex items-end gap-2 h-32 pt-4">
                     {% set max_val = (overview_focus.usage_7d | max) or 1 %}
                     {% for val in overview_focus.usage_7d %}
@@ -499,15 +499,15 @@
         <section class="dashboard-widget xl:col-span-2 col-span-1" data-widget-id="top_turnover">
             <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                 <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
-                <span class="text-sm font-semibold text-gray-700 ml-1">Top Filamenty</span>
+                <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('overview_top_turnover_title') }}</span>
                 <div class="ml-auto flex items-center gap-1">
                     <button onclick="moveOverviewWidgetUp('top_turnover')" title="{{ t('stats_move_up') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-up text-xs"></i></button>
                     <button onclick="moveOverviewWidgetDown('top_turnover')" title="{{ t('stats_move_down') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-down text-xs"></i></button>
                 </div>
             </div>
             <div class="ui-panel h-full">
-                <div class="ui-label">Spotřeba</div>
-                <h2 class="text-xl font-bold mb-4">Nejpoužívanější (30 dní)</h2>
+                <div class="ui-label">{{ t('overview_consumption_label') }}</div>
+                <h2 class="text-xl font-bold mb-4">{{ t('overview_top_turnover_title') }}</h2>
                 <div class="space-y-3">
                    {% for f in overview_focus.top_turnover_month %}
                    <a href="{{ url_for('filament_detail', id=f.filament.id) }}" class="flex items-center gap-3 group">
@@ -516,7 +516,7 @@
                        <div class="text-xs font-bold text-gray-500">{{ f.usage|round|int }} g</div>
                    </a>
                    {% else %}
-                   <div class="text-sm text-gray-400">Žádná aktivita za poslední měsíc</div>
+                   <div class="text-sm text-gray-400">{{ t('overview_no_activity_month') }}</div>
                    {% endfor %}
                 </div>
             </div>
