@@ -257,6 +257,128 @@
         .ui-button-ghost:hover {
             transform: translateY(-1px);
         }
+        .md-editor-shell {
+            border: 1px solid var(--ui-border);
+            border-radius: 1rem;
+            background: var(--ui-surface-strong);
+            overflow: hidden;
+            box-shadow: var(--ui-shadow-soft);
+        }
+        .md-editor-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid var(--ui-border);
+            background: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(248,250,252,0.88));
+        }
+        html.dark .md-editor-toolbar {
+            background: linear-gradient(180deg, rgba(15,23,42,0.78), rgba(30,41,59,0.84));
+        }
+        .md-editor-toolbar-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+        }
+        .md-editor-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.35rem;
+            min-width: 2.4rem;
+            height: 2.4rem;
+            padding: 0 0.8rem;
+            border-radius: 0.8rem;
+            border: 1px solid var(--ui-border);
+            background: var(--ui-surface-soft);
+            color: var(--ui-text);
+            font-size: 0.82rem;
+            font-weight: 700;
+            transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+        }
+        .md-editor-btn:hover {
+            transform: translateY(-1px);
+            border-color: var(--ui-border-strong);
+        }
+        .md-editor-btn.is-active {
+            background: var(--ui-brand-soft);
+            color: var(--ui-brand);
+            border-color: var(--ui-brand-ring);
+        }
+        .md-editor-surface {
+            min-height: 14rem;
+            padding: 1rem 1.1rem;
+        }
+        .md-editor-input,
+        .md-editor-visual,
+        .md-editor-preview {
+            width: 100%;
+            min-height: 12rem;
+            border: 0;
+            background: transparent;
+            color: var(--ui-text);
+            outline: none;
+            line-height: 1.7;
+        }
+        .md-editor-input {
+            resize: vertical;
+        }
+        .md-editor-resizer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 1.25rem;
+            border-top: 1px solid var(--ui-border);
+            background: var(--ui-surface-soft);
+            cursor: ns-resize;
+        }
+        .md-editor-resizer-line {
+            width: 4rem;
+            height: 0.28rem;
+            border-radius: 9999px;
+            background: rgba(148, 163, 184, 0.45);
+        }
+        .md-editor-visual[contenteditable="true"]:empty:before {
+            content: attr(data-placeholder);
+            color: var(--ui-text-muted);
+        }
+        .md-editor-preview a,
+        .md-editor-visual a {
+            color: #2563eb;
+            text-decoration: underline;
+        }
+        .md-editor-preview blockquote,
+        .md-editor-visual blockquote {
+            border-left: 4px solid rgba(148, 163, 184, 0.35);
+            padding-left: 1rem;
+            font-style: italic;
+            color: var(--ui-text-muted);
+        }
+        .md-editor-preview pre,
+        .md-editor-visual pre {
+            background: #0f172a;
+            color: #e2e8f0;
+            border-radius: 1rem;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+        .md-editor-preview code,
+        .md-editor-visual code {
+            background: rgba(148, 163, 184, 0.15);
+            padding: 0.1rem 0.35rem;
+            border-radius: 0.35rem;
+        }
+        .md-editor-preview ul,
+        .md-editor-visual ul {
+            list-style: disc;
+            padding-left: 1.3rem;
+        }
+        .md-editor-preview ol,
+        .md-editor-visual ol {
+            list-style: decimal;
+            padding-left: 1.3rem;
+        }
         .ui-table {
             width: 100%;
             border-collapse: collapse;
@@ -1726,6 +1848,279 @@
                 applyRememberedBambuFilters();
             }
         })();
+    </script>
+    <script>
+        function markdownEditor(config) {
+            return {
+                mode: config.defaultMode || 'visual',
+                value: config.initialValue || '',
+                placeholder: config.placeholder || '',
+                editorHeight: config.defaultHeight || 260,
+                init() {
+                    if (this.$refs.source) {
+                        this.value = this.$refs.source.value || this.value || '';
+                    }
+                    this.refreshVisual();
+                    if (this.mode === 'preview') {
+                        this.syncPreview();
+                    }
+                },
+                setMode(nextMode) {
+                    if (this.mode === nextMode) return;
+                    if (this.mode === 'visual') {
+                        this.syncFromVisual();
+                    }
+                    this.mode = nextMode;
+                    if (nextMode === 'visual') {
+                        this.$nextTick(() => this.refreshVisual());
+                    }
+                    if (nextMode === 'preview') {
+                        this.syncPreview();
+                    }
+                },
+                syncPreview() {
+                    if (this.mode === 'visual') {
+                        this.syncFromVisual();
+                    }
+                },
+                refreshVisual() {
+                    if (!this.$refs.visual) return;
+                    this.$refs.visual.innerHTML = this.markdownToHtml(this.value || '');
+                },
+                syncFromVisual() {
+                    if (!this.$refs.visual) return;
+                    this.value = this.htmlToMarkdown(this.$refs.visual.innerHTML);
+                    if (this.$refs.source) {
+                        this.$refs.source.value = this.value;
+                    }
+                },
+                startResize(event) {
+                    var startY = event.clientY;
+                    var startHeight = this.editorHeight;
+                    var self = this;
+                    function onMove(moveEvent) {
+                        self.editorHeight = Math.max(180, startHeight + (moveEvent.clientY - startY));
+                    }
+                    function onUp() {
+                        window.removeEventListener('mousemove', onMove);
+                        window.removeEventListener('mouseup', onUp);
+                    }
+                    window.addEventListener('mousemove', onMove);
+                    window.addEventListener('mouseup', onUp);
+                },
+                apply(action) {
+                    if (this.mode === 'visual') {
+                        this.applyVisual(action);
+                        this.syncFromVisual();
+                    } else {
+                        this.applyMarkdown(action);
+                    }
+                    if (this.mode === 'preview') {
+                        this.syncPreview();
+                    }
+                },
+                applyVisual(action) {
+                    if (!this.$refs.visual) return;
+                    this.$refs.visual.focus();
+                    if (action === 'bold') document.execCommand('bold');
+                    if (action === 'italic') document.execCommand('italic');
+                    if (action === 'h2') document.execCommand('formatBlock', false, 'h2');
+                    if (action === 'ul') document.execCommand('insertUnorderedList');
+                    if (action === 'ol') document.execCommand('insertOrderedList');
+                    if (action === 'quote') document.execCommand('formatBlock', false, 'blockquote');
+                    if (action === 'link') {
+                        var url = window.prompt('URL', 'https://');
+                        if (url) document.execCommand('createLink', false, url);
+                    }
+                    if (action === 'code') {
+                        document.execCommand('insertHTML', false, '<code>' + this.escapeHtml(window.getSelection().toString() || 'code') + '</code>');
+                    }
+                },
+                applyMarkdown(action) {
+                    var textarea = this.$refs.markdown;
+                    if (!textarea) return;
+                    var start = textarea.selectionStart || 0;
+                    var end = textarea.selectionEnd || 0;
+                    var selected = this.value.slice(start, end);
+                    var result = this.value;
+                    var nextCursor = end;
+
+                    function replaceRange(prefix, suffix, fallback) {
+                        var insert = prefix + (selected || fallback) + suffix;
+                        result = result.slice(0, start) + insert + result.slice(end);
+                        nextCursor = start + insert.length;
+                    }
+
+                    if (action === 'bold') replaceRange('**', '**', 'text');
+                    if (action === 'italic') replaceRange('*', '*', 'text');
+                    if (action === 'h2') replaceRange('## ', '', 'Heading');
+                    if (action === 'quote') replaceRange('> ', '', 'Quote');
+                    if (action === 'code') replaceRange('`', '`', 'code');
+                    if (action === 'ul') replaceRange('- ', '', 'List item');
+                    if (action === 'ol') replaceRange('1. ', '', 'List item');
+                    if (action === 'link') {
+                        var href = window.prompt('URL', 'https://');
+                        if (href) {
+                            var text = selected || 'link';
+                            var insert = '[' + text + '](' + href + ')';
+                            result = result.slice(0, start) + insert + result.slice(end);
+                            nextCursor = start + insert.length;
+                        }
+                    }
+
+                    this.value = result;
+                    this.$nextTick(() => {
+                        textarea.focus();
+                        textarea.setSelectionRange(nextCursor, nextCursor);
+                    });
+                },
+                escapeHtml(value) {
+                    return String(value || '')
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/'/g, '&#39;');
+                },
+                renderInline(value) {
+                    var html = this.escapeHtml(value || '');
+                    html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+                    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+|mailto:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+                    html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+                    html = html.replace(/(^|[^\*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+                    return html;
+                },
+                markdownToHtml(markdown) {
+                    var lines = String(markdown || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+                    var blocks = [];
+                    var paragraph = [];
+                    var listType = null;
+                    var listItems = [];
+                    var quoteLines = [];
+                    var inCode = false;
+                    var codeLines = [];
+                    var self = this;
+
+                    function flushParagraph() {
+                        if (!paragraph.length) return;
+                        blocks.push('<p>' + paragraph.map(line => self.renderInline(line)).join('<br>') + '</p>');
+                        paragraph = [];
+                    }
+                    function flushList() {
+                        if (!listItems.length) return;
+                        blocks.push('<' + listType + '>' + listItems.map(item => '<li>' + item + '</li>').join('') + '</' + listType + '>');
+                        listItems = [];
+                        listType = null;
+                    }
+                    function flushQuote() {
+                        if (!quoteLines.length) return;
+                        blocks.push('<blockquote>' + quoteLines.map(line => self.renderInline(line)).join('<br>') + '</blockquote>');
+                        quoteLines = [];
+                    }
+                    function flushCode() {
+                        if (!codeLines.length) return;
+                        blocks.push('<pre><code>' + self.escapeHtml(codeLines.join('\n')) + '</code></pre>');
+                        codeLines = [];
+                    }
+
+                    lines.forEach(function (line) {
+                        var trimmed = line.trim();
+                        if (inCode) {
+                            if (trimmed.startsWith('```')) {
+                                flushCode();
+                                inCode = false;
+                            } else {
+                                codeLines.push(line);
+                            }
+                            return;
+                        }
+                        if (trimmed.startsWith('```')) {
+                            flushParagraph();
+                            flushList();
+                            flushQuote();
+                            inCode = true;
+                            return;
+                        }
+                        if (!trimmed) {
+                            flushParagraph();
+                            flushList();
+                            flushQuote();
+                            return;
+                        }
+                        if (/^(#{1,6})\s+/.test(line)) {
+                            flushParagraph();
+                            flushList();
+                            flushQuote();
+                            var level = line.match(/^(#{1,6})\s+/)[1].length;
+                            blocks.push('<h' + level + '>' + self.renderInline(line.replace(/^(#{1,6})\s+/, '')) + '</h' + level + '>');
+                            return;
+                        }
+                        if (/^>\s?/.test(line)) {
+                            flushParagraph();
+                            flushList();
+                            quoteLines.push(line.replace(/^>\s?/, ''));
+                            return;
+                        }
+                        if (/^\s*[-*+]\s+/.test(line) || /^\s*\d+\.\s+/.test(line)) {
+                            flushParagraph();
+                            flushQuote();
+                            var nextType = /^\s*\d+\.\s+/.test(line) ? 'ol' : 'ul';
+                            if (listType && listType !== nextType) flushList();
+                            listType = nextType;
+                            listItems.push(self.renderInline(line.replace(/^\s*(?:[-*+]|\d+\.)\s+/, '')));
+                            return;
+                        }
+                        flushList();
+                        flushQuote();
+                        paragraph.push(line);
+                    });
+
+                    flushParagraph();
+                    flushList();
+                    flushQuote();
+                    if (inCode) flushCode();
+                    return blocks.join('');
+                },
+                htmlToMarkdown(html) {
+                    var wrapper = document.createElement('div');
+                    wrapper.innerHTML = html || '';
+                    return this.nodeToMarkdown(wrapper).trim();
+                },
+                nodeToMarkdown(node) {
+                    var self = this;
+                    return Array.from(node.childNodes).map(function (child) {
+                        if (child.nodeType === Node.TEXT_NODE) {
+                            return child.textContent.replace(/\u00a0/g, ' ');
+                        }
+                        if (child.nodeType !== Node.ELEMENT_NODE) {
+                            return '';
+                        }
+                        var tag = child.tagName.toLowerCase();
+                        if (tag === 'strong' || tag === 'b') return '**' + self.nodeToMarkdown(child).trim() + '**';
+                        if (tag === 'em' || tag === 'i') return '*' + self.nodeToMarkdown(child).trim() + '*';
+                        if (tag === 'code' && child.parentElement && child.parentElement.tagName.toLowerCase() !== 'pre') return '`' + child.textContent + '`';
+                        if (tag === 'a') return '[' + self.nodeToMarkdown(child).trim() + '](' + (child.getAttribute('href') || '') + ')';
+                        if (tag === 'h1') return '# ' + self.nodeToMarkdown(child).trim() + '\n\n';
+                        if (tag === 'h2') return '## ' + self.nodeToMarkdown(child).trim() + '\n\n';
+                        if (tag === 'h3') return '### ' + self.nodeToMarkdown(child).trim() + '\n\n';
+                        if (tag === 'blockquote') return self.nodeToMarkdown(child).split('\n').filter(Boolean).map(line => '> ' + line).join('\n') + '\n\n';
+                        if (tag === 'pre') return '```\n' + child.textContent.trim() + '\n```\n\n';
+                        if (tag === 'ul') {
+                            return Array.from(child.children).map(li => '- ' + self.nodeToMarkdown(li).trim()).join('\n') + '\n\n';
+                        }
+                        if (tag === 'ol') {
+                            return Array.from(child.children).map(function (li, index) {
+                                return (index + 1) + '. ' + self.nodeToMarkdown(li).trim();
+                            }).join('\n') + '\n\n';
+                        }
+                        if (tag === 'br') return '\n';
+                        if (tag === 'div' || tag === 'p') return self.nodeToMarkdown(child).trim() + '\n\n';
+                        if (tag === 'li') return self.nodeToMarkdown(child);
+                        return self.nodeToMarkdown(child);
+                    }).join('');
+                },
+            };
+        }
     </script>
 </body>
 </html>

@@ -39,7 +39,7 @@ from utils import get_settings
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.53.0'
+APP_VERSION = '1.54.0'
 
 csrf = CSRFProtect()
 
@@ -85,15 +85,17 @@ def create_app(test_config=None) -> Flask:
         currency = setting.currency if setting and setting.currency else 'CZK'
         theme = setting.theme if setting and setting.theme else 'light'
         nav_palette = setting.nav_palette if setting and setting.nav_palette else 'teal'
+        current_user = get_current_user()
 
         def t(key):
             return TRANSLATIONS.get(lang, TRANSLATIONS['cs']).get(key, key)
 
         # Navigation visibility flags ─────────────────────────────────────────
-        nav_bambu_enabled = bool(setting and setting.bambu_token)
+        printer_access = has_section_access('printers', user=current_user) or is_admin(current_user)
+        nav_bambu_enabled = bool(setting and setting.bambu_token and printer_access)
         try:
             from models import PrusaPrinter
-            nav_prusa_enabled = PrusaPrinter.query.filter_by(enabled=True).first() is not None
+            nav_prusa_enabled = bool(printer_access and PrusaPrinter.query.filter_by(enabled=True).first() is not None)
         except Exception:
             nav_prusa_enabled = False
 
@@ -106,7 +108,7 @@ def create_app(test_config=None) -> Flask:
             app_version=APP_VERSION,
             nav_bambu_enabled=nav_bambu_enabled,
             nav_prusa_enabled=nav_prusa_enabled,
-            current_user=get_current_user(),
+            current_user=current_user,
             auth_has_section_access=has_section_access,
             auth_is_admin=is_admin,
         )
@@ -216,6 +218,7 @@ def _setup_database(app: Flask) -> None:
         _safe_alter(app, 'ALTER TABLE notification ADD COLUMN body TEXT DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE notification ADD COLUMN link VARCHAR(500) DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE notification ADD COLUMN is_read BOOLEAN NOT NULL DEFAULT 0')
+        _safe_alter(app, 'ALTER TABLE project_comment ADD COLUMN updated_at DATETIME DEFAULT NULL')
 
         # ── Seed data (only runs once on fresh database) ─────────────────────
         if not Brand.query.first():

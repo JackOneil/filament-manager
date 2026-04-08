@@ -14,7 +14,7 @@ from models import (
     Brand, Color, Material, AppSetting, Filament, MovementHistory,
     PrintHistory, Project, ProjectFile, ProjectLink, ProjectFilament, ProjectQuote,
     BambuPrinter, BambuPrintJob, BambuJobMaterial, StoragePlacement, StorageShelf,
-    PrusaPrinter, PrusaPrintJob, ProjectComment, User, UserInvite, Notification,
+    PrusaPrinter, PrusaPrintJob, ProjectComment, ProjectTodo, User, UserInvite, Notification,
 )
 from utils import build_action_center, decrypt_token, encrypt_token, format_tags, parse_sync_status, remove_tag, top_tags
 
@@ -482,7 +482,15 @@ def register(app):
                     'user': _user_ref(comment.user),
                     'body': comment.body,
                     'created_at': comment.created_at.isoformat() if comment.created_at else None,
+                    'updated_at': comment.updated_at.isoformat() if comment.updated_at else None,
                 } for comment in proj.comments],
+                'todos': [{
+                    'user': _user_ref(todo.user),
+                    'body': todo.body,
+                    'is_done': todo.is_done,
+                    'created_at': todo.created_at.isoformat() if todo.created_at else None,
+                    'completed_at': todo.completed_at.isoformat() if todo.completed_at else None,
+                } for todo in proj.todos],
             } for proj in Project.query.order_by(Project.created_at).all()],
 
             'users': [{
@@ -887,6 +895,25 @@ def register(app):
                                 user_id=comment_user.id if comment_user else None,
                                 body=comment_data.get('body', ''),
                                 created_at=comment_ts,
+                                updated_at=datetime.fromisoformat(comment_data['updated_at']) if comment_data.get('updated_at') else None,
+                            ))
+
+                    for todo_data in proj_data.get('todos', []):
+                        todo_ts = datetime.fromisoformat(todo_data['created_at']) if todo_data.get('created_at') else datetime.utcnow()
+                        existing_todo = ProjectTodo.query.filter_by(
+                            project_id=proj.id,
+                            body=todo_data.get('body', ''),
+                            created_at=todo_ts,
+                        ).first()
+                        todo_user = _resolve_user_ref(todo_data.get('user'))
+                        if not existing_todo:
+                            db.session.add(ProjectTodo(
+                                project_id=proj.id,
+                                user_id=todo_user.id if todo_user else None,
+                                body=(todo_data.get('body') or '')[:255],
+                                is_done=todo_data.get('is_done', False),
+                                created_at=todo_ts,
+                                completed_at=datetime.fromisoformat(todo_data['completed_at']) if todo_data.get('completed_at') else None,
                             ))
 
                 # ── 6. Bambu printers ─────────────────────────────────

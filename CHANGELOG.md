@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.54.0] - 2026-04-08
+### Added
+- **Project collaboration UX upgrades:** Project detail now supports TODO checklists, Markdown-rendered descriptions and comments, inline comment editing for the comment owner, deletion of uploaded project files across file types, and a richer Markdown/WYSIWYG editor with preview for project descriptions and project comments.
+- **3D preview color control:** The project 3D model viewer now includes a simple model color picker to improve visibility for hard-to-see meshes in the preview.
+
+### Changed
+- **Project detail workspace refinement:** The low-value "Next steps" card was replaced by a TODO-focused card and summary, the TODO input layout was hardened for narrow sidebars, and the filament picker in project materials now stays above neighboring cards instead of rendering underneath the quote section.
+- **Navigation permissions tightened:** Bambu and Prusa printer entries in the navigation are now hidden unless the user actually has access to the printers section, not only when the integration is configured.
+
 ## [1.53.0] - 2026-04-07
 ### Added
 - **Global Command Palette:** Added a global search layer (Ctrl+K) accessible from anywhere to instantly navigate through filaments, projects, and printers.

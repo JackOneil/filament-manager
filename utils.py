@@ -1,4 +1,5 @@
 import ipaddress
+import html
 import json
 import math
 import os
@@ -66,6 +67,149 @@ def parse_tags(raw_value):
 
 def format_tags(raw_value):
     return ', '.join(parse_tags(raw_value))
+
+
+def _is_safe_markdown_href(href):
+    href = (href or '').strip()
+    if not href:
+        return False
+    parsed = urlparse(href)
+    return parsed.scheme in {'http', 'https', 'mailto'}
+
+
+def _render_markdown_inline(text):
+    escaped = html.escape(text or '')
+    code_tokens = {}
+
+    def _store_code(match):
+        token = f'@@CODE{len(code_tokens)}@@'
+        code_tokens[token] = f'<code>{match.group(1)}</code>'
+        return token
+
+    escaped = re.sub(r'`([^`\n]+)`', _store_code, escaped)
+
+    def _replace_link(match):
+        label = match.group(1)
+        href = html.unescape(match.group(2)).strip()
+        if not _is_safe_markdown_href(href):
+            return label
+        safe_href = html.escape(href, quote=True)
+        return f'<a href="{safe_href}" target="_blank" rel="noopener noreferrer">{label}</a>'
+
+    escaped = re.sub(r'\[([^\]]+)\]\(([^)\s]+)\)', _replace_link, escaped)
+    escaped = re.sub(r'\*\*([^*\n]+)\*\*', r'<strong>\1</strong>', escaped)
+    escaped = re.sub(r'(?<!\*)\*([^*\n]+)\*(?!\*)', r'<em>\1</em>', escaped)
+
+    for token, value in code_tokens.items():
+        escaped = escaped.replace(token, value)
+    return escaped
+
+
+def render_markdown(text):
+    lines = (text or '').replace('\r\n', '\n').replace('\r', '\n').split('\n')
+    blocks = []
+    paragraph_lines = []
+    quote_lines = []
+    list_type = None
+    list_items = []
+    in_code_block = False
+    code_lines = []
+
+    def _flush_paragraph():
+        nonlocal paragraph_lines
+        if not paragraph_lines:
+            return
+        content = '<br>'.join(_render_markdown_inline(line) for line in paragraph_lines)
+        blocks.append(f'<p>{content}</p>')
+        paragraph_lines = []
+
+    def _flush_quote():
+        nonlocal quote_lines
+        if not quote_lines:
+            return
+        content = '<br>'.join(_render_markdown_inline(line) for line in quote_lines)
+        blocks.append(f'<blockquote>{content}</blockquote>')
+        quote_lines = []
+
+    def _flush_list():
+        nonlocal list_type, list_items
+        if not list_items:
+            return
+        items = ''.join(f'<li>{item}</li>' for item in list_items)
+        blocks.append(f'<{list_type}>{items}</{list_type}>')
+        list_type = None
+        list_items = []
+
+    def _flush_code():
+        nonlocal in_code_block, code_lines
+        code_html = html.escape('\n'.join(code_lines))
+        blocks.append(f'<pre><code>{code_html}</code></pre>')
+        in_code_block = False
+        code_lines = []
+
+    for raw_line in lines:
+        stripped = raw_line.strip()
+
+        if in_code_block:
+            if stripped.startswith('```'):
+                _flush_code()
+            else:
+                code_lines.append(raw_line)
+            continue
+
+        if stripped.startswith('```'):
+            _flush_paragraph()
+            _flush_quote()
+            _flush_list()
+            in_code_block = True
+            code_lines = []
+            continue
+
+        if not stripped:
+            _flush_paragraph()
+            _flush_quote()
+            _flush_list()
+            continue
+
+        heading_match = re.match(r'^(#{1,6})\s+(.*)$', raw_line)
+        if heading_match:
+            _flush_paragraph()
+            _flush_quote()
+            _flush_list()
+            level = len(heading_match.group(1))
+            blocks.append(f'<h{level}>{_render_markdown_inline(heading_match.group(2).strip())}</h{level}>')
+            continue
+
+        quote_match = re.match(r'^>\s?(.*)$', raw_line)
+        if quote_match:
+            _flush_paragraph()
+            _flush_list()
+            quote_lines.append(quote_match.group(1))
+            continue
+
+        unordered_match = re.match(r'^\s*[-*+]\s+(.*)$', raw_line)
+        ordered_match = re.match(r'^\s*\d+\.\s+(.*)$', raw_line)
+        if unordered_match or ordered_match:
+            _flush_paragraph()
+            _flush_quote()
+            next_list_type = 'ul' if unordered_match else 'ol'
+            if list_type and list_type != next_list_type:
+                _flush_list()
+            list_type = next_list_type
+            list_items.append(_render_markdown_inline((unordered_match or ordered_match).group(1)))
+            continue
+
+        _flush_quote()
+        _flush_list()
+        paragraph_lines.append(raw_line)
+
+    _flush_paragraph()
+    _flush_quote()
+    _flush_list()
+    if in_code_block:
+        _flush_code()
+
+    return ''.join(blocks)
 
 
 def remove_tag(raw_value, tag_to_remove):

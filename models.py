@@ -177,9 +177,23 @@ class ProjectComment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True, index=True)
     body = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, nullable=True)
 
     project = db.relationship('Project', backref=db.backref('comments', lazy=True, cascade='all, delete-orphan'))
     user = db.relationship('User', backref=db.backref('project_comments', lazy=True))
+
+
+class ProjectTodo(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='CASCADE'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True, index=True)
+    body = db.Column(db.String(255), nullable=False)
+    is_done = db.Column(db.Boolean, nullable=False, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
+
+    project = db.relationship('Project', backref=db.backref('todos', lazy=True, cascade='all, delete-orphan'))
+    user = db.relationship('User', backref=db.backref('project_todos', lazy=True))
 
 
 class ProjectFile(db.Model):

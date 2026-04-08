@@ -5,6 +5,7 @@ from datetime import datetime
 from types import SimpleNamespace
 
 from flask import abort, current_app, flash, redirect, render_template, request, send_from_directory, url_for
+from markupsafe import Markup
 from sqlalchemy.orm import joinedload
 from werkzeug.utils import secure_filename
 
@@ -21,11 +22,12 @@ from models import (
     ProjectFilament,
     ProjectLink,
     ProjectQuote,
+    ProjectTodo,
     PrusaPrintJob,
     PrusaPrinter,
     User,
 )
-from utils import build_project_metrics, format_tags
+from utils import build_project_metrics, format_tags, render_markdown
 
 
 ALLOWED_PROJECT_FILE_EXTENSIONS = {
@@ -176,6 +178,13 @@ def _project_write_allowed(project):
     if current_app.config.get('TESTING') and not current_app.config.get('AUTH_REQUIRED_IN_TESTS'):
         return True
     return bool(user and (is_admin(user) or project.owner_user_id == user.id))
+
+
+def _comment_edit_allowed(comment):
+    user = get_current_user()
+    if current_app.config.get('TESTING') and not current_app.config.get('AUTH_REQUIRED_IN_TESTS'):
+        return bool(user and comment.user_id == user.id)
+    return bool(user and comment.user_id == user.id)
 
 
 def _require_project_admin():
@@ -436,6 +445,7 @@ def register(app):
                 joinedload(Project.links),
                 joinedload(Project.quotes),
                 joinedload(Project.comments).joinedload(ProjectComment.user),
+                joinedload(Project.todos).joinedload(ProjectTodo.user),
                 joinedload(Project.filaments).joinedload(ProjectFilament.filament).joinedload(Filament.color),
                 joinedload(Project.filaments).joinedload(ProjectFilament.filament).joinedload(Filament.brand),
                 joinedload(Project.filaments).joinedload(ProjectFilament.filament).joinedload(Filament.material),
@@ -504,10 +514,17 @@ def register(app):
             })
         for comment in sorted(project.comments, key=lambda item: item.created_at or datetime.min, reverse=True):
             activity_events.append({
-                'created_at': comment.created_at,
+                'created_at': comment.updated_at or comment.created_at,
                 'label': f'Comment: {(comment.body or "")[:60]}',
                 'meta': comment.user.name if comment.user else '-',
                 'kind': 'comment',
+            })
+        for todo in sorted(project.todos, key=lambda item: item.created_at or datetime.min, reverse=True):
+            activity_events.append({
+                'created_at': todo.completed_at or todo.created_at,
+                'label': f'TODO: {todo.body}',
+                'meta': 'Done' if todo.is_done else 'Open',
+                'kind': 'todo',
             })
         activity_events.sort(key=lambda item: item['created_at'] or datetime.min, reverse=True)
 
@@ -539,6 +556,22 @@ def register(app):
             }
             for filament in filaments
         ]
+        project_comments = []
+        for comment in sorted(project.comments, key=lambda item: item.created_at or datetime.min, reverse=True):
+            project_comments.append({
+                'id': comment.id,
+                'user': comment.user,
+                'body': comment.body,
+                'body_html': Markup(render_markdown(comment.body)),
+                'created_at': comment.created_at,
+                'updated_at': comment.updated_at,
+                'can_edit': _comment_edit_allowed(comment),
+            })
+        project_todos = sorted(
+            project.todos,
+            key=lambda item: (item.is_done, item.completed_at or datetime.max, item.created_at or datetime.min),
+        )
+        todo_done_count = len([todo for todo in project_todos if todo.is_done])
         return render_template(
             'project_detail.html',
             project=project,
@@ -547,6 +580,7 @@ def register(app):
             setting=setting,
             project_tags=format_tags(project.tag_text),
             project_metrics=project_metrics,
+            project_description_html=Markup(render_markdown(project.description or '')),
             images=images,
             model_files=model_files,
             other_files=other_files,
@@ -557,7 +591,9 @@ def register(app):
             show_prusa_jobs=show_prusa_jobs,
             job_feed=job_feed_page,
             jobs_pagination=jobs_pagination,
-            project_comments=sorted(project.comments, key=lambda item: item.created_at or datetime.min, reverse=True),
+            project_comments=project_comments,
+            project_todos=project_todos,
+            todo_done_count=todo_done_count,
             can_edit_project=_project_write_allowed(project),
             can_manage_project=is_admin(),
         )
@@ -820,4 +856,62 @@ def register(app):
             db.session.add(ProjectComment(project_id=project.id, user_id=user.id, body=body))
             _notify_project_comment(project, user)
             db.session.commit()
+        return _project_detail_redirect(id, 'overview')
+
+    @app.route('/projects/<int:id>/comments/<int:comment_id>/edit', methods=['POST'])
+    def project_update_comment(id, comment_id):
+        _project_or_404(id)
+        comment = db.get_or_404(ProjectComment, comment_id)
+        if comment.project_id != id:
+            abort(404)
+        if not _comment_edit_allowed(comment):
+            abort(403)
+        body = request.form.get('body', '').strip()
+        if not body:
+            flash('project_comment_empty', 'error')
+            return _project_detail_redirect(id, 'overview')
+        comment.body = body
+        comment.updated_at = datetime.utcnow()
+        db.session.commit()
+        return _project_detail_redirect(id, 'overview')
+
+    @app.route('/projects/<int:id>/todos', methods=['POST'])
+    def project_add_todo(id):
+        project = _project_or_404(id)
+        if not _project_write_allowed(project):
+            abort(403)
+        body = request.form.get('body', '').strip()
+        user = get_current_user()
+        if body:
+            db.session.add(ProjectTodo(
+                project_id=project.id,
+                user_id=user.id if user else None,
+                body=body[:255],
+            ))
+            db.session.commit()
+        return _project_detail_redirect(id, 'overview')
+
+    @app.route('/projects/<int:id>/todos/<int:todo_id>/toggle', methods=['POST'])
+    def project_toggle_todo(id, todo_id):
+        project = _project_or_404(id)
+        if not _project_write_allowed(project):
+            abort(403)
+        todo = db.get_or_404(ProjectTodo, todo_id)
+        if todo.project_id != id:
+            abort(404)
+        todo.is_done = not todo.is_done
+        todo.completed_at = datetime.utcnow() if todo.is_done else None
+        db.session.commit()
+        return _project_detail_redirect(id, 'overview')
+
+    @app.route('/projects/<int:id>/todos/<int:todo_id>/delete', methods=['POST'])
+    def project_delete_todo(id, todo_id):
+        project = _project_or_404(id)
+        if not _project_write_allowed(project):
+            abort(403)
+        todo = db.get_or_404(ProjectTodo, todo_id)
+        if todo.project_id != id:
+            abort(404)
+        db.session.delete(todo)
+        db.session.commit()
         return _project_detail_redirect(id, 'overview')

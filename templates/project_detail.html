@@ -10,6 +10,8 @@
         modelViewerOpen: false,
         modelViewerTitle: '',
         modelViewerDownload: '',
+        modelViewerUrl: '',
+        modelViewerColor: '#3b82f6',
         workspaceTab: '{{ active_tab }}',
         setTab(tab) {
             this.workspaceTab = tab;
@@ -121,17 +123,9 @@
                         <div class="text-sm text-gray-500 mt-2">{{ t('project_workspace_quote_state') }}</div>
                     </div>
                     <div class="ui-card-soft p-4">
-                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-sky-600">{{ t('project_workspace_next_step') }}</div>
-                        <div class="text-lg font-bold mt-2">
-                            {% if next_actions and next_actions[0] == 'overdue' %}{{ t('project_action_overdue_title') }}
-                            {% elif next_actions and next_actions[0] == 'plan_filaments' %}{{ t('project_action_plan_filaments_title') }}
-                            {% elif next_actions and next_actions[0] == 'create_quote' %}{{ t('project_action_quote_title') }}
-                            {% elif next_actions and next_actions[0] == 'consume_planned' %}{{ t('project_action_consume_title') }}
-                            {% elif next_actions and next_actions[0] == 'map_bambu_jobs' %}{{ t('project_action_bambu_title') }}
-                            {% elif next_actions and next_actions[0] == 'map_prusa_jobs' %}{{ t('project_action_prusa_title') }}
-                            {% else %}{{ t('project_actions_complete') }}{% endif %}
-                        </div>
-                        <div class="text-sm text-gray-500 mt-2">{{ t('project_next_actions') }}</div>
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-sky-600">{{ t('project_todo_title') }}</div>
+                        <div class="text-3xl font-bold mt-2">{{ todo_done_count }}/{{ project_todos|length }}</div>
+                        <div class="text-sm text-gray-500 mt-2">{{ t('project_todo_summary') }}</div>
                     </div>
                 </div>
             </div>
@@ -174,33 +168,51 @@
             <div class="ui-panel overflow-hidden relative">
                 <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.16),transparent_34%)] pointer-events-none"></div>
                 <div class="relative">
-                    <div class="ui-label">{{ t('project_workspace_next_step') }}</div>
-                    <h2 class="text-2xl font-bold mt-2">{{ t('project_next_actions') }}</h2>
-                    <div class="space-y-2 mt-4">
-                        {% for action in next_actions %}
-                        <div class="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm">
-                            {% if action == 'overdue' %}
-                            <div class="font-semibold text-red-600">{{ t('project_action_overdue_title') }}</div>
-                            <div class="text-gray-500 mt-1">{{ t('project_action_overdue_desc') }}</div>
-                            {% elif action == 'plan_filaments' %}
-                            <div class="font-semibold">{{ t('project_action_plan_filaments_title') }}</div>
-                            <div class="text-gray-500 mt-1">{{ t('project_action_plan_filaments_desc') }}</div>
-                            {% elif action == 'create_quote' %}
-                            <div class="font-semibold">{{ t('project_action_quote_title') }}</div>
-                            <div class="text-gray-500 mt-1">{{ t('project_action_quote_desc') }}</div>
-                            {% elif action == 'consume_planned' %}
-                            <div class="font-semibold">{{ t('project_action_consume_title') }}</div>
-                            <div class="text-gray-500 mt-1">{{ t('project_action_consume_desc') }}</div>
-                            {% elif action == 'map_bambu_jobs' %}
-                            <div class="font-semibold">{{ t('project_action_bambu_title') }}</div>
-                            <div class="text-gray-500 mt-1">{{ t('project_action_bambu_desc') }}</div>
-                            {% elif action == 'map_prusa_jobs' %}
-                            <div class="font-semibold">{{ t('project_action_prusa_title') }}</div>
-                            <div class="text-gray-500 mt-1">{{ t('project_action_prusa_desc') }}</div>
-                            {% endif %}
+                    <div class="ui-label">{{ t('project_todo_title') }}</div>
+                    <h2 class="text-2xl font-bold mt-2">{{ t('project_todo_heading') }}</h2>
+                    <p class="text-sm text-gray-500 mt-2">{{ t('project_todo_desc') }}</p>
+                    {% if can_edit_project %}
+                    <form method="POST" action="{{ url_for('project_add_todo', id=project.id) }}" class="ui-card-soft p-4 mt-4">
+                        <div class="flex flex-col sm:flex-row gap-2">
+                            <input type="text" name="body" maxlength="255" required class="flex-1 min-w-0 border border-gray-300 rounded-xl px-4 py-2.5" placeholder="{{ t('project_todo_placeholder') }}">
+                            <button type="submit" class="shrink-0 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-semibold transition sm:w-auto">{{ t('save') }}</button>
+                        </div>
+                    </form>
+                    {% endif %}
+                    <div class="space-y-3 mt-4">
+                        {% for todo in project_todos %}
+                        <div class="rounded-2xl border border-white/70 bg-white/80 px-4 py-3">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="flex items-start gap-3 min-w-0">
+                                    {% if can_edit_project %}
+                                    <form method="POST" action="{{ url_for('project_toggle_todo', id=project.id, todo_id=todo.id) }}">
+                                        <button type="submit" class="mt-0.5 w-6 h-6 rounded-full border flex items-center justify-center transition {% if todo.is_done %}bg-emerald-500 border-emerald-500 text-white{% else %}border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500{% endif %}" aria-label="{{ t('project_todo_toggle') }}">
+                                            <i class="fa-solid fa-check text-xs"></i>
+                                        </button>
+                                    </form>
+                                    {% else %}
+                                    <span class="mt-0.5 w-6 h-6 rounded-full border flex items-center justify-center {% if todo.is_done %}bg-emerald-500 border-emerald-500 text-white{% else %}border-gray-300 text-gray-300{% endif %}">
+                                        <i class="fa-solid fa-check text-xs"></i>
+                                    </span>
+                                    {% endif %}
+                                    <div class="min-w-0">
+                                        <div class="text-sm font-semibold {% if todo.is_done %}line-through text-gray-500{% else %}text-gray-800{% endif %}">{{ todo.body }}</div>
+                                        <div class="text-xs text-gray-400 mt-1">
+                                            {% if todo.user %}{{ todo.user.name }} · {% endif %}
+                                            {{ todo.created_at.strftime('%d.%m.%Y %H:%M') if todo.created_at else '' }}
+                                            {% if todo.is_done and todo.completed_at %} · {{ t('project_todo_done_at') }} {{ todo.completed_at.strftime('%d.%m.%Y %H:%M') }}{% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% if can_edit_project %}
+                                <form method="POST" action="{{ url_for('project_delete_todo', id=project.id, todo_id=todo.id) }}" onsubmit="return confirm('{{ t('delete') }}?');">
+                                    <button type="submit" class="text-gray-400 hover:text-red-500 transition"><i class="fa-solid fa-trash"></i></button>
+                                </form>
+                                {% endif %}
+                            </div>
                         </div>
                         {% else %}
-                        <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{{ t('project_actions_complete') }}</div>
+                        <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{{ t('project_todo_empty') }}</div>
                         {% endfor %}
                     </div>
                 </div>
@@ -289,7 +301,12 @@
                     <div class="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-5">
                         <div>
                             <div class="ui-label">{{ t('project_description') }}</div>
-                            <div class="text-base text-gray-700 whitespace-pre-wrap mt-3">{{ project.description or '-' }}</div>
+                            <div class="text-xs text-gray-500 mt-3">{{ t('project_description_markdown_hint') }}</div>
+                            {% if project.description %}
+                            <div class="mt-3 text-base text-gray-700 space-y-3 break-words [&_a]:text-blue-600 [&_a:hover]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-gray-200 [&_blockquote]:pl-4 [&_blockquote]:italic [&_code]:bg-gray-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-4 [&_pre]:rounded-2xl [&_pre]:overflow-x-auto [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:leading-7">{{ project_description_html }}</div>
+                            {% else %}
+                            <div class="text-base text-gray-700 mt-3">-</div>
+                            {% endif %}
                         </div>
                         <div class="ui-card-soft p-4">
                             <div class="ui-label">{{ t('project_workspace_summary') }}</div>
@@ -306,18 +323,91 @@
                 <div class="ui-panel">
                     <div class="ui-label">{{ t('project_comments_title') }}</div>
                     <h2 class="text-2xl font-bold mt-1 mb-4">{{ t('project_comments_heading') }}</h2>
+                    {% if can_edit_project %}
                     <form method="POST" action="{{ url_for('project_add_comment', id=project.id) }}" class="ui-card-soft p-4 mb-4 space-y-3">
-                        <textarea name="body" rows="3" required class="w-full border border-gray-300 rounded-xl px-4 py-3" placeholder="{{ t('project_comment_placeholder') }}"></textarea>
+                        <div x-data='markdownEditor({ defaultMode: "visual", placeholder: "{{ t("project_comment_placeholder") }}" })' class="md-editor-shell">
+                            <textarea x-ref="source" x-model="value" name="body" class="hidden"></textarea>
+                            <div class="md-editor-toolbar">
+                                <div class="md-editor-toolbar-group">
+                                    <button type="button" class="md-editor-btn" @click="apply('bold')" title="{{ t('markdown_editor_bold') }}"><i class="fa-solid fa-bold"></i></button>
+                                    <button type="button" class="md-editor-btn" @click="apply('italic')" title="{{ t('markdown_editor_italic') }}"><i class="fa-solid fa-italic"></i></button>
+                                    <button type="button" class="md-editor-btn" @click="apply('h2')" title="{{ t('markdown_editor_heading') }}"><i class="fa-solid fa-heading"></i></button>
+                                    <button type="button" class="md-editor-btn" @click="apply('ul')" title="{{ t('markdown_editor_bullets') }}"><i class="fa-solid fa-list-ul"></i></button>
+                                    <button type="button" class="md-editor-btn" @click="apply('ol')" title="{{ t('markdown_editor_numbers') }}"><i class="fa-solid fa-list-ol"></i></button>
+                                    <button type="button" class="md-editor-btn" @click="apply('quote')" title="{{ t('markdown_editor_quote') }}"><i class="fa-solid fa-quote-left"></i></button>
+                                    <button type="button" class="md-editor-btn" @click="apply('code')" title="{{ t('markdown_editor_code') }}"><i class="fa-solid fa-code"></i></button>
+                                    <button type="button" class="md-editor-btn" @click="apply('link')" title="{{ t('markdown_editor_link') }}"><i class="fa-solid fa-link"></i></button>
+                                </div>
+                                <div class="md-editor-toolbar-group">
+                                    <button type="button" class="md-editor-btn" :class="{ 'is-active': mode === 'visual' }" @click="setMode('visual')">{{ t('markdown_editor_visual') }}</button>
+                                    <button type="button" class="md-editor-btn" :class="{ 'is-active': mode === 'markdown' }" @click="setMode('markdown')">{{ t('markdown_editor_markdown') }}</button>
+                                    <button type="button" class="md-editor-btn" :class="{ 'is-active': mode === 'preview' }" @click="setMode('preview')">{{ t('markdown_editor_preview') }}</button>
+                                </div>
+                            </div>
+                            <div class="md-editor-surface">
+                                <div x-show="mode === 'visual'" x-cloak x-ref="visual" contenteditable="true" class="md-editor-visual" :style="{ minHeight: editorHeight + 'px' }" :data-placeholder="placeholder" @input="syncFromVisual()"></div>
+                                <textarea x-show="mode === 'markdown'" x-cloak x-ref="markdown" x-model="value" class="md-editor-input font-mono text-sm" :style="{ minHeight: editorHeight + 'px' }" :placeholder="placeholder"></textarea>
+                                <div x-show="mode === 'preview'" x-cloak class="md-editor-preview" :style="{ minHeight: editorHeight + 'px' }" x-html="markdownToHtml(value)"></div>
+                            </div>
+                            <div class="md-editor-resizer" @mousedown.prevent="startResize($event)"><div class="md-editor-resizer-line"></div></div>
+                        </div>
+                        <div class="text-xs text-gray-500">{{ t('project_comment_markdown_hint') }}</div>
                         <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-semibold transition">{{ t('project_add_comment') }}</button>
                     </form>
+                    {% endif %}
                     <div class="space-y-3">
                         {% for comment in project_comments %}
-                        <div class="ui-card-soft p-4">
+                        <div class="ui-card-soft p-4" x-data="{ editing: false }">
                             <div class="flex items-center justify-between gap-3">
-                                <div class="font-semibold">{{ comment.user.name if comment.user else t('project_comment_unknown_user') }}</div>
-                                <div class="text-xs text-gray-400">{{ comment.created_at.strftime('%d.%m.%Y %H:%M') if comment.created_at else '' }}</div>
+                                <div>
+                                    <div class="font-semibold">{{ comment.user.name if comment.user else t('project_comment_unknown_user') }}</div>
+                                    <div class="text-xs text-gray-400 mt-1">
+                                        {{ comment.created_at.strftime('%d.%m.%Y %H:%M') if comment.created_at else '' }}
+                                        {% if comment.updated_at %} · {{ t('project_comment_edited') }} {{ comment.updated_at.strftime('%d.%m.%Y %H:%M') }}{% endif %}
+                                    </div>
+                                </div>
+                                {% if comment.can_edit %}
+                                <button type="button" @click="editing = !editing" class="ui-badge">
+                                    <i class="fa-solid fa-pen"></i> {{ t('edit') }}
+                                </button>
+                                {% endif %}
                             </div>
-                            <div class="text-sm text-gray-700 whitespace-pre-wrap mt-2">{{ comment.body }}</div>
+                            <div x-show="!editing" class="mt-3 text-sm text-gray-700 space-y-3 break-words [&_a]:text-blue-600 [&_a:hover]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-gray-200 [&_blockquote]:pl-4 [&_blockquote]:italic [&_code]:bg-gray-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-4 [&_pre]:rounded-2xl [&_pre]:overflow-x-auto [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:leading-6">{{ comment.body_html }}</div>
+                            {% if comment.can_edit %}
+                            <form x-show="editing" x-cloak method="POST" action="{{ url_for('project_update_comment', id=project.id, comment_id=comment.id) }}" class="space-y-3 mt-3">
+                                <div x-data='markdownEditor({ defaultMode: "visual", placeholder: "{{ t("project_comment_placeholder") }}" })' class="md-editor-shell">
+                                    <textarea x-ref="source" x-model="value" name="body" class="hidden">{{ comment.body }}</textarea>
+                                    <div class="md-editor-toolbar">
+                                        <div class="md-editor-toolbar-group">
+                                            <button type="button" class="md-editor-btn" @click="apply('bold')" title="{{ t('markdown_editor_bold') }}"><i class="fa-solid fa-bold"></i></button>
+                                            <button type="button" class="md-editor-btn" @click="apply('italic')" title="{{ t('markdown_editor_italic') }}"><i class="fa-solid fa-italic"></i></button>
+                                            <button type="button" class="md-editor-btn" @click="apply('h2')" title="{{ t('markdown_editor_heading') }}"><i class="fa-solid fa-heading"></i></button>
+                                            <button type="button" class="md-editor-btn" @click="apply('ul')" title="{{ t('markdown_editor_bullets') }}"><i class="fa-solid fa-list-ul"></i></button>
+                                            <button type="button" class="md-editor-btn" @click="apply('ol')" title="{{ t('markdown_editor_numbers') }}"><i class="fa-solid fa-list-ol"></i></button>
+                                            <button type="button" class="md-editor-btn" @click="apply('quote')" title="{{ t('markdown_editor_quote') }}"><i class="fa-solid fa-quote-left"></i></button>
+                                            <button type="button" class="md-editor-btn" @click="apply('code')" title="{{ t('markdown_editor_code') }}"><i class="fa-solid fa-code"></i></button>
+                                            <button type="button" class="md-editor-btn" @click="apply('link')" title="{{ t('markdown_editor_link') }}"><i class="fa-solid fa-link"></i></button>
+                                        </div>
+                                        <div class="md-editor-toolbar-group">
+                                            <button type="button" class="md-editor-btn" :class="{ 'is-active': mode === 'visual' }" @click="setMode('visual')">{{ t('markdown_editor_visual') }}</button>
+                                            <button type="button" class="md-editor-btn" :class="{ 'is-active': mode === 'markdown' }" @click="setMode('markdown')">{{ t('markdown_editor_markdown') }}</button>
+                                            <button type="button" class="md-editor-btn" :class="{ 'is-active': mode === 'preview' }" @click="setMode('preview')">{{ t('markdown_editor_preview') }}</button>
+                                        </div>
+                                    </div>
+                                    <div class="md-editor-surface">
+                                        <div x-show="mode === 'visual'" x-cloak x-ref="visual" contenteditable="true" class="md-editor-visual" :style="{ minHeight: editorHeight + 'px' }" :data-placeholder="placeholder" @input="syncFromVisual()"></div>
+                                        <textarea x-show="mode === 'markdown'" x-cloak x-ref="markdown" x-model="value" class="md-editor-input font-mono text-sm" :style="{ minHeight: editorHeight + 'px' }" :placeholder="placeholder"></textarea>
+                                        <div x-show="mode === 'preview'" x-cloak class="md-editor-preview" :style="{ minHeight: editorHeight + 'px' }" x-html="markdownToHtml(value)"></div>
+                                    </div>
+                                    <div class="md-editor-resizer" @mousedown.prevent="startResize($event)"><div class="md-editor-resizer-line"></div></div>
+                                </div>
+                                <div class="text-xs text-gray-500">{{ t('project_comment_markdown_hint') }}</div>
+                                <div class="flex gap-2">
+                                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-semibold transition">{{ t('save_changes') }}</button>
+                                    <button type="button" @click="editing = false" class="ui-badge">{{ t('cancel') }}</button>
+                                </div>
+                            </form>
+                            {% endif %}
                         </div>
                         {% else %}
                         <div class="text-sm text-gray-500">{{ t('project_comments_empty') }}</div>
@@ -327,7 +417,7 @@
             </div>
 
             <div x-show="workspaceTab === 'materials'" x-cloak class="space-y-4">
-                <div class="ui-panel">
+                <div class="ui-panel relative z-20">
                     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
                         <div>
                             <div class="ui-label">{{ t('project_filaments') }}</div>
@@ -351,7 +441,7 @@
                                         <i class="fa-solid fa-chevron-down text-xs"></i>
                                     </div>
                                 </div>
-                                <div x-show="open" x-cloak class="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+                                <div x-show="open" x-cloak class="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
                                     <template x-for="f in filtered" :key="f.id">
                                         <button type="button" @click="select(f)" class="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-gray-50 last:border-0">
                                             <div class="font-semibold text-gray-800" x-text="f.name"></div>
@@ -424,7 +514,7 @@
                     </div>
                 </div>
 
-                <div class="ui-panel">
+                <div class="ui-panel relative z-10">
                     <div class="ui-label">{{ t('quote_project_title') }}</div>
                     <h2 class="text-2xl font-bold mt-1 mb-4">{{ t('project_quotes_heading') }}</h2>
                     <div class="space-y-3">
@@ -454,6 +544,7 @@
                 <div class="ui-panel">
                     <div class="ui-label">{{ t('project_files_title') }}</div>
                     <h2 class="text-2xl font-bold mt-1 mb-4">{{ t('project_files_heading') }}</h2>
+                    {% if can_edit_project %}
                     <form id="upload-form" method="POST" action="{{ url_for('project_upload_file', id=project.id) }}" enctype="multipart/form-data" class="mb-5">
                         <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center hover:bg-gray-50 transition cursor-pointer flex flex-col items-center justify-center gap-2">
                             <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-400"></i>
@@ -466,6 +557,7 @@
                             </div>
                         </div>
                     </form>
+                    {% endif %}
 
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <div class="ui-card-soft p-4">
@@ -478,10 +570,15 @@
                                         <div class="text-xs text-gray-500">{{ file.filename.rsplit('.', 1)[-1].upper() if '.' in file.filename else 'FILE' }}</div>
                                     </div>
                                     <div class="flex gap-2">
-                                        <button type="button" @click="modelViewerOpen = true; modelViewerTitle = '{{ file.filename|escape }}'; modelViewerDownload = '{{ url_for('project_download_file', id=project.id, file_id=file.id) }}'; open3DViewer('{{ url_for('project_view_file', id=project.id, file_id=file.id, filename=file.filename) }}')" class="ui-badge ui-badge-brand">
+                                        <button type="button" @click="modelViewerOpen = true; modelViewerTitle = '{{ file.filename|escape }}'; modelViewerDownload = '{{ url_for('project_download_file', id=project.id, file_id=file.id) }}'; modelViewerUrl = '{{ url_for('project_view_file', id=project.id, file_id=file.id, filename=file.filename) }}'; open3DViewer(modelViewerUrl, modelViewerColor)" class="ui-badge ui-badge-brand">
                                             <i class="fa-solid fa-cube"></i> {{ t('project_preview_3d') }}
                                         </button>
                                         <a href="{{ url_for('project_download_file', id=project.id, file_id=file.id) }}" class="ui-badge"><i class="fa-solid fa-download"></i></a>
+                                        {% if can_edit_project %}
+                                        <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=file.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');">
+                                            <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-trash"></i></button>
+                                        </form>
+                                        {% endif %}
                                     </div>
                                 </div>
                                 {% else %}
@@ -501,9 +598,11 @@
                                     </div>
                                     <div class="flex gap-2">
                                         <a href="{{ url_for('project_download_file', id=project.id, file_id=file.id) }}" class="ui-badge"><i class="fa-solid fa-download"></i> {{ t('download') }}</a>
+                                        {% if can_edit_project %}
                                         <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=file.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');">
                                             <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-trash"></i></button>
                                         </form>
+                                        {% endif %}
                                     </div>
                                 </div>
                                 {% else %}
@@ -522,9 +621,11 @@
                                 <img src="{{ url_for('project_image_file', id=project.id, file_id=img.id) }}" alt="{{ img.filename }}" class="object-cover w-full h-full">
                                 <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
                                     <div class="text-white hover:text-blue-300 transition"><i class="fa-solid fa-expand text-2xl"></i></div>
+                                    {% if can_edit_project %}
                                     <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=img.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');" @click.stop>
                                         <button type="submit" class="text-white hover:text-red-400 transition ml-2"><i class="fa-solid fa-trash text-xl"></i></button>
                                     </form>
+                                    {% endif %}
                                 </div>
                             </div>
                             {% else %}
@@ -743,6 +844,10 @@
                 <div class="bg-black/70 backdrop-blur-md border border-white/10 px-6 py-3 rounded-2xl shadow-xl flex items-center gap-4 pointer-events-auto max-w-full">
                     <div x-text="modelViewerTitle" class="font-medium text-white/90 truncate text-sm sm:text-lg max-w-[200px] sm:max-w-md"></div>
                     <div class="h-6 w-px bg-white/20"></div>
+                    <label class="flex items-center gap-2 text-white/80 text-sm whitespace-nowrap">
+                        <span>{{ t('project_preview_color') }}</span>
+                        <input type="color" x-model="modelViewerColor" @input="if (modelViewerUrl) open3DViewer(modelViewerUrl, modelViewerColor)" class="h-8 w-10 rounded border border-white/20 bg-transparent p-0 cursor-pointer">
+                    </label>
                     <a :href="modelViewerDownload" download class="text-blue-400 hover:text-blue-300 transition text-sm flex items-center gap-2 font-semibold whitespace-nowrap">
                         <i class="fa-solid fa-download"></i> {{ t('download') }}
                     </a>
@@ -819,14 +924,27 @@ function projectFilamentPicker() {
 <script>
 let viewerInstance = null;
 
-function open3DViewer(url) {
+function hexToRgb(hex) {
+    const normalized = (hex || '#3b82f6').replace('#', '');
+    const value = normalized.length === 3 ? normalized.split('').map(ch => ch + ch).join('') : normalized;
+    const intValue = parseInt(value, 16);
+    return {
+        r: (intValue >> 16) & 255,
+        g: (intValue >> 8) & 255,
+        b: intValue & 255,
+    };
+}
+
+function open3DViewer(url, colorHex) {
     setTimeout(() => {
-        if (!viewerInstance) {
-            viewerInstance = new OV.EmbeddedViewer(document.getElementById('3d-viewer-container'), {
-                backgroundColor: new OV.RGBAColor(15, 23, 42, 255),
-                defaultColor: new OV.RGBColor(59, 130, 246)
-            });
-        }
+        const container = document.getElementById('3d-viewer-container');
+        if (!container) return;
+        container.innerHTML = '';
+        const color = hexToRgb(colorHex);
+        viewerInstance = new OV.EmbeddedViewer(container, {
+            backgroundColor: new OV.RGBAColor(15, 23, 42, 255),
+            defaultColor: new OV.RGBColor(color.r, color.g, color.b)
+        });
         viewerInstance.LoadModelFromUrlList([url]);
     }, 50);
 }
