@@ -23,11 +23,14 @@
         </div>
     </div>
 
-    <section class="ui-panel overflow-hidden relative" id="overviewVisibilityPanel" class="hidden">
-        <div class="p-2 w-full">
-            <h3 class="font-bold text-gray-800 mb-3 ml-2"><i class="fa-solid fa-eye text-blue-500 mr-2"></i>{{ t('stats_widget_visibility') }}</h3>
-            <div class="visibility-toggles flex flex-wrap gap-2">
-               <!-- Auto-populated by createWidgetLayoutManager via syncVisibility -->
+    <section class="ui-panel hidden" id="overviewVisibilityPanel">
+        <div class="p-3 w-full">
+            <div class="flex items-center gap-2 mb-3">
+                <i class="fa-solid fa-sliders text-blue-500 text-sm"></i>
+                <span class="text-sm font-semibold text-gray-700 dark:text-slate-200">{{ t('stats_widget_visibility') }}</span>
+            </div>
+            <div class="visibility-toggles grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-2">
+                <!-- Auto-populated by createWidgetLayoutManager via syncVisibility -->
             </div>
         </div>
     </section>
@@ -552,6 +555,9 @@ const overviewLayout = createWidgetLayoutManager({
     visibilityPanelId: 'overviewVisibilityPanel',
     editText: {{ t('stats_edit_layout')|tojson }},
     doneText: {{ t('stats_done_editing')|tojson }},
+    hideBtnTitle: {{ t('dashboard_hide_widget')|tojson }},
+    showBtnTitle: {{ t('dashboard_show_widget')|tojson }},
+    limitAllText: {{ t('stats_limit_all')|tojson }},
     defaultOrder: ['recent_activity', 'live_printers', 'kpis', 'action_center', 'upcoming_deadlines', 'usage_7d', 'top_turnover', 'quick_links'],
 });
 

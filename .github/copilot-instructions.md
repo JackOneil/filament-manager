@@ -328,6 +328,16 @@ The `/export` and `/import` functions in `routes/settings.py` must cover the **e
 - Templates: `snake_case.html`, partials prefixed with `_` (e.g. `_filament_cards.html`).
 - i18n keys: `snake_case` with namespace prefix (e.g. `bambu_`, `stats_`, `project_`).
 
+### Rule 22 — Dashboard Consistency (Overview, Projects, Statistics)
+- All three dashboard pages must expose **identical capabilities**: widget drag-to-reorder, resize handles, row-limit selectors, and inline per-widget hide button.
+- Shared dashboard logic lives exclusively in **`static/js/dashboard.js`** (loaded by `base.html`). Never duplicate this code across templates.
+  - `createWidgetLayoutManager(config)` — used by Overview and Projects pages (flat widget grids).
+  - `createCardResizeManager(config)` — used by the Statistics page (card-level resize + row limits).
+- When adding or changing dashboard behaviour, update `dashboard.js` once. The change automatically applies to all three pages.
+- `createWidgetLayoutManager` config **must** always include `hideBtnTitle` and `limitAllText` (translated via `t()` in the template).
+- The inline hide button (`.widget-hide-btn`) is injected dynamically by `applyLayout()` into each widget's `.dashboard-edit-bar`. Use the visibility panel (`visibilityPanelId`) to allow the user to restore hidden widgets.
+- localStorage keys: `overview_layout_v1`, `projects_layout_v1`, `stats_layout_v2`.
+
 ---
 
 ## 7. Post-Implementation Checklist
@@ -347,4 +357,5 @@ After every set of feature additions or structural fixes:
 11. ✅ If file upload added → verify validation and unique naming (rule 14)
 12. ✅ If security-sensitive code added → verify tests exist (rule 19)
 13. ✅ If Stats page modified → verify compliance with rule 16
-14. ✅ Keep this instruction file up to date with any new rules or patterns
+14. ✅ If any dashboard page (Overview, Projects, Stats) modified → verify compliance with rule 22
+15. ✅ Keep this instruction file up to date with any new rules or patterns

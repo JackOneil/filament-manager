@@ -39,6 +39,10 @@ html.dark #restorePanel {
     background: var(--ui-surface-soft);
     border-color: var(--ui-border);
 }
+html.dark .widget-color-picker > div {
+    background: var(--ui-surface-strong) !important;
+    border-color: var(--ui-border-strong) !important;
+}
 </style>
 <div class="page-shell" id="stats-page" x-data="statsDashboard()">
     <div class="page-hero">
@@ -676,12 +680,13 @@ html.dark #restorePanel {
     </div>
     {% endif %}
 
-    <!-- Restore hidden cards (visible only in edit mode) -->
-    <div id="restorePanel" class="hidden bg-gray-50 border border-gray-200 rounded-xl p-4">
-        <p class="text-sm font-semibold text-gray-700 mb-3">
-            <i class="fa-solid fa-eye-slash mr-1 text-gray-400"></i> {{ t('stats_hidden_widgets') }}
-        </p>
-        <div id="restoreButtons" class="flex flex-wrap gap-2"></div>
+    <!-- Widget overview panel (visible only in edit mode) -->
+    <div id="restorePanel" class="hidden ui-panel p-3">
+        <div class="flex items-center gap-2 mb-3">
+            <i class="fa-solid fa-sliders text-blue-500 text-sm"></i>
+            <span class="text-sm font-semibold text-gray-700 dark:text-slate-200">{{ t('stats_widget_visibility') }}</span>
+        </div>
+        <div id="restoreButtons" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-2"></div>
     </div>
 
 </div>
@@ -836,7 +841,7 @@ let editMode = false;
 function loadLayout() {
     try {
         const s = JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}');
-        return { order: s.order || [...DEFAULT_ORDER], hidden: s.hidden || [], limits: { ...DEFAULT_LIMITS, ...(s.limits || {}) }, sizes: s.sizes || {}, heights: s.heights || {} };
+        return { order: s.order || [...DEFAULT_ORDER], hidden: s.hidden || [], limits: { ...DEFAULT_LIMITS, ...(s.limits || {}) }, sizes: s.sizes || {}, heights: s.heights || {}, colors: s.colors || {} };
     } catch { return { order: [...DEFAULT_ORDER], hidden: [], limits: { ...DEFAULT_LIMITS }, sizes: {}, heights: {} }; }
 }
 
@@ -844,6 +849,12 @@ function saveLayout() {
     layout.order = [...document.querySelectorAll('#stats-page > [data-section-id]')].map(s => s.dataset.sectionId);
     localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
 }
+
+const cardManager = createCardResizeManager({
+    getLayout:    () => layout,
+    saveLayout:   saveLayout,
+    isEditMode:   () => editMode,
+});
 
 function applyOrder() {
     const page = document.getElementById('stats-page');
@@ -860,54 +871,6 @@ function applyVisibility() {
     updateEmptySections();
 }
 
-function clearCardSizeClasses(card) {
-    card.className = card.className
-        .replace(/\bxl:col-span-\d+\b/g, '')
-        .replace(/\s{2,}/g, ' ')
-        .trim();
-}
-
-function getDefaultCardSize(card) {
-    if (!card) return 1;
-    if (!card.dataset.defaultXlSpan) {
-        const match = (card.className || '').match(/\bxl:col-span-(\d+)\b/);
-        card.dataset.defaultXlSpan = match ? match[1] : '1';
-    }
-    return parseInt(card.dataset.defaultXlSpan, 10) || 1;
-}
-
-function applyCardSize(cardId, size) {
-    const card = document.querySelector(`[data-card-id="${cardId}"]`);
-    if (!card) return;
-    clearCardSizeClasses(card);
-    const defaultSize = getDefaultCardSize(card);
-    const nextSize = parseInt(size || defaultSize, 10) || defaultSize;
-    if (nextSize > 1) {
-        card.classList.add(`xl:col-span-${nextSize}`);
-    }
-    const controls = card.querySelectorAll('.card-size-controls [data-size-value]');
-    controls.forEach((btn) => {
-        const isActive = parseInt(btn.dataset.sizeValue || '0', 10) === nextSize;
-        btn.classList.toggle('bg-blue-600', isActive);
-        btn.classList.toggle('text-white', isActive);
-        btn.classList.toggle('shadow-sm', isActive);
-        btn.classList.toggle('text-blue-700', !isActive);
-    });
-}
-
-function setCardSize(cardId, size) {
-    const card = document.querySelector(`[data-card-id="${cardId}"]`);
-    if (!card) return;
-    const defaultSize = getDefaultCardSize(card);
-    if (parseInt(size, 10) === defaultSize) {
-        delete layout.sizes[cardId];
-    } else {
-        layout.sizes[cardId] = parseInt(size, 10);
-    }
-    applyCardSize(cardId, layout.sizes[cardId] || defaultSize);
-    saveLayout();
-}
-
 function updateEmptySections() {
     document.querySelectorAll('#stats-page > [data-section-id]').forEach(section => {
         const cards = section.querySelectorAll('.stats-card');
@@ -916,130 +879,11 @@ function updateEmptySections() {
     });
 }
 
-function applyLimits() {
-    Object.entries(layout.limits).forEach(([id, lim]) => applyCardLimit(id, lim));
-}
+function applyLimits()  { cardManager.applyLimits();       }
+function applySizes()   { cardManager.applySizes();        }
+function applyHeights() { cardManager.applyHeights();      }
 
-function applySizes() {
-    document.querySelectorAll('.stats-card').forEach((card) => {
-        const cardId = card.dataset.cardId;
-        const size = layout.sizes[cardId] || getDefaultCardSize(card);
-        applyCardSize(cardId, size);
-    });
-}
-
-function applyHeights() {
-    if (!layout.heights) return;
-    Object.entries(layout.heights).forEach(([id, h]) => {
-        const el = document.querySelector(`[data-card-id="${id}"]`);
-        if (el) el.style.minHeight = h + 'px';
-    });
-}
-
-// ── Card resize ───────────────────────────────────────────────────────────────
-let cardResizeState = null;
-
-function getParentMaxCols(card) {
-    const grid = card.parentElement;
-    if (!grid) return 1;
-    const m = (grid.className || '').match(/xl:grid-cols-(\d+)/);
-    return m ? parseInt(m[1], 10) : 1;
-}
-
-function getCardColWidth(card) {
-    const grid = card.parentElement;
-    if (!grid) return 200;
-    const maxCols = getParentMaxCols(card);
-    const style = getComputedStyle(grid);
-    const gap = parseFloat(style.columnGap) || parseFloat(style.gap) || 24;
-    return (grid.getBoundingClientRect().width - (maxCols - 1) * gap) / maxCols;
-}
-
-function initCardResizeHandles() {
-    document.querySelectorAll('.stats-card').forEach((card) => {
-        if (card.querySelector('.resize-handle')) return;
-        const id = card.dataset.cardId;
-        if (!id) return;
-        const handle = document.createElement('div');
-        handle.className = 'resize-handle';
-        handle.setAttribute('draggable', 'false');
-        handle.title = 'Resize';
-        handle.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" style="pointer-events:none;opacity:.7"><path d="M0 10 L10 0 L10 2 L2 10 Z M4 10 L10 4 L10 6 L6 10 Z M8 10 L10 8 L10 10 Z"/></svg>';
-        card.appendChild(handle);
-        handle.addEventListener('mousedown', (e) => {
-            if (!editMode) return;
-            e.preventDefault();
-            e.stopPropagation();
-            const rect = card.getBoundingClientRect();
-            const savedSize = layout.sizes[id] || getDefaultCardSize(card);
-            cardResizeState = {
-                card, id,
-                startX: e.clientX,
-                startY: e.clientY,
-                startCols: parseInt(savedSize) || 1,
-                startHeight: rect.height,
-                currentCols: parseInt(savedSize) || 1,
-                currentHeight: rect.height,
-            };
-            document.addEventListener('mousemove', onCardMouseMove);
-            document.addEventListener('mouseup', onCardMouseUp);
-            document.body.classList.add('resize-dragging');
-        });
-    });
-}
-
-function onCardMouseMove(e) {
-    if (!cardResizeState) return;
-    const { card, startX, startY, startCols, startHeight } = cardResizeState;
-    const maxCols = getParentMaxCols(card);
-    const colWidth = getCardColWidth(card);
-    const deltaX = e.clientX - startX;
-    const deltaY = e.clientY - startY;
-    const newCols = Math.max(1, Math.min(maxCols, Math.round(startCols + deltaX / colWidth)));
-    const ROW_SNAP = 80;
-    const newHeight = Math.max(ROW_SNAP, Math.round((startHeight + deltaY) / ROW_SNAP) * ROW_SNAP);
-    card.className = card.className.replace(/\bxl:col-span-\d+\b/g, '').replace(/\s{2,}/g, ' ').trim();
-    if (newCols > 1) card.classList.add(`xl:col-span-${newCols}`);
-    card.style.minHeight = newHeight + 'px';
-    cardResizeState.currentCols = newCols;
-    cardResizeState.currentHeight = newHeight;
-}
-
-function onCardMouseUp(e) {
-    if (!cardResizeState) return;
-    const { id, currentCols, currentHeight, startCols, startHeight } = cardResizeState;
-    if (currentCols !== startCols) {
-        setCardSize(id, currentCols);
-    }
-    if (currentHeight !== startHeight) {
-        if (!layout.heights) layout.heights = {};
-        layout.heights[id] = currentHeight;
-        const card = document.querySelector(`[data-card-id="${id}"]`);
-        if (card) card.style.minHeight = currentHeight + 'px';
-    }
-    document.removeEventListener('mousemove', onCardMouseMove);
-    document.removeEventListener('mouseup', onCardMouseUp);
-    document.body.classList.remove('resize-dragging');
-    cardResizeState = null;
-    saveLayout();
-}
-
-function applyCardLimit(cardId, limit) {
-    const card = document.querySelector(`[data-card-id="${cardId}"]`);
-    if (!card) return;
-    const lim = (limit === 'all') ? Infinity : parseInt(limit);
-    card.querySelectorAll('[data-row-index]').forEach(row => {
-        row.style.display = parseInt(row.dataset.rowIndex) >= lim ? 'none' : '';
-    });
-    const sel = card.querySelector('.widget-limit-select');
-    if (sel) sel.value = String(limit);
-}
-
-function setCardLimit(cardId, value) {
-    layout.limits[cardId] = value === 'all' ? 'all' : parseInt(value);
-    applyCardLimit(cardId, layout.limits[cardId]);
-    saveLayout();
-}
+function setCardLimit(cardId, value) { cardManager.setLimit(cardId, value); }
 
 function hideCard(cardId) {
     if (!layout.hidden.includes(cardId)) layout.hidden.push(cardId);
@@ -1061,20 +905,46 @@ function showCard(cardId) {
 
 function updateRestorePanel() {
     const panel = document.getElementById('restorePanel');
-    const btns = document.getElementById('restoreButtons');
+    const btns  = document.getElementById('restoreButtons');
     if (!panel || !btns) return;
+    if (!editMode) { panel.classList.add('hidden'); return; }
+    panel.classList.remove('hidden');
     btns.innerHTML = '';
-    layout.hidden.forEach(cardId => {
-        const card = document.querySelector(`[data-card-id="${cardId}"]`);
-        const h2 = card ? card.querySelector('h2') : null;
-        const label = h2 ? h2.textContent.trim() : cardId;
-        const btn = document.createElement('button');
-        btn.className = 'inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:border-blue-400 transition';
-        btn.innerHTML = `<i class="fa-solid fa-eye text-blue-500"></i> ${label}`;
-        btn.onclick = () => showCard(cardId);
-        btns.appendChild(btn);
+    // Show ALL cards (not just hidden ones)
+    document.querySelectorAll('.stats-card').forEach(cardEl => {
+        const cardId    = cardEl.dataset.cardId;
+        if (!cardId) return;
+        const h2        = cardEl.querySelector('h2');
+        const labelText = h2 ? h2.textContent.trim() : cardId;
+        const isHidden  = layout.hidden.includes(cardId);
+        const colorId   = (layout.colors && layout.colors[cardId]) || '';
+        const dot       = colorId ? (_DASH_COLORS.find(c => c.id === colorId) || {}).dot : null;
+        const card = document.createElement('div');
+        card.className = 'flex items-center gap-2 px-3 py-2.5 rounded-xl border cursor-default transition-all ' +
+            (isHidden
+                ? 'border-dashed border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-800/30 opacity-60'
+                : 'border-gray-200 dark:border-slate-600 bg-white/80 dark:bg-slate-800/60');
+        // Colour dot
+        const dotEl = document.createElement('div');
+        dotEl.style.cssText = 'width:12px;height:12px;border-radius:50%;flex-shrink:0;border:1.5px solid rgba(0,0,0,0.12);background:' +
+            (dot || (isHidden ? '#cbd5e1' : '#e2e8f0'));
+        card.appendChild(dotEl);
+        // Label
+        const labelEl = document.createElement('span');
+        labelEl.className = 'flex-1 text-xs font-semibold truncate text-gray-700 dark:text-slate-300 min-w-0';
+        labelEl.textContent = labelText;
+        card.appendChild(labelEl);
+        // Eye toggle
+        const eyeBtn = document.createElement('button');
+        eyeBtn.type = 'button';
+        eyeBtn.className = 'w-6 h-6 flex-shrink-0 flex items-center justify-center rounded transition ' +
+            (isHidden ? 'text-gray-400 hover:bg-green-100 hover:text-green-600' : 'text-blue-500 hover:bg-blue-100');
+        eyeBtn.innerHTML = `<i class="fa-solid ${isHidden ? 'fa-eye-slash' : 'fa-eye'} text-xs"></i>`;
+        eyeBtn.title = isHidden ? {{ t('dashboard_show_widget')|tojson }} : {{ t('dashboard_hide_widget')|tojson }};
+        eyeBtn.onclick = () => isHidden ? showCard(cardId) : hideCard(cardId);
+        card.appendChild(eyeBtn);
+        btns.appendChild(card);
     });
-    panel.classList.toggle('hidden', layout.hidden.length === 0 || !editMode);
 }
 
 // ── Edit mode ─────────────────────────────────────────────────────────────────
@@ -1091,7 +961,7 @@ function toggleEditMode() {
         label.textContent = '{{ t("stats_done_editing") }}';
         hint.classList.remove('hidden');
         enableDrag();
-        initCardResizeHandles();
+        cardManager.initHandles();
     } else {
         page.classList.remove('edit-mode');
         btn.classList.remove('bg-blue-600','text-white','border-blue-600','hover:bg-blue-700');
@@ -1180,12 +1050,13 @@ function disableDrag() {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-    initCardResizeHandles();
+    cardManager.initHandles();
     applyOrder();
     applyVisibility();
     applyLimits();
     applySizes();
     applyHeights();
+    cardManager.applyColors();
     updateRestorePanel();
 });
 </script>

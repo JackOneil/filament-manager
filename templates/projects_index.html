@@ -33,6 +33,19 @@
         <button onclick="resetProjectsLayout()" class="ml-auto text-xs font-semibold text-blue-600 hover:text-blue-800 underline">{{ t('stats_reset_layout') }}</button>
     </div>
 
+    <!-- Widget visibility / colour panel (shown in edit mode) -->
+    <section class="ui-panel hidden" id="projectsVisibilityPanel">
+        <div class="p-3 w-full">
+            <div class="flex items-center gap-2 mb-3">
+                <i class="fa-solid fa-sliders text-blue-500 text-sm"></i>
+                <span class="text-sm font-semibold text-gray-700 dark:text-slate-200">{{ t('stats_widget_visibility') }}</span>
+            </div>
+            <div class="visibility-toggles grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-2">
+                <!-- Auto-populated by createWidgetLayoutManager via syncVisibility -->
+            </div>
+        </div>
+    </section>
+
     <!-- Content wrapper for AJAX reload -->
     <div id="projects-inner-wrapper" class="relative transition-opacity duration-300" :class="loading ? 'opacity-50 pointer-events-none' : 'opacity-100'">
         {% include '_projects_layout.html' %}
@@ -49,8 +62,12 @@ window.initProjectsLayout = function() {
         editButtonId: 'projectsEditBtn',
         labelId: 'projectsEditBtnLabel',
         hintId: 'projectsEditHint',
+        visibilityPanelId: 'projectsVisibilityPanel',
         editText: {{ t('stats_edit_layout')|tojson }},
         doneText: {{ t('stats_done_editing')|tojson }},
+        hideBtnTitle: {{ t('dashboard_hide_widget')|tojson }},
+        showBtnTitle: {{ t('dashboard_show_widget')|tojson }},
+        limitAllText: {{ t('stats_limit_all')|tojson }},
         defaultOrder: ['due_calendar', 'status_new', 'status_printing', 'status_done', 'project_table'],
     });
 };

@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.60.0] - 2026-04-11
+### Added
+- **Toggle-hide on widgets**: Clicking the hide button on an already-hidden widget (shown as faded in edit mode) now shows it again. The hide button switches to an amber eye icon when the widget is hidden, making the toggle state obvious.
+- **Widget colour picker**: Every widget on Overview, Projects, and Statistics pages now has a colour-palette button in the edit bar. Choose from 9 subtle accent tints (blue, green, amber, red, purple, rose, cyan, slate + default). The tint is applied as a translucent background, keeping text fully legible in both light and dark mode. Selections persist in `localStorage`.
+- **Redesigned widget overview panel**: The widget list at the top of all three dashboard pages (shown in edit mode) is now a grid of cards — one per widget — each displaying a colour dot, widget name, and a visibility toggle eye button. Hidden cards are indicated with a dashed border and reduced opacity.
+- **Projects visibility panel**: The Projects page now has a `#projectsVisibilityPanel` (matching Overview), populated by `createWidgetLayoutManager`. Previously it had no panel at all.
+- **Stats hidden-card panel upgraded**: The `#restorePanel` on Statistics now shows ALL cards (not just hidden ones), matching the design of Overview and Projects.
+
+### Changed
+- `createWidgetLayoutManager` extended: `showBtnTitle` config param, `colors` in layout storage, `syncVisibility()` rebuild to grid-card layout.
+- `createCardResizeManager` extended: `initHandles()` injects colour-picker buttons into `.card-edit-bar`; new `applyColors()` export.
+- `dashboard_show_widget` i18n key added (CS + EN).
+
+## [1.59.0] - 2026-04-13
+### Added
+- **Inline Widget Hide Button**: All widgets on the Overview and Projects dashboard pages now have an inline hide button (eye-slash icon) directly on the widget's edit bar — identical to the hide button already present on Statistics cards. Click the button in edit mode to immediately hide a widget; restore it via the visibility panel.
+- **Shared Dashboard Module** (`static/js/dashboard.js`): Extracted all dashboard management logic into a single shared JS file. `createWidgetLayoutManager` (Overview/Projects) and `createCardResizeManager` (Statistics) are now defined once and sourced by all three dashboard pages, eliminating code duplication.
+
+### Changed
+- `createWidgetLayoutManager` now accepts `hideBtnTitle` and `limitAllText` config params (translated strings), and injects the hide button and row-limit selector dynamically.
+- `stats.html` refactored to use `createCardResizeManager` from `dashboard.js` instead of inline duplicated functions. Card resize, size apply, and limit apply are now delegated to the shared manager.
+- `copilot-instructions.md` updated with Rule 22 (Dashboard Consistency) requiring identical capabilities on Overview, Projects, and Statistics pages via `dashboard.js`.
+
 ## [1.58.0] - 2026-04-12
 ### Added
 - **Live Printers Widget**: Restored the standalone "Currently Printing" widget on the Overview dashboard, now alongside the Recent Activity widget. Shows real-time Prusa progress bars and Bambu stripe animations with material swatches.
