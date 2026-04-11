@@ -6,6 +6,87 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- **Interactive Project Filtering**: The projects dashboard (`/projects`) now features an Alpine.js-powered real-time filter panel. Users can instantly search projects by Name, Client, and Tag without full page reloads.
+- **Clickable Project Tags**: Any tag clicked on a project row or card now acts as a quick-filter, instantly restricting the visible projects to that specific tag using the new AJAX integration.
+## [1.56.9] - 2026-04-10
+### Added
+- **Global Billing Settings**: Added a new configuration panel in Settings for setting up default company billing details (Supplier info), ensuring invoice documents are prepopulated and synced with database backups.
+- **Interactive Invoice & Quote Generator**: Completely reimagined the quote export flow using Alpine.js and Tailwind. Users can seamlessly switch between three layout modes: `Simple Quote`, `Detailed Quote`, and `Invoice` (Faktura), and adjust data dynamically before generating print-perfect cross-browser PDFs.
+
+### Changed
+- Standardized display precision of numeric values related to Print Quotes in the project detail interface. Material volumes and print times are now nicely rounded to nearest decimals for cleaner UI.
+
+### Fixed
+- **Detailed Quote Print Scaling**: Adjusted the padding values of the detailed quote layout during print mode. The document now natively fits onto a standard A4 page without requiring the user to manually scale down to 72% in the print dialog.
+
+## [1.56.8] - 2026-04-10
+### Fixed
+- **Project calculator saving:** Instead of saving an individual row (`ProjectQuote`) for every single mapped filament slot, the calculator now saves **one unified calculate quote** for the entire project.
+  - Generates a composite name (e.g. `PLA Black (200g) + PETG White (50g)`).
+  - Contains the aggregated payload of total material cost, base cost, margin, and electricity.
+  - Fixes timeline and Materials tab cluttering from dozens of single quotes.
+
+## [1.56.7] - 2026-04-10
+### Changed
+- **Project calculator — real job data as primary source:** The project-mode calculator (`/calculator/project/<id>`) now prefers actual print data from Bambu and Prusa jobs over planned filament estimates:
+  - **Bambu jobs:** Reads per-AMS-slot `BambuJobMaterial` records (weight per slot, mapped filament, color). Multiple jobs are aggregated per filament.
+  - **Prusa jobs:** Reads `PrusaPrintJob` weight and mapped filament.
+  - **Print time:** Calculated from the sum of actual `cost_time` (seconds) across all jobs, not the project estimate.
+  - **Fallback:** If no jobs with usable data exist, falls back to planned `ProjectFilament` entries and estimated print time.
+  - **Source badge:** Header shows a teal badge ("Realálná data z tiskových jobů") or amber badge ("Plánovaná data") so the user knows which source is used.
+  - **Unmapped slots:** Bambu slots not yet assigned to a filament are shown with a warning badge instead of being silently dropped — their cost is 0 but weight is still visible.
+  - **Empty state:** Improved with links to both the Materials tab and Jobs tab when neither source provides data.
+
+## [1.56.6] - 2026-04-10
+### Added
+- **Project-mode print calculator (`/calculator/project/<id>`):** Clicking the Calculator button from any project detail page now opens a dedicated project-mode calculator that automatically pre-fills all inputs from the project — filaments, estimated weights, and print time. Only the margin (%) can be adjusted by the user.
+  - Per-material cost breakdown table with material name, weight, unit price, and material cost.
+  - Shared electricity cost row split proportionally by weight across materials.
+  - Live-updating sidebar: changing the margin instantly recalculates the final price without a page reload.
+  - Saving stores one `ProjectQuote` row per material line and redirects back to the project Materials tab.
+  - Empty-state shown when the project has no filaments assigned yet.
+### Changed
+- **Project detail — Calculator links:** All three calculator buttons in project detail (hero badge, materials tab badge) now link directly to the new project-mode calculator instead of the generic manual calculator.
+
+## [1.56.5] - 2026-04-10
+### Changed
+- **Command Center redesign:** Replaced the 2-panel layout (large description block + 4 stat cards + 2 wide project panels) with a compact 3-column hub that acts as a true crossroads of what's happening now:
+  - **Needs Attention** — each urgent item (low stock, overdue projects, unmapped Bambu jobs, printer issues) is its own clickable row with a coloured dot and chevron; a green "all clear" state when nothing is pending.
+  - **Active Print** — compact live printer cards with progress bar, model name, start time and BAMBU/% badge; scales to show all active printers.
+  - **Active Projects** — concise list with a status-coloured dot, project name, status label and due date; projects due today are highlighted in amber.
+  - KPI totals (urgent, active projects, live printers, due today) moved to a compact pill row in the header instead of 4 large stat cards.
+
+## [1.56.4] - 2026-04-10
+### Fixed
+- **Movement History — per_page preference not remembered:** Replaced the previous `localStorage` + redirect approach (which caused a double page load) with a server-side cookie (`history_per_page`, 1 year). The server reads the cookie as a fallback when `per_page` is absent from the URL, so the preference is applied immediately on every visit without any redirect or flicker.
+
+## [1.56.3] - 2026-04-10
+### Changed
+- **Movement History — unified design:** Rewritten `history.html` to use the same `page-shell` / `page-hero` / `app-surface` layout pattern as other pages (Bambu, Prusa, Stats). The page header now uses the shared `page-title` / `page-title-icon` component. Table uses design-system CSS variables for colors, borders, and dark-mode support.
+- **Movement History — clickable filament rows:** Each movement that has a linked filament record (`filament_id` is set) now renders the filament name as a clickable link leading to the filament detail page. A spool icon and an "external-link" indicator appear on hover.
+
+## [1.56.2] - 2026-04-10
+### Fixed
+- **Missing Movement History link in main navigation:** The movement history page (`/history`) was accessible via the command palette (Ctrl+K) but had no entry in the sidebar or mobile menu. Added a dedicated nav link with the `fa-clock-rotate-left` icon, correct active-state highlight, permission guard (`auth_has_section_access('history')`), and breadcrumb label in the topbar.
+
+### Fixed
+- **Bambu — active print not shown on overview:** For some printer/firmware versions, the Bambu Cloud API reports ongoing prints with status `PAUSED` (raw=4) instead of `RUNNING` (raw=1). The "Live Printers" widget on the main page now includes both values in the filter, so ongoing prints are correctly displayed as active even in this state.
+
+## [1.56.0] - 2026-04-08
+### Changed
+- **Dark mode – Stats page:** All stats cards (`low_stock`, `top_turnover`, `profitable_projects`, charts, tables, color palette) now correctly adapt to dark mode using CSS custom-property surfaces, borders, and text colors. Day-filter pills, edit-mode button, navigator links, and color-palette tooltips also switch to dark-aware styles.
+- **Dark mode – Project detail:** Status-flow step cards, progress-bar track, TODO item cards, description text, and comment bodies now all render correctly in dark mode.
+- **Project client simplified:** Removed the separate "Vlastník (uživatel)" user-selector and "Vlastník (externí jméno)" manual-input fields from project create, edit, and the projects list/kanban view. Only the "Klient" field is now shown and editable. The owner relationship is retained internally for access-control (non-admin users still see only their own projects) but is no longer surfaced in the UI.
+
+## [1.55.0] - 2026-04-08
+### Added
+- **Project owner assignment flexibility:** Administrators can now assign a project owner either to an existing system user or to an external person name (without creating a user account).
+
+### Changed
+- **Project create/edit forms:** Admin project forms now include dedicated owner assignment fields (`owner user` and `external owner name`), with external name taking precedence when filled.
+- **Owner display fallback:** Project owner labels across project list/detail and overview now correctly show external owner names when no user account is assigned.
+- **Backup compatibility:** Project export/import now preserves the new external owner name field so owner assignments remain intact after restore.
 
 ## [1.54.0] - 2026-04-08
 ### Added

@@ -15,7 +15,7 @@
                     <i class="fa-solid fa-diagram-project"></i> {{ t('project_create') }}
                 </a>
                 <button id="overviewEditBtn" onclick="toggleOverviewEditMode()"
-                        class="px-4 py-2 rounded-full text-sm font-semibold border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-all flex items-center gap-2">
+                        class="px-4 py-2 rounded-full text-sm font-semibold border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all flex items-center gap-2">
                     <i class="fa-solid fa-pen-to-square"></i>
                     <span id="overviewEditBtnLabel">{{ t('stats_edit_layout') }}</span>
                 </button>
@@ -48,9 +48,9 @@
                         <div class="text-sm text-gray-500 mt-2">{{ t('overview_action_center_desc') }}</div>
                         <div class="space-y-2 mt-3">
                             {% for item in overview_focus.urgent_items %}
-                            <a href="{{ item.url }}" class="flex items-center justify-between gap-3 rounded-xl border border-white/70 bg-white/80 px-3 py-2 hover:border-red-200 transition">
+                            <a href="{{ item.url }}" class="flex items-center justify-between gap-3 rounded-xl border border-white/70 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60 px-3 py-2 hover:border-red-200 dark:hover:border-red-700 transition">
                                 <span class="min-w-0">
-                                    <span class="block text-sm font-semibold text-gray-800 truncate">{{ item.title }}</span>
+                                    <span class="block text-sm font-semibold text-gray-800 dark:text-slate-100 truncate">{{ item.title }}</span>
                                     <span class="block text-xs {% if item.tone == 'critical' %}text-red-600{% else %}text-amber-600{% endif %} mt-1">{{ item.meta }}</span>
                                 </span>
                                 <span class="w-2.5 h-2.5 rounded-full {% if item.tone == 'critical' %}bg-red-500{% else %}bg-amber-400{% endif %} flex-shrink-0"></span>
@@ -89,12 +89,12 @@
                     </div>
                     <div class="space-y-3">
                         {% for project in overview_focus.due_today %}
-                        <a href="{{ url_for('project_detail', id=project.id) }}" class="flex items-center justify-between gap-4 rounded-2xl border border-white/60 bg-white/80 px-4 py-3 hover:border-amber-200 transition">
+                        <a href="{{ url_for('project_detail', id=project.id) }}" class="flex items-center justify-between gap-4 rounded-2xl border border-white/60 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60 px-4 py-3 hover:border-amber-200 dark:hover:border-amber-700 transition">
                             <div class="min-w-0">
-                                <div class="font-semibold text-gray-800 truncate">{{ project.name }}</div>
-                                <div class="text-sm text-gray-500 mt-1">
+                                <div class="font-semibold text-gray-800 dark:text-slate-100 truncate">{{ project.name }}</div>
+                                <div class="text-sm text-gray-500 dark:text-slate-400 mt-1">
                                     {{ project.client_name or t('project_client_missing_label') }}
-                                    {% if project.owner %} · {{ project.owner.name }}{% endif %}
+                                    {% if project.owner_display_name %} · {{ project.owner_display_name }}{% endif %}
                                 </div>
                             </div>
                             <div class="text-right flex-shrink-0">
@@ -103,7 +103,7 @@
                             </div>
                         </a>
                         {% else %}
-                        <div class="rounded-2xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-400">{{ t('overview_command_center_no_due_today') }}</div>
+                        <div class="rounded-2xl border border-dashed border-gray-200 dark:border-slate-700 px-4 py-8 text-center text-sm text-gray-400">{{ t('overview_command_center_no_due_today') }}</div>
                         {% endfor %}
                     </div>
                 </div>
@@ -113,18 +113,18 @@
                     <div class="text-xl font-bold mt-1 mb-4">{{ t('overview_command_center_focus_projects') }}</div>
                     <div class="space-y-3">
                         {% for project in overview_focus.active_projects %}
-                        <a href="{{ url_for('project_detail', id=project.id) }}" class="block rounded-2xl border border-white/60 bg-white/80 px-4 py-3 hover:border-blue-200 transition">
+                        <a href="{{ url_for('project_detail', id=project.id) }}" class="block rounded-2xl border border-white/60 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60 px-4 py-3 hover:border-blue-200 dark:hover:border-blue-700 transition">
                             <div class="flex items-center justify-between gap-3">
-                                <div class="font-semibold text-gray-800 truncate">{{ project.name }}</div>
+                                <div class="font-semibold text-gray-800 dark:text-slate-100 truncate">{{ project.name }}</div>
                                 <span class="ui-badge {% if project.status == 'PRINTING' %}ui-badge-brand{% elif project.status == 'PENDING_APPROVAL' %}ui-badge-warning{% else %}ui-badge{% endif %}">{{ t('status_' ~ project.status|lower) }}</span>
                             </div>
-                            <div class="text-xs text-gray-500 mt-2">
+                            <div class="text-xs text-gray-500 dark:text-slate-400 mt-2">
                                 {{ project.client_name or t('project_client_missing_label') }}
                                 {% if project.due_date %} · {{ project.due_date.strftime('%d.%m.%Y') }}{% endif %}
                             </div>
                         </a>
                         {% else %}
-                        <div class="rounded-2xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-400">{{ t('overview_all_clear') }}</div>
+                        <div class="rounded-2xl border border-dashed border-gray-200 dark:border-slate-700 px-4 py-8 text-center text-sm text-gray-400">{{ t('overview_all_clear') }}</div>
                         {% endfor %}
                     </div>
                 </div>
@@ -132,7 +132,7 @@
         </div>
     </section>
 
-    <div id="overviewEditHint" class="hidden bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 text-sm text-blue-700">
+    <div id="overviewEditHint" class="hidden bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/40 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 text-sm text-blue-700 dark:text-blue-300">
         <i class="fa-solid fa-arrows-up-down-left-right"></i>
         <span>{{ t('stats_drag_hint') }}</span>
         <button onclick="resetOverviewLayout()" class="ml-auto text-xs font-semibold text-blue-600 hover:text-blue-800 underline">{{ t('stats_reset_layout') }}</button>
@@ -316,8 +316,8 @@
                         </div>
                         <div class="space-y-2">
                             {% for item in action_center.low_stock %}
-                            <a href="{{ url_for('filament_detail', id=item.filament.id) }}" class="block rounded-xl border border-amber-100 bg-white/70 px-3 py-2 hover:border-amber-300 transition">
-                                <div class="font-semibold text-gray-800">{{ item.filament.name }}</div>
+                            <a href="{{ url_for('filament_detail', id=item.filament.id) }}" class="block rounded-xl border border-amber-100 dark:border-amber-900/40 bg-white/70 dark:bg-slate-800/60 px-3 py-2 hover:border-amber-300 dark:hover:border-amber-700 transition">
+                                <div class="font-semibold text-gray-800 dark:text-slate-100">{{ item.filament.name }}</div>
                                 <div class="text-xs {% if item.status == 'critical' %}text-red-600{% else %}text-amber-600{% endif %}">
                                     {{ item.recommended_spools }} {{ t('pieces') }} · {{ item.recommended_grams }} g
                                 </div>
@@ -334,8 +334,8 @@
                         </div>
                         <div class="space-y-2">
                             {% for project in action_center.overdue_projects %}
-                            <a href="{{ url_for('project_detail', id=project.id) }}" class="block rounded-xl border border-red-100 bg-white/70 px-3 py-2 hover:border-red-300 transition">
-                                <div class="font-semibold text-gray-800">{{ project.name }}</div>
+                            <a href="{{ url_for('project_detail', id=project.id) }}" class="block rounded-xl border border-red-100 dark:border-red-900/40 bg-white/70 dark:bg-slate-800/60 px-3 py-2 hover:border-red-300 dark:hover:border-red-700 transition">
+                                <div class="font-semibold text-gray-800 dark:text-slate-100">{{ project.name }}</div>
                                 <div class="text-xs text-red-600">{{ project.due_date.strftime('%d.%m.%Y') }} · {{ t('project_status') }} {{ t('status_' ~ project.status|lower) }}</div>
                             </a>
                             {% else %}
@@ -350,15 +350,15 @@
                         </div>
                         <div class="space-y-2">
                             {% for job in action_center.unmapped_bambu %}
-                            <a href="{{ url_for('bambu_jobs') }}" class="block rounded-xl border border-blue-100 bg-white/70 px-3 py-2 hover:border-blue-300 transition">
-                                <div class="font-semibold text-gray-800">{{ job.model_name or job.external_id }}</div>
-                                <div class="text-xs text-gray-500">Bambu · {{ t('overview_without_filament') }}</div>
+                            <a href="{{ url_for('bambu_jobs') }}" class="block rounded-xl border border-blue-100 dark:border-blue-900/40 bg-white/70 dark:bg-slate-800/60 px-3 py-2 hover:border-blue-300 dark:hover:border-blue-700 transition">
+                                <div class="font-semibold text-gray-800 dark:text-slate-100">{{ job.model_name or job.external_id }}</div>
+                                <div class="text-xs text-gray-500 dark:text-slate-400">Bambu · {{ t('overview_without_filament') }}</div>
                             </a>
                             {% endfor %}
                             {% for job in action_center.unmapped_prusa %}
-                            <a href="{{ url_for('prusa_jobs') }}" class="block rounded-xl border border-blue-100 bg-white/70 px-3 py-2 hover:border-blue-300 transition">
-                                <div class="font-semibold text-gray-800">{{ job.display_name or job.file_name or ('Job #' ~ job.id) }}</div>
-                                <div class="text-xs text-gray-500">
+                            <a href="{{ url_for('prusa_jobs') }}" class="block rounded-xl border border-blue-100 dark:border-blue-900/40 bg-white/70 dark:bg-slate-800/60 px-3 py-2 hover:border-blue-300 dark:hover:border-blue-700 transition">
+                                <div class="font-semibold text-gray-800 dark:text-slate-100">{{ job.display_name or job.file_name or ('Job #' ~ job.id) }}</div>
+                                <div class="text-xs text-gray-500 dark:text-slate-400">
                                     Prusa
                                     {% if not job.project_id %} · {{ t('overview_without_project') }}{% endif %}
                                     {% if not job.filament_id %} · {{ t('overview_without_filament') }}{% endif %}
@@ -377,10 +377,10 @@
                         </div>
                         <div class="space-y-2">
                             {% for print in action_center.recent_prints %}
-                            <a href="{{ print.detail_url }}" class="block rounded-xl border border-gray-100 bg-white/70 px-3 py-2 hover:border-blue-200 transition">
-                                <div class="font-semibold text-gray-800 truncate">{{ print.title }}</div>
+                            <a href="{{ print.detail_url }}" class="block rounded-xl border border-gray-100 dark:border-slate-700 bg-white/70 dark:bg-slate-800/60 px-3 py-2 hover:border-blue-200 dark:hover:border-blue-700 transition">
+                                <div class="font-semibold text-gray-800 dark:text-slate-100 truncate">{{ print.title }}</div>
                                 <div class="flex items-center justify-between gap-1 mt-0.5">
-                                    <div class="text-xs text-gray-500 truncate">
+                                    <div class="text-xs text-gray-500 dark:text-slate-400 truncate">
                                         <i class="fa-solid {% if print.source == 'bambu' %}fa-print{% else %}fa-network-wired{% endif %} mr-0.5"></i>
                                         {{ print.printer_name or print.source }}
                                     </div>
@@ -419,23 +419,23 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                     <a href="{{ url_for('filaments_index') }}" class="ui-card-soft p-4 hover:border-blue-300 transition">
                         <div class="ui-badge ui-badge-brand mb-3"><i class="fa-solid fa-layer-group"></i> {{ t('filaments_nav') }}</div>
-                        <div class="font-semibold text-gray-800">{{ t('overview_open_filaments') }}</div>
-                        <div class="text-sm text-gray-500 mt-2">{{ t('overview_open_filaments_desc') }}</div>
+                        <div class="font-semibold text-gray-800 dark:text-slate-100">{{ t('overview_open_filaments') }}</div>
+                        <div class="text-sm text-gray-500 dark:text-slate-400 mt-2">{{ t('overview_open_filaments_desc') }}</div>
                     </a>
                     <a href="{{ url_for('storage') }}" class="ui-card-soft p-4 hover:border-blue-300 transition">
                         <div class="ui-badge mb-3"><i class="fa-solid fa-warehouse"></i> {{ t('storage_nav') }}</div>
-                        <div class="font-semibold text-gray-800">{{ t('overview_open_storage') }}</div>
-                        <div class="text-sm text-gray-500 mt-2">{{ t('overview_open_storage_desc') }}</div>
+                        <div class="font-semibold text-gray-800 dark:text-slate-100">{{ t('overview_open_storage') }}</div>
+                        <div class="text-sm text-gray-500 dark:text-slate-400 mt-2">{{ t('overview_open_storage_desc') }}</div>
                     </a>
                     <a href="{{ url_for('projects_index') }}" class="ui-card-soft p-4 hover:border-blue-300 transition">
                         <div class="ui-badge mb-3"><i class="fa-solid fa-diagram-project"></i> {{ t('projects') }}</div>
-                        <div class="font-semibold text-gray-800">{{ t('overview_open_projects') }}</div>
-                        <div class="text-sm text-gray-500 mt-2">{{ t('overview_open_projects_desc') }}</div>
+                        <div class="font-semibold text-gray-800 dark:text-slate-100">{{ t('overview_open_projects') }}</div>
+                        <div class="text-sm text-gray-500 dark:text-slate-400 mt-2">{{ t('overview_open_projects_desc') }}</div>
                     </a>
                     <a href="{{ url_for('stats') }}" class="ui-card-soft p-4 hover:border-blue-300 transition">
                         <div class="ui-badge mb-3"><i class="fa-solid fa-chart-column"></i> {{ t('stats_nav') }}</div>
-                        <div class="font-semibold text-gray-800">{{ t('overview_open_stats') }}</div>
-                        <div class="text-sm text-gray-500 mt-2">{{ t('overview_open_stats_desc') }}</div>
+                        <div class="font-semibold text-gray-800 dark:text-slate-100">{{ t('overview_open_stats') }}</div>
+                        <div class="text-sm text-gray-500 dark:text-slate-400 mt-2">{{ t('overview_open_stats_desc') }}</div>
                     </a>
                 </div>
             </div>
@@ -455,11 +455,11 @@
                 <h2 class="text-xl font-bold mb-4">{{ t('overview_upcoming_projects_title') }}</h2>
                 <div class="space-y-3">
                    {% for project in overview_focus.upcoming_deadlines %}
-                   <a href="{{ url_for('project_detail', id=project.id) }}" class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-blue-200 transition bg-white/50">
-                       <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold shrink-0">{{ project.due_date.strftime('%d') }}</div>
+                   <a href="{{ url_for('project_detail', id=project.id) }}" class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:border-blue-200 dark:hover:border-blue-700 transition bg-white/50 dark:bg-slate-800/50">
+                       <div class="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold shrink-0">{{ project.due_date.strftime('%d') }}</div>
                        <div class="min-w-0 flex-1">
-                           <div class="font-bold text-gray-800 truncate">{{ project.name }}</div>
-                           <div class="text-xs text-gray-500">{{ project.due_date.strftime('%b %Y') }} · {{ t('status_' ~ project.status|lower) }}</div>
+                           <div class="font-bold text-gray-800 dark:text-slate-100 truncate">{{ project.name }}</div>
+                           <div class="text-xs text-gray-500 dark:text-slate-400">{{ project.due_date.strftime('%b %Y') }} · {{ t('status_' ~ project.status|lower) }}</div>
                        </div>
                    </a>
                    {% else %}
@@ -512,8 +512,8 @@
                    {% for f in overview_focus.top_turnover_month %}
                    <a href="{{ url_for('filament_detail', id=f.filament.id) }}" class="flex items-center gap-3 group">
                        <div class="w-6 h-6 rounded-full border shadow-sm shrink-0" style="background-color: #{{ f.filament.color.hex_value.lstrip('#') if f.filament.color and f.filament.color.hex_value else 'eee' }};"></div>
-                       <div class="text-sm font-semibold text-gray-700 group-hover:text-blue-600 truncate flex-1">{{ f.filament.name }}</div>
-                       <div class="text-xs font-bold text-gray-500">{{ f.usage|round|int }} g</div>
+                       <div class="text-sm font-semibold text-gray-700 dark:text-slate-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate flex-1">{{ f.filament.name }}</div>
+                       <div class="text-xs font-bold text-gray-500 dark:text-slate-400">{{ f.usage|round|int }} g</div>
                    </a>
                    {% else %}
                    <div class="text-sm text-gray-400">{{ t('overview_no_activity_month') }}</div>

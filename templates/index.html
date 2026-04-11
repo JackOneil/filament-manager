@@ -66,10 +66,10 @@
                 <div class="ui-label">{{ t('inventory_low_stock_widget') }}</div>
                 <div class="space-y-3 mt-3">
                     {% for fil in stock_alerts[:3] %}
-                    <a href="{{ url_for('filament_detail', id=fil.id) }}" class="flex items-center gap-3 rounded-2xl border border-white/70 bg-white/80 px-3 py-3 hover:border-red-200 transition">
-                        <span class="w-10 h-10 rounded-2xl border border-gray-200 shadow-sm flex-shrink-0" style="background: linear-gradient(135deg, {{ fil.color.hex_value or '#cbd5e1' }}, rgba(255,255,255,0.65));"></span>
+                    <a href="{{ url_for('filament_detail', id=fil.id) }}" class="flex items-center gap-3 rounded-2xl border border-white/70 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60 px-3 py-3 hover:border-red-200 dark:hover:border-red-700 transition">
+                        <span class="w-10 h-10 rounded-2xl border border-gray-200 dark:border-slate-600 shadow-sm flex-shrink-0" style="background: linear-gradient(135deg, {{ fil.color.hex_value or '#cbd5e1' }}, rgba(255,255,255,0.65));"></span>
                         <span class="min-w-0 flex-1">
-                            <span class="block font-semibold text-gray-800 truncate">{{ fil.name }}</span>
+                            <span class="block font-semibold text-gray-800 dark:text-slate-100 truncate">{{ fil.name }}</span>
                             <span class="block text-xs {% if fil.stock_metrics.status == 'critical' %}text-red-600{% else %}text-amber-600{% endif %} mt-1">{{ fil.stock_metrics.remaining | int }} g · {{ t('stats_recommend_buy') }} {{ fil.stock_metrics.recommended_grams }} g</span>
                         </span>
                     </a>
@@ -82,13 +82,13 @@
                 <div class="ui-label">{{ t('inventory_top_turnover_widget') }}</div>
                 <div class="space-y-3 mt-3">
                     {% for fil in inventory_highlights.top_turnover %}
-                    <a href="{{ url_for('filament_detail', id=fil.id) }}" class="flex items-center justify-between gap-3 rounded-2xl border border-white/70 bg-white/80 px-3 py-3 hover:border-blue-200 transition">
+                    <a href="{{ url_for('filament_detail', id=fil.id) }}" class="flex items-center justify-between gap-3 rounded-2xl border border-white/70 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60 px-3 py-3 hover:border-blue-200 dark:hover:border-blue-700 transition">
                         <div class="min-w-0">
-                            <div class="font-semibold text-gray-800 truncate">{{ fil.name }}</div>
-                            <div class="text-xs text-gray-500 mt-1">{{ fil.brand.name }} · {{ fil.material.name }}</div>
+                            <div class="font-semibold text-gray-800 dark:text-slate-100 truncate">{{ fil.name }}</div>
+                            <div class="text-xs text-gray-500 dark:text-slate-400 mt-1">{{ fil.brand.name }} · {{ fil.material.name }}</div>
                         </div>
                         <div class="text-right flex-shrink-0">
-                            <div class="font-semibold text-blue-700">{{ fil.stock_metrics.usage_30 | round(0) | int }} g</div>
+                            <div class="font-semibold text-blue-700 dark:text-blue-400">{{ fil.stock_metrics.usage_30 | round(0) | int }} g</div>
                             <div class="text-xs text-gray-400">30d</div>
                         </div>
                     </a>
@@ -106,9 +106,9 @@
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
             {% for item in inventory_highlights.color_mix %}
             <div class="ui-card-soft p-4">
-                <div class="w-full h-14 rounded-2xl border border-white/70 shadow-sm" style="background: linear-gradient(135deg, {{ item.hex }}, color-mix(in srgb, {{ item.hex }} 60%, white));"></div>
-                <div class="font-semibold text-gray-800 mt-3 truncate">{{ item.name }}</div>
-                <div class="text-xs text-gray-500 mt-1">{{ item.count }} {{ t('pieces') }}</div>
+                <div class="w-full h-14 rounded-2xl border border-white/70 dark:border-slate-700 shadow-sm" style="background: linear-gradient(135deg, {{ item.hex }}, color-mix(in srgb, {{ item.hex }} 60%, white));"></div>
+                <div class="font-semibold text-gray-800 dark:text-slate-100 mt-3 truncate">{{ item.name }}</div>
+                <div class="text-xs text-gray-500 dark:text-slate-400 mt-1">{{ item.count }} {{ t('pieces') }}</div>
             </div>
             {% else %}
             <div class="col-span-full text-sm text-gray-400">{{ t('no_results') }}</div>
@@ -118,12 +118,12 @@
             <div class="ui-label">{{ t('inventory_focus_stable') }}</div>
             <div class="space-y-2 mt-3">
                 {% for fil in inventory_highlights.healthy_pool %}
-                <a href="{{ url_for('filament_detail', id=fil.id) }}" class="flex items-center justify-between gap-3 rounded-xl border border-white/70 bg-white/80 px-3 py-2.5 hover:border-emerald-200 transition">
+                <a href="{{ url_for('filament_detail', id=fil.id) }}" class="flex items-center justify-between gap-3 rounded-xl border border-white/70 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60 px-3 py-2.5 hover:border-emerald-200 dark:hover:border-emerald-700 transition">
                     <div class="min-w-0">
-                        <div class="font-semibold text-gray-800 truncate">{{ fil.name }}</div>
-                        <div class="text-xs text-gray-500 mt-1">{{ fil.brand.name }} · {{ fil.material.name }}</div>
+                        <div class="font-semibold text-gray-800 dark:text-slate-100 truncate">{{ fil.name }}</div>
+                        <div class="text-xs text-gray-500 dark:text-slate-400 mt-1">{{ fil.brand.name }} · {{ fil.material.name }}</div>
                     </div>
-                    <div class="text-sm font-semibold text-emerald-700">{{ fil.weight_remaining | int }} g</div>
+                    <div class="text-sm font-semibold text-emerald-700 dark:text-emerald-400">{{ fil.weight_remaining | int }} g</div>
                 </a>
                 {% else %}
                 <div class="text-sm text-gray-400">{{ t('no_results') }}</div>

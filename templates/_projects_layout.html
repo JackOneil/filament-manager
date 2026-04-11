@@ -1,0 +1,298 @@
+    <div id="projects-layout" class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <section class="dashboard-widget xl:col-span-3" data-widget-id="due_calendar">
+            <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
+                <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('projects_due_calendar_title') }}</span>
+                <div class="ml-auto flex items-center gap-1">
+                    <button onclick="moveProjectsWidgetUp('due_calendar')" title="{{ t('stats_move_up') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-up text-xs"></i></button>
+                    <button onclick="moveProjectsWidgetDown('due_calendar')" title="{{ t('stats_move_down') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-down text-xs"></i></button>
+                </div>
+            </div>
+            <div class="ui-panel">
+                <div class="ui-label">{{ t('projects_due_calendar_title') }}</div>
+                <div class="grid grid-cols-2 md:flex md:flex-row gap-3 mt-4 md:overflow-x-auto">
+                    {% for project in upcoming_due %}
+                    <a href="{{ url_for('project_detail', id=project.id) }}" class="ui-card-soft p-3 hover:border-blue-300 transition md:flex-1 md:min-w-0 min-w-0">
+                        <div class="flex items-center justify-between gap-3">
+                            <div class="font-semibold text-gray-800 truncate">{{ project.name }}</div>
+                        {% if project.status == 'PENDING_APPROVAL' %}
+                        <span class="ui-badge ui-badge-warning">{{ t('status_pending_approval') }}</span>
+                        {% elif project.status == 'APPROVED' %}
+                        <span class="ui-badge ui-badge-brand">{{ t('status_approved') }}</span>
+                        {% elif project.status == 'REJECTED' %}
+                        <span class="ui-badge ui-badge-critical">{{ t('status_rejected') }}</span>
+                        {% elif project.status == 'DONE' %}
+                        <span class="ui-badge ui-badge-success">{{ t('status_done') }}</span>
+                        {% elif project.status == 'PRINTING' %}
+                        <span class="ui-badge ui-badge-brand">{{ t('status_printing') }}</span>
+                            {% else %}
+                            <span class="ui-badge">{{ t('status_new') }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="text-sm text-gray-500 mt-1 truncate">{{ project.due_date.strftime('%d.%m.%Y') if project.due_date else t('projects_no_due_date') }}</div>
+                        <div class="text-xs mt-1 truncate {% if project.due_date and project.due_date < now %}text-red-600{% else %}text-gray-400{% endif %}">
+                            {{ project.client_name or t('project_client_missing_label') }}
+                        </div>
+                    </a>
+                    {% else %}
+                    <div class="text-sm text-gray-400">{{ t('projects_no_due_items') }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+
+        {% for status, board in projects_by_status.items() %}
+        <section class="dashboard-widget" data-widget-id="status_{{ status|lower }}">
+            <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
+                <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('status_' ~ status|lower) }}</span>
+                <div class="ml-auto flex items-center gap-1">
+                    <button onclick="moveProjectsWidgetUp('status_{{ status|lower }}')" title="{{ t('stats_move_up') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-up text-xs"></i></button>
+                    <button onclick="moveProjectsWidgetDown('status_{{ status|lower }}')" title="{{ t('stats_move_down') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-down text-xs"></i></button>
+                </div>
+            </div>
+            <div class="ui-panel h-full">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-bold">{{ t('status_' ~ status|lower) }}</h2>
+                    <span class="ui-badge">{{ board['total'] }}</span>
+                </div>
+                <div class="space-y-2.5">
+                    {% for project in board['items'] %}
+                    {% set metrics = project_metrics.get(project.id) %}
+                    <a href="{{ url_for('project_detail', id=project.id) }}" class="ui-card-soft block p-3 hover:border-blue-300 transition">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <div class="font-semibold text-gray-800 text-sm truncate">{{ project.name }}</div>
+                                <div class="text-xs text-gray-500 mt-1 truncate">{{ project.client_name or t('project_client_missing_label') }}</div>
+                            </div>
+                            {% if project.due_date %}
+                            <div class="text-[11px] font-semibold {% if project.due_date < now and project.status != 'DONE' %}text-red-600{% else %}text-gray-400{% endif %}">
+                                {{ project.due_date.strftime('%d.%m') }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mt-3 text-[11px] leading-4">
+                            <div class="min-w-0">
+                                <div class="text-gray-400">{{ t('projects_estimate_label') }}</div>
+                                <div class="font-semibold truncate">{{ metrics.estimated_material_cost if metrics else 0 }} {{ current_currency }}</div>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-gray-400">{{ t('projects_actual_label') }}</div>
+                                <div class="font-semibold truncate">{{ metrics.actual_total_cost if metrics else 0 }} {{ current_currency }}</div>
+                            </div>
+                        </div>
+                    </a>
+                    {% else %}
+                    <p class="text-sm text-gray-400">{{ t('project_no_projects') }}</p>
+                    {% endfor %}
+                </div>
+                {% if board['pagination'].pages > 1 %}
+                <div class="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-gray-200 text-xs">
+                    <a href="#" @click.prevent="if (fetchStatusContent) fetchStatusContent('{{ status }}', {{ board['pagination'].prev_num if board['pagination'].has_prev else 1 }})"
+                       class="{{ 'text-blue-600 hover:text-blue-800' if board['pagination'].has_prev else 'text-gray-300 cursor-not-allowed' }}">
+                        <i class="fa-solid fa-chevron-left mr-1"></i>{{ t('prev_page') }}
+                    </a>
+                    <div class="flex items-center gap-1">
+                        {% for p in board['pagination'].page_list %}
+                            {% if p %}
+                                {% if p == board['pagination'].page %}
+                                <span class="ui-badge ui-badge-brand">{{ p }}</span>
+                                {% else %}
+                                <a href="#" @click.prevent="if (fetchStatusContent) fetchStatusContent('{{ status }}', {{ p }})" class="ui-badge">{{ p }}</a>
+                                {% endif %}
+                            {% else %}
+                            <span class="px-1 text-gray-400">…</span>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    <a href="#" @click.prevent="if (fetchStatusContent) fetchStatusContent('{{ status }}', {{ board['pagination'].next_num if board['pagination'].has_next else board['pagination'].pages }})"
+                       class="{{ 'text-blue-600 hover:text-blue-800' if board['pagination'].has_next else 'text-gray-300 cursor-not-allowed' }}">
+                        {{ t('next_page') }}<i class="fa-solid fa-chevron-right ml-1"></i>
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </section>
+        {% endfor %}
+
+        <section class="dashboard-widget xl:col-span-3" data-widget-id="project_table">
+            <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
+                <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('projects_table_title') }}</span>
+                <div class="ml-auto flex items-center gap-1">
+                    <button onclick="moveProjectsWidgetUp('project_table')" title="{{ t('stats_move_up') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-up text-xs"></i></button>
+                    <button onclick="moveProjectsWidgetDown('project_table')" title="{{ t('stats_move_down') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-down text-xs"></i></button>
+                </div>
+            </div>
+            <div class="ui-table-shell overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-200 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                    <div>
+                        <div class="ui-label">{{ t('projects_table_title') }}</div>
+                        <h2 class="text-xl font-bold mt-1">{{ t('projects_table_heading') }}</h2>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <a href="#" @click.prevent="resetFilters()" x-show="hasFilters" class="ui-badge ui-badge-warning" style="display: none;">
+                            <i class="fa-solid fa-filter-circle-xmark"></i> {{ t('filter_reset') }}
+                        </a>
+                        <a href="#" @click.prevent="toggleSort('name')" class="ui-badge" :class="sortBy === 'name' ? 'ui-badge-brand' : ''">{{ t('project_name') }}</a>
+                        <a href="#" @click.prevent="toggleSort('due_date')" class="ui-badge" :class="sortBy === 'due_date' ? 'ui-badge-brand' : ''">{{ t('project_due_date') }}</a>
+                        <a href="#" @click.prevent="toggleSort('status')" class="ui-badge" :class="sortBy === 'status' ? 'ui-badge-brand' : ''">{{ t('project_status') }}</a>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="ui-table">
+                        <thead>
+                            <tr>
+                                <th>{{ t('project_name') }}</th>
+                                <th>{{ t('project_client') }}</th>
+                                <th>{{ t('project_due_date') }}</th>
+                                <th>{{ t('project_status') }}</th>
+                                <th>{{ t('projects_estimate_label') }}</th>
+                                <th>{{ t('projects_actual_label') }}</th>
+                                <th>{{ t('projects_margin_label') }}</th>
+                                <th class="text-right">{{ t('action') }}</th>
+                            </tr>
+                            <tr class="bg-gray-50/50 dark:bg-gray-800/50">
+                                <th class="!py-2 !px-3 border-b border-gray-200 dark:border-gray-700">
+                                    <div class="flex gap-2">
+                                        <div class="w-full">
+                                            <input id="search-name" type="text" x-model.debounce.500ms="nameQ" value="{{ name_filter|default('') }}" placeholder="Hledat název..." class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none font-normal text-gray-800 bg-white shadow-sm dark:bg-gray-900 dark:border-gray-600 dark:text-gray-200" autocomplete="off">
+                                        </div>
+                                        <div class="w-24 relative" @click.outside="tagFocus = false">
+                                            <input id="search-tag" type="text" x-model.debounce.500ms="tagQ" value="{{ tag_filter|default('') }}" @focus="tagFocus = true" placeholder="Štítek..." class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none font-normal text-gray-800 bg-white shadow-sm dark:bg-gray-900 dark:border-gray-600 dark:text-gray-200" autocomplete="off">
+                                            
+                                            <!-- Tag Dropdown -->
+                                            <div x-show="tagFocus && tagOptions.length > 0" x-transition.opacity.duration.200ms class="ui-dropdown absolute w-36 left-0 top-full mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-[60] overflow-hidden" x-cloak style="display: none;">
+                                                <div class="py-1 max-h-48 overflow-y-auto">
+                                                    <template x-for="tval in filteredTags" :key="tval">
+                                                        <button type="button" @click="selectTag(tval)" class="w-full text-left px-3 py-1.5 text-xs font-normal hover:bg-blue-50 hover:text-blue-700 transition" :class="tagQ === tval ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-700'">
+                                                            <span x-text="tval"></span>
+                                                        </button>
+                                                    </template>
+                                                    <div x-show="filteredTags.length === 0" class="px-3 py-2 text-xs font-normal text-gray-400">Nic nenalezeno</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </th>
+                                <th class="!py-2 !px-3 border-b border-gray-200 dark:border-gray-700">
+                                    <div class="w-full relative" @click.outside="clientFocus = false">
+                                        <input id="search-client" type="text" x-model.debounce.500ms="clientQ" value="{{ client_filter|default('') }}" @focus="clientFocus = true" placeholder="Hledat klienta..." class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none font-normal text-gray-800 bg-white shadow-sm dark:bg-gray-900 dark:border-gray-600 dark:text-gray-200" autocomplete="off">
+                                        
+                                        <!-- Client Dropdown -->
+                                        <div x-show="clientFocus && clientOptions.length > 0" x-transition.opacity.duration.200ms class="ui-dropdown absolute w-full min-w-32 left-0 top-full mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-[60] overflow-hidden" x-cloak style="display: none;">
+                                            <div class="py-1 max-h-48 overflow-y-auto">
+                                                <template x-for="item in filteredClients" :key="item">
+                                                    <button type="button" @click="selectClient(item)" class="w-full text-left px-3 py-1.5 text-xs font-normal hover:bg-blue-50 hover:text-blue-700 transition" :class="clientQ === item ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-700'">
+                                                        <span x-text="item"></span>
+                                                    </button>
+                                                </template>
+                                                <div x-show="filteredClients.length === 0" class="px-3 py-2 text-xs font-normal text-gray-400">Nenalezeno</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </th>
+                                <th colspan="6" class="!py-2 !px-3 border-b border-gray-200 dark:border-gray-700"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in projects.items %}
+                            {% set metrics = project_metrics.get(p.id) %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('project_detail', id=p.id) }}" class="font-semibold text-blue-600 hover:underline">{{ p.name }}</a>
+                                    {% if p.tag_text %}
+                                    {% set tags = p.tag_text.split(',') %}
+                                    {% set ns = namespace(total=0) %}
+                                    {% for tag in tags %}
+                                        {% if tag.strip() %}
+                                            {% set ns.total = ns.total + 1 %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    <div class="flex flex-nowrap items-center gap-1 mt-2 overflow-hidden h-6">
+                                        {% for tag in tags[:2] %}
+                                        {% if tag.strip() %}
+                                        <button type="button" @click.prevent="if (window.__proj) window.__proj.selectTag('{{ tag.strip() }}')" class="ui-badge max-w-28 truncate hover:bg-blue-100 hover:text-blue-700 cursor-pointer transition">{{ tag.strip() }}</button>
+                                        {% endif %}
+                                        {% endfor %}
+                                        {% if ns.total > 2 %}
+                                        <span class="ui-badge shrink-0">+{{ ns.total - 2 }}</span>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if p.client_name %}
+                                    <a href="#" @click.prevent="if (window.__proj) window.__proj.selectClient('{{ p.client_name }}')" class="text-blue-600 hover:underline">{{ p.client_name }}</a>
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                                <td>{{ p.due_date.strftime('%d.%m.%Y') if p.due_date else '-' }}</td>
+                                <td>
+                                    {% if p.status == 'PENDING_APPROVAL' %}
+                                    <span class="ui-badge ui-badge-warning">{{ t('status_pending_approval') }}</span>
+                                    {% elif p.status == 'APPROVED' %}
+                                    <span class="ui-badge ui-badge-brand">{{ t('status_approved') }}</span>
+                                    {% elif p.status == 'REJECTED' %}
+                                    <span class="ui-badge ui-badge-critical">{{ t('status_rejected') }}</span>
+                                    {% elif p.status == 'DONE' %}
+                                    <span class="ui-badge ui-badge-success">{{ t('status_done') }}</span>
+                                    {% elif p.status == 'PRINTING' %}
+                                    <span class="ui-badge ui-badge-brand">{{ t('status_printing') }}</span>
+                                    {% else %}
+                                    <span class="ui-badge">{{ t('status_new') }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ metrics.estimated_material_cost if metrics else 0 }} {{ current_currency }}</td>
+                                <td>{{ metrics.actual_total_cost if metrics else 0 }} {{ current_currency }}</td>
+                                <td>
+                                    {% if metrics and metrics.profit is not none %}
+                                    <span class="{% if metrics.profit >= 0 %}text-emerald-600{% else %}text-red-600{% endif %} font-semibold">{{ metrics.profit }} {{ current_currency }}</span>
+                                    {% else %}
+                                    <span class="text-gray-400">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-right">
+                                    <a href="{{ url_for('project_detail', id=p.id) }}" class="ui-badge ui-badge-brand"><i class="fa-solid fa-eye"></i> {{ t('project_detail') }}</a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="8" class="text-center text-gray-500 py-8">{{ t('project_no_projects') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    {% if projects.pages > 1 %}
+    <div class="flex justify-center mt-6">
+        <nav class="flex items-center gap-1 bg-white rounded-lg shadow-sm border border-gray-200 px-2 py-1">
+            <a href="#" @click.prevent="if (fetchPage) fetchPage({{ projects.prev_num if projects.has_prev else 1 }})"
+               class="px-3 py-1 rounded {{ 'text-blue-600 hover:bg-blue-50' if projects.has_prev else 'text-gray-300 cursor-not-allowed' }}">
+                <i class="fa-solid fa-chevron-left"></i>
+            </a>
+
+            {% for p in projects.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if p %}
+                    {% if p == projects.page %}
+                        <span class="px-3 py-1 rounded bg-blue-600 text-white font-bold">{{ p }}</span>
+                    {% else %}
+                        <a href="#" @click.prevent="if (fetchPage) fetchPage({{ p }})" class="px-3 py-1 rounded text-gray-700 hover:bg-gray-100 transition-colors">{{ p }}</a>
+                    {% endif %}
+                {% else %}
+                    <span class="px-2 text-gray-400">...</span>
+                {% endif %}
+            {% endfor %}
+
+            <a href="#" @click.prevent="if (fetchPage) fetchPage({{ projects.next_num if projects.has_next else projects.pages }})"
+               class="px-3 py-1 rounded {{ 'text-blue-600 hover:bg-blue-50' if projects.has_next else 'text-gray-300 cursor-not-allowed' }}">
+                <i class="fa-solid fa-chevron-right"></i>
+            </a>
+        </nav>
+    </div>
+    {% endif %}

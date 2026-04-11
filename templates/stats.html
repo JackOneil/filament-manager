@@ -10,6 +10,37 @@
 .edit-mode .card-edit-bar { display: flex; }
 .card-size-controls { display: none; }
 .edit-mode .card-size-controls { display: flex; }
+/* Dark mode support for stats cards */
+.stats-card {
+    background: var(--ui-surface-strong);
+    border-color: var(--ui-border) !important;
+    box-shadow: var(--ui-shadow-soft);
+}
+html.dark .stats-card h2,
+html.dark .stats-card .text-gray-800 { color: var(--ui-text) !important; }
+html.dark .stats-card .text-gray-700 { color: var(--ui-text-muted); }
+html.dark .stats-card .text-gray-600 { color: var(--ui-text-muted); }
+html.dark .stats-card .text-gray-500 { color: var(--ui-text-muted); }
+html.dark .stats-card .hover\:bg-gray-50:hover { background-color: rgba(30,41,59,0.6) !important; }
+html.dark .stats-card thead { border-color: var(--ui-border); }
+html.dark .stats-card tbody tr { border-color: var(--ui-border); }
+html.dark .stats-card .border-b,
+html.dark .stats-card .border-gray-100,
+html.dark .stats-card .border-gray-50 { border-color: var(--ui-border) !important; }
+html.dark .stats-card select.widget-limit-select {
+    background: var(--ui-surface-soft);
+    border-color: var(--ui-border-strong);
+    color: var(--ui-text-muted);
+}
+html.dark .section-edit-bar {
+    background: rgba(30,41,59,0.7);
+    border-color: rgba(59,130,246,0.3);
+}
+html.dark .section-edit-bar .text-gray-700 { color: var(--ui-text-muted); }
+html.dark #restorePanel {
+    background: var(--ui-surface-soft);
+    border-color: var(--ui-border);
+}
 </style>
 <div class="page-shell" id="stats-page" x-data="statsDashboard()">
     <div class="page-hero">
@@ -21,12 +52,12 @@
             <div class="flex flex-wrap gap-2 items-center">
                 {% for option in [7, 30, 90, 180] %}
                 <a href="{{ url_for('stats', days=option) }}"
-                   class="px-4 py-2 rounded-full text-sm font-semibold transition-colors {% if days == option %}bg-blue-600 text-white shadow{% else %}bg-white border border-gray-200 text-gray-600 hover:bg-gray-50{% endif %}">
+                   class="px-4 py-2 rounded-full text-sm font-semibold transition-colors {% if days == option %}bg-blue-600 text-white shadow{% else %}bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700{% endif %}">
                     {{ option }} {{ t('stats_days_suffix') }}
                 </a>
                 {% endfor %}
                 <button id="editModeBtn" onclick="toggleEditMode()"
-                        class="px-4 py-2 rounded-full text-sm font-semibold border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-all flex items-center gap-2">
+                        class="px-4 py-2 rounded-full text-sm font-semibold border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all flex items-center gap-2">
                     <i class="fa-solid fa-pen-to-square"></i>
                     <span id="editModeBtnLabel">{{ t('stats_edit_layout') }}</span>
                 </button>
@@ -34,7 +65,7 @@
         </div>
     </div>
 
-    <div id="editModeHint" class="hidden bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 text-sm text-blue-700">
+    <div id="editModeHint" class="hidden bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/40 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 text-sm text-blue-700 dark:text-blue-300">
         <i class="fa-solid fa-arrows-up-down-left-right"></i>
         <span>{{ t('stats_drag_hint') }}</span>
         <button onclick="resetLayout()" class="ml-auto text-xs font-semibold text-blue-600 hover:text-blue-800 underline">{{ t('stats_reset_layout') }}</button>
@@ -110,21 +141,21 @@
                 <h3 class="text-xl font-bold">{{ t('stats_navigator_heading') }}</h3>
                 <p class="text-sm text-gray-500 mt-2 mb-4">{{ t('stats_navigator_desc') }}</p>
                 <div class="space-y-3 text-sm">
-                    <a href="#section_charts_primary" class="block rounded-xl border border-gray-200 px-4 py-3 hover:border-blue-300 hover:bg-blue-50/40 transition">
-                        <div class="font-semibold text-gray-800">{{ t('stats_section_planning_title') }}</div>
-                        <div class="text-gray-500 mt-1">{{ summary.reorder_recommendations }} {{ t('stats_recommendations_short') }}</div>
+                    <a href="#section_charts_primary" class="block rounded-xl border border-gray-200 dark:border-slate-700 px-4 py-3 hover:border-blue-300 hover:bg-blue-50/40 dark:hover:bg-blue-900/20 transition">
+                        <div class="font-semibold text-gray-800 dark:text-slate-200">{{ t('stats_section_planning_title') }}</div>
+                        <div class="text-gray-500 dark:text-slate-400 mt-1">{{ summary.reorder_recommendations }} {{ t('stats_recommendations_short') }}</div>
                     </a>
-                    <a href="#section_overview" class="block rounded-xl border border-gray-200 px-4 py-3 hover:border-blue-300 hover:bg-blue-50/40 transition">
-                        <div class="font-semibold text-gray-800">{{ t('stats_section_projects_title') }}</div>
-                        <div class="text-gray-500 mt-1">{{ project_rows|length }} {{ t('stats_projects_with_usage_short') }}</div>
+                    <a href="#section_overview" class="block rounded-xl border border-gray-200 dark:border-slate-700 px-4 py-3 hover:border-blue-300 hover:bg-blue-50/40 dark:hover:bg-blue-900/20 transition">
+                        <div class="font-semibold text-gray-800 dark:text-slate-200">{{ t('stats_section_projects_title') }}</div>
+                        <div class="text-gray-500 dark:text-slate-400 mt-1">{{ project_rows|length }} {{ t('stats_projects_with_usage_short') }}</div>
                     </a>
-                    <a href="#section_tables" class="block rounded-xl border border-gray-200 px-4 py-3 hover:border-blue-300 hover:bg-blue-50/40 transition">
-                        <div class="font-semibold text-gray-800">{{ t('stats_section_detail_title') }}</div>
-                        <div class="text-gray-500 mt-1">{{ t('stats_section_detail_desc') }}</div>
+                    <a href="#section_tables" class="block rounded-xl border border-gray-200 dark:border-slate-700 px-4 py-3 hover:border-blue-300 hover:bg-blue-50/40 dark:hover:bg-blue-900/20 transition">
+                        <div class="font-semibold text-gray-800 dark:text-slate-200">{{ t('stats_section_detail_title') }}</div>
+                        <div class="text-gray-500 dark:text-slate-400 mt-1">{{ t('stats_section_detail_desc') }}</div>
                     </a>
-                    <a href="#section_colors" class="block rounded-xl border border-gray-200 px-4 py-3 hover:border-blue-300 hover:bg-blue-50/40 transition">
-                        <div class="font-semibold text-gray-800">{{ t('stats_section_colors_title') }}</div>
-                        <div class="text-gray-500 mt-1">{{ color_palette|length }} {{ t('stats_active_colors_short') }}</div>
+                    <a href="#section_colors" class="block rounded-xl border border-gray-200 dark:border-slate-700 px-4 py-3 hover:border-blue-300 hover:bg-blue-50/40 dark:hover:bg-blue-900/20 transition">
+                        <div class="font-semibold text-gray-800 dark:text-slate-200">{{ t('stats_section_colors_title') }}</div>
+                        <div class="text-gray-500 dark:text-slate-400 mt-1">{{ color_palette|length }} {{ t('stats_active_colors_short') }}</div>
                     </a>
                 </div>
             </div>
@@ -616,23 +647,23 @@
                        style="background-color: {{ entry.hex_value }};"
                        title="{{ entry.color_name }}"></a>
                     <div class="hidden group-hover:block pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-30 w-60">
-                        <div class="rounded-xl border border-gray-200 bg-white shadow-xl p-3">
+                        <div class="rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-xl p-3">
                             <div class="flex items-center gap-2 mb-2">
                                 <span class="w-4 h-4 rounded-full border border-gray-200 flex-shrink-0" style="background-color: {{ entry.hex_value }};"></span>
-                                <span class="text-sm font-bold text-gray-800">{{ entry.color_name }}</span>
+                                <span class="text-sm font-bold text-gray-800 dark:text-slate-100">{{ entry.color_name }}</span>
                                 <span class="ml-auto text-xs text-gray-400">{{ entry.filaments|length }} {{ t('stats_color_spools') }}</span>
                             </div>
                             <div class="space-y-2 max-h-52 overflow-y-auto">
                                 {% for fil in entry.filaments %}
                                 <div class="text-xs">
-                                    <div class="font-semibold text-gray-700 truncate">{{ fil.name }}</div>
+                                    <div class="font-semibold text-gray-700 dark:text-slate-200 truncate">{{ fil.name }}</div>
                                     <div class="text-gray-400">{{ fil.brand }} · {{ fil.material }}</div>
-                                    <div class="mt-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                                    <div class="mt-1 h-1.5 rounded-full bg-gray-200 dark:bg-slate-700 overflow-hidden">
                                         <div class="h-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-blue-500" style="width: {{ fil.fill_pct }}%;"></div>
                                     </div>
                                     <div class="text-gray-400 mt-0.5">{{ fil.remaining }} g · {{ fil.fill_pct }}%{% if fil.quantity > 1 %} · {{ fil.quantity }}× {{ t('pieces') }}{% endif %}</div>
                                 </div>
-                                {% if not loop.last %}<div class="border-t border-gray-100"></div>{% endif %}
+                                {% if not loop.last %}<div class="border-t border-gray-100 dark:border-slate-700"></div>{% endif %}
                                 {% endfor %}
                             </div>
                         </div>

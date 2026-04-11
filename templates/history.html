@@ -1,125 +1,168 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="max-w-6xl mx-auto">
-    <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 pb-4 border-b border-gray-200 gap-4">
-        <div class="flex items-center gap-3">
-            <i class="fa-solid fa-clock-rotate-left text-3xl text-gray-400"></i>
+<div class="page-shell">
+
+    {# ── Page header ─────────────────────────────────────────────────────── #}
+    <div class="page-hero">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-                <h1 class="text-3xl font-bold text-gray-800">{{ t('movement_history') }}</h1>
+                <h1 class="page-title">
+                    <span class="page-title-icon"><i class="fa-solid fa-clock-rotate-left"></i></span>
+                    <span>{{ t('movement_history') }}</span>
+                </h1>
             </div>
+
+            {% if movements.items and movements.items|length > 0 %}
+            <div class="flex items-center gap-3 flex-wrap">
+                <label class="flex items-center gap-2 text-sm text-[var(--ui-text-muted)] font-medium">
+                    {{ t('per_page') }}
+                    <select id="per_page"
+                        class="border border-[var(--ui-border)] rounded-lg px-2 py-1.5 text-sm bg-[var(--ui-surface)] text-[var(--ui-text)] focus:ring-2 focus:ring-[var(--ui-brand)] outline-none cursor-pointer"
+                        onchange="changeHistoryPerPage(this.value)">
+                        <option value="10"  {% if per_page == 10  %}selected{% endif %}>10</option>
+                        <option value="20"  {% if per_page == 20  %}selected{% endif %}>20</option>
+                        <option value="50"  {% if per_page == 50  %}selected{% endif %}>50</option>
+                        <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                    </select>
+                </label>
+                <form action="{{ url_for('clear_history') }}" method="POST">
+                    <button type="submit"
+                        onclick="return confirm('{{ t('clear_history_confirm') }}')"
+                        class="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded-lg text-sm transition-colors shadow-sm">
+                        <i class="fa-solid fa-trash"></i>
+                        {{ t('clear_history') }}
+                    </button>
+                </form>
+            </div>
+            {% endif %}
         </div>
-        
-        {% if movements.items and movements.items|length > 0 %}
-        <div class="flex flex-col sm:flex-row items-center gap-2 text-sm bg-white px-3 py-1.5 rounded shadow-sm border border-gray-200">
-            <label for="per_page" class="text-gray-600 font-semibold">{{ t('per_page') }}</label>
-            <select id="per_page" class="bg-transparent border-none focus:ring-0 outline-none cursor-pointer text-gray-800 font-bold" onchange="changeHistoryPerPage(this.value)">
-                <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
-                <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
-                <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
-                <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
-            </select>
-            <div class="flex-1"></div>
-            <form action="{{ url_for('clear_history') }}" method="POST" style="display:inline;">
-                <button type="submit" onclick="return confirm('{{ t('clear_history_confirm') }}')" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors whitespace-nowrap">
-                    <i class="fa-solid fa-trash"></i> {{ t('clear_history') }}
-                </button>
-            </form>
-        </div>
-        {% endif %}
     </div>
 
+    {# ── Content ──────────────────────────────────────────────────────────── #}
     {% if movements.items and movements.items|length > 0 %}
-        <div class="-mx-4 sm:mx-0 overflow-x-auto">
-            <div class="inline-block min-w-full align-middle">
-                <div class="overflow-hidden shadow-sm sm:rounded-lg border border-gray-200">
-                    <table class="min-w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-gray-100 text-gray-600 text-sm uppercase">
-                                <th class="py-3 px-4">{{ t('datetime') }}</th>
-                                <th class="py-3 px-4">{{ t('movement_filament') }}</th>
-                                <th class="py-3 px-4">{{ t('movement_action') }}</th>
-                                <th class="py-3 px-4 text-right">{{ t('movement_amount') }}</th>
-                                <th class="py-3 px-4 text-right">{{ t('movement_cost') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody class="text-gray-700 text-sm bg-white">
-                            {% for m in movements.items %}
-                            <tr class="border-b hover:bg-gray-50 transition-colors">
-                                <td class="py-3 px-4">{{ m.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
-                                <td class="py-3 px-4 font-semibold">{{ m.filament_name }}</td>
-                                <td class="py-3 px-4">
-                                    {% if m.action_type == 'add' %}
-                                        <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold"><i class="fa-solid fa-plus"></i> {{ t('movement_added') }}</span>
-                                    {% else %}
-                                        <span class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-bold"><i class="fa-solid fa-minus"></i> {{ t('movement_removed') }}</span>
-                                    {% endif %}
-                                </td>
-                                <td class="py-3 px-4 text-right font-medium">
-                                    {{ '{:0.1f}'.format(m.weight) }} g
-                                </td>
-                                <td class="py-3 px-4 text-right font-bold {% if m.action_type == 'add' %}text-green-600{% else %}text-red-600{% endif %}">
-                                    {% if m.action_type == 'add' %}+{% else %}-{% endif %}{{ '{:0.2f}'.format(m.cost) }} {{ m.currency }}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+
+    <div class="app-surface overflow-hidden p-0">
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-left border-collapse">
+                <thead>
+                    <tr class="border-b border-[var(--ui-border)] bg-[var(--ui-surface-strong)]">
+                        <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-[var(--ui-text-muted)]">{{ t('datetime') }}</th>
+                        <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-[var(--ui-text-muted)]">{{ t('movement_filament') }}</th>
+                        <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-[var(--ui-text-muted)]">{{ t('movement_action') }}</th>
+                        <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-[var(--ui-text-muted)] text-right">{{ t('movement_amount') }}</th>
+                        <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-[var(--ui-text-muted)] text-right">{{ t('movement_cost') }}</th>
+                        <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-[var(--ui-text-muted)]">{{ t('note') if t('note') else 'Note' }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in movements.items %}
+                    <tr class="border-b border-[var(--ui-border)] hover:bg-[var(--ui-brand-soft)] transition-colors group">
+
+                        {# Date/time #}
+                        <td class="py-3 px-4 text-sm text-[var(--ui-text-muted)] whitespace-nowrap">
+                            <span class="font-medium text-[var(--ui-text)]">{{ m.created_at.strftime('%d.%m.%Y') }}</span>
+                            <span class="ml-1">{{ m.created_at.strftime('%H:%M') }}</span>
+                        </td>
+
+                        {# Filament — clickable if filament_id exists #}
+                        <td class="py-3 px-4">
+                            {% if m.filament_id %}
+                            <a href="{{ url_for('filament_detail', id=m.filament_id) }}"
+                               class="inline-flex items-center gap-1.5 font-semibold text-[var(--ui-brand-strong)] hover:underline text-sm group-hover:text-[var(--ui-brand)]">
+                                <i class="fa-solid fa-spool text-xs opacity-60"></i>
+                                {{ m.filament_name }}
+                                <i class="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-0 group-hover:opacity-60 transition-opacity"></i>
+                            </a>
+                            {% else %}
+                            <span class="font-semibold text-sm text-[var(--ui-text)]">{{ m.filament_name }}</span>
+                            {% endif %}
+                        </td>
+
+                        {# Action badge #}
+                        <td class="py-3 px-4">
+                            {% if m.action_type == 'add' %}
+                            <span class="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 px-2.5 py-1 rounded-full text-xs font-bold">
+                                <i class="fa-solid fa-plus"></i> {{ t('movement_added') }}
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1 bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300 px-2.5 py-1 rounded-full text-xs font-bold">
+                                <i class="fa-solid fa-minus"></i> {{ t('movement_removed') }}
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        {# Weight #}
+                        <td class="py-3 px-4 text-right text-sm font-medium text-[var(--ui-text)] tabular-nums">
+                            {{ '{:0.1f}'.format(m.weight) }} g
+                        </td>
+
+                        {# Cost #}
+                        <td class="py-3 px-4 text-right text-sm font-bold tabular-nums
+                            {% if m.action_type == 'add' %}text-emerald-600 dark:text-emerald-400{% else %}text-red-600 dark:text-red-400{% endif %}">
+                            {% if m.action_type == 'add' %}+{% else %}-{% endif %}{{ '{:0.2f}'.format(m.cost) }} {{ m.currency }}
+                        </td>
+
+                        {# Note #}
+                        <td class="py-3 px-4 text-sm text-[var(--ui-text-muted)] max-w-[200px] truncate">
+                            {% if m.note %}
+                            <span title="{{ m.note }}">{{ m.note }}</span>
+                            {% else %}
+                            <span class="opacity-30">—</span>
+                            {% endif %}
+                        </td>
+
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
+    </div>
 
-        <!--Strankovanikomponenta-->
-        {% if movements.pages > 1 %}
-        <div class="flex justify-center mt-6">
-            <nav class="flex items-center gap-1 bg-white rounded-lg shadow-sm border border-gray-200 px-2 py-1">
-                <!--Zpet-->
-                <a href="{{ url_for('history', page=movements.prev_num, per_page=per_page) if movements.has_prev else '#' }}" 
-                   class="px-3 py-1 rounded {{ 'text-blue-600 hover:bg-blue-50' if movements.has_prev else 'text-gray-300 cursor-not-allowed' }}">
-                    <i class="fa-solid fa-chevron-left"></i>
-                </a>
+    {# ── Pagination ───────────────────────────────────────────────────────── #}
+    {% if movements.pages > 1 %}
+    <nav class="flex items-center gap-1 bg-[var(--ui-surface)] rounded-xl shadow-sm border border-[var(--ui-border)] px-4 py-2 w-fit mx-auto">
+        <a href="{{ url_for('history', page=movements.prev_num, per_page=per_page) if movements.has_prev else '#' }}"
+           class="px-3 py-1 rounded-lg text-sm transition-colors
+                  {{ 'text-[var(--ui-brand-strong)] hover:bg-[var(--ui-brand-soft)]' if movements.has_prev else 'text-[var(--ui-text-muted)] cursor-not-allowed opacity-40' }}">
+            <i class="fa-solid fa-chevron-left"></i>
+        </a>
 
-                <!--Stranky-->
-                {% for p in movements.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-                    {% if p %}
-                        {% if p == movements.page %}
-                            <span class="px-3 py-1 rounded bg-blue-600 text-white font-bold">{{ p }}</span>
-                        {% else %}
-                            <a href="{{ url_for('history', page=p, per_page=per_page) }}" class="px-3 py-1 rounded text-gray-700 hover:bg-gray-100 transition-colors">{{ p }}</a>
-                        {% endif %}
-                    {% else %}
-                        <span class="px-2 text-gray-400">...</span>
-                    {% endif %}
-                {% endfor %}
+        {% for p in movements.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+            {% if p %}
+                {% if p == movements.page %}
+                <span class="px-3 py-1 rounded-lg bg-[var(--ui-brand)] text-white font-bold text-sm">{{ p }}</span>
+                {% else %}
+                <a href="{{ url_for('history', page=p, per_page=per_page) }}"
+                   class="px-3 py-1 rounded-lg text-sm text-[var(--ui-text)] hover:bg-[var(--ui-brand-soft)] hover:text-[var(--ui-brand-strong)] transition-colors">{{ p }}</a>
+                {% endif %}
+            {% else %}
+            <span class="px-2 text-[var(--ui-text-muted)]">…</span>
+            {% endif %}
+        {% endfor %}
 
-                <!--Vpred-->
-                <a href="{{ url_for('history', page=movements.next_num, per_page=per_page) if movements.has_next else '#' }}" 
-                   class="px-3 py-1 rounded {{ 'text-blue-600 hover:bg-blue-50' if movements.has_next else 'text-gray-300 cursor-not-allowed' }}">
-                    <i class="fa-solid fa-chevron-right"></i>
-                </a>
-            </nav>
-        </div>
-        {% endif %}
+        <a href="{{ url_for('history', page=movements.next_num, per_page=per_page) if movements.has_next else '#' }}"
+           class="px-3 py-1 rounded-lg text-sm transition-colors
+                  {{ 'text-[var(--ui-brand-strong)] hover:bg-[var(--ui-brand-soft)]' if movements.has_next else 'text-[var(--ui-text-muted)] cursor-not-allowed opacity-40' }}">
+            <i class="fa-solid fa-chevron-right"></i>
+        </a>
+    </nav>
+    {% endif %}
 
     {% else %}
-        <p class="text-gray-500 text-center py-6 bg-gray-50 rounded-lg italic">
-            {{ t('no_movements') }}
-        </p>
+    {# ── Empty state ──────────────────────────────────────────────────────── #}
+    <div class="app-surface p-12 text-center text-[var(--ui-text-muted)]">
+        <i class="fa-solid fa-clock-rotate-left text-5xl mb-4 block opacity-20"></i>
+        <p class="text-lg font-semibold">{{ t('no_movements') }}</p>
+    </div>
     {% endif %}
+
 </div>
 
 <script>
 function changeHistoryPerPage(val) {
-    localStorage.setItem('history_per_page', val);
+    // Navigating with ?per_page= causes the server to set a cookie,
+    // so the preference is remembered on all future visits without any redirect.
     window.location.href = '{{ url_for('history') }}?per_page=' + val;
 }
-(function () {
-    var urlParams = new URLSearchParams(window.location.search);
-    if (!urlParams.has('per_page')) {
-        var saved = localStorage.getItem('history_per_page');
-        if (saved && ['10', '20', '50', '100'].indexOf(saved) !== -1) {
-            window.location.replace('{{ url_for('history') }}?per_page=' + saved);
-        }
-    }
-})();
 </script>
 {% endblock %}

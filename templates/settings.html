@@ -687,6 +687,59 @@
         </div>
     </div>
 
+    <!-- Billing settings -->
+    <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center gap-2 mb-4 border-b pb-3">
+            <i class="fa-solid fa-file-invoice text-indigo-500"></i>
+            <h2 class="text-xl font-bold text-gray-800">{{ t('billing_settings_title') if t('billing_settings_title') != 'billing_settings_title' else 'Fakturační údaje' }}</h2>
+        </div>
+        <p class="text-sm text-gray-500 mb-4">Tyto údaje se automaticky vyplní jako "Dodavatel" při exportu cenových nabídek a faktur.</p>
+        <form method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-4xl">
+            <input type="hidden" name="action" value="billing_settings">
+            
+            <div class="md:col-span-2">
+                <label class="text-xs font-bold text-gray-600 block mb-1">Název společnosti / Jméno</label>
+                <input type="text" name="company_name" value="{{ app_settings.company_name or '' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+
+            <div class="md:col-span-2">
+                <label class="text-xs font-bold text-gray-600 block mb-1">Ulice a číslo popisné</label>
+                <input type="text" name="company_street" value="{{ app_settings.company_street or '' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+
+            <div>
+                <label class="text-xs font-bold text-gray-600 block mb-1">Město</label>
+                <input type="text" name="company_city" value="{{ app_settings.company_city or '' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+
+            <div>
+                <label class="text-xs font-bold text-gray-600 block mb-1">PSČ</label>
+                <input type="text" name="company_zip" value="{{ app_settings.company_zip or '' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+
+            <div>
+                <label class="text-xs font-bold text-gray-600 block mb-1">IČO</label>
+                <input type="text" name="company_id" value="{{ app_settings.company_id or '' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+
+            <div>
+                <label class="text-xs font-bold text-gray-600 block mb-1">DIČ</label>
+                <input type="text" name="company_vat_id" value="{{ app_settings.company_vat_id or '' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+
+            <div class="md:col-span-2">
+                <label class="text-xs font-bold text-gray-600 block mb-1">Bankovní účet / IBAN</label>
+                <input type="text" name="company_bank_account" value="{{ app_settings.company_bank_account or '' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+
+            <div class="md:col-span-2 mt-2">
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 transition-colors text-white font-semibold py-2 px-5 rounded-lg text-sm shadow">
+                    <i class="fa-solid fa-save"></i> {{ t('save') }}
+                </button>
+            </div>
+        </form>
+    </div>
+
     <!-- Export / Import -->
     <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div class="flex items-center gap-2 mb-4 border-b pb-3">

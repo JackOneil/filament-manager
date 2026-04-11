@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.54.0***
+*Current version: **v1.55.0***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -16,7 +16,7 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 ### Projects & Client Workflow
 - **Project Management** — Track 3D print jobs as unified projects with client names, due dates, statuses (NEW → PRINTING → DONE), file attachments, and external links with rich preview cards.
 - **Kanban Board** — Overview of all projects by status with paginated columns, due-date calendar strip, and estimate-vs-actual metrics.
-- **Print Cost Calculator** — Enter model weight and print time, see exact material + electricity cost. Save quotes to projects with margin and customer pricing.
+- **Print Cost Calculator** — Enter model weight and print time, see exact material + electricity cost. Save quotes to projects with margin and customer pricing, and export them into customized basic, detailed, or fully compliant invoice PDF templates.
 - **3D Model Viewer** — Interactive in-browser preview of `.stl` and `.3mf` files attached to projects.
 
 ### Multi-User Workspace

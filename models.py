@@ -124,6 +124,15 @@ class AppSetting(db.Model):
     bambu_last_sync_at = db.Column(db.DateTime, nullable=True)
     bambu_last_sync_status = db.Column(db.String(255), nullable=True)
     reorder_shop_url = db.Column(db.Text, nullable=True)
+    
+    # Billing / Invoice Details
+    company_name = db.Column(db.String(200), nullable=True)
+    company_street = db.Column(db.String(200), nullable=True)
+    company_city = db.Column(db.String(200), nullable=True)
+    company_zip = db.Column(db.String(20), nullable=True)
+    company_id = db.Column(db.String(50), nullable=True)  # IČO
+    company_vat_id = db.Column(db.String(50), nullable=True)  # DIČ
+    company_bank_account = db.Column(db.String(100), nullable=True)
 
 
 class PrintHistory(db.Model):
@@ -165,10 +174,17 @@ class Project(db.Model):
     status = db.Column(db.String(20), default='NEW') # PENDING_APPROVAL, APPROVED, REJECTED, PRINTING, DONE
     tag_text = db.Column(db.Text, nullable=True)
     owner_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, index=True)
+    owner_name = db.Column(db.String(120), nullable=True)
     created_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, index=True)
 
     owner = db.relationship('User', foreign_keys=[owner_user_id], backref=db.backref('owned_projects', lazy=True))
     created_by = db.relationship('User', foreign_keys=[created_by_user_id], backref=db.backref('created_projects', lazy=True))
+
+    @property
+    def owner_display_name(self):
+        if self.owner:
+            return self.owner.name
+        return (self.owner_name or '').strip()
 
 
 class ProjectComment(db.Model):

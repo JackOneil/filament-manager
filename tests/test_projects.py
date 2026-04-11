@@ -214,6 +214,7 @@ class ProjectCollaborationTests(unittest.TestCase):
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def login(self, email):
+        self.client.post('/logout', follow_redirects=True)
         return self.client.post('/login', data={'email': email, 'password': 'password123'}, follow_redirects=True)
 
     def test_comment_markdown_is_rendered_in_project_detail(self):
@@ -230,16 +231,18 @@ class ProjectCollaborationTests(unittest.TestCase):
         self.assertIn('href="https://example.com"', html)
 
     def test_only_comment_author_can_edit_comment(self):
-        self.login('admin@example.com')
-        response = self.client.post(
+        client_admin = self.app.test_client()
+        client_admin.post('/login', data={'email': 'admin@example.com', 'password': 'password123'}, follow_redirects=True)
+        response = client_admin.post(
             f'/projects/{self.project_id}/comments/{self.comment_id}/edit',
             data={'body': 'Hijacked'},
             follow_redirects=False,
         )
         self.assertEqual(response.status_code, 403)
 
-        self.login('owner@example.com')
-        response = self.client.post(
+        client_owner = self.app.test_client()
+        client_owner.post('/login', data={'email': 'owner@example.com', 'password': 'password123'}, follow_redirects=True)
+        response = client_owner.post(
             f'/projects/{self.project_id}/comments/{self.comment_id}/edit',
             data={'body': 'Updated **comment**'},
             follow_redirects=False,

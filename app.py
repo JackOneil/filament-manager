@@ -39,7 +39,7 @@ from utils import get_settings
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.54.0'
+APP_VERSION = '1.56.9'
 
 csrf = CSRFProtect()
 
@@ -173,6 +173,15 @@ def _setup_database(app: Flask) -> None:
         _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN bambu_last_sync_at DATETIME DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN bambu_last_sync_status VARCHAR(255) DEFAULT NULL')
 
+        # Billing details
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN company_name VARCHAR(200) DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN company_street VARCHAR(200) DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN company_city VARCHAR(200) DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN company_zip VARCHAR(20) DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN company_id VARCHAR(50) DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN company_vat_id VARCHAR(50) DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN company_bank_account VARCHAR(100) DEFAULT NULL")
+
         _safe_alter(app, "ALTER TABLE project_link ADD COLUMN og_title VARCHAR(255) DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE project_link ADD COLUMN og_image VARCHAR(500) DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE project_link ADD COLUMN og_description TEXT DEFAULT NULL")
@@ -182,6 +191,7 @@ def _setup_database(app: Flask) -> None:
         _safe_alter(app, 'ALTER TABLE movement_history ADD COLUMN bambu_job_id INTEGER DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE movement_history ADD COLUMN note TEXT DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE project ADD COLUMN owner_user_id INTEGER DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE project ADD COLUMN owner_name VARCHAR(120) DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE project ADD COLUMN created_by_user_id INTEGER DEFAULT NULL')
 
         # Bambu Lab Cloud integration

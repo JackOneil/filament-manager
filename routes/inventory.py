@@ -108,11 +108,15 @@ def _live_printers():
         ):
             live.append({'printer': printer, 'job': job, 'type': 'prusa'})
 
-    # Bambu Cloud — jobs with RUNNING status fetched from Cloud API
-    # Use a SimpleNamespace so the template can access attributes uniformly.
+    # Bambu Cloud — jobs with RUNNING or PAUSED status fetched from Cloud API.
+    # NOTE: Bambu Cloud API sometimes reports actively printing jobs as PAUSED
+    # (raw status=4) instead of RUNNING (raw status=1). This is a known firmware
+    # quirk — PAUSED from the task API does NOT mean the print is actually paused
+    # by the user; it means the job is in an intermediate active-printing state.
+    # Both statuses are therefore treated as "currently printing" for the overview.
     running_bambu = (
         BambuPrintJob.query
-        .filter(BambuPrintJob.status == 'RUNNING')
+        .filter(BambuPrintJob.status.in_(['RUNNING', 'PAUSED']))
         .order_by(BambuPrintJob.synced_at.desc())
         .all()
     )
@@ -469,6 +473,7 @@ def register(app):
             action_center=action_center,
             live_printers=live_printers,
             overview_focus=_overview_focus(action_center, live_printers),
+            today=datetime.utcnow().date(),
         )
 
     @app.route('/filaments')

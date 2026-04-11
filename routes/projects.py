@@ -27,7 +27,7 @@ from models import (
     PrusaPrinter,
     User,
 )
-from utils import build_project_metrics, format_tags, render_markdown
+from utils import build_project_metrics, format_tags, parse_tags, render_markdown
 
 
 ALLOWED_PROJECT_FILE_EXTENSIONS = {
@@ -200,6 +200,26 @@ def _project_owner_choices():
     return User.query.filter_by(is_active=True).order_by(User.name.asc()).all()
 
 
+def _resolve_project_owner_from_form(user):
+    owner_user_id = user.id if user else None
+    owner_name = None
+    if not is_admin(user):
+        return owner_user_id, owner_name
+
+    selected_owner_id = request.form.get('owner_user_id', type=int)
+    manual_owner_name = (request.form.get('owner_name', '') or '').strip()
+
+    if manual_owner_name:
+        return None, manual_owner_name[:120]
+
+    if selected_owner_id:
+        selected_owner = db.session.get(User, selected_owner_id)
+        if selected_owner and selected_owner.is_active:
+            return selected_owner.id, None
+
+    return owner_user_id, None
+
+
 def _notify_project_created(project):
     for admin in User.query.filter_by(role='admin', is_active=True).all():
         if admin.notify_project_created:
@@ -270,9 +290,16 @@ def register(app):
         per_page = setting.items_per_page if setting and setting.items_per_page in [12, 24, 48, 96] else 12
         base_query = _project_scope()
         client_filter = request.args.get('client', '').strip()
+        name_filter = request.args.get('name', '').strip()
+        tag_filter = request.args.get('tag', '').strip()
+        ajax_mode = request.args.get('ajax') == '1'
 
         if client_filter:
             base_query = base_query.filter(Project.client_name.ilike(f'%{client_filter}%'))
+        if name_filter:
+            base_query = base_query.filter(Project.name.ilike(f'%{name_filter}%'))
+        if tag_filter:
+            base_query = base_query.filter(Project.tag_text.ilike(f'%{tag_filter}%'))
 
         if sort_by == 'name':
             order_expr = [Project.name.asc()]
@@ -307,6 +334,8 @@ def register(app):
                 'page': page,
                 'owner_id': request.args.get('owner_id', type=int),
                 'client': client_filter or None,
+                'name': name_filter or None,
+                'tag': tag_filter or None,
                 **{field: request.args.get(field, 1, type=int) for field in status_page_fields.values()},
             }
             params.update(overrides)
@@ -375,11 +404,13 @@ def register(app):
             for value in projects.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2)
             if value
         }
-        return render_template(
-            'projects_index.html',
+        
+        context = dict(
             projects=projects,
             sort_by=sort_by,
             client_filter=client_filter,
+            name_filter=name_filter,
+            tag_filter=tag_filter,
             per_page=per_page,
             project_metrics=project_metrics,
             projects_by_status=projects_by_status,
@@ -398,6 +429,18 @@ def register(app):
             now=datetime.utcnow(),
         )
 
+        if ajax_mode:
+            from flask import jsonify
+            html = render_template('_projects_layout.html', **context)
+            return jsonify({'html': html})
+            
+        client_options = [c[0] for c in db.session.query(Project.client_name).distinct().filter(Project.client_name != None, Project.client_name != '').all()]
+        tag_options = sorted({tag for p in _project_scope().all() for tag in parse_tags(p.tag_text)}, key=str.lower)
+        context['client_options'] = client_options
+        context['tag_options'] = tag_options
+
+        return render_template('projects_index.html', **context)
+
     @app.route('/projects/create', methods=['GET', 'POST'])
     def project_create():
         user = get_current_user()
@@ -410,6 +453,9 @@ def register(app):
             minutes = request.form.get('print_minutes', 0, type=int)
             estimated_print_time = hours * 60 + minutes if hours > 0 or minutes > 0 else 0
             due_date = datetime.strptime(due_date_str, '%Y-%m-%d') if due_date_str else None
+            
+            owner_user_id, owner_name = _resolve_project_owner_from_form(user)
+            
             project = Project(
                 name=name,
                 description=description,
@@ -417,7 +463,8 @@ def register(app):
                 due_date=due_date,
                 estimated_print_time=estimated_print_time,
                 tag_text=format_tags(request.form.get('tag_text', '')),
-                owner_user_id=user.id if user else None,
+                owner_user_id=owner_user_id,
+                owner_name=owner_name,
                 created_by_user_id=user.id if user else None,
                 status='APPROVED' if is_admin(user) else 'PENDING_APPROVAL',
             )
@@ -600,6 +647,7 @@ def register(app):
 
     @app.route('/projects/<int:id>/edit', methods=['GET', 'POST'])
     def project_edit(id):
+        user = get_current_user()
         project = _project_or_404(id)
         if not _project_write_allowed(project):
             abort(403)
@@ -613,6 +661,10 @@ def register(app):
             minutes = request.form.get('print_minutes', 0, type=int)
             project.estimated_print_time = hours * 60 + minutes if hours > 0 or minutes > 0 else 0
             project.due_date = datetime.strptime(due_date_str, '%Y-%m-%d') if due_date_str else None
+            if is_admin(user):
+                owner_user_id, owner_name = _resolve_project_owner_from_form(user)
+                project.owner_user_id = owner_user_id
+                project.owner_name = owner_name
             db.session.commit()
             return redirect(url_for('project_detail', id=project.id))
         return render_template('project_edit.html', project=project, project_tags=format_tags(project.tag_text), can_manage_project=is_admin())

@@ -40,6 +40,8 @@ class AuthAccessTests(unittest.TestCase):
             )
             db.session.add_all([admin, user])
             db.session.flush()
+            self.admin_id = admin.id
+            self.user_id = user.id
             db.session.add_all([
                 Project(name='Admin project', owner_user_id=admin.id, created_by_user_id=admin.id, status='APPROVED'),
                 Project(name='User project', owner_user_id=user.id, created_by_user_id=user.id, status='PENDING_APPROVAL'),
@@ -55,11 +57,13 @@ class AuthAccessTests(unittest.TestCase):
                 ),
             ])
             db.session.commit()
+            self.admin_project_id = Project.query.filter_by(name='Admin project').first().id
 
     def tearDown(self):
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def login(self, email):
+        self.client.post('/logout', follow_redirects=True)
         return self.client.post('/login', data={'email': email, 'password': 'password123'}, follow_redirects=True)
 
     def test_protected_route_redirects_to_login(self):
@@ -206,6 +210,64 @@ class AuthAccessTests(unittest.TestCase):
             project = Project.query.filter_by(name='New request').first()
             self.assertIsNotNone(project)
             self.assertEqual(project.client_name, 'User')
+
+    def test_admin_project_create_can_assign_existing_user_owner(self):
+        self.login('admin@example.com')
+        response = self.client.post(
+            '/projects/create',
+            data={
+                'name': 'Admin assigned project',
+                'client_name': 'ACME',
+                'owner_user_id': self.user_id,
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+
+        with self.app.app_context():
+            project = Project.query.filter_by(name='Admin assigned project').first()
+            self.assertIsNotNone(project)
+            self.assertEqual(project.owner_user_id, self.user_id)
+            self.assertIsNone(project.owner_name)
+
+    def test_admin_project_create_can_assign_external_owner_name(self):
+        self.login('admin@example.com')
+        response = self.client.post(
+            '/projects/create',
+            data={
+                'name': 'External owner project',
+                'client_name': 'External client',
+                'owner_name': 'External Person',
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+
+        with self.app.app_context():
+            project = Project.query.filter_by(name='External owner project').first()
+            self.assertIsNotNone(project)
+            self.assertIsNone(project.owner_user_id)
+            self.assertEqual(project.owner_name, 'External Person')
+
+    def test_admin_project_edit_can_reassign_owner(self):
+        self.login('admin@example.com')
+        response = self.client.post(
+            f'/projects/{self.admin_project_id}/edit',
+            data={
+                'name': 'Admin project',
+                'client_name': 'Admin',
+                'owner_user_id': self.user_id,
+                'owner_name': '',
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+
+        with self.app.app_context():
+            project = db.session.get(Project, self.admin_project_id)
+            self.assertIsNotNone(project)
+            self.assertEqual(project.owner_user_id, self.user_id)
+            self.assertIsNone(project.owner_name)
 
     def test_notifications_are_paginated(self):
         with self.app.app_context():

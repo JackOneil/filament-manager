@@ -11,7 +11,7 @@ from app import create_app
 from database import db
 from models import (
     BambuPrintJob, Brand, Color, Filament, Material, MovementHistory,
-    Project, ProjectFile, ProjectFilament, ProjectQuote, StoragePlacement, StorageShelf,
+    Project, ProjectFile, ProjectFilament, ProjectQuote, StoragePlacement, StorageShelf, User,
 )
 
 
@@ -183,6 +183,47 @@ class ImportAtomicityTests(unittest.TestCase):
             quote = ProjectQuote.query.first()
             self.assertIsNotNone(quote)
             self.assertEqual(quote.final_price, 80.6)
+
+    def test_export_and_import_preserve_project_owner_name(self):
+        with self.app.app_context():
+            user = User(email='owner@example.com', name='Owner', password_hash='hash', role='user')
+            db.session.add(user)
+            db.session.flush()
+            db.session.add_all([
+                Project(name='External owner project', owner_name='Client Contact'),
+                Project(name='User owner project', owner_user_id=user.id),
+            ])
+            db.session.commit()
+
+        exported, exported_files = unpack_backup_response(self.client.get('/export'))
+        external = next((p for p in exported['projects'] if p['name'] == 'External owner project'), None)
+        user_owned = next((p for p in exported['projects'] if p['name'] == 'User owner project'), None)
+        self.assertIsNotNone(external)
+        self.assertEqual(external['owner_name'], 'Client Contact')
+        self.assertIsNotNone(user_owned)
+        self.assertIsNone(user_owned['owner_name'])
+
+        with self.app.app_context():
+            db.drop_all()
+            db.create_all()
+
+        response = self.client.post(
+            '/import',
+            data={'file': (encode_backup_payload(exported, exported_files), 'backup.tar.gz')},
+            content_type='multipart/form-data',
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+
+        with self.app.app_context():
+            external_restored = Project.query.filter_by(name='External owner project').first()
+            user_restored = Project.query.filter_by(name='User owner project').first()
+            self.assertIsNotNone(external_restored)
+            self.assertEqual(external_restored.owner_name, 'Client Contact')
+            self.assertIsNone(external_restored.owner_user_id)
+            self.assertIsNotNone(user_restored)
+            self.assertEqual(user_restored.owner_name, None)
+            self.assertIsNotNone(user_restored.owner_user_id)
 
     def test_export_and_import_preserve_new_filament_fields_and_movement_links(self):
         with self.app.app_context():

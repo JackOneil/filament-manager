@@ -329,6 +329,17 @@ def register(app):
                     setting.reorder_shop_url = url_raw or None
                     app.logger.debug(f'Reorder shop URL updated: {setting.reorder_shop_url}')
 
+                elif action == 'billing_settings':
+                    setting = AppSetting.query.first()
+                    setting.company_name = request.form.get('company_name', '').strip() or None
+                    setting.company_street = request.form.get('company_street', '').strip() or None
+                    setting.company_city = request.form.get('company_city', '').strip() or None
+                    setting.company_zip = request.form.get('company_zip', '').strip() or None
+                    setting.company_id = request.form.get('company_id', '').strip() or None
+                    setting.company_vat_id = request.form.get('company_vat_id', '').strip() or None
+                    setting.company_bank_account = request.form.get('company_bank_account', '').strip() or None
+                    app.logger.debug('Billing settings updated.')
+
                 db.session.commit()
             except Exception as e:
                 db.session.rollback()
@@ -387,6 +398,13 @@ def register(app):
                 'bambu_last_sync_at': setting.bambu_last_sync_at.isoformat() if setting and setting.bambu_last_sync_at else None,
                 'bambu_last_sync_status': setting.bambu_last_sync_status if setting else None,
                 'reorder_shop_url': setting.reorder_shop_url if setting else None,
+                'company_name': setting.company_name if setting else None,
+                'company_street': setting.company_street if setting else None,
+                'company_city': setting.company_city if setting else None,
+                'company_zip': setting.company_zip if setting else None,
+                'company_id': setting.company_id if setting else None,
+                'company_vat_id': setting.company_vat_id if setting else None,
+                'company_bank_account': setting.company_bank_account if setting else None,
                 # bambu_token intentionally excluded for security
             } if setting else {},
 
@@ -448,6 +466,7 @@ def register(app):
                 'due_date': proj.due_date.isoformat() if proj.due_date else None,
                 'created_at': proj.created_at.isoformat() if proj.created_at else None,
                 'owner': _user_ref(proj.owner),
+                'owner_name': proj.owner_name,
                 'created_by': _user_ref(proj.created_by),
                 'files': [_project_file_payload(pf) for pf in proj.files],
                 'links': [{
@@ -689,6 +708,13 @@ def register(app):
                         setting.bambu_last_sync_at = datetime.fromisoformat(s['bambu_last_sync_at']) if s.get('bambu_last_sync_at') else setting.bambu_last_sync_at
                         setting.bambu_last_sync_status = s.get('bambu_last_sync_status', setting.bambu_last_sync_status)
                         setting.reorder_shop_url = s.get('reorder_shop_url', setting.reorder_shop_url)
+                        setting.company_name = s.get('company_name', setting.company_name)
+                        setting.company_street = s.get('company_street', setting.company_street)
+                        setting.company_city = s.get('company_city', setting.company_city)
+                        setting.company_zip = s.get('company_zip', setting.company_zip)
+                        setting.company_id = s.get('company_id', setting.company_id)
+                        setting.company_vat_id = s.get('company_vat_id', setting.company_vat_id)
+                        setting.company_bank_account = s.get('company_bank_account', setting.company_bank_account)
 
                 # ── 2b. Users, invites, notifications ────────────────
                 for user_data in data.get('users', []):
@@ -790,12 +816,15 @@ def register(app):
                             due_date=datetime.fromisoformat(proj_data['due_date']) if proj_data.get('due_date') else None,
                             created_at=datetime.fromisoformat(proj_data['created_at']) if proj_data.get('created_at') else datetime.utcnow(),
                             owner_user_id=_resolve_user_ref(proj_data.get('owner')).id if _resolve_user_ref(proj_data.get('owner')) else None,
+                            owner_name=(proj_data.get('owner_name') or '').strip() or None,
                             created_by_user_id=_resolve_user_ref(proj_data.get('created_by')).id if _resolve_user_ref(proj_data.get('created_by')) else None,
                         )
                         db.session.add(proj)
                         db.session.flush()
                     else:
                         proj.tag_text = format_tags(proj_data.get('tag_text', proj.tag_text or ''))
+                        if 'owner_name' in proj_data:
+                            proj.owner_name = (proj_data.get('owner_name') or '').strip() or None
 
                     for file_data in proj_data.get('files', []):
                         uploaded_at = datetime.fromisoformat(file_data['uploaded_at']) if file_data.get('uploaded_at') else datetime.utcnow()

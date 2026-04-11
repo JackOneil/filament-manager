@@ -1038,6 +1038,13 @@
             </a>
             {% endif %}
 
+            {% if auth_has_section_access('history') or auth_is_admin(current_user) %}
+            <a href="{{ url_for('history') }}" class="flex items-center px-4 py-3 text-[var(--ui-text)] hover:bg-[var(--ui-brand-soft)] hover:text-[var(--ui-brand-strong)] transition-colors whitespace-nowrap {% if endpoint == 'history' %}bg-[var(--ui-brand-soft)] text-[var(--ui-brand-strong)] border-r-2 border-[var(--ui-brand-strong)]{% endif %}" title="{{ t('movement_history') }}">
+                <i class="fa-solid fa-clock-rotate-left text-lg w-8 text-center flex-shrink-0"></i>
+                <span class="ml-2 font-semibold opacity-0 group-[.pinned]:opacity-100 transition-opacity">{{ t('movement_history') }}</span>
+            </a>
+            {% endif %}
+
             {% if auth_has_section_access('users') or auth_is_admin(current_user) %}
             <a href="{{ url_for('users_index') }}" class="flex items-center px-4 py-3 text-[var(--ui-text)] hover:bg-[var(--ui-brand-soft)] hover:text-[var(--ui-brand-strong)] transition-colors whitespace-nowrap {% if endpoint in ['users_index', 'user_detail'] %}bg-[var(--ui-brand-soft)] text-[var(--ui-brand-strong)] border-r-2 border-[var(--ui-brand-strong)]{% endif %}" title="{{ t('users_nav') }}">
                 <i class="fa-solid fa-users-gear text-lg w-8 text-center flex-shrink-0"></i>
@@ -1142,6 +1149,11 @@
                     <i class="fa-solid fa-users-gear text-sky-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('users_nav') }}</span>
                 </a>
                 {% endif %}
+                {% if auth_has_section_access('history') or auth_is_admin(current_user) %}
+                <a href="{{ url_for('history') }}" class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
+                    <i class="fa-solid fa-clock-rotate-left text-violet-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('movement_history') }}</span>
+                </a>
+                {% endif %}
                 <a href="{{ url_for('account_settings') }}" class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
                     <i class="fa-solid fa-user text-emerald-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('auth_account') }}</span>
                 </a>
@@ -1186,6 +1198,8 @@
                         <span>{{ t('stats_nav') }}</span>
                     {% elif endpoint in ['settings'] %}
                         <span>{{ t('settings') }}</span>
+                    {% elif endpoint in ['history'] %}
+                        <span>{{ t('movement_history') }}</span>
                     {% else %}
                          <span>Navigation</span>
                     {% endif %}
