@@ -154,7 +154,10 @@
             </div>
             <div class="text-sm text-gray-500 mt-2">{{ fil.brand.name }} · {{ fil.material.name }}</div>
             <div class="text-xs mt-2 {% if fil.stock_metrics.status == 'critical' %}text-red-600{% else %}text-amber-600{% endif %}">
-                {{ t('remaining') }} {{ fil.stock_metrics.remaining }} g · {{ t('stats_recommend_buy') }} {{ fil.stock_metrics.recommended_grams }} g
+                {{ t('remaining') }} {{ fil.stock_metrics.remaining }} g
+                {% if fil.stock_metrics.recommended_spools > 0 %}
+                · {{ t('stats_recommend_buy') }} {{ fil.stock_metrics.recommended_spools }} {{ t('pieces') }} ({{ fil.stock_metrics.recommended_order_grams | int }} g)
+                {% endif %}
             </div>
         </a>
         {% endfor %}

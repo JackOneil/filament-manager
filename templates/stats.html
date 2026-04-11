@@ -866,7 +866,16 @@ function applyOrder() {
 function applyVisibility() {
     document.querySelectorAll('.stats-card').forEach((card) => {
         const cardId = card.dataset.cardId;
-        card.classList.toggle('hidden', layout.hidden.includes(cardId));
+        const isHidden = layout.hidden.includes(cardId);
+        if (isHidden) {
+            // In edit mode: keep visible but faded so user can toggle back.
+            // Outside edit mode: hide completely.
+            card.style.display = editMode ? '' : 'none';
+            card.classList.toggle('opacity-50', editMode);
+        } else {
+            card.style.display = '';
+            card.classList.remove('opacity-50');
+        }
     });
     updateEmptySections();
 }
@@ -874,7 +883,8 @@ function applyVisibility() {
 function updateEmptySections() {
     document.querySelectorAll('#stats-page > [data-section-id]').forEach(section => {
         const cards = section.querySelectorAll('.stats-card');
-        const allHidden = cards.length > 0 && [...cards].every(c => c.classList.contains('hidden'));
+        // A section is empty when all its cards are hidden and NOT in edit mode.
+        const allHidden = cards.length > 0 && [...cards].every(c => layout.hidden.includes(c.dataset.cardId));
         section.style.display = (!editMode && allHidden) ? 'none' : '';
     });
 }
@@ -887,19 +897,15 @@ function setCardLimit(cardId, value) { cardManager.setLimit(cardId, value); }
 
 function hideCard(cardId) {
     if (!layout.hidden.includes(cardId)) layout.hidden.push(cardId);
-    const el = document.querySelector(`[data-card-id="${cardId}"]`);
-    if (el) el.classList.add('hidden');
-    updateEmptySections();
     saveLayout();
+    applyVisibility();
     updateRestorePanel();
 }
 
 function showCard(cardId) {
     layout.hidden = layout.hidden.filter(id => id !== cardId);
-    const el = document.querySelector(`[data-card-id="${cardId}"]`);
-    if (el) el.classList.remove('hidden');
-    updateEmptySections();
     saveLayout();
+    applyVisibility();
     updateRestorePanel();
 }
 
@@ -970,7 +976,7 @@ function toggleEditMode() {
         hint.classList.add('hidden');
         disableDrag();
     }
-    updateEmptySections();
+    applyVisibility();
     updateRestorePanel();
 }
 

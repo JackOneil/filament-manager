@@ -19,6 +19,54 @@
         </div>
     </div>
 
+    {% if filament.stock_metrics.status in ['critical', 'warning'] and not filament.reorder_alert_snoozed %}
+    {% set is_critical = filament.stock_metrics.status == 'critical' %}
+    <div class="rounded-2xl border px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4
+        {% if is_critical %}bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800{% else %}bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800{% endif %}">
+        <div class="flex items-center gap-3 flex-1 min-w-0">
+            <span class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0
+                {% if is_critical %}bg-red-100 dark:bg-red-900/60 text-red-600{% else %}bg-amber-100 dark:bg-amber-900/60 text-amber-600{% endif %}">
+                <i class="fa-solid fa-triangle-exclamation text-lg"></i>
+            </span>
+            <div class="min-w-0">
+                <div class="font-bold {% if is_critical %}text-red-700 dark:text-red-400{% else %}text-amber-700 dark:text-amber-400{% endif %}">
+                    {% if is_critical %}{{ t('detail_stock_critical_title') }}{% else %}{{ t('detail_stock_warning_title') }}{% endif %}
+                </div>
+                <div class="text-sm mt-0.5 {% if is_critical %}text-red-600 dark:text-red-400{% else %}text-amber-600 dark:text-amber-500{% endif %} flex flex-wrap gap-x-4 gap-y-1">
+                    <span>{{ t('remaining') }}: <strong>{{ filament.stock_metrics.remaining | int }} g</strong></span>
+                    {% if detail_days_left is not none %}
+                    <span>{{ t('detail_days_left') }}: <strong>{{ detail_days_left }} {{ t('stats_days_left') | lower }}</strong></span>
+                    {% endif %}
+                    {% if filament.stock_metrics.recommended_spools > 0 %}
+                    <span>{{ t('detail_order_recommended') }}: <strong>{{ filament.stock_metrics.recommended_spools }} {{ t('pieces') }} ({{ filament.stock_metrics.recommended_order_grams | int }} g)</strong></span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+            {% if filament.shop_url %}
+            <a href="{{ filament.shop_url }}" target="_blank" rel="noopener noreferrer"
+               class="inline-flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition
+               {% if is_critical %}bg-red-600 hover:bg-red-700 text-white{% else %}bg-amber-500 hover:bg-amber-600 text-white{% endif %}">
+                <i class="fa-solid fa-cart-shopping"></i> {{ t('detail_order_btn') }}
+            </a>
+            {% elif filament.brand.shop_url %}
+            <button type="button" onclick="openReorderShop('{{ filament.name|e }}', '{{ filament.brand.shop_url|e }}')"
+               class="inline-flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition
+               {% if is_critical %}bg-red-600 hover:bg-red-700 text-white{% else %}bg-amber-500 hover:bg-amber-600 text-white{% endif %}">
+                <i class="fa-solid fa-magnifying-glass"></i> {{ t('detail_search_btn') }}
+            </button>
+            {% elif app_settings and app_settings.reorder_shop_url %}
+            <button type="button" onclick="openReorderShop('{{ filament.name|e }}', '{{ app_settings.reorder_shop_url|e }}')"
+               class="inline-flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition
+               {% if is_critical %}bg-red-600 hover:bg-red-700 text-white{% else %}bg-amber-500 hover:bg-amber-600 text-white{% endif %}">
+                <i class="fa-solid fa-magnifying-glass"></i> {{ t('detail_search_btn') }}
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div class="ui-panel space-y-4">
             <h2 class="text-xl font-bold text-gray-800">{{ t('spool_life_timeline') }}</h2>
@@ -38,18 +86,49 @@
                     </div>
                 </div>
                 <div>
-                    <div class="text-gray-500">{{ t('stats_recommend_buy') }}</div>
-                    <div class="font-bold text-blue-700">{{ filament.stock_metrics.recommended_spools }} ks</div>
-                    <div class="text-xs text-gray-400">{{ filament.stock_metrics.recommended_order_grams }} g · {{ filament.stock_metrics.recommended_order_price }} {{ current_currency }}</div>
+                    <div class="text-gray-500">{{ t('detail_days_left') }}</div>
+                    {% if detail_days_left is not none %}
+                    <div class="font-bold {% if detail_days_left < 7 %}text-red-600{% elif detail_days_left < 30 %}text-amber-600{% else %}text-gray-800{% endif %}">
+                        {{ detail_days_left }} {{ t('stats_days_left') | lower }}
+                    </div>
+                    {% else %}
+                    <div class="font-bold text-gray-400">—</div>
+                    {% endif %}
                 </div>
+                {% if filament.stock_metrics.recommended_spools > 0 %}
+                <div class="col-span-2">
+                    <div class="text-gray-500">{{ t('detail_order_recommended') }}</div>
+                    <div class="font-bold text-blue-700">{{ filament.stock_metrics.recommended_spools }} {{ t('pieces') }} · {{ filament.stock_metrics.recommended_order_grams | int }} g
+                        {% if filament.stock_metrics.recommended_order_price > 0 %} · {{ filament.stock_metrics.recommended_order_price }} {{ current_currency }}{% endif %}
+                    </div>
+                </div>
+                {% endif %}
             </div>
             {% if filament.stock_metrics.status in ['critical', 'warning'] %}
-            <form method="POST" action="{{ url_for('filament_toggle_reorder_snooze', id=filament.id) }}">
-                <button type="submit" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-semibold {% if filament.reorder_alert_snoozed %}bg-slate-100 border-slate-200 text-slate-700{% else %}bg-amber-50 border-amber-200 text-amber-700{% endif %}">
-                    <i class="fa-solid {% if filament.reorder_alert_snoozed %}fa-bell{% else %}fa-bell-slash{% endif %}"></i>
-                    {% if filament.reorder_alert_snoozed %}{{ t('reorder_alert_unsnooze') }}{% else %}{{ t('reorder_alert_snooze') }}{% endif %}
+            <div class="flex flex-wrap gap-2">
+                <form method="POST" action="{{ url_for('filament_toggle_reorder_snooze', id=filament.id) }}">
+                    <button type="submit" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-semibold {% if filament.reorder_alert_snoozed %}bg-slate-100 border-slate-200 text-slate-700{% else %}bg-amber-50 border-amber-200 text-amber-700{% endif %}">
+                        <i class="fa-solid {% if filament.reorder_alert_snoozed %}fa-bell{% else %}fa-bell-slash{% endif %}"></i>
+                        {% if filament.reorder_alert_snoozed %}{{ t('reorder_alert_unsnooze') }}{% else %}{{ t('reorder_alert_snooze') }}{% endif %}
+                    </button>
+                </form>
+                {% if filament.shop_url %}
+                <a href="{{ filament.shop_url }}" target="_blank" rel="noopener noreferrer"
+                   class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 text-sm font-semibold transition">
+                    <i class="fa-solid fa-cart-shopping"></i> {{ t('detail_order_btn') }}
+                </a>
+                {% elif filament.brand.shop_url %}
+                <button type="button" onclick="openReorderShop('{{ filament.name|e }}', '{{ filament.brand.shop_url|e }}')"
+                   class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 text-sm font-semibold transition">
+                    <i class="fa-solid fa-magnifying-glass"></i> {{ t('detail_search_btn') }}
                 </button>
-            </form>
+                {% elif app_settings and app_settings.reorder_shop_url %}
+                <button type="button" onclick="openReorderShop('{{ filament.name|e }}', '{{ app_settings.reorder_shop_url|e }}')"
+                   class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 text-sm font-semibold transition">
+                    <i class="fa-solid fa-magnifying-glass"></i> {{ t('detail_search_btn') }}
+                </button>
+                {% endif %}
+            </div>
             {% endif %}
             {% if filament.tag_list %}
             <div>
@@ -258,4 +337,10 @@
         </div>
     </div>
 </div>
+<script>
+function openReorderShop(name, template) {
+    var url = template.replace('{query}', encodeURIComponent(name));
+    window.open(url, '_blank', 'noopener,noreferrer');
+}
+</script>
 {% endblock %}

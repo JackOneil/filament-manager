@@ -481,6 +481,7 @@ def build_action_center(now=None):
                 'status': stock['status'],
                 'recommended_spools': stock['recommended_spools'],
                 'recommended_grams': stock['recommended_grams'],
+                'recommended_order_grams': stock['recommended_order_grams'],
             })
     low_stock_rows.sort(key=lambda item: (0 if item['status'] == 'critical' else 1, -item['recommended_grams']))
 

@@ -57,8 +57,8 @@
                 {% if fil.stock_metrics.min_stock > 0 %}
                 <div class="text-xs mt-2 {% if fil.stock_metrics.status == 'critical' %}text-red-600{% elif fil.stock_metrics.status == 'warning' %}text-amber-600{% else %}text-gray-400{% endif %}">
                     {{ t('min_stock_grams') }}: {{ fil.stock_metrics.min_stock }} g
-                    {% if fil.stock_metrics.recommended_grams > 0 %}
-                    · {{ t('stats_recommend_buy') }}: {{ fil.stock_metrics.recommended_grams }} g
+                    {% if fil.stock_metrics.recommended_spools > 0 %}
+                    · {{ t('stats_recommend_buy') }}: {{ fil.stock_metrics.recommended_spools }} {{ t('pieces') }} ({{ fil.stock_metrics.recommended_order_grams | int }} g)
                     {% endif %}
                 </div>
                 {% endif %}

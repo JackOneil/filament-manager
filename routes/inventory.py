@@ -537,6 +537,13 @@ def register(app):
         ).order_by(BambuPrintJob.started_at.desc().nullslast())
         related_jobs_paginated = db.paginate(related_jobs_query, page=jobs_page, per_page=detail_per_page, error_out=False)
 
+        m = filament.stock_metrics
+        daily_usage = m['usage_30'] / 30.0 if m['usage_30'] > 0 else 0.0
+        detail_days_left = round(m['remaining'] / daily_usage) if daily_usage > 0 else None
+
+        from utils import get_settings
+        app_settings = get_settings()
+
         return render_template(
             'filament_detail.html',
             filament=filament,
@@ -546,6 +553,8 @@ def register(app):
             related_jobs=related_jobs_paginated.items,
             related_jobs_paginated=related_jobs_paginated,
             formatted_tags=format_tags(filament.tag_text),
+            detail_days_left=detail_days_left,
+            app_settings=app_settings,
         )
 
     @app.route('/filament/<int:id>/meta', methods=['POST'])

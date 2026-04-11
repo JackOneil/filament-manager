@@ -60,6 +60,16 @@ function _dashEnsurePickerClose() {
     });
 }
 
+// Returns the inner visual card element to which background colour should be applied.
+// For flat-grid pages, items are wrapper <section> elements; the card itself is the
+// first child .ui-panel / .ui-card-soft / .ui-card inside it.
+function _dashInnerCard(item) {
+    return item.querySelector(':scope > .ui-panel') ||
+           item.querySelector(':scope > .ui-card-soft') ||
+           item.querySelector(':scope > .ui-card') ||
+           item;
+}
+
 function _dashUpdateColorBtnUI(btn, colorId) {
     var dot = _dashColorDot(colorId);
     if (dot) {
@@ -257,21 +267,22 @@ function createWidgetLayoutManager(config) {
                 item.classList.add.apply(item.classList, item.dataset.defaultSpanClass.split(/\s+/).filter(Boolean));
             }
 
-            // Visibility
+            // Visibility: in edit mode show hidden widgets at opacity-50 (toggle-able);
+            // outside edit mode hide completely.
             var isHidden = layout.visibility && layout.visibility[id] === false;
             if (isHidden) {
-                item.style.display = editMode ? 'block' : 'none';
+                item.style.display = editMode ? '' : 'none';
                 if (editMode) item.classList.add('opacity-50');
             } else {
-                item.style.display = 'block';
+                item.style.display = '';
                 item.classList.remove('opacity-50');
             }
 
             // Height
             item.style.minHeight = (layout.heights && layout.heights[id]) ? layout.heights[id] + 'px' : '';
 
-            // Background colour
-            item.style.backgroundColor = _dashGetBg((layout.colors && layout.colors[id]) || '');
+            // Background colour (applied to inner visual card, not the wrapper)
+            _dashInnerCard(item).style.backgroundColor = _dashGetBg((layout.colors && layout.colors[id]) || '');
 
             // Resize handle (add once)
             if (!item.querySelector('.resize-handle')) addResizeHandle(item, id);
@@ -315,7 +326,7 @@ function createWidgetLayoutManager(config) {
                                 if (!layout.colors) layout.colors = {};
                                 layout.colors[wid] = colorId;
                                 var el = document.querySelector('[data-widget-id="' + wid + '"]');
-                                if (el) el.style.backgroundColor = _dashGetBg(colorId);
+                                if (el) _dashInnerCard(el).style.backgroundColor = _dashGetBg(colorId);
                                 syncVisibility();  // refresh dot in overview panel
                                 saveLayout();
                             };
@@ -348,7 +359,9 @@ function createWidgetLayoutManager(config) {
                     return function(e) {
                         e.preventDefault();
                         e.stopPropagation();
-                        layout.visibility[wid] = !hidden;
+                        // hidden=true  → widget was hidden  → set to true  (show it)
+                        // hidden=false → widget was visible → set to false (hide it)
+                        layout.visibility[wid] = hidden;
                         applyLayout();
                         syncVisibility();
                         saveLayout();
@@ -622,6 +635,7 @@ function createWidgetLayoutManager(config) {
         layout = loadLayout();
         items().forEach(function(item) {
             item.style.minHeight = '';
+            _dashInnerCard(item).style.backgroundColor = '';
             item.style.backgroundColor = '';
         });
         applyLayout();
