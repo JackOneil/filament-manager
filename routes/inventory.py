@@ -178,12 +178,10 @@ def _overview_focus(action_center, live_printers, now=None):
             Project.due_date.asc(),
             Project.created_at.desc(),
         )
-        .limit(6)
+        .limit(20)
         .all()
     )
 
-    from utils import collect_usage_windows
-    
     upcoming_deadlines = (
         Project.query
         .filter(
@@ -192,9 +190,11 @@ def _overview_focus(action_center, live_printers, now=None):
             Project.due_date >= today_start,
         )
         .order_by(Project.due_date.asc(), Project.created_at.desc())
-        .limit(6)
+        .limit(15)
         .all()
     )
+
+    from utils import collect_usage_windows
 
     seven_days_ago = datetime.combine(now.date() - timedelta(days=6), datetime.min.time())
     recent_movements = MovementHistory.query.filter(
@@ -217,7 +217,7 @@ def _overview_focus(action_center, live_printers, now=None):
          if usage > 0:
              top_turnover_month.append({'filament': f, 'usage': usage})
     top_turnover_month.sort(key=lambda x: x['usage'], reverse=True)
-    top_turnover_month = top_turnover_month[:5]
+    top_turnover_month = top_turnover_month[:10]
 
     urgent_items = []
     for item in action_center['low_stock'][:2]:
@@ -242,6 +242,13 @@ def _overview_focus(action_center, live_printers, now=None):
             'tone': 'warning',
         })
 
+    recent_activity = (
+        MovementHistory.query
+        .order_by(MovementHistory.created_at.desc())
+        .limit(20)
+        .all()
+    )
+
     return {
         'urgent_total': (
             int(action_center['counts']['low_stock'] or 0)
@@ -259,6 +266,7 @@ def _overview_focus(action_center, live_printers, now=None):
         'active_projects': active_projects,
         'usage_7d': usage_7d,
         'top_turnover_month': top_turnover_month,
+        'recent_activity': recent_activity,
     }
 
 

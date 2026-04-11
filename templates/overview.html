@@ -135,10 +135,66 @@
     <div id="overviewEditHint" class="hidden bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/40 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 text-sm text-blue-700 dark:text-blue-300">
         <i class="fa-solid fa-arrows-up-down-left-right"></i>
         <span>{{ t('stats_drag_hint') }}</span>
+        <span class="text-blue-500 opacity-70">·</span>
+        <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
+        <span>{{ t('overview_resize_hint') }}</span>
         <button onclick="resetOverviewLayout()" class="ml-auto text-xs font-semibold text-blue-600 hover:text-blue-800 underline">{{ t('stats_reset_layout') }}</button>
     </div>
 
     <div id="overview-layout" class="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        <section class="dashboard-widget xl:col-span-2" data-widget-id="recent_activity">
+            <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
+                <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('overview_widget_recent_activity') }}</span>
+                <div class="ml-auto flex items-center gap-1">
+                    <button onclick="moveOverviewWidgetUp('recent_activity')" title="{{ t('stats_move_up') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-up text-xs"></i></button>
+                    <button onclick="moveOverviewWidgetDown('recent_activity')" title="{{ t('stats_move_down') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-down text-xs"></i></button>
+                </div>
+            </div>
+            <div class="ui-panel h-full flex flex-col">
+                <div class="flex items-center justify-between mb-4 flex-shrink-0">
+                    <div>
+                        <div class="ui-label">{{ t('overview_recent_activity_label') }}</div>
+                        <h2 class="text-xl font-bold mt-1">{{ t('overview_recent_activity_title') }}</h2>
+                    </div>
+                    <a href="{{ url_for('history') }}" class="ui-badge"><i class="fa-solid fa-clock-rotate-left"></i> {{ t('history') }}</a>
+                </div>
+                <div class="space-y-2 overflow-y-auto flex-1 min-h-0">
+                    {% for entry in overview_focus.recent_activity %}
+                    {% set action_icons = {
+                        'add': ('fa-plus', 'bg-emerald-100 text-emerald-600'),
+                        'remove': ('fa-minus', 'bg-amber-100 text-amber-600'),
+                        'bambu_print': ('fa-print', 'bg-teal-100 text-teal-600'),
+                        'bulk_add_weight': ('fa-weight-hanging', 'bg-blue-100 text-blue-600'),
+                        'bulk_add_spool': ('fa-circle-plus', 'bg-emerald-100 text-emerald-600'),
+                        'bulk_remove_spool': ('fa-circle-minus', 'bg-red-100 text-red-600'),
+                        'bulk_delete': ('fa-trash', 'bg-red-100 text-red-600'),
+                    } %}
+                    {% set icon_data = action_icons.get(entry.action_type, ('fa-arrow-right', 'bg-gray-100 text-gray-500')) %}
+                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 dark:border-slate-700 bg-white/60 dark:bg-slate-800/50 px-3 py-2.5 min-w-0" data-row-index="{{ loop.index0 }}">
+                        <span class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 {{ icon_data[1] }}">
+                            <i class="fa-solid {{ icon_data[0] }} text-xs"></i>
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <div class="text-sm font-semibold text-gray-800 dark:text-slate-100 truncate">{{ entry.filament_name or '—' }}</div>
+                            <div class="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1.5 truncate">
+                                <span>{{ t('action_type_' ~ entry.action_type) if ('action_type_' ~ entry.action_type) in ['action_type_add','action_type_remove','action_type_bambu_print','action_type_bulk_add_weight','action_type_bulk_delete','action_type_bulk_add_spool','action_type_bulk_remove_spool'] else entry.action_type | replace('_',' ') | title }}</span>
+                                {% if entry.weight %}<span class="text-gray-400">·</span><span>{{ entry.weight | round(1) }} g</span>{% endif %}
+                                {% if entry.project %}<span class="text-gray-400">·</span><span class="truncate">{{ entry.project.name }}</span>{% endif %}
+                            </div>
+                        </div>
+                        <div class="text-xs text-gray-400 flex-shrink-0">{{ entry.created_at.strftime('%d.%m %H:%M') if entry.created_at else '' }}</div>
+                    </div>
+                    {% else %}
+                    <div class="flex flex-col items-center justify-center py-8 text-gray-400 gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-3xl opacity-30"></i>
+                        <p class="text-sm">{{ t('overview_no_recent_activity') }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+
         <section class="dashboard-widget xl:col-span-2" data-widget-id="live_printers">
             <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                 <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
@@ -148,106 +204,67 @@
                     <button onclick="moveOverviewWidgetDown('live_printers')" title="{{ t('stats_move_down') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-down text-xs"></i></button>
                 </div>
             </div>
-            <div class="ui-panel">
-                <div class="flex items-center justify-between mb-4">
+            <div class="ui-panel h-full flex flex-col">
+                <div class="flex items-center justify-between mb-4 flex-shrink-0">
                     <div>
-                        <div class="ui-label">{{ t('live_printers') }}</div>
+                        <div class="ui-label">{{ t('overview_live_printers_label') }}</div>
                         <h2 class="text-xl font-bold mt-1">{{ t('overview_live_printers_title') }}</h2>
                     </div>
-                    {% if live_printers %}
-                    <span class="ui-badge ui-badge-brand">{{ live_printers|length }}</span>
-                    {% else %}
-                    <span class="ui-badge">{{ t('overview_no_active_printers') }}</span>
-                    {% endif %}
+                    <div class="flex gap-2">
+                        <a href="{{ url_for('bambu_jobs') }}" class="ui-badge"><i class="fa-solid fa-print"></i> Bambu</a>
+                        <a href="{{ url_for('prusa_jobs') }}" class="ui-badge"><i class="fa-solid fa-network-wired"></i> Prusa</a>
+                    </div>
                 </div>
                 {% if live_printers %}
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-3 overflow-y-auto flex-1 min-h-0">
                     {% for lp in live_printers %}
-                    {% set live_title = lp.job.display_name or lp.job.file_name or ('Job #' ~ lp.job.id) %}
-                    {% set live_progress = ((lp.job.progress or 0) * 100) | round | int %}
-                    {% set live_eta = lp.job.finished_at %}
-                    {% set is_bambu = lp.type == 'bambu' %}
-                    <div class="ui-card-soft p-4 border-l-4 {% if is_bambu %}border-l-teal-500{% else %}border-l-orange-500{% endif %} flex flex-col relative overflow-hidden transition-all hover:shadow-md">
-                        <div class="flex justify-between items-start mb-2">
-                            <div class="font-bold text-gray-800 text-sm truncate flex items-center gap-2 mr-2">
-                                {% if is_bambu %}
-                                <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-teal-100 flex-shrink-0">
-                                    <i class="fa-solid fa-print text-teal-600 text-[10px]"></i>
-                                </span>
-                                {% else %}
-                                <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-orange-100 flex-shrink-0">
-                                    <i class="fa-solid fa-cube text-orange-600 text-[10px]"></i>
-                                </span>
-                                {% endif %}
-                                <span class="truncate">{{ (lp.printer.name if lp.printer.name else lp.printer.host) | default(lp.printer.host) }}</span>
-                                {% if is_bambu and lp.printer.printer_model %}
-                                <span class="text-[9px] text-gray-400 font-normal flex-shrink-0 truncate hidden sm:inline">{{ lp.printer.printer_model }}</span>
+                    <div class="rounded-xl border border-gray-100 dark:border-slate-700 bg-white/60 dark:bg-slate-800/50 px-4 py-3">
+                        <div class="flex items-center justify-between gap-3 mb-2">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0 animate-pulse"></span>
+                                <span class="font-semibold text-gray-800 dark:text-slate-100 truncate">{{ lp.printer.name }}</span>
+                                {% if lp.printer.printer_model %}
+                                <span class="ui-badge text-xs">{{ lp.printer.printer_model }}</span>
                                 {% endif %}
                             </div>
-                            <div class="ui-badge ui-badge-brand animate-pulse flex-shrink-0">{{ t('status_printing') }}</div>
+                            {% if lp.type == 'prusa' %}
+                            <span class="ui-badge ui-badge-brand text-xs">Prusa · {{ lp.job.progress|int }}%</span>
+                            {% else %}
+                            <span class="ui-badge ui-badge-brand text-xs">Bambu</span>
+                            {% endif %}
                         </div>
-                        <div class="text-xs text-gray-700 font-semibold truncate mb-1" title="{{ live_title }}">{{ live_title }}</div>
-                        {% if is_bambu %}
-                        <!-- Bambu material swatches + weight + duration -->
-                        <div class="flex items-center gap-2 mb-2 flex-wrap">
-                            {% if lp.job.material_swatches %}
-                            <div class="flex items-center gap-0.5">
-                                {% for sw in lp.job.material_swatches %}
-                                <span class="inline-block w-3 h-3 rounded-full border border-white shadow-sm flex-shrink-0" style="background-color: #{{ sw.color_hex.lstrip('#') }};" title="{{ sw.material_name }}{% if sw.weight_grams %} · {{ sw.weight_grams | round(1) }}g{% endif %}"></span>
-                                {% endfor %}
-                                <span class="text-[10px] text-gray-500 ml-1">
-                                    {% for sw in lp.job.material_swatches %}{{ sw.material_name }}{% if not loop.last %} / {% endif %}{% endfor %}
-                                </span>
-                            </div>
-                            {% endif %}
-                            {% if lp.job.weight_grams %}
-                            <span class="text-[10px] text-gray-400"><i class="fa-solid fa-weight-hanging text-[8px]"></i> {{ lp.job.weight_grams | round(1) }} g</span>
-                            {% endif %}
-                            {% if lp.job.cost_time %}
-                            {% set ct_h = (lp.job.cost_time // 3600) | int %}
-                            {% set ct_m = ((lp.job.cost_time % 3600) // 60) | int %}
-                            <span class="text-[10px] text-gray-400"><i class="fa-regular fa-clock text-[8px]"></i> {% if ct_h %}{{ ct_h }}h {% endif %}{{ ct_m }}m</span>
-                            {% endif %}
+                        <div class="text-sm font-medium text-gray-700 dark:text-slate-300 truncate mb-2">
+                            {{ lp.job.display_name or lp.job.file_name or t('overview_unknown_job') }}
+                        </div>
+                        {% if lp.type == 'prusa' and lp.job.progress is not none %}
+                        <div class="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
+                            <div class="bg-blue-500 h-full rounded-full transition-all" style="width: {{ lp.job.progress|int }}%;"></div>
+                        </div>
+                        {% elif lp.type == 'bambu' %}
+                        <div class="w-full h-1.5 rounded-full overflow-hidden bg-gray-100 dark:bg-slate-700">
+                            <div class="h-full rounded-full bg-gradient-to-r from-teal-400 via-blue-500 to-teal-400 bg-[length:200%_100%] animate-[shimmer_1.5s_linear_infinite]"></div>
                         </div>
                         {% endif %}
-                        <div class="mt-auto">
-                            {% if is_bambu %}
-                            <div class="flex justify-between text-[10px] text-gray-500 font-semibold mb-1">
-                                <span class="flex items-center gap-1">
-                                    <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-teal-100 text-teal-700 tracking-wider">BAMBU</span>
-                                    Bambu Cloud
-                                </span>
-                                {% if lp.job.started_at %}
-                                <span class="text-gray-400">{{ t('overview_started_at') }} {{ lp.job.started_at.strftime('%H:%M') }}</span>
-                                {% endif %}
+                        {% if lp.type == 'bambu' and lp.job.material_swatches %}
+                        <div class="flex gap-1 mt-2 flex-wrap">
+                            {% for swatch in lp.job.material_swatches %}
+                            <div class="flex items-center gap-1 text-xs text-gray-500 dark:text-slate-400">
+                                <span class="w-3 h-3 rounded-full border border-gray-200 flex-shrink-0" style="background-color: {{ swatch.color_hex }};"></span>
+                                <span>{{ swatch.material_name }}</span>
                             </div>
-                            <div class="w-full bg-gray-100 rounded-full h-1.5 shadow-inner overflow-hidden">
-                                <div class="bg-teal-500 h-1.5 rounded-full relative overflow-hidden w-full" style="background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.25) 10px, rgba(255,255,255,0.25) 20px); animation: progress-stripes 1.5s linear infinite;"></div>
-                            </div>
-                            {% else %}
-                            <div class="flex justify-between text-[10px] text-gray-500 font-semibold mb-1">
-                                <span class="flex items-center gap-1">
-                                    <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-100 text-orange-700 tracking-wider">PRUSA</span>
-                                    {{ live_progress | int }} %
-                                </span>
-                                {% if live_eta %}
-                                <span>{{ live_eta.strftime('%H:%M') }}</span>
-                                {% endif %}
-                            </div>
-                            <div class="w-full bg-gray-100 rounded-full h-1.5 shadow-inner overflow-hidden">
-                                <div class="bg-orange-500 h-1.5 rounded-full transition-all duration-1000 relative overflow-hidden" style="width: {{ live_progress }}%">
-                                    <div class="absolute inset-0 bg-white/20" style="background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.2) 10px, rgba(255,255,255,0.2) 20px); animation: progress-stripes 2s linear infinite;"></div>
-                                </div>
-                            </div>
-                            {% endif %}
+                            {% endfor %}
                         </div>
+                        {% endif %}
+                        {% if lp.job.started_at %}
+                        <div class="text-xs text-gray-400 mt-1">{{ t('overview_started') }} {{ lp.job.started_at.strftime('%d.%m %H:%M') }}</div>
+                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>
                 {% else %}
-                <div class="flex flex-col items-center justify-center py-8 text-gray-400 gap-2">
+                <div class="flex flex-col items-center justify-center py-8 text-gray-400 gap-2 flex-1">
                     <i class="fa-solid fa-print text-3xl opacity-30"></i>
-                    <p class="text-sm">{{ t('overview_no_active_printers_desc') }}</p>
+                    <p class="text-sm">{{ t('overview_no_live_printers') }}</p>
                 </div>
                 {% endif %}
             </div>
@@ -455,7 +472,7 @@
                 <h2 class="text-xl font-bold mb-4">{{ t('overview_upcoming_projects_title') }}</h2>
                 <div class="space-y-3">
                    {% for project in overview_focus.upcoming_deadlines %}
-                   <a href="{{ url_for('project_detail', id=project.id) }}" class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:border-blue-200 dark:hover:border-blue-700 transition bg-white/50 dark:bg-slate-800/50">
+                   <a href="{{ url_for('project_detail', id=project.id) }}" class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:border-blue-200 dark:hover:border-blue-700 transition bg-white/50 dark:bg-slate-800/50" data-row-index="{{ loop.index0 }}">
                        <div class="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold shrink-0">{{ project.due_date.strftime('%d') }}</div>
                        <div class="min-w-0 flex-1">
                            <div class="font-bold text-gray-800 dark:text-slate-100 truncate">{{ project.name }}</div>
@@ -510,7 +527,7 @@
                 <h2 class="text-xl font-bold mb-4">{{ t('overview_top_turnover_title') }}</h2>
                 <div class="space-y-3">
                    {% for f in overview_focus.top_turnover_month %}
-                   <a href="{{ url_for('filament_detail', id=f.filament.id) }}" class="flex items-center gap-3 group">
+                   <a href="{{ url_for('filament_detail', id=f.filament.id) }}" class="flex items-center gap-3 group" data-row-index="{{ loop.index0 }}">
                        <div class="w-6 h-6 rounded-full border shadow-sm shrink-0" style="background-color: #{{ f.filament.color.hex_value.lstrip('#') if f.filament.color and f.filament.color.hex_value else 'eee' }};"></div>
                        <div class="text-sm font-semibold text-gray-700 dark:text-slate-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate flex-1">{{ f.filament.name }}</div>
                        <div class="text-xs font-bold text-gray-500 dark:text-slate-400">{{ f.usage|round|int }} g</div>
@@ -535,7 +552,7 @@ const overviewLayout = createWidgetLayoutManager({
     visibilityPanelId: 'overviewVisibilityPanel',
     editText: {{ t('stats_edit_layout')|tojson }},
     doneText: {{ t('stats_done_editing')|tojson }},
-    defaultOrder: ['live_printers', 'upcoming_deadlines', 'kpis', 'action_center', 'usage_7d', 'top_turnover', 'quick_links'],
+    defaultOrder: ['recent_activity', 'live_printers', 'kpis', 'action_center', 'upcoming_deadlines', 'usage_7d', 'top_turnover', 'quick_links'],
 });
 
 function toggleOverviewEditMode() { overviewLayout.toggleEditMode(); }

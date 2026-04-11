@@ -8,8 +8,6 @@
 .section-edit-bar, .card-edit-bar { display: none; }
 .edit-mode .section-edit-bar { display: flex; }
 .edit-mode .card-edit-bar { display: flex; }
-.card-size-controls { display: none; }
-.edit-mode .card-size-controls { display: flex; }
 /* Dark mode support for stats cards */
 .stats-card {
     background: var(--ui-surface-strong);
@@ -68,6 +66,9 @@ html.dark #restorePanel {
     <div id="editModeHint" class="hidden bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/40 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 text-sm text-blue-700 dark:text-blue-300">
         <i class="fa-solid fa-arrows-up-down-left-right"></i>
         <span>{{ t('stats_drag_hint') }}</span>
+        <span class="text-blue-500 opacity-50">·</span>
+        <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
+        <span>{{ t('overview_resize_hint') }}</span>
         <button onclick="resetLayout()" class="ml-auto text-xs font-semibold text-blue-600 hover:text-blue-800 underline">{{ t('stats_reset_layout') }}</button>
     </div>
 
@@ -835,8 +836,8 @@ let editMode = false;
 function loadLayout() {
     try {
         const s = JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}');
-        return { order: s.order || [...DEFAULT_ORDER], hidden: s.hidden || [], limits: { ...DEFAULT_LIMITS, ...(s.limits || {}) }, sizes: s.sizes || {} };
-    } catch { return { order: [...DEFAULT_ORDER], hidden: [], limits: { ...DEFAULT_LIMITS }, sizes: {} }; }
+        return { order: s.order || [...DEFAULT_ORDER], hidden: s.hidden || [], limits: { ...DEFAULT_LIMITS, ...(s.limits || {}) }, sizes: s.sizes || {}, heights: s.heights || {} };
+    } catch { return { order: [...DEFAULT_ORDER], hidden: [], limits: { ...DEFAULT_LIMITS }, sizes: {}, heights: {} }; }
 }
 
 function saveLayout() {
@@ -864,15 +865,6 @@ function clearCardSizeClasses(card) {
         .replace(/\bxl:col-span-\d+\b/g, '')
         .replace(/\s{2,}/g, ' ')
         .trim();
-}
-
-function getCardSizeOptions(card) {
-    const grid = card.parentElement;
-    if (!grid) return [1];
-    const className = grid.className || '';
-    const xlColsMatch = className.match(/xl:grid-cols-(\d+)/);
-    const xlCols = xlColsMatch ? parseInt(xlColsMatch[1], 10) : 1;
-    return Array.from({ length: Math.max(xlCols, 1) }, (_, idx) => idx + 1);
 }
 
 function getDefaultCardSize(card) {
@@ -916,33 +908,6 @@ function setCardSize(cardId, size) {
     saveLayout();
 }
 
-function initCardSizeControls() {
-    document.querySelectorAll('.stats-card').forEach((card) => {
-        const cardId = card.dataset.cardId;
-        const bar = card.querySelector('.card-edit-bar');
-        if (!cardId || !bar || bar.querySelector('.card-size-controls')) return;
-        const options = getCardSizeOptions(card);
-        if (options.length <= 1) return;
-        const wrap = document.createElement('div');
-        wrap.className = 'card-size-controls items-center gap-1 bg-white border border-blue-200 rounded px-1 text-xs shadow-sm';
-        options.forEach((size) => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.dataset.sizeValue = String(size);
-            btn.textContent = String(size);
-            btn.title = `${size}x`;
-            btn.className = 'w-6 h-6 flex items-center justify-center hover:bg-blue-50 text-blue-700 font-mono rounded transition';
-            btn.onclick = (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                setCardSize(cardId, size);
-            };
-            wrap.appendChild(btn);
-        });
-        bar.insertBefore(wrap, bar.querySelector('.ml-auto'));
-    });
-}
-
 function updateEmptySections() {
     document.querySelectorAll('#stats-page > [data-section-id]').forEach(section => {
         const cards = section.querySelectorAll('.stats-card');
@@ -961,6 +926,102 @@ function applySizes() {
         const size = layout.sizes[cardId] || getDefaultCardSize(card);
         applyCardSize(cardId, size);
     });
+}
+
+function applyHeights() {
+    if (!layout.heights) return;
+    Object.entries(layout.heights).forEach(([id, h]) => {
+        const el = document.querySelector(`[data-card-id="${id}"]`);
+        if (el) el.style.minHeight = h + 'px';
+    });
+}
+
+// ── Card resize ───────────────────────────────────────────────────────────────
+let cardResizeState = null;
+
+function getParentMaxCols(card) {
+    const grid = card.parentElement;
+    if (!grid) return 1;
+    const m = (grid.className || '').match(/xl:grid-cols-(\d+)/);
+    return m ? parseInt(m[1], 10) : 1;
+}
+
+function getCardColWidth(card) {
+    const grid = card.parentElement;
+    if (!grid) return 200;
+    const maxCols = getParentMaxCols(card);
+    const style = getComputedStyle(grid);
+    const gap = parseFloat(style.columnGap) || parseFloat(style.gap) || 24;
+    return (grid.getBoundingClientRect().width - (maxCols - 1) * gap) / maxCols;
+}
+
+function initCardResizeHandles() {
+    document.querySelectorAll('.stats-card').forEach((card) => {
+        if (card.querySelector('.resize-handle')) return;
+        const id = card.dataset.cardId;
+        if (!id) return;
+        const handle = document.createElement('div');
+        handle.className = 'resize-handle';
+        handle.setAttribute('draggable', 'false');
+        handle.title = 'Resize';
+        handle.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" style="pointer-events:none;opacity:.7"><path d="M0 10 L10 0 L10 2 L2 10 Z M4 10 L10 4 L10 6 L6 10 Z M8 10 L10 8 L10 10 Z"/></svg>';
+        card.appendChild(handle);
+        handle.addEventListener('mousedown', (e) => {
+            if (!editMode) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = card.getBoundingClientRect();
+            const savedSize = layout.sizes[id] || getDefaultCardSize(card);
+            cardResizeState = {
+                card, id,
+                startX: e.clientX,
+                startY: e.clientY,
+                startCols: parseInt(savedSize) || 1,
+                startHeight: rect.height,
+                currentCols: parseInt(savedSize) || 1,
+                currentHeight: rect.height,
+            };
+            document.addEventListener('mousemove', onCardMouseMove);
+            document.addEventListener('mouseup', onCardMouseUp);
+            document.body.classList.add('resize-dragging');
+        });
+    });
+}
+
+function onCardMouseMove(e) {
+    if (!cardResizeState) return;
+    const { card, startX, startY, startCols, startHeight } = cardResizeState;
+    const maxCols = getParentMaxCols(card);
+    const colWidth = getCardColWidth(card);
+    const deltaX = e.clientX - startX;
+    const deltaY = e.clientY - startY;
+    const newCols = Math.max(1, Math.min(maxCols, Math.round(startCols + deltaX / colWidth)));
+    const ROW_SNAP = 80;
+    const newHeight = Math.max(ROW_SNAP, Math.round((startHeight + deltaY) / ROW_SNAP) * ROW_SNAP);
+    card.className = card.className.replace(/\bxl:col-span-\d+\b/g, '').replace(/\s{2,}/g, ' ').trim();
+    if (newCols > 1) card.classList.add(`xl:col-span-${newCols}`);
+    card.style.minHeight = newHeight + 'px';
+    cardResizeState.currentCols = newCols;
+    cardResizeState.currentHeight = newHeight;
+}
+
+function onCardMouseUp(e) {
+    if (!cardResizeState) return;
+    const { id, currentCols, currentHeight, startCols, startHeight } = cardResizeState;
+    if (currentCols !== startCols) {
+        setCardSize(id, currentCols);
+    }
+    if (currentHeight !== startHeight) {
+        if (!layout.heights) layout.heights = {};
+        layout.heights[id] = currentHeight;
+        const card = document.querySelector(`[data-card-id="${id}"]`);
+        if (card) card.style.minHeight = currentHeight + 'px';
+    }
+    document.removeEventListener('mousemove', onCardMouseMove);
+    document.removeEventListener('mouseup', onCardMouseUp);
+    document.body.classList.remove('resize-dragging');
+    cardResizeState = null;
+    saveLayout();
 }
 
 function applyCardLimit(cardId, limit) {
@@ -1030,6 +1091,7 @@ function toggleEditMode() {
         label.textContent = '{{ t("stats_done_editing") }}';
         hint.classList.remove('hidden');
         enableDrag();
+        initCardResizeHandles();
     } else {
         page.classList.remove('edit-mode');
         btn.classList.remove('bg-blue-600','text-white','border-blue-600','hover:bg-blue-700');
@@ -1118,11 +1180,12 @@ function disableDrag() {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-    initCardSizeControls();
+    initCardResizeHandles();
     applyOrder();
     applyVisibility();
     applyLimits();
     applySizes();
+    applyHeights();
     updateRestorePanel();
 });
 </script>

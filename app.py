@@ -39,7 +39,7 @@ from utils import get_settings
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.56.9'
+APP_VERSION = '1.58.0'
 
 csrf = CSRFProtect()
 

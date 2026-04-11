@@ -6,9 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.58.0] - 2026-04-12
 ### Added
-- **Interactive Project Filtering**: The projects dashboard (`/projects`) now features an Alpine.js-powered real-time filter panel. Users can instantly search projects by Name, Client, and Tag without full page reloads.
-- **Clickable Project Tags**: Any tag clicked on a project row or card now acts as a quick-filter, instantly restricting the visible projects to that specific tag using the new AJAX integration.
+- **Live Printers Widget**: Restored the standalone "Currently Printing" widget on the Overview dashboard, now alongside the Recent Activity widget. Shows real-time Prusa progress bars and Bambu stripe animations with material swatches.
+- **Row Limit Controls**: All list widgets on the Overview page (Recent Activity, Upcoming Deadlines, Top Turnover) now have a row-count selector (5 / 10 / 20 / All) in their edit bar. The selection persists in `localStorage`. Changing the limit instantly shows or hides rows.
+- **Projects Grid Expanded to 4 Columns**: Projects layout changed from 3 to 4 columns on XL screens, allowing widgets (e.g. Due Calendar) to be resized up to 4 columns.
+
+### Changed
+- Removed the numeric 1/2/4 size buttons from all widget edit bars on Overview, Projects and Statistics pages — horizontal resizing is now done exclusively via the drag-to-resize corner handle.
+- Increased backend data limits for Recent Activity (20), Upcoming Deadlines (15), and Top Turnover (10) to better support the row-limit selector.
+
+## [1.57.0] - 2026-04-11
+### Added
+- **Interactive Card Resize**: Dashboard widgets on the Overview, Projects, and Statistics pages can now be resized interactively by dragging the bottom-right corner handle. Resizing snaps horizontally by one grid column and vertically in 80 px increments. Sizes persist in `localStorage`. The drag-to-move functionality is preserved.
+- **Recent Activity Widget**: Replaced the duplicate "Currently Printing" widget on the Overview command-center layout with a **Recent Activity** feed showing the last 10 filament movement log entries (type, grams, project, timestamp). The live-printer status is still shown in the Command Center header stats.
+- Resize hint added to edit-mode banners on Overview, Projects, and Statistics pages.
+
+### Changed
+- `createWidgetLayoutManager` in `base.html` now stores widget heights in `localStorage` and adds a resize handle to every managed widget.
+- Statistics page card resize now uses drag-handle in addition to the existing numeric size buttons; heights are persisted.
+
 ## [1.56.9] - 2026-04-10
 ### Added
 - **Global Billing Settings**: Added a new configuration panel in Settings for setting up default company billing details (Supplier info), ensuring invoice documents are prepopulated and synced with database backups.

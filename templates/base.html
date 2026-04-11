@@ -706,6 +706,7 @@
         }
         .dashboard-widget {
             position: relative;
+            min-width: 0; /* prevent grid blowout */
         }
         .dashboard-widget.drag-over {
             outline: 2px dashed #3b82f6;
@@ -721,12 +722,36 @@
         .layout-edit-mode .dashboard-edit-bar {
             display: flex;
         }
-        .size-controls {
+        /* ── Resize handle ─────────────────────────────────────────── */
+        .resize-handle {
             display: none;
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 28px;
+            height: 28px;
+            cursor: se-resize;
+            color: #94a3b8;
+            z-index: 20;
+            align-items: flex-end;
+            justify-content: flex-end;
+            padding: 5px 5px;
+            border-radius: 0 0 1rem 0;
+            user-select: none;
+            -webkit-user-select: none;
         }
-        .layout-edit-mode .size-controls {
+        .layout-edit-mode .resize-handle,
+        #stats-page.edit-mode .resize-handle {
             display: flex;
         }
+        .resize-handle:hover { color: #3b82f6; }
+        .resize-dragging,
+        .resize-dragging * { cursor: se-resize !important; user-select: none !important; }
+        /* Prevent inner panels from blowing out their grid column */
+        .dashboard-widget .ui-panel,
+        .dashboard-widget .ui-kpi { min-width: 0; }
+        /* Stats cards need relative positioning for the resize handle */
+        .stats-card { position: relative; }
         html.dark body {
             background-color: #111827;
             color: #f3f4f6;
@@ -1349,6 +1374,7 @@
             let layout = loadLayout();
             let editMode = false;
             let dragSrc = null;
+            let resizeState = null;
 
             function loadLayout() {
                 try {
@@ -1356,10 +1382,12 @@
                     return {
                         order: Array.isArray(raw.order) ? raw.order : [...defaultOrder],
                         sizes: typeof raw.sizes === 'object' ? raw.sizes : {},
-                        visibility: typeof raw.visibility === 'object' ? raw.visibility : {}
+                        heights: typeof raw.heights === 'object' ? raw.heights : {},
+                        visibility: typeof raw.visibility === 'object' ? raw.visibility : {},
+                        limits: typeof raw.limits === 'object' ? raw.limits : {}
                     };
                 } catch (e) {
-                    return { order: [...defaultOrder], sizes: {}, visibility: {} };
+                    return { order: [...defaultOrder], sizes: {}, heights: {}, visibility: {}, limits: {} };
                 }
             }
 
@@ -1379,10 +1407,6 @@
                     .replace(/\bcol-span-\d+\b/g, '')
                     .replace(/\s{2,}/g, ' ')
                     .trim();
-            }
-
-            function sizeOptions() {
-                return config.sizeOptions || [1, 2, 4];
             }
 
             function spanClass(size) {
@@ -1422,40 +1446,43 @@
                         item.classList.remove('opacity-50');
                     }
 
-                    const bar = item.querySelector('.dashboard-edit-bar');
-                    if (bar && !bar.querySelector('.size-controls')) {
-                        const wrap = document.createElement('div');
-                        wrap.className = "size-controls items-center gap-1 bg-white border border-blue-200 rounded px-1 ml-2 text-xs shadow-sm";
-                        sizeOptions().forEach(sz => {
-                            const btn = document.createElement('button');
-                            btn.type = 'button';
-                            btn.textContent = sz;
-                            btn.title = sz + ' x';
-                            btn.dataset.sizeValue = String(sz);
-                            btn.className = "w-6 h-6 flex items-center justify-center hover:bg-blue-50 text-blue-700 font-mono rounded transition";
-                            btn.onclick = (event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                const span = spanClass(sz);
-                                layout.sizes[id] = span;
-                                applyLayout();
-                                saveLayout();
-                            };
-                            wrap.appendChild(btn);
-                        });
-                        bar.insertBefore(wrap, bar.querySelector('.ml-auto'));
+                    // Restore saved height
+                    if (layout.heights && layout.heights[id]) {
+                        item.style.minHeight = layout.heights[id] + 'px';
+                    } else {
+                        item.style.minHeight = '';
                     }
 
-                    const currentSpanClass = layout.sizes[id] || item.dataset.defaultSpanClass || spanClass(1);
-                    const controlButtons = item.querySelectorAll('.size-controls [data-size-value]');
-                    controlButtons.forEach((btn) => {
-                        const btnSize = Number(btn.dataset.sizeValue || 0);
-                        const isActive = currentSpanClass === spanClass(btnSize);
-                        btn.classList.toggle('bg-blue-600', isActive);
-                        btn.classList.toggle('text-white', isActive);
-                        btn.classList.toggle('shadow-sm', isActive);
-                        btn.classList.toggle('text-blue-700', !isActive);
-                    });
+                    // Add resize handle once
+                    if (!item.querySelector('.resize-handle')) {
+                        addResizeHandle(item, id);
+                    }
+
+                    // Add row-limit select to edit bar if widget has indexed rows
+                    const bar = item.querySelector('.dashboard-edit-bar');
+                    if (bar && !bar.querySelector('.widget-limit-select')) {
+                        const hasRows = item.querySelectorAll('[data-row-index]').length > 0;
+                        if (hasRows) {
+                            const sel = document.createElement('select');
+                            sel.className = 'widget-limit-select text-xs border border-blue-200 rounded px-1 py-0.5 bg-white text-blue-700 ml-2';
+                            sel.title = 'Počet záznamů';
+                            [5, 10, 20, 'all'].forEach(opt => {
+                                const o = document.createElement('option');
+                                o.value = String(opt);
+                                o.textContent = opt === 'all' ? 'Vše' : String(opt);
+                                sel.appendChild(o);
+                            });
+                            const currentLim = layout.limits && layout.limits[id] !== undefined ? String(layout.limits[id]) : '10';
+                            sel.value = currentLim;
+                            sel.addEventListener('change', (e) => {
+                                if (!layout.limits) layout.limits = {};
+                                layout.limits[id] = e.target.value;
+                                applyWidgetLimits();
+                                saveLayout();
+                            });
+                            bar.insertBefore(sel, bar.querySelector('.ml-auto'));
+                        }
+                    }
                 });
                 layout.order.forEach((id) => {
                     if (map[id]) {
@@ -1467,7 +1494,89 @@
                 saveLayout();
             }
 
+            // ── Resize ────────────────────────────────────────────────────────────
+            function getMaxCols() {
+                const m = (container.className || '').match(/xl:grid-cols-(\d+)/);
+                return m ? parseInt(m[1], 10) : 4;
+            }
+
+            function getColWidth() {
+                const maxCols = getMaxCols();
+                const style = getComputedStyle(container);
+                const gap = parseFloat(style.columnGap) || parseFloat(style.gap) || 24;
+                return (container.getBoundingClientRect().width - (maxCols - 1) * gap) / maxCols;
+            }
+
+            function addResizeHandle(item, id) {
+                const handle = document.createElement('div');
+                handle.className = 'resize-handle';
+                handle.setAttribute('draggable', 'false');
+                handle.title = 'Resize';
+                handle.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" style="pointer-events:none;opacity:.7"><path d="M0 10 L10 0 L10 2 L2 10 Z M4 10 L10 4 L10 6 L6 10 Z M8 10 L10 8 L10 10 Z"/></svg>';
+                item.appendChild(handle);
+
+                handle.addEventListener('mousedown', (e) => {
+                    if (!editMode) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const rect = item.getBoundingClientRect();
+                    const xlMatch = (item.className || '').match(/xl:col-span-(\d+)/);
+                    const defMatch = (item.dataset.defaultSpanClass || '').match(/xl:col-span-(\d+)/);
+                    const currentCols = xlMatch ? parseInt(xlMatch[1], 10) : (defMatch ? parseInt(defMatch[1], 10) : 1);
+                    resizeState = {
+                        item, id,
+                        startX: e.clientX,
+                        startY: e.clientY,
+                        startCols: currentCols,
+                        startHeight: rect.height,
+                        currentCols: currentCols,
+                        currentHeight: rect.height,
+                    };
+                    document.addEventListener('mousemove', onGlobalMouseMove);
+                    document.addEventListener('mouseup', onGlobalMouseUp);
+                    document.body.classList.add('resize-dragging');
+                });
+            }
+
+            function onGlobalMouseMove(e) {
+                if (!resizeState) return;
+                const { item, startX, startY, startCols, startHeight } = resizeState;
+                const maxCols = getMaxCols();
+                const colWidth = getColWidth();
+                const deltaX = e.clientX - startX;
+                const deltaY = e.clientY - startY;
+                const newCols = Math.max(1, Math.min(maxCols, Math.round(startCols + deltaX / colWidth)));
+                const ROW_SNAP = 80;
+                const newHeight = Math.max(ROW_SNAP, Math.round((startHeight + deltaY) / ROW_SNAP) * ROW_SNAP);
+                // Visual feedback during drag
+                clearSizeClasses(item);
+                item.classList.add('col-span-1', `md:col-span-${Math.min(newCols, 2)}`, `xl:col-span-${newCols}`);
+                item.style.minHeight = newHeight + 'px';
+                resizeState.currentCols = newCols;
+                resizeState.currentHeight = newHeight;
+            }
+
+            function onGlobalMouseUp(e) {
+                if (!resizeState) return;
+                const { id, currentCols, currentHeight, startCols, startHeight } = resizeState;
+                if (currentCols !== startCols) {
+                    layout.sizes[id] = spanClass(currentCols);
+                }
+                if (currentHeight !== startHeight) {
+                    if (!layout.heights) layout.heights = {};
+                    layout.heights[id] = currentHeight;
+                }
+                document.removeEventListener('mousemove', onGlobalMouseMove);
+                document.removeEventListener('mouseup', onGlobalMouseUp);
+                document.body.classList.remove('resize-dragging');
+                resizeState = null;
+                saveLayout();
+                applyLayout();
+            }
+            // ─────────────────────────────────────────────────────────────────────
+
             function onDragStart(e) {
+                if (resizeState) { e.preventDefault(); return; }
                 dragSrc = this;
                 e.dataTransfer.effectAllowed = 'move';
                 e.dataTransfer.setData('text/plain', this.dataset.widgetId);
@@ -1620,14 +1729,31 @@
                 }
             }
 
+            function applyWidgetLimits() {
+                items().forEach(item => {
+                    const id = item.dataset.widgetId;
+                    if (!id) return;
+                    const lim = layout.limits && layout.limits[id] !== undefined ? layout.limits[id] : null;
+                    const limit = (lim === 'all' || lim === null) ? Infinity : parseInt(lim);
+                    item.querySelectorAll('[data-row-index]').forEach(row => {
+                        row.style.display = parseInt(row.dataset.rowIndex) >= limit ? 'none' : '';
+                    });
+                    const sel = item.querySelector('.widget-limit-select');
+                    if (sel && lim !== null) sel.value = String(lim);
+                });
+            }
+
             function reset() {
                 localStorage.removeItem(config.storageKey);
                 layout = loadLayout();
+                items().forEach((item) => { item.style.minHeight = ''; });
                 applyLayout();
+                applyWidgetLimits();
             }
 
             if (items().length > 0) {
                 applyLayout();
+                applyWidgetLimits();
                 syncControls();
                 syncVisibility();
                 applyLayout();
