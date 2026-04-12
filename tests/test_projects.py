@@ -133,7 +133,8 @@ class ProjectSortingTests(unittest.TestCase):
         html = response.data.decode('utf-8')
         self.assertIn('Paged Project 00', html)
         self.assertNotIn('Paged Project 12', html)
-        self.assertIn('?sort_by=name&amp;page=2', html)
+        # Pagination uses Alpine.js fetchPage() — verify page 2 navigation is rendered
+        self.assertIn('fetchPage(2)', html)
 
     def test_project_client_is_rendered_as_filter_link(self):
         with self.app.app_context():
@@ -144,7 +145,8 @@ class ProjectSortingTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         html = response.data.decode('utf-8')
         self.assertIn('>ACME Studio</a>', html)
-        self.assertIn('?sort_by=name&amp;page=1&amp;client=ACME+Studio', html)
+        # Client filter now uses Alpine.js selectClient() rather than a URL link
+        self.assertIn("selectClient('ACME Studio')", html)
 
         filtered_response = self.client.get('/projects?sort_by=name&client=ACME+Studio')
         self.assertEqual(filtered_response.status_code, 200)
@@ -279,3 +281,47 @@ class ProjectCollaborationTests(unittest.TestCase):
             todo = db.session.get(ProjectTodo, todo_id)
             self.assertTrue(todo.is_done)
             self.assertIsNotNone(todo.completed_at)
+
+    def test_user_client_dropdown_only_shows_own_clients(self):
+        """Security: client_options passed to the dropdown must be scoped to the current
+        user's own projects so that regular users cannot discover other users' client names."""
+        # Create a second user with their own separate project
+        second_client = self.app.test_client()
+        with self.app.app_context():
+            second = User(
+                email='second@example.com',
+                name='Second',
+                password_hash=hash_password('password123'),
+                role='user',
+            )
+            db.session.add(second)
+            db.session.flush()
+            db.session.add(Project(
+                name='Second project',
+                client_name='Secret Corp',
+                owner_user_id=second.id,
+                created_by_user_id=second.id,
+            ))
+            db.session.commit()
+
+        # Add a project owned by the owner user so they have at least one client entry
+        with self.app.app_context():
+            owner = User.query.filter_by(email='owner@example.com').first()
+            db.session.add(Project(
+                name='Owner client project',
+                client_name='Visible Studio',
+                owner_user_id=owner.id,
+                created_by_user_id=owner.id,
+            ))
+            db.session.commit()
+
+        # Log in as the owner user and fetch the projects page
+        self.login('owner@example.com')
+        response = self.client.get('/projects')
+        self.assertEqual(response.status_code, 200)
+        html = response.data.decode('utf-8')
+
+        # Owner's own client IS in the dropdown options
+        self.assertIn('Visible Studio', html)
+        # Other user's client is NOT exposed in the dropdown options
+        self.assertNotIn('Secret Corp', html)

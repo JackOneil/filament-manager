@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.61.0] - 2026-04-12
+### Fixed
+- **Security: client filter dropdown scoped to current user** — The list of client names shown in the project search dropdown was previously built from a global query across all projects, leaking other users' client names. The query is now scoped through `_project_scope()` so regular users only see client names from their own projects.
+- **Smart highlights — "Co dochází" widget** now shows the recommended order in pieces (`N ks`) instead of the raw gram deficit (`285 g`), consistent with all other low-stock displays in the app.
+- **Card view weight-bar tooltip** under the progress bar also updated from `recommended_grams` to `recommended_spools` count for consistency.
+- **Command center KPI mini-card** for "Hoří teď" replaced with a **Stock value card** showing total filament inventory value (with currency), spool count, and remaining weight in kg — the duplicate urgent-items list was already displayed in the large panel below.
+- **Command center large panel** — "Hoří teď" heading and `overview_burning_now_title` i18n key added (CS + EN) to complete the command center redesign.
+
+### Tests
+- Updated `test_projects_list_is_paginated_using_app_setting` and `test_project_client_is_rendered_as_filter_link` to match the current Alpine.js AJAX pagination and filter-click behavior (tests previously checked for URL-based `?page=2` links that no longer exist).
+- Added `test_user_client_dropdown_only_shows_own_clients` — regression test verifying that a user's client name dropdown does not expose client names from other users' projects.
+
 ## [1.60.0] - 2026-04-11
 ### Added
 - **Toggle-hide on widgets**: Clicking the hide button on an already-hidden widget (shown as faded in edit mode) now shows it again. The hide button switches to an amber eye icon when the widget is hidden, making the toggle state obvious.
