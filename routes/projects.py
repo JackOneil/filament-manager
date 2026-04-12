@@ -434,7 +434,7 @@ def register(app):
             html = render_template('_projects_layout.html', **context)
             return jsonify({'html': html})
             
-        client_options = [c[0] for c in db.session.query(Project.client_name).distinct().filter(Project.client_name != None, Project.client_name != '').all()]
+        client_options = [c[0] for c in _project_scope().with_entities(Project.client_name).distinct().filter(Project.client_name != None, Project.client_name != '').all()]
         tag_options = sorted({tag for p in _project_scope().all() for tag in parse_tags(p.tag_text)}, key=str.lower)
         context['client_options'] = client_options
         context['tag_options'] = tag_options

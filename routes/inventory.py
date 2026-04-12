@@ -223,7 +223,7 @@ def _overview_focus(action_center, live_printers, now=None):
     for item in action_center['low_stock'][:2]:
         urgent_items.append({
             'title': item['filament'].name,
-            'meta': f"{int(item['recommended_grams'] or 0)} g",
+            'meta': f"{int(item['filament'].weight_remaining or 0)} g",
             'url': url_for('filament_detail', id=item['filament'].id),
             'tone': 'critical' if item['status'] == 'critical' else 'warning',
         })

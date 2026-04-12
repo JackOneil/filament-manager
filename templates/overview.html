@@ -46,21 +46,12 @@
                 </div>
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 xl:min-w-[520px]">
                     <div class="ui-card-soft p-4">
-                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-red-500">{{ t('overview_command_center_urgent') }}</div>
-                        <div class="text-3xl font-bold mt-2">{{ overview_focus.urgent_total }}</div>
-                        <div class="text-sm text-gray-500 mt-2">{{ t('overview_action_center_desc') }}</div>
-                        <div class="space-y-2 mt-3">
-                            {% for item in overview_focus.urgent_items %}
-                            <a href="{{ item.url }}" class="flex items-center justify-between gap-3 rounded-xl border border-white/70 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60 px-3 py-2 hover:border-red-200 dark:hover:border-red-700 transition">
-                                <span class="min-w-0">
-                                    <span class="block text-sm font-semibold text-gray-800 dark:text-slate-100 truncate">{{ item.title }}</span>
-                                    <span class="block text-xs {% if item.tone == 'critical' %}text-red-600{% else %}text-amber-600{% endif %} mt-1">{{ item.meta }}</span>
-                                </span>
-                                <span class="w-2.5 h-2.5 rounded-full {% if item.tone == 'critical' %}bg-red-500{% else %}bg-amber-400{% endif %} flex-shrink-0"></span>
-                            </a>
-                            {% else %}
-                            <div class="text-xs text-gray-400">{{ t('overview_all_clear') }}</div>
-                            {% endfor %}
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-500">{{ t('total_value') }}</div>
+                        <div class="text-3xl font-bold mt-2 leading-none">{{ '{:,.0f}'.format(stats.value) }}<span class="text-lg font-semibold text-gray-400 ml-1.5">{{ current_currency }}</span></div>
+                        <div class="text-sm text-gray-500 mt-2">{{ stats.spools }} {{ t('total_spools')|lower }}</div>
+                        <div class="mt-3 pt-3 border-t border-gray-100 dark:border-slate-700/60">
+                            <div class="text-xs font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">{{ t('total_remaining') }}</div>
+                            <div class="text-xl font-bold">{{ '{:.1f}'.format(stats.remaining / 1000) }} <span class="text-sm font-normal text-gray-400">kg</span></div>
                         </div>
                     </div>
                     <div class="ui-card-soft p-4">
@@ -85,29 +76,47 @@
                 <div class="ui-card-soft p-5">
                     <div class="flex items-center justify-between gap-3 mb-4">
                         <div>
-                            <div class="ui-label">{{ t('overview_command_center_due_today') }}</div>
-                            <div class="text-xl font-bold mt-1">{{ t('overview_command_center_today_queue') }}</div>
+                            <div class="ui-label">{{ t('overview_command_center_urgent') }}</div>
+                            <div class="text-xl font-bold mt-1">{{ t('overview_burning_now_title') }}</div>
                         </div>
-                        <a href="{{ url_for('projects_index') }}" class="ui-badge ui-badge-brand"><i class="fa-solid fa-diagram-project"></i> {{ t('projects') }}</a>
+                        <a href="{{ url_for('stats') }}" class="ui-badge ui-badge-brand"><i class="fa-solid fa-chart-column"></i> {{ t('stats_nav') }}</a>
                     </div>
-                    <div class="space-y-3">
-                        {% for project in overview_focus.due_today %}
-                        <a href="{{ url_for('project_detail', id=project.id) }}" class="flex items-center justify-between gap-4 rounded-2xl border border-white/60 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60 px-4 py-3 hover:border-amber-200 dark:hover:border-amber-700 transition">
-                            <div class="min-w-0">
-                                <div class="font-semibold text-gray-800 dark:text-slate-100 truncate">{{ project.name }}</div>
-                                <div class="text-sm text-gray-500 dark:text-slate-400 mt-1">
-                                    {{ project.client_name or t('project_client_missing_label') }}
-                                    {% if project.owner_display_name %} · {{ project.owner_display_name }}{% endif %}
+                    {% set ns = namespace(has_items=false) %}
+                    <div class="space-y-2">
+                        {% for item in action_center.low_stock %}
+                        {% set ns.has_items = true %}
+                        <a href="{{ url_for('filament_detail', id=item.filament.id) }}" class="flex items-center justify-between gap-3 rounded-2xl border border-white/60 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60 px-4 py-3 hover:border-amber-200 dark:hover:border-amber-700 transition">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span class="w-2 h-2 rounded-full flex-shrink-0 {% if item.status == 'critical' %}bg-red-500{% else %}bg-amber-400{% endif %}"></span>
+                                <div class="min-w-0">
+                                    <div class="font-semibold text-gray-800 dark:text-slate-100 truncate">{{ item.filament.name }}</div>
+                                    <div class="text-xs {% if item.status == 'critical' %}text-red-600{% else %}text-amber-600{% endif %} mt-0.5">
+                                        {{ t('remaining') }}: {{ item.filament.weight_remaining | int }} g
+                                        &middot; {{ t('detail_order_recommended') }}: {{ item.recommended_spools }} {{ t('pieces') }}
+                                    </div>
                                 </div>
                             </div>
-                            <div class="text-right flex-shrink-0">
-                                <div class="ui-badge {% if project.status == 'PRINTING' %}ui-badge-brand{% elif project.status == 'PENDING_APPROVAL' %}ui-badge ui-badge-warning{% else %}ui-badge{% endif %}">{{ t('status_' ~ project.status|lower) }}</div>
-                                <div class="text-xs text-amber-600 font-semibold mt-2">{{ project.due_date.strftime('%d.%m.%Y') }}</div>
-                            </div>
+                            <span class="ui-badge {% if item.status == 'critical' %}ui-badge-critical{% else %}ui-badge-warning{% endif %} flex-shrink-0">
+                                {% if item.status == 'critical' %}{{ t('out_of_stock') }}{% else %}{{ t('low_stock') }}{% endif %}
+                            </span>
                         </a>
-                        {% else %}
-                        <div class="rounded-2xl border border-dashed border-gray-200 dark:border-slate-700 px-4 py-8 text-center text-sm text-gray-400">{{ t('overview_command_center_no_due_today') }}</div>
                         {% endfor %}
+                        {% for project in action_center.overdue_projects %}
+                        {% set ns.has_items = true %}
+                        <a href="{{ url_for('project_detail', id=project.id) }}" class="flex items-center justify-between gap-3 rounded-2xl border border-white/60 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60 px-4 py-3 hover:border-red-200 dark:hover:border-red-700 transition">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span class="w-2 h-2 rounded-full bg-red-500 flex-shrink-0"></span>
+                                <div class="min-w-0">
+                                    <div class="font-semibold text-gray-800 dark:text-slate-100 truncate">{{ project.name }}</div>
+                                    <div class="text-xs text-red-600 mt-0.5">{{ t('overview_due_dates_title') }}: {{ project.due_date.strftime('%d.%m.%Y') }}</div>
+                                </div>
+                            </div>
+                            <span class="ui-badge ui-badge-critical flex-shrink-0">{{ t('status_' ~ project.status|lower) }}</span>
+                        </a>
+                        {% endfor %}
+                        {% if not ns.has_items %}
+                        <div class="rounded-2xl border border-dashed border-gray-200 dark:border-slate-700 px-4 py-8 text-center text-sm text-gray-400">{{ t('overview_all_clear') }}</div>
+                        {% endif %}
                     </div>
                 </div>
 
