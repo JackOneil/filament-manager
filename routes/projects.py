@@ -1,5 +1,6 @@
 import math
 import os
+import threading
 import uuid
 from datetime import datetime
 from types import SimpleNamespace
@@ -272,6 +273,40 @@ def _notify_project_comment(project, author):
             url_for('project_detail', id=project.id, tab='overview'),
             kind='comment',
         )
+
+
+def _schedule_link_preview_refresh(flask_app, link_id, url, max_attempts=3, retry_delay=12):
+    """Fetch and store link preview metadata in a background thread with retries.
+
+    MakerWorld and similar JS-heavy sites (behind Cloudflare) often return a
+    challenge page on the first request. The jina.ai reader fallback needs a
+    short window to render and cache the page before it can return useful data.
+    Retrying with delays handles this transparently without blocking the user.
+    """
+    def _fetch():
+        from utils import fetch_link_metadata
+
+        for attempt in range(max_attempts):
+            if attempt > 0:
+                threading.Event().wait(retry_delay)  # non-blocking sleep
+            try:
+                with flask_app.app_context():
+                    meta = fetch_link_metadata(url)
+                    if not any(v for v in (meta['og_title'], meta['og_image'], meta['og_description'])):
+                        continue  # weak result – retry
+                    link = db.session.get(ProjectLink, link_id)
+                    if link:
+                        link.og_title = meta['og_title']
+                        link.og_image = meta['og_image']
+                        link.og_description = meta['og_description']
+                        link.domain = meta['domain'] or link.domain
+                        db.session.commit()
+                    return  # success
+            except Exception:
+                pass  # keep retrying
+
+    t = threading.Thread(target=_fetch, daemon=True)
+    t.start()
 
 
 def register(app):
@@ -770,7 +805,8 @@ def register(app):
 
     @app.route('/projects/<int:id>/add_link', methods=['POST'])
     def project_add_link(id):
-        from utils import fetch_link_metadata, is_safe_external_url
+        from utils import is_safe_external_url
+        from urllib.parse import urlparse as _urlparse
 
         project = _project_or_404(id)
         if not _project_write_allowed(project):
@@ -781,17 +817,22 @@ def register(app):
             if not is_safe_external_url(url):
                 flash('project_link_invalid', 'error')
                 return _project_detail_redirect(id, 'files')
-            meta = fetch_link_metadata(url)
-            db.session.add(ProjectLink(
+            # Save the link immediately so the user isn't blocked waiting for
+            # slow external fetches (e.g. Cloudflare-protected MakerWorld pages).
+            # Preview metadata is fetched in a background thread with retries.
+            domain = _urlparse(url).netloc
+            new_link = ProjectLink(
                 project_id=project.id,
                 url=url,
                 name=name,
-                og_title=meta['og_title'],
-                og_image=meta['og_image'],
-                og_description=meta['og_description'],
-                domain=meta['domain'],
-            ))
+                og_title=None,
+                og_image=None,
+                og_description=None,
+                domain=domain,
+            )
+            db.session.add(new_link)
             db.session.commit()
+            _schedule_link_preview_refresh(current_app._get_current_object(), new_link.id, url)
         return _project_detail_redirect(id, 'files')
 
     @app.route('/projects/<int:id>/delete_link/<int:link_id>', methods=['POST'])

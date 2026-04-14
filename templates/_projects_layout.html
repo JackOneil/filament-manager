@@ -192,7 +192,14 @@
                                         </div>
                                     </div>
                                 </th>
-                                <th colspan="6" class="!py-2 !px-3 border-b border-gray-200 dark:border-gray-700"></th>
+                                <th colspan="6" class="!py-2 !px-3 border-b border-gray-200 dark:border-gray-700">
+                                    <div class="flex justify-end">
+                                        <button type="button" @click="resetFilters()" x-show="hasFilters" x-cloak
+                                            class="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-semibold rounded-md bg-orange-100 text-orange-700 hover:bg-orange-200 transition whitespace-nowrap">
+                                            <i class="fa-solid fa-filter-circle-xmark"></i> {{ t('filter_reset') }}
+                                        </button>
+                                    </div>
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
