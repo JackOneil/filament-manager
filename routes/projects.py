@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from types import SimpleNamespace
 
-from flask import abort, current_app, flash, redirect, render_template, request, send_from_directory, url_for
+from flask import abort, current_app, flash, jsonify, redirect, render_template, request, send_from_directory, url_for
 from markupsafe import Markup
 from sqlalchemy.orm import joinedload
 from werkzeug.utils import secure_filename
@@ -28,7 +28,7 @@ from models import (
     PrusaPrinter,
     User,
 )
-from utils import build_project_metrics, format_tags, parse_tags, render_markdown
+from utils import build_project_metrics, format_tags, parse_tags, render_markdown, _toggle_markdown_checkbox
 
 
 ALLOWED_PROJECT_FILE_EXTENSIONS = {
@@ -186,6 +186,13 @@ def _comment_edit_allowed(comment):
     if current_app.config.get('TESTING') and not current_app.config.get('AUTH_REQUIRED_IN_TESTS'):
         return bool(user and comment.user_id == user.id)
     return bool(user and comment.user_id == user.id)
+
+
+def _comment_delete_allowed(comment):
+    user = get_current_user()
+    if current_app.config.get('TESTING') and not current_app.config.get('AUTH_REQUIRED_IN_TESTS'):
+        return bool(user and (is_admin(user) or comment.user_id == user.id))
+    return bool(user and (is_admin(user) or comment.user_id == user.id))
 
 
 def _require_project_admin():
@@ -648,6 +655,7 @@ def register(app):
                 'created_at': comment.created_at,
                 'updated_at': comment.updated_at,
                 'can_edit': _comment_edit_allowed(comment),
+                'can_delete': _comment_delete_allowed(comment),
             })
         project_todos = sorted(
             project.todos,
@@ -967,6 +975,54 @@ def register(app):
         comment.updated_at = datetime.utcnow()
         db.session.commit()
         return _project_detail_redirect(id, 'overview')
+
+    @app.route('/projects/<int:id>/comments/<int:comment_id>/delete', methods=['POST'])
+    def project_delete_comment(id, comment_id):
+        project = _project_or_404(id)
+        if not _project_write_allowed(project):
+            abort(403)
+        comment = db.get_or_404(ProjectComment, comment_id)
+        if comment.project_id != id:
+            abort(404)
+        if not _comment_delete_allowed(comment):
+            abort(403)
+        db.session.delete(comment)
+        db.session.commit()
+        return _project_detail_redirect(id, 'overview')
+
+    @app.route('/projects/<int:id>/comments/<int:comment_id>/toggle-checkbox', methods=['POST'])
+    def project_toggle_comment_checkbox(id, comment_id):
+        project = _project_or_404(id)
+        if not _project_write_allowed(project):
+            return jsonify({'error': 'Forbidden'}), 403
+        comment = db.get_or_404(ProjectComment, comment_id)
+        if comment.project_id != id:
+            abort(404)
+        try:
+            checkbox_index = int(request.form.get('checkbox_index', -1))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'Invalid index'}), 400
+        if checkbox_index < 0:
+            return jsonify({'error': 'Invalid index'}), 400
+        comment.body = _toggle_markdown_checkbox(comment.body, checkbox_index)
+        comment.updated_at = datetime.utcnow()
+        db.session.commit()
+        return jsonify({'html': render_markdown(comment.body)})
+
+    @app.route('/projects/<int:id>/toggle-description-checkbox', methods=['POST'])
+    def project_toggle_description_checkbox(id):
+        project = _project_or_404(id)
+        if not _project_write_allowed(project):
+            return jsonify({'error': 'Forbidden'}), 403
+        try:
+            checkbox_index = int(request.form.get('checkbox_index', -1))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'Invalid index'}), 400
+        if checkbox_index < 0:
+            return jsonify({'error': 'Invalid index'}), 400
+        project.description = _toggle_markdown_checkbox(project.description or '', checkbox_index)
+        db.session.commit()
+        return jsonify({'html': render_markdown(project.description)})
 
     @app.route('/projects/<int:id>/todos', methods=['POST'])
     def project_add_todo(id):

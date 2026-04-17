@@ -298,7 +298,7 @@
                             <div class="ui-label">{{ t('project_description') }}</div>
                             <div class="text-xs text-gray-500 mt-3">{{ t('project_description_markdown_hint') }}</div>
                             {% if project.description %}
-                            <div class="mt-3 text-base text-gray-700 dark:text-slate-300 space-y-3 break-words [&_a]:text-blue-600 [&_a:hover]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-gray-200 [&_blockquote]:pl-4 [&_blockquote]:italic [&_code]:bg-gray-100 dark:[&_code]:bg-slate-700 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-4 [&_pre]:rounded-2xl [&_pre]:overflow-x-auto [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:leading-7">{{ project_description_html }}</div>
+                            <div class="mt-3 text-base text-gray-700 dark:text-slate-300 space-y-3 break-words [&_a]:text-blue-600 [&_a:hover]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-gray-200 [&_blockquote]:pl-4 [&_blockquote]:italic [&_code]:bg-gray-100 dark:[&_code]:bg-slate-700 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-4 [&_pre]:rounded-2xl [&_pre]:overflow-x-auto [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:leading-7"{% if can_edit_project %} data-checkbox-url="{{ url_for('project_toggle_description_checkbox', id=project.id) }}"{% endif %}>{{ project_description_html }}</div>
                             {% else %}
                             <div class="text-base text-gray-700 mt-3">-</div>
                             {% endif %}
@@ -332,6 +332,7 @@
                                     <button type="button" class="md-editor-btn" @click="apply('quote')" title="{{ t('markdown_editor_quote') }}"><i class="fa-solid fa-quote-left"></i></button>
                                     <button type="button" class="md-editor-btn" @click="apply('code')" title="{{ t('markdown_editor_code') }}"><i class="fa-solid fa-code"></i></button>
                                     <button type="button" class="md-editor-btn" @click="apply('link')" title="{{ t('markdown_editor_link') }}"><i class="fa-solid fa-link"></i></button>
+                                    <button type="button" class="md-editor-btn" @click="apply('checkbox')" title="{{ t('markdown_editor_checkbox_title') }}"><i class="fa-regular fa-square-check"></i></button>
                                 </div>
                                 <div class="md-editor-toolbar-group">
                                     <button type="button" class="md-editor-btn" :class="{ 'is-active': mode === 'visual' }" @click="setMode('visual')">{{ t('markdown_editor_visual') }}</button>
@@ -361,13 +362,22 @@
                                         {% if comment.updated_at %} · {{ t('project_comment_edited') }} {{ comment.updated_at.strftime('%d.%m.%Y %H:%M') }}{% endif %}
                                     </div>
                                 </div>
-                                {% if comment.can_edit %}
-                                <button type="button" @click="editing = !editing" class="ui-badge">
-                                    <i class="fa-solid fa-pen"></i> {{ t('edit') }}
-                                </button>
-                                {% endif %}
+                                <div class="flex items-center gap-2">
+                                    {% if comment.can_edit %}
+                                    <button type="button" @click="editing = !editing" class="ui-badge">
+                                        <i class="fa-solid fa-pen"></i> {{ t('edit') }}
+                                    </button>
+                                    {% endif %}
+                                    {% if comment.can_delete %}
+                                    <form method="POST" action="{{ url_for('project_delete_comment', id=project.id, comment_id=comment.id) }}" onsubmit="return confirm('{{ t('project_comment_delete_confirm') }}');">
+                                        <button type="submit" class="ui-badge ui-badge-critical">
+                                            <i class="fa-solid fa-trash"></i> {{ t('delete') }}
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
                             </div>
-                            <div x-show="!editing" class="mt-3 text-sm text-gray-700 dark:text-slate-300 space-y-3 break-words [&_a]:text-blue-600 [&_a:hover]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-gray-200 [&_blockquote]:pl-4 [&_blockquote]:italic [&_code]:bg-gray-100 dark:[&_code]:bg-slate-700 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-4 [&_pre]:rounded-2xl [&_pre]:overflow-x-auto [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:leading-6">{{ comment.body_html }}</div>
+                            <div x-show="!editing" class="mt-3 text-sm text-gray-700 dark:text-slate-300 space-y-3 break-words [&_a]:text-blue-600 [&_a:hover]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-gray-200 [&_blockquote]:pl-4 [&_blockquote]:italic [&_code]:bg-gray-100 dark:[&_code]:bg-slate-700 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-4 [&_pre]:rounded-2xl [&_pre]:overflow-x-auto [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:leading-6"{% if can_edit_project %} data-checkbox-url="{{ url_for('project_toggle_comment_checkbox', id=project.id, comment_id=comment.id) }}"{% endif %}>{{ comment.body_html }}</div>
                             {% if comment.can_edit %}
                             <form x-show="editing" x-cloak method="POST" action="{{ url_for('project_update_comment', id=project.id, comment_id=comment.id) }}" class="space-y-3 mt-3">
                                 <div x-data='markdownEditor({ defaultMode: "visual", placeholder: "{{ t("project_comment_placeholder") }}" })' class="md-editor-shell">
@@ -382,6 +392,7 @@
                                             <button type="button" class="md-editor-btn" @click="apply('quote')" title="{{ t('markdown_editor_quote') }}"><i class="fa-solid fa-quote-left"></i></button>
                                             <button type="button" class="md-editor-btn" @click="apply('code')" title="{{ t('markdown_editor_code') }}"><i class="fa-solid fa-code"></i></button>
                                             <button type="button" class="md-editor-btn" @click="apply('link')" title="{{ t('markdown_editor_link') }}"><i class="fa-solid fa-link"></i></button>
+                                            <button type="button" class="md-editor-btn" @click="apply('checkbox')" title="{{ t('markdown_editor_checkbox_title') }}"><i class="fa-regular fa-square-check"></i></button>
                                         </div>
                                         <div class="md-editor-toolbar-group">
                                             <button type="button" class="md-editor-btn" :class="{ 'is-active': mode === 'visual' }" @click="setMode('visual')">{{ t('markdown_editor_visual') }}</button>
@@ -949,5 +960,30 @@ function close3DViewer() {
         // Keeping the current viewer instance alive avoids expensive reinitialization.
     }
 }
+
+// Interactive markdown checkboxes — toggle without entering edit mode
+document.addEventListener('click', function (e) {
+    var cb = e.target;
+    if (!cb.matches('input.task-checkbox[type="checkbox"]')) return;
+    e.preventDefault();
+    var container = cb.closest('[data-checkbox-url]');
+    if (!container) return;
+    var idx = parseInt(cb.getAttribute('data-index'), 10);
+    var url = container.getAttribute('data-checkbox-url');
+    if (isNaN(idx) || !url) return;
+    container.querySelectorAll('.task-checkbox').forEach(function (c) { c.disabled = true; });
+    var formData = new FormData();
+    formData.append('checkbox_index', idx);
+    fetch(url, { method: 'POST', body: formData })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function (data) {
+            if (data.html !== undefined) {
+                container.innerHTML = data.html;
+            }
+        })
+        .catch(function () {
+            container.querySelectorAll('.task-checkbox').forEach(function (c) { c.disabled = false; });
+        });
+});
 </script>
 {% endblock %}

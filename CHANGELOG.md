@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.62.6] - 2026-04-16
+### Fixed
+- **Visual editor — cursor oscillation after exiting task list** — After typing text in a checkbox row and pressing Enter twice to exit the list, subsequent Enter presses no longer make the cursor jump back and forth between the paragraph and the task list item. Root cause: the exit `<p>` was created with a bare empty text node which browsers (Chrome especially) do not accept as a stable cursor anchor, causing the cursor to silently drift back into the task list. Fixed by creating `<p><br></p>` and placing the cursor with `range.setStart(p, 0)`, matching native browser expectations.
+- **Visual editor — `<ul>` nesting inside `<p>`** — Clicking the checkbox toolbar button while the cursor was inside a paragraph could cause the new `<ul>` to be inserted inside the `<p>` (invalid HTML), leading to unpredictable DOM repairs by the browser. A new `_blockAncestor()` helper now finds the surrounding block element and inserts the list cleanly after it.
+- **Removed `placeCaretAtElementStart`** — The helper incorrectly tried to append a text node inside `<br>` elements; it has been removed and replaced by the inline `range.setStart(element, 0)` approach used in the exit-paragraph logic above.
+
+## [1.62.5] - 2026-04-16
+### Added
+- **Project comment delete action** — Added a delete button for comments in project detail, including confirmation prompt before deletion.
+
+### Fixed
+- **Visual editor checkbox reinsertion after list exit** — After leaving a checkbox list with double Enter, the toolbar checkbox button works immediately on the current line (no need to type/delete a character first).
+- **Visual caret persistence** — Added selection save/restore in the visual markdown editor so toolbar actions apply reliably at the current caret position.
+
+## [1.62.4] - 2026-04-16
+### Fixed
+- **Visual checkbox Enter regression** — Pressing Enter after typing text in a checkbox row no longer deletes the existing row. Empty-row detection now evaluates all non-checkbox content in the row (including browser-generated text nodes outside helper spans), so only truly empty rows trigger list-exit behavior.
+
+## [1.62.3] - 2026-04-16
+### Fixed
+- **Visual checkbox list parity with bullet lists** — Pressing Enter on an empty checkbox row now exits checkbox list editing and continues in normal text mode, instead of endlessly creating/keeping empty checkbox rows.
+
+## [1.62.2] - 2026-04-16
+### Fixed
+- **Visual task-list editing** — Enter inside a checkbox item now creates a clean sibling checkbox row (no progressive indentation drift).
+- **Caret placement after checkbox insertion** is now anchored into the task text area directly to the right of the checkbox.
+- **Visual paste behavior restored** to native rich-text paste (formatting preserved), while still keeping deterministic task-list insertion behavior.
+- **Checkbox click handling in visual mode** now places the caret into editable task text instead of stealing focus unpredictably.
+
+## [1.62.1] - 2026-04-16
+### Fixed
+- **Markdown editor UX for checkboxes** — The checkbox action now inserts an empty task marker in Markdown mode (`- [ ] `) without forcing placeholder text.
+- **Visual editor checkbox insertion** no longer injects default filler text when no selection exists.
+- **Visual editor paste behavior** is now normalized to plain text in the rich-text area, preventing unpredictable pasted structures (unexpected lists/HTML blocks) after inserting task checkboxes.
+
+## [1.62.0] - 2026-04-16
+### Added
+- **Interactive markdown checkboxes** — Task-list syntax (`- [ ] item`, `- [x] item`) is now supported in both project descriptions and comments. Checkboxes render as interactive elements and can be checked/unchecked directly in the view without entering edit mode. Clicking a checkbox sends an AJAX request that persists the updated state immediately.
+- **Checkbox toolbar button** added to all markdown editors (project create, edit, comment add and comment edit forms) for quick task-list insertion.
+- New AJAX endpoints `POST /projects/<id>/toggle-description-checkbox` and `POST /projects/<id>/comments/<id>/toggle-checkbox` handle server-side state persistence. Both require project write access (admin or project owner).
+
 ## [1.61.0] - 2026-04-12
 ### Fixed
 - **Security: client filter dropdown scoped to current user** — The list of client names shown in the project search dropdown was previously built from a global query across all projects, leaking other users' client names. The query is now scoped through `_project_scope()` so regular users only see client names from their own projects.

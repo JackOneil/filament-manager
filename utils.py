@@ -105,6 +105,22 @@ def _render_markdown_inline(text):
     return escaped
 
 
+def _toggle_markdown_checkbox(text, index):
+    """Toggle the checkbox at the given 0-based index in the markdown text."""
+    lines = (text or '').split('\n')
+    count = 0
+    for i, line in enumerate(lines):
+        if re.match(r'^\s*[-*+]\s+\[[ xX]\]\s+', line):
+            if count == index:
+                if re.match(r'^\s*[-*+]\s+\[ \]\s+', line):
+                    lines[i] = re.sub(r'^(\s*[-*+]\s+)\[ \]', r'\1[x]', line)
+                else:
+                    lines[i] = re.sub(r'^(\s*[-*+]\s+)\[[xX]\]', r'\1[ ]', line)
+                return '\n'.join(lines)
+            count += 1
+    return text
+
+
 def render_markdown(text):
     lines = (text or '').replace('\r\n', '\n').replace('\r', '\n').split('\n')
     blocks = []
@@ -114,6 +130,7 @@ def render_markdown(text):
     list_items = []
     in_code_block = False
     code_lines = []
+    checkbox_index = [0]
 
     def _flush_paragraph():
         nonlocal paragraph_lines
@@ -135,8 +152,12 @@ def render_markdown(text):
         nonlocal list_type, list_items
         if not list_items:
             return
-        items = ''.join(f'<li>{item}</li>' for item in list_items)
-        blocks.append(f'<{list_type}>{items}</{list_type}>')
+        if list_type == 'task':
+            items = ''.join(list_items)
+            blocks.append(f'<ul class="task-list">{items}</ul>')
+        else:
+            items = ''.join(f'<li>{item}</li>' for item in list_items)
+            blocks.append(f'<{list_type}>{items}</{list_type}>')
         list_type = None
         list_items = []
 
@@ -185,6 +206,21 @@ def render_markdown(text):
             _flush_paragraph()
             _flush_list()
             quote_lines.append(quote_match.group(1))
+            continue
+
+        task_match = re.match(r'^\s*[-*+]\s+\[([ xX])\]\s+(.*)$', raw_line)
+        if task_match:
+            _flush_paragraph()
+            _flush_quote()
+            if list_type and list_type != 'task':
+                _flush_list()
+            list_type = 'task'
+            checked = task_match.group(1).lower() == 'x'
+            idx = checkbox_index[0]
+            checkbox_index[0] += 1
+            checked_attr = ' checked' if checked else ''
+            item_text = _render_markdown_inline(task_match.group(2))
+            list_items.append(f'<li class="task-list-item"><input type="checkbox" class="task-checkbox" data-index="{idx}"{checked_attr}> {item_text}</li>')
             continue
 
         unordered_match = re.match(r'^\s*[-*+]\s+(.*)$', raw_line)

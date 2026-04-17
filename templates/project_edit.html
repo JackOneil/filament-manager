@@ -65,6 +65,7 @@
                         <button type="button" class="md-editor-btn" @click="apply('quote')" title="{{ t('markdown_editor_quote') }}"><i class="fa-solid fa-quote-left"></i></button>
                         <button type="button" class="md-editor-btn" @click="apply('code')" title="{{ t('markdown_editor_code') }}"><i class="fa-solid fa-code"></i></button>
                         <button type="button" class="md-editor-btn" @click="apply('link')" title="{{ t('markdown_editor_link') }}"><i class="fa-solid fa-link"></i></button>
+                        <button type="button" class="md-editor-btn" @click="apply('checkbox')" title="{{ t('markdown_editor_checkbox_title') }}"><i class="fa-regular fa-square-check"></i></button>
                     </div>
                     <div class="md-editor-toolbar-group">
                         <button type="button" class="md-editor-btn" :class="{ 'is-active': mode === 'visual' }" @click="setMode('visual')">{{ t('markdown_editor_visual') }}</button>
