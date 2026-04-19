@@ -10,7 +10,7 @@
             <input type="checkbox" form="bulkDeleteForm" name="selected_ids" value="{{ fil.id }}" class="filament-select w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
         </div>
         <!-- Barva a název (ZVĚTŠENO) -->
-        <div class="col-span-2 sm:col-span-3 flex items-start gap-2">
+        <div class="col-span-5 sm:col-span-3 flex items-start gap-2">
             <div class="w-3 h-10 rounded-full flex-shrink-0" style="background-color: {{ fil.color.hex_value }};"></div>
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-1.5">
@@ -41,15 +41,13 @@
             <div class="font-medium">{{ fil.brand.name }}</div>
         </div>
         
-        <!-- Počet kusů -->
-        <div class="col-span-2 sm:col-span-1 text-center">
-            <div class="text-xs text-gray-500 sm:hidden">{{ t('pieces') }}</div>
+        <!-- Počet kusů (skryto na mobilu) -->
+        <div class="hidden sm:block sm:col-span-1 text-center">
             <div class="font-bold text-gray-800 text-sm">{{ fil.quantity }}</div>
         </div>
         
-        <!-- Zbývající váha -->
-        <div class="col-span-2 sm:col-span-1 text-center">
-            <div class="text-xs text-gray-500 sm:hidden">{{ t('remaining') }}</div>
+        <!-- Zbývající váha (skryto na mobilu) -->
+        <div class="hidden sm:block sm:col-span-1 text-center">
             <div class="font-bold text-gray-800 text-sm">{{ fil.weight_remaining | int }}g</div>
         </div>
         
@@ -59,7 +57,7 @@
         </div>
         
         <!-- Procenta -->
-        <div class="col-span-2 sm:col-span-1 text-center">
+        <div class="col-span-3 sm:col-span-1 text-center">
             <span class="px-2 py-1 text-xs font-bold rounded
                 {% if pct > 50 %}bg-green-100 text-green-800
                 {% elif pct > 20 %}bg-yellow-100 text-yellow-800

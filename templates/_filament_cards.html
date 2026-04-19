@@ -65,13 +65,13 @@
                 <div class="text-xs text-center text-gray-400 mt-1">{{ t('spool_price').format(price='{:0.2f}'.format(fil.price), weight=fil.weight_total | int, currency=current_currency) }}</div>
             </div>
 
-            <div class="mt-6 flex flex-col xl:flex-row justify-between items-center gap-3 border-t pt-4 border-gray-100">
-                <form action="{{ url_for('use_filament', id=fil.id) }}" method="POST" class="flex items-center gap-2 w-full xl:w-auto">
+            <div class="mt-6 flex flex-col sm:flex-row justify-between items-center gap-3 border-t pt-4 border-gray-100">
+                <form action="{{ url_for('use_filament', id=fil.id) }}" method="POST" class="flex items-center gap-2 w-full sm:w-auto">
                     <input type="number" name="amount" min="1" max="{{ fil.weight_remaining }}" step="0.1" placeholder="g" class="w-20 border rounded px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
                     <button type="submit" class="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-200 transition-colors text-xs px-3 py-1.5 rounded whitespace-nowrap font-semibold">{{ t('subtract_usage') }}</button>
                 </form>
                 
-                <div class="flex gap-4 pt-2 xl:pt-0">
+                <div class="flex gap-4 pt-2 sm:pt-0">
                     <form action="{{ url_for('add_spool', id=fil.id) }}" method="POST">
                         <button type="submit" title="{{ t('add_spool') }}" class="text-green-500 hover:text-green-700 transition-colors"><i class="fa-solid fa-plus-circle"></i></button>
                     </form>

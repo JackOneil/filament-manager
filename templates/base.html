@@ -1200,6 +1200,11 @@
                     <i class="fa-solid fa-clock-rotate-left text-violet-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('movement_history') }}</span>
                 </a>
                 {% endif %}
+                {% if nav_bambu_enabled and (auth_has_section_access('printers') or auth_is_admin(current_user)) %}
+                <a href="{{ url_for('bambu_jobs') }}" class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
+                    <i class="fa-solid fa-print text-green-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('bambu_jobs') }}</span>
+                </a>
+                {% endif %}
                 <a href="{{ url_for('account_settings') }}" class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
                     <i class="fa-solid fa-user text-emerald-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('auth_account') }}</span>
                 </a>
@@ -1559,6 +1564,10 @@
             <footer class="mt-8 pb-4 text-center text-sm text-gray-500 md:block hidden">
                 {{ t('nav_shell_subtitle') }} · v{{ app_version }}
             </footer>
+            {# Mobile bottom-nav spacer: prevents content from being obscured by the fixed tab bar.
+               A real DOM element is used instead of padding-bottom on the scroll container
+               because WebKit/Safari does not include overflow-container padding in scroll height. #}
+            <div class="h-20 md:hidden flex-shrink-0" aria-hidden="true"></div>
         </div>
     </main>
     </div> <!--endflexwrapper-->

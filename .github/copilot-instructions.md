@@ -338,6 +338,37 @@ The `/export` and `/import` functions in `routes/settings.py` must cover the **e
 - The inline hide button (`.widget-hide-btn`) is injected dynamically by `applyLayout()` into each widget's `.dashboard-edit-bar`. Use the visibility panel (`visibilityPanelId`) to allow the user to restore hidden widgets.
 - localStorage keys: `overview_layout_v1`, `projects_layout_v1`, `stats_layout_v2`.
 
+### Rule 23 — Dashboard Mobile Layout (Widget col-span and localStorage)
+
+**Critical gotcha:** `createWidgetLayoutManager` saves widget sizes as CSS class strings (e.g. `col-span-1 md:col-span-2 xl:col-span-3`) in localStorage. When the user resizes a widget on desktop, these classes are persisted and re-applied on every page load. If the grid container does **not** have `md:grid-cols-N` defined, applying `md:col-span-*` creates **implicit grid columns** — widgets end up side-by-side on tablet/mobile even though the grid appears to be single-column.
+
+**`mdGridCols` config parameter** controls this behaviour in `dashboard.js`:
+- `mdGridCols: 1` (default) — `spanClass()` emits only `xl:col-span-N`. When restoring from localStorage, `col-span-*` and `md:col-span-*` are stripped. Grid stays 1-column below xl.
+- `mdGridCols: 2` — `spanClass()` emits `col-span-1 md:col-span-N xl:col-span-N`. Use this when the grid container has `md:grid-cols-2`.
+
+**Current configuration:**
+| Page | Grid container class | `mdGridCols` |
+|---|---|---|
+| Overview (`overview.html`) | `grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4` | `2` |
+| Projects (`projects_index.html` / `_projects_layout.html`) | `grid grid-cols-1 xl:grid-cols-4` | `1` (default) |
+
+**CSS override as safety net:** For grids that must be single-column on mobile regardless of JS/localStorage, add a scoped `!important` rule in the page template:
+```html
+<style>
+@media (max-width: 1279px) {
+    #projects-layout > .dashboard-widget {
+        grid-column: 1 / -1 !important;
+    }
+}
+</style>
+```
+This is already applied to `projects_index.html` and overrides any stale localStorage col-span classes.
+
+**When adding a new dashboard page:**
+1. Decide if the grid uses `md:grid-cols-N` — if yes, set `mdGridCols: N` in the `createWidgetLayoutManager` config.
+2. If the grid is `grid-cols-1 xl:grid-cols-4` (single column until xl), omit `mdGridCols` (defaults to 1) **and** add the CSS `!important` override above as a belt-and-suspenders safeguard.
+3. Full-width widgets (spanning all columns) need the matching `xl:col-span-4` and, if using a 2-col md grid, `md:col-span-2` class in the `<section>` element.
+
 ---
 
 ## 7. Post-Implementation Checklist

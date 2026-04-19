@@ -181,6 +181,10 @@ function _dashMakeColorPickerBtn(currentColorId, onSelect) {
 //   limitAllText       – "All" option for row-limit selector (translated)
 //   defaultOrder       – array of widget IDs for fallback order
 //   itemSelector       – CSS selector for items (default: '[data-widget-id]')
+//   mdGridCols         – number of grid columns at the md breakpoint (default: 1)
+//                        Set to 2 if the grid container uses md:grid-cols-2.
+//                        When 1, md:col-span-* classes are suppressed to prevent
+//                        implicit grid-column creation in a 1-col md grid.
 // ─────────────────────────────────────────────────────────────────────────────
 function createWidgetLayoutManager(config) {
     var container = document.getElementById(config.containerId);
@@ -193,6 +197,7 @@ function createWidgetLayoutManager(config) {
     var limitAllText = config.limitAllText  || 'All';
     var hideBtnTitle = config.hideBtnTitle  || 'Hide';
     var showBtnTitle = config.showBtnTitle  || 'Show';
+    var mdGridCols   = config.mdGridCols    || 1;
     var layout       = loadLayout();
     var editMode     = false;
     var dragSrc      = null;
@@ -235,7 +240,10 @@ function createWidgetLayoutManager(config) {
     }
 
     function spanClass(size) {
-        return 'col-span-1 md:col-span-' + Math.min(size, 2) + ' xl:col-span-' + size;
+        if (mdGridCols >= 2) {
+            return 'col-span-1 md:col-span-' + Math.min(size, mdGridCols) + ' xl:col-span-' + size;
+        }
+        return 'xl:col-span-' + size;
     }
 
     // ── Layout apply ──────────────────────────────────────────────────────────
@@ -262,7 +270,13 @@ function createWidgetLayoutManager(config) {
             clearSizeClasses(item);
             var savedSize = layout.sizes && layout.sizes[id];
             if (savedSize) {
-                item.classList.add.apply(item.classList, savedSize.split(/\s+/).filter(Boolean));
+                var classes = savedSize.split(/\s+/).filter(Boolean);
+                if (mdGridCols < 2) {
+                    // Strip col-span-* and md:col-span-* — grid is 1-col below xl,
+                    // applying these would create unwanted implicit grid columns.
+                    classes = classes.filter(function(c) { return /^xl:col-span-/.test(c); });
+                }
+                item.classList.add.apply(item.classList, classes);
             } else if (item.dataset.defaultSpanClass) {
                 item.classList.add.apply(item.classList, item.dataset.defaultSpanClass.split(/\s+/).filter(Boolean));
             }
@@ -427,7 +441,11 @@ function createWidgetLayoutManager(config) {
         var ROW_SNAP  = 80;
         var newHeight = Math.max(ROW_SNAP, Math.round((resizeState.startHeight + (e.clientY - resizeState.startY)) / ROW_SNAP) * ROW_SNAP);
         clearSizeClasses(resizeState.item);
-        resizeState.item.classList.add('col-span-1', 'md:col-span-' + Math.min(newCols, 2), 'xl:col-span-' + newCols);
+        if (mdGridCols >= 2) {
+            resizeState.item.classList.add('col-span-1', 'md:col-span-' + Math.min(newCols, mdGridCols), 'xl:col-span-' + newCols);
+        } else {
+            resizeState.item.classList.add('xl:col-span-' + newCols);
+        }
         resizeState.item.style.minHeight = newHeight + 'px';
         resizeState.currentCols   = newCols;
         resizeState.currentHeight = newHeight;

@@ -135,7 +135,7 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 xl:grid-cols-5 gap-3">
+            <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
                 {% for status in status_flow %}
                 {% set is_completed = current_idx >= loop.index0 %}
                 {% set is_current = project.status == status %}

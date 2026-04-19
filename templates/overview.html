@@ -44,14 +44,14 @@
                     <h2 class="text-3xl font-bold mt-2 tracking-tight">{{ t('overview_command_center_heading') }}</h2>
                     <p class="text-sm text-gray-500 mt-3">{{ t('overview_command_center_desc') }}</p>
                 </div>
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 xl:min-w-[520px]">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div class="ui-card-soft p-4">
                         <div class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-500">{{ t('total_value') }}</div>
-                        <div class="text-3xl font-bold mt-2 leading-none">{{ '{:,.0f}'.format(stats.value) }}<span class="text-lg font-semibold text-gray-400 ml-1.5">{{ current_currency }}</span></div>
+                        <div class="text-xl sm:text-3xl font-bold mt-2 leading-none">{{ '{:,.0f}'.format(stats.value) }}<span class="text-base sm:text-lg font-semibold text-gray-400 ml-1">{{ current_currency }}</span></div>
                         <div class="text-sm text-gray-500 mt-2">{{ stats.spools }} {{ t('total_spools')|lower }}</div>
                         <div class="mt-3 pt-3 border-t border-gray-100 dark:border-slate-700/60">
                             <div class="text-xs font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">{{ t('total_remaining') }}</div>
-                            <div class="text-xl font-bold">{{ '{:.1f}'.format(stats.remaining / 1000) }} <span class="text-sm font-normal text-gray-400">kg</span></div>
+                            <div class="text-lg sm:text-xl font-bold">{{ '{:.1f}'.format(stats.remaining / 1000) }} <span class="text-sm font-normal text-gray-400">kg</span></div>
                         </div>
                     </div>
                     <div class="ui-card-soft p-4">
@@ -153,7 +153,7 @@
         <button onclick="resetOverviewLayout()" class="ml-auto text-xs font-semibold text-blue-600 hover:text-blue-800 underline">{{ t('stats_reset_layout') }}</button>
     </div>
 
-    <div id="overview-layout" class="grid grid-cols-1 xl:grid-cols-4 gap-6">
+    <div id="overview-layout" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6">
         <section class="dashboard-widget xl:col-span-2" data-widget-id="recent_activity">
             <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                 <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
@@ -318,7 +318,7 @@
             </div>
         </section>
 
-        <section class="dashboard-widget xl:col-span-4" data-widget-id="action_center">
+        <section class="dashboard-widget md:col-span-2 xl:col-span-4" data-widget-id="action_center">
             <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                 <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
                 <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('action_center') }}</span>
@@ -339,7 +339,7 @@
                         <a href="{{ url_for('settings') }}#printer-diagnostics" class="ui-badge"><i class="fa-solid fa-plug-circle-bolt"></i> {{ t('printer_diagnostics') }}</a>
                     </div>
                 </div>
-                <div class="grid grid-cols-1 xl:grid-cols-4 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                     <div class="ui-card-soft p-4">
                         <div class="flex items-center justify-between mb-3">
                             <span class="ui-badge ui-badge-warning"><i class="fa-solid fa-triangle-exclamation"></i> {{ t('overview_low_stock_title') }}</span>
@@ -433,7 +433,7 @@
             </div>
         </section>
 
-        <section class="dashboard-widget xl:col-span-4" data-widget-id="quick_links">
+        <section class="dashboard-widget md:col-span-2 xl:col-span-4" data-widget-id="quick_links">
             <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                 <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
                 <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('overview_quick_links_title') }}</span>
@@ -572,6 +572,7 @@ const overviewLayout = createWidgetLayoutManager({
     hideBtnTitle: {{ t('dashboard_hide_widget')|tojson }},
     showBtnTitle: {{ t('dashboard_show_widget')|tojson }},
     limitAllText: {{ t('stats_limit_all')|tojson }},
+    mdGridCols: 2,
     defaultOrder: ['recent_activity', 'live_printers', 'kpis', 'action_center', 'upcoming_deadlines', 'usage_7d', 'top_turnover', 'quick_links'],
 });
 

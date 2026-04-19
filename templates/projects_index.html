@@ -34,6 +34,16 @@
     </div>
 
     <!-- Widget visibility / colour panel (shown in edit mode) -->
+    <style>
+    /* On screens narrower than xl (1280px), force every widget to span the full
+       grid width regardless of any col-span-* classes applied by the layout editor
+       or saved in localStorage. */
+    @media (max-width: 1279px) {
+        #projects-layout > .dashboard-widget {
+            grid-column: 1 / -1 !important;
+        }
+    }
+    </style>
     <section class="ui-panel hidden" id="projectsVisibilityPanel">
         <div class="p-3 w-full">
             <div class="flex items-center gap-2 mb-3">
