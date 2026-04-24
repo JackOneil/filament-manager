@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/chart.min.js') }}"></script>
 <style>
 .stats-section { position: relative; }
 .stats-section.drag-over { outline: 2px dashed #3b82f6; outline-offset: 4px; border-radius: 1rem; }

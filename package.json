@@ -1,0 +1,12 @@
+{
+  "name": "filament-frontend",
+  "private": true,
+  "description": "Frontend asset build for Filament Manager (Tailwind CSS + self-hosted JS/CSS libs)",
+  "devDependencies": {
+    "tailwindcss": "^3.4.17",
+    "alpinejs": "^3.14.9",
+    "chart.js": "^4.4.9",
+    "@fortawesome/fontawesome-free": "^6.4.0",
+    "online-3d-viewer": "^0.18.0"
+  }
+}
