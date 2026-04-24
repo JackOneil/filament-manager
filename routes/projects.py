@@ -28,7 +28,7 @@ from models import (
     PrusaPrinter,
     User,
 )
-from utils import build_project_metrics, escape_like, format_tags, parse_tags, render_markdown, _toggle_markdown_checkbox
+from utils import build_project_metrics, escape_like, format_tags, parse_tags, render_markdown, translate, utc_now, _toggle_markdown_checkbox
 
 
 ALLOWED_PROJECT_FILE_EXTENSIONS = {
@@ -229,20 +229,22 @@ def _notify_project_created(project):
         if admin.notify_project_created:
             create_notification(
                 admin,
-                f'Novy projekt: {project.name}',
-                'Byla vytvorena nova poptavka a ceka na schvaleni.',
+                translate('notify_project_created_title').format(name=project.name),
+                translate('notify_project_created_body'),
                 url_for('project_detail', id=project.id),
                 kind='project',
             )
 
 
 def _notify_project_status(project):
-    status_label = project.status
+    status_label = translate(f'project_status_{project.status.lower()}') if project.status else project.status
+    title = translate('notify_project_status_title').format(name=project.name)
+    body = translate('notify_project_status_body').format(status=status_label)
     if project.owner and project.owner.notify_project_status_changed:
         create_notification(
             project.owner,
-            f'Projekt {project.name}',
-            f'Stav projektu byl zmenen na {status_label}.',
+            title,
+            body,
             url_for('project_detail', id=project.id),
             kind='project',
         )
@@ -250,8 +252,8 @@ def _notify_project_status(project):
         if admin.notify_project_status_changed:
             create_notification(
                 admin,
-                f'Projekt {project.name}',
-                f'Stav projektu byl zmenen na {status_label}.',
+                title,
+                body,
                 url_for('project_detail', id=project.id),
                 kind='project',
             )
@@ -265,17 +267,118 @@ def _notify_project_comment(project, author):
         if admin.id != author.id and admin.notify_project_comment:
             recipients.append(admin)
     seen = set()
+    title = translate('notify_comment_title').format(name=project.name)
+    body = translate('notify_comment_body').format(author=author.name)
     for recipient in recipients:
         if recipient.id in seen:
             continue
         seen.add(recipient.id)
         create_notification(
             recipient,
-            f'Komentar u projektu {project.name}',
-            f'{author.name} pridal novy komentar.',
+            title,
+            body,
             url_for('project_detail', id=project.id, tab='overview'),
-            kind='comment',
+            kind='project',
         )
+
+
+def _get_project_files_by_category(project):
+    images, model_files, other_files = [], [], []
+    for project_file in project.files:
+        ext = _get_extension(project_file.filename)
+        if ext in IMAGE_EXTENSIONS:
+            images.append(project_file)
+        elif ext in {'3mf', 'stl', 'obj', 'amf', 'step', 'stp', 'gcode', 'gc', 'bgcode'}:
+            model_files.append(project_file)
+        else:
+            other_files.append(project_file)
+    return images, model_files, other_files
+
+
+def _build_project_next_actions(project, project_metrics, show_bambu_jobs, show_prusa_jobs):
+    next_actions = []
+    if project.due_date and project.due_date < utc_now() and project.status != 'DONE':
+        next_actions.append('overdue')
+    if is_admin() and not project.filaments:
+        next_actions.append('plan_filaments')
+    if is_admin() and project_metrics['has_quote'] is False:
+        next_actions.append('create_quote')
+    if is_admin() and any(not row.is_used for row in project.filaments):
+        next_actions.append('consume_planned')
+    if show_prusa_jobs and any(job.project_id is None or job.filament_id is None for job in getattr(project, 'prusa_jobs', [])):
+        next_actions.append('map_prusa_jobs')
+    if show_bambu_jobs and any(
+        job.project_id is None or job.filament_id is None or any(slot.filament_id is None for slot in job.materials)
+        for job in getattr(project, 'bambu_jobs', [])
+    ):
+        next_actions.append('map_bambu_jobs')
+    return next_actions
+
+
+def _build_project_activity_events(project):
+    activity_events = []
+    for quote in sorted(project.quotes, key=lambda item: item.created_at or datetime.min, reverse=True):
+        activity_events.append({
+            'created_at': quote.created_at,
+            'label': f'Quote saved: {quote.final_price:.2f} {quote.currency}',
+            'meta': f'{quote.filament_name} · {quote.weight} g',
+            'kind': 'quote',
+        })
+    for project_file in sorted(project.files, key=lambda item: item.uploaded_at or datetime.min, reverse=True):
+        activity_events.append({
+            'created_at': project_file.uploaded_at,
+            'label': f'File uploaded: {project_file.filename}',
+            'meta': _get_extension(project_file.filename).upper() or 'FILE',
+            'kind': 'file',
+        })
+    for comment in sorted(project.comments, key=lambda item: item.created_at or datetime.min, reverse=True):
+        activity_events.append({
+            'created_at': comment.updated_at or comment.created_at,
+            'label': f'Comment: {(comment.body or "")[:60]}',
+            'meta': comment.user.name if comment.user else '-',
+            'kind': 'comment',
+        })
+    for todo in sorted(project.todos, key=lambda item: item.created_at or datetime.min, reverse=True):
+        activity_events.append({
+            'created_at': todo.completed_at or todo.created_at,
+            'label': f'TODO: {todo.body}',
+            'meta': 'Done' if todo.is_done else 'Open',
+            'kind': 'todo',
+        })
+    activity_events.sort(key=lambda item: item['created_at'] or datetime.min, reverse=True)
+    return activity_events
+
+
+def _build_project_comments(project):
+    project_comments = []
+    for comment in sorted(project.comments, key=lambda item: item.created_at or datetime.min, reverse=True):
+        project_comments.append({
+            'id': comment.id,
+            'user': comment.user,
+            'body': comment.body,
+            'body_html': Markup(render_markdown(comment.body)),
+            'created_at': comment.created_at,
+            'updated_at': comment.updated_at,
+            'can_edit': _comment_edit_allowed(comment),
+            'can_delete': _comment_delete_allowed(comment),
+        })
+    return project_comments
+
+
+def _paginate_jobs(job_feed, page, per_page=8):
+    jobs_total = len(job_feed)
+    jobs_pages = max(1, math.ceil(jobs_total / per_page)) if jobs_total else 1
+    page = min(max(page, 1), jobs_pages)
+    start = (page - 1) * per_page
+    return job_feed[start:start + per_page], SimpleNamespace(
+        page=page,
+        pages=jobs_pages,
+        total=jobs_total,
+        has_prev=page > 1,
+        has_next=page < jobs_pages,
+        prev_num=page - 1 if page > 1 else 1,
+        next_num=page + 1 if page < jobs_pages else jobs_pages,
+    )
 
 
 def _schedule_link_preview_refresh(flask_app, link_id, url, max_attempts=3, retry_delay=12):
@@ -469,7 +572,7 @@ def register(app):
             projects_index_url=_projects_index_url,
             owner_choices=_project_owner_choices(),
             selected_owner_id=request.args.get('owner_id', type=int),
-            now=datetime.utcnow(),
+            now=utc_now(),
         )
 
         if ajax_mode:
@@ -560,81 +663,14 @@ def register(app):
             active_tab = 'overview'
 
         project_metrics = build_project_metrics(project, setting)
-        images, model_files, other_files = [], [], []
-        for project_file in project.files:
-            ext = _get_extension(project_file.filename)
-            if ext in IMAGE_EXTENSIONS:
-                images.append(project_file)
-            elif ext in {'3mf', 'stl', 'obj', 'amf', 'step', 'stp', 'gcode', 'gc', 'bgcode'}:
-                model_files.append(project_file)
-            else:
-                other_files.append(project_file)
-
-        next_actions = []
-        if project.due_date and project.due_date < datetime.utcnow() and project.status != 'DONE':
-            next_actions.append('overdue')
-        if is_admin() and not project.filaments:
-            next_actions.append('plan_filaments')
-        if is_admin() and project_metrics['has_quote'] is False:
-            next_actions.append('create_quote')
-        if is_admin() and any(not row.is_used for row in project.filaments):
-            next_actions.append('consume_planned')
-        if show_prusa_jobs and any(job.project_id is None or job.filament_id is None for job in getattr(project, 'prusa_jobs', [])):
-            next_actions.append('map_prusa_jobs')
-        if show_bambu_jobs and any(
-            job.project_id is None or job.filament_id is None or any(slot.filament_id is None for slot in job.materials)
-            for job in getattr(project, 'bambu_jobs', [])
-        ):
-            next_actions.append('map_bambu_jobs')
-
-        activity_events = []
-        for quote in sorted(project.quotes, key=lambda item: item.created_at or datetime.min, reverse=True):
-            activity_events.append({
-                'created_at': quote.created_at,
-                'label': f'Quote saved: {quote.final_price:.2f} {quote.currency}',
-                'meta': f'{quote.filament_name} · {quote.weight} g',
-                'kind': 'quote',
-            })
-        for project_file in sorted(project.files, key=lambda item: item.uploaded_at or datetime.min, reverse=True):
-            activity_events.append({
-                'created_at': project_file.uploaded_at,
-                'label': f'File uploaded: {project_file.filename}',
-                'meta': _get_extension(project_file.filename).upper() or 'FILE',
-                'kind': 'file',
-            })
-        for comment in sorted(project.comments, key=lambda item: item.created_at or datetime.min, reverse=True):
-            activity_events.append({
-                'created_at': comment.updated_at or comment.created_at,
-                'label': f'Comment: {(comment.body or "")[:60]}',
-                'meta': comment.user.name if comment.user else '-',
-                'kind': 'comment',
-            })
-        for todo in sorted(project.todos, key=lambda item: item.created_at or datetime.min, reverse=True):
-            activity_events.append({
-                'created_at': todo.completed_at or todo.created_at,
-                'label': f'TODO: {todo.body}',
-                'meta': 'Done' if todo.is_done else 'Open',
-                'kind': 'todo',
-            })
-        activity_events.sort(key=lambda item: item['created_at'] or datetime.min, reverse=True)
+        images, model_files, other_files = _get_project_files_by_category(project)
+        next_actions = _build_project_next_actions(project, project_metrics, show_bambu_jobs, show_prusa_jobs)
+        activity_events = _build_project_activity_events(project)
 
         job_feed = _build_project_job_feed(project, setting, show_bambu_jobs, show_prusa_jobs)
         jobs_page = request.args.get('jobs_page', 1, type=int)
-        jobs_per_page = 8
-        jobs_total = len(job_feed)
-        jobs_pages = max(1, math.ceil(jobs_total / jobs_per_page)) if jobs_total else 1
-        jobs_page = min(max(jobs_page, 1), jobs_pages)
-        start = (jobs_page - 1) * jobs_per_page
-        job_feed_page = job_feed[start:start + jobs_per_page]
-        jobs_pagination = SimpleNamespace(
-            page=jobs_page,
-            pages=jobs_pages,
-            total=jobs_total,
-            has_prev=jobs_page > 1,
-            has_next=jobs_page < jobs_pages,
-            prev_num=jobs_page - 1 if jobs_page > 1 else 1,
-            next_num=jobs_page + 1 if jobs_page < jobs_pages else jobs_pages,
-        )
+        job_feed_page, jobs_pagination = _paginate_jobs(job_feed, jobs_page)
+
         filaments_json = [
             {
                 'id': filament.id,
@@ -646,18 +682,8 @@ def register(app):
             }
             for filament in filaments
         ]
-        project_comments = []
-        for comment in sorted(project.comments, key=lambda item: item.created_at or datetime.min, reverse=True):
-            project_comments.append({
-                'id': comment.id,
-                'user': comment.user,
-                'body': comment.body,
-                'body_html': Markup(render_markdown(comment.body)),
-                'created_at': comment.created_at,
-                'updated_at': comment.updated_at,
-                'can_edit': _comment_edit_allowed(comment),
-                'can_delete': _comment_delete_allowed(comment),
-            })
+        
+        project_comments = _build_project_comments(project)
         project_todos = sorted(
             project.todos,
             key=lambda item: (item.is_done, item.completed_at or datetime.max, item.created_at or datetime.min),
@@ -973,7 +999,7 @@ def register(app):
             flash('project_comment_empty', 'error')
             return _project_detail_redirect(id, 'overview')
         comment.body = body
-        comment.updated_at = datetime.utcnow()
+        comment.updated_at = utc_now()
         db.session.commit()
         return _project_detail_redirect(id, 'overview')
 
@@ -1006,7 +1032,7 @@ def register(app):
         if checkbox_index < 0:
             return jsonify({'error': 'Invalid index'}), 400
         comment.body = _toggle_markdown_checkbox(comment.body, checkbox_index)
-        comment.updated_at = datetime.utcnow()
+        comment.updated_at = utc_now()
         db.session.commit()
         return jsonify({'html': render_markdown(comment.body)})
 
@@ -1050,7 +1076,7 @@ def register(app):
         if todo.project_id != id:
             abort(404)
         todo.is_done = not todo.is_done
-        todo.completed_at = datetime.utcnow() if todo.is_done else None
+        todo.completed_at = utc_now() if todo.is_done else None
         db.session.commit()
         return _project_detail_redirect(id, 'overview')
 

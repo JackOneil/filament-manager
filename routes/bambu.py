@@ -18,7 +18,7 @@ from models import (
     Filament, PrintHistory, Project, ProjectFilament,
 )
 from sqlalchemy import and_, func, or_, select
-from utils import deduct_filament_stock, decrypt_token, log_movement
+from utils import deduct_filament_stock, decrypt_token, log_movement, utc_now
 
 _LOG = logging.getLogger(__name__)
 
@@ -71,7 +71,8 @@ def _parse_ts(value):
     if isinstance(value, (int, float)):
         ts = float(value) / 1000 if value > 1_000_000_000_000 else float(value)
         try:
-            return datetime.utcfromtimestamp(ts)
+            from datetime import timezone as _tz
+            return datetime.fromtimestamp(ts, tz=_tz.utc).replace(tzinfo=None)
         except (OSError, OverflowError, ValueError):
             return None
     s = re.sub(r'Z$|[+-]\d{2}:?\d{2}$', '', str(value).strip())
@@ -459,7 +460,7 @@ def register(app):
             return jsonify({'ok': False, 'error': 'No Bambu token configured'}), 400
         token = decrypt_token(setting.bambu_token)
         result = do_sync(token, setting.bambu_region or 'global')
-        setting.bambu_last_sync_at = datetime.utcnow()
+        setting.bambu_last_sync_at = utc_now()
         if result.get('error'):
             setting.bambu_last_sync_status = f"error: {result['error'][:220]}"
         else:

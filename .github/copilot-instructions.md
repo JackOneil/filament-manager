@@ -39,8 +39,9 @@ models.py               # All ORM models (~23 tables): Brand, Color, Material, F
                         #   BambuJobMaterial, PrusaPrinter, PrusaPrintJob, User, UserInvite, Notification
 auth.py                 # Multi-user auth, RBAC, session management, invite system
 messages.py             # i18n translations (cs + en), ~700 keys per language
-utils.py                # Shared helpers: get_settings(), log_movement(), encrypt/decrypt_token(),
-                        #   link preview (SSRF-safe), stock status logic, action center builder
+utils.py                # Shared helpers: get_settings(), utc_now(), translate(), log_movement(),
+                        #   encrypt/decrypt_token(), escape_like(), link preview (SSRF-safe),
+                        #   stock status logic, action center builder
 routes/
   __init__.py           # register_all(app) — calls all register() functions
   inventory.py          # /, /filaments, /filament/<id>, /add, /edit, /use, /delete, bulk operations
@@ -368,6 +369,17 @@ This is already applied to `projects_index.html` and overrides any stale localSt
 1. Decide if the grid uses `md:grid-cols-N` — if yes, set `mdGridCols: N` in the `createWidgetLayoutManager` config.
 2. If the grid is `grid-cols-1 xl:grid-cols-4` (single column until xl), omit `mdGridCols` (defaults to 1) **and** add the CSS `!important` override above as a belt-and-suspenders safeguard.
 3. Full-width widgets (spanning all columns) need the matching `xl:col-span-4` and, if using a 2-col md grid, `md:col-span-2` class in the `<section>` element.
+
+### Rule 24 — Time Handling (utc_now)
+- Never use `datetime.utcnow()` directly, as it is deprecated and will be removed in Python 3.14.
+- Always use the `utc_now()` helper from `utils.py`.
+- For model definitions, `models.py` uses its own internal `_utc_now()` helper to avoid circular imports.
+- Any time math or defaulting must rely on timezone-aware UTC representations when possible or naive UTC from `utc_now()` if legacy compatibility requires it.
+
+### Rule 25 — Backend Translation (translate)
+- Jinja2 templates use the `t("key")` context processor.
+- Python code (e.g. background tasks, route handlers) must use `translate("key")` from `utils.py`.
+- Do not hardcode localized strings in Python code (e.g. notifications, flash messages where feasible) if it should adapt to the user's selected language.
 
 ---
 

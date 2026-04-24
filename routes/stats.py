@@ -9,7 +9,7 @@ from sqlalchemy.orm import joinedload
 
 from database import db
 from models import AppSetting, BambuPrintJob, Filament, MovementHistory, Project, ProjectFilament, ProjectQuote
-from utils import build_filament_history_name as _display_filament_name, collect_usage_windows, compute_stock_status
+from utils import build_filament_history_name as _display_filament_name, collect_usage_windows, compute_stock_status, utc_now
 
 
 def _hex_to_hsl_sort_key(hex_value):
@@ -37,7 +37,7 @@ CHART_PALETTE = [
 
 
 def _date_labels(days):
-    today = datetime.utcnow().date()
+    today = utc_now().date()
     return [today - timedelta(days=offset) for offset in range(days - 1, -1, -1)]
 
 
@@ -119,7 +119,7 @@ def register(app):
         labels = _date_labels(days)
         label_keys = [day.isoformat() for day in labels]
         since_dt = datetime.combine(labels[0], datetime.min.time())
-        last_30_dt = datetime.utcnow() - timedelta(days=30)
+        last_30_dt = utc_now() - timedelta(days=30)
 
         filaments = Filament.query.options(
             joinedload(Filament.brand),

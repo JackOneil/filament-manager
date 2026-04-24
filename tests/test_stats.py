@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from app import create_app
 from database import db
 from models import BambuPrintJob, Brand, Color, Filament, Material, MovementHistory, Project, ProjectFilament
-from utils import log_movement
+from utils import log_movement, utc_now
 
 
 class StatsDashboardTests(unittest.TestCase):
@@ -62,9 +62,9 @@ class StatsDashboardTests(unittest.TestCase):
             db.session.commit()
 
             movements = MovementHistory.query.order_by(MovementHistory.id.asc()).all()
-            movements[0].created_at = datetime.utcnow() - timedelta(days=3)
-            movements[1].created_at = datetime.utcnow() - timedelta(days=2)
-            movements[2].created_at = datetime.utcnow() - timedelta(days=1)
+            movements[0].created_at = utc_now() - timedelta(days=3)
+            movements[1].created_at = utc_now() - timedelta(days=2)
+            movements[2].created_at = utc_now() - timedelta(days=1)
             db.session.commit()
 
     def tearDown(self):

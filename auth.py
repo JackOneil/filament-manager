@@ -1,6 +1,7 @@
 import json
 import secrets
 from datetime import datetime, timedelta
+from utils import utc_now
 from functools import wraps
 from urllib.parse import urljoin, urlsplit
 
@@ -227,7 +228,7 @@ def safe_redirect_target(target, fallback_endpoint='index'):
 
 def login_user(user, plain_password=None):
     session.clear()
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = utc_now()
     if plain_password and password_needs_rehash(user.password_hash):
         user.password_hash = hash_password(plain_password)
     db.session.commit()
@@ -332,7 +333,7 @@ def create_invite(email=None, role='user', permissions=None, expires_days=14):
         code=code,
         role='admin' if role == 'admin' else 'user',
         section_permissions=serialize_permissions(permissions or default_section_permissions(), role=role),
-        expires_at=datetime.utcnow() + timedelta(days=expires_days),
+        expires_at=utc_now() + timedelta(days=expires_days),
     )
     db.session.add(invite)
     return invite
@@ -341,6 +342,6 @@ def create_invite(email=None, role='user', permissions=None, expires_days=14):
 def invite_is_valid(invite):
     if not invite or invite.is_used:
         return False
-    if invite.expires_at and invite.expires_at < datetime.utcnow():
+    if invite.expires_at and invite.expires_at < utc_now():
         return False
     return True

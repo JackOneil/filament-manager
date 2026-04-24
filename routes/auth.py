@@ -1,4 +1,5 @@
 from datetime import datetime
+from utils import utc_now
 
 from flask import abort, flash, redirect, render_template, request, url_for
 from sqlalchemy import or_
@@ -229,7 +230,7 @@ def register(app):
             default_permissions=default_section_permissions(),
             user_projects_count=len(user_projects),
             user_last_project_at=max((project.created_at for project in user_projects), default=None),
-            now=datetime.utcnow(),
+            now=utc_now(),
         )
 
     @app.route('/account', methods=['GET', 'POST'])

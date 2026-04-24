@@ -1,5 +1,13 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from database import db
+
+
+def _utc_now():
+    """Return current UTC time as a naive datetime (no tzinfo).
+
+    Local helper to avoid circular import with utils.utc_now.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class User(db.Model):
@@ -13,8 +21,11 @@ class User(db.Model):
     notify_project_created = db.Column(db.Boolean, nullable=False, default=True)
     notify_project_status_changed = db.Column(db.Boolean, nullable=False, default=True)
     notify_project_comment = db.Column(db.Boolean, nullable=False, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utc_now)
     last_login_at = db.Column(db.DateTime, nullable=True, index=True)
+
+    def __repr__(self):
+        return f'<User {self.id} {self.email!r} role={self.role}>'
 
 
 class UserInvite(db.Model):
@@ -24,8 +35,11 @@ class UserInvite(db.Model):
     role = db.Column(db.String(20), nullable=False, default='user')
     section_permissions = db.Column(db.Text, nullable=True)
     is_used = db.Column(db.Boolean, nullable=False, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utc_now)
     expires_at = db.Column(db.DateTime, nullable=True)
+
+    def __repr__(self):
+        return f'<UserInvite {self.id} code={self.code!r}>'
 
 
 class Notification(db.Model):
@@ -36,9 +50,12 @@ class Notification(db.Model):
     body = db.Column(db.Text, nullable=True)
     link = db.Column(db.String(500), nullable=True)
     is_read = db.Column(db.Boolean, nullable=False, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    created_at = db.Column(db.DateTime, default=_utc_now, index=True)
 
     user = db.relationship('User', backref=db.backref('notifications', lazy=True, cascade='all, delete-orphan'))
+
+    def __repr__(self):
+        return f'<Notification {self.id} user={self.user_id} {self.kind!r}>'
 
 
 class Brand(db.Model):
@@ -46,16 +63,25 @@ class Brand(db.Model):
     name = db.Column(db.String(100), unique=True, nullable=False)
     shop_url = db.Column(db.Text, nullable=True)
 
+    def __repr__(self):
+        return f'<Brand {self.id} {self.name!r}>'
+
 
 class Color(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
     hex_value = db.Column(db.String(20), nullable=True)
 
+    def __repr__(self):
+        return f'<Color {self.id} {self.name!r}>'
+
 
 class Material(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True, nullable=False)
+
+    def __repr__(self):
+        return f'<Material {self.id} {self.name!r}>'
 
 
 class Filament(db.Model):
@@ -86,10 +112,13 @@ class Filament(db.Model):
     color = db.relationship('Color', backref=db.backref('filaments', lazy=True))
     material = db.relationship('Material', backref=db.backref('filaments', lazy=True))
 
+    def __repr__(self):
+        return f'<Filament {self.id} {self.name!r}>'
+
 
 class MovementHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    created_at = db.Column(db.DateTime, default=_utc_now, index=True)
     filament_id = db.Column(db.Integer, db.ForeignKey('filament.id'), nullable=True, index=True)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
     bambu_job_id = db.Column(db.Integer, db.ForeignKey('bambu_print_job.id'), nullable=True)
@@ -103,6 +132,9 @@ class MovementHistory(db.Model):
     filament = db.relationship('Filament', backref=db.backref('movements', lazy=True))
     project = db.relationship('Project', backref=db.backref('movements', lazy=True))
     bambu_job = db.relationship('BambuPrintJob', backref=db.backref('movements', lazy=True))
+
+    def __repr__(self):
+        return f'<MovementHistory {self.id} {self.action_type!r} {self.weight}g>'
 
 
 class AppSetting(db.Model):
@@ -140,7 +172,7 @@ class PrintHistory(db.Model):
     filament_name = db.Column(db.String(200), nullable=False)
     weight = db.Column(db.Float, nullable=False)
     total_cost = db.Column(db.Float, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utc_now)
 
 
 class ProjectQuote(db.Model):
@@ -157,7 +189,7 @@ class ProjectQuote(db.Model):
     margin_amount = db.Column(db.Float, nullable=False, default=0.0)
     final_price = db.Column(db.Float, nullable=False, default=0.0)
     currency = db.Column(db.String(10), nullable=False, default='CZK')
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utc_now)
 
     project = db.relationship('Project', backref=db.backref('quotes', lazy=True, cascade='all, delete-orphan'))
     filament = db.relationship('Filament')
@@ -167,7 +199,7 @@ class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utc_now)
     due_date = db.Column(db.DateTime, nullable=True)
     client_name = db.Column(db.String(100), nullable=True)
     estimated_print_time = db.Column(db.Integer, default=0) # in minutes
@@ -186,13 +218,16 @@ class Project(db.Model):
             return self.owner.name
         return (self.owner_name or '').strip()
 
+    def __repr__(self):
+        return f'<Project {self.id} {self.name!r} status={self.status}>'
+
 
 class ProjectComment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='CASCADE'), nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True, index=True)
     body = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    created_at = db.Column(db.DateTime, default=_utc_now, index=True)
     updated_at = db.Column(db.DateTime, nullable=True)
 
     project = db.relationship('Project', backref=db.backref('comments', lazy=True, cascade='all, delete-orphan'))
@@ -205,7 +240,7 @@ class ProjectTodo(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True, index=True)
     body = db.Column(db.String(255), nullable=False)
     is_done = db.Column(db.Boolean, nullable=False, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    created_at = db.Column(db.DateTime, default=_utc_now, index=True)
     completed_at = db.Column(db.DateTime, nullable=True)
 
     project = db.relationship('Project', backref=db.backref('todos', lazy=True, cascade='all, delete-orphan'))
@@ -217,7 +252,7 @@ class ProjectFile(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='CASCADE'), nullable=False)
     filename = db.Column(db.String(255), nullable=False)
     filepath = db.Column(db.String(255), nullable=False)
-    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    uploaded_at = db.Column(db.DateTime, default=_utc_now)
     project = db.relationship('Project', backref=db.backref('files', lazy=True, cascade="all, delete-orphan"))
 
 
@@ -269,7 +304,7 @@ class BambuPrinter(db.Model):
     name = db.Column(db.String(200), nullable=False)
     printer_model = db.Column(db.String(50), nullable=True)
     notes = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utc_now)
 
 
 class BambuPrintJob(db.Model):
@@ -289,10 +324,13 @@ class BambuPrintJob(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='SET NULL'), nullable=True)
     filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='SET NULL'), nullable=True)
     deducted = db.Column(db.Boolean, default=False)
-    synced_at = db.Column(db.DateTime, default=datetime.utcnow)
+    synced_at = db.Column(db.DateTime, default=_utc_now)
 
     project = db.relationship('Project', backref=db.backref('bambu_jobs', lazy=True))
     filament = db.relationship('Filament', backref=db.backref('bambu_jobs', lazy=True))
+
+    def __repr__(self):
+        return f'<BambuPrintJob {self.id} {self.model_name!r} status={self.status}>'
 
 
 class BambuJobMaterial(db.Model):
@@ -323,7 +361,7 @@ class PrusaPrinter(db.Model):
     last_sync_at = db.Column(db.DateTime, nullable=True)
     last_success_at = db.Column(db.DateTime, nullable=True)
     last_sync_status = db.Column(db.String(255), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utc_now)
 
 
 class PrusaPrintJob(db.Model):
@@ -343,8 +381,11 @@ class PrusaPrintJob(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='SET NULL'), nullable=True)
     deducted = db.Column(db.Boolean, nullable=False, default=False)
     raw_payload = db.Column(db.Text, nullable=True)
-    synced_at = db.Column(db.DateTime, default=datetime.utcnow)
+    synced_at = db.Column(db.DateTime, default=_utc_now)
 
     printer = db.relationship('PrusaPrinter', backref=db.backref('jobs', lazy=True))
     filament = db.relationship('Filament', backref=db.backref('prusa_jobs', lazy=True))
     project = db.relationship('Project', backref=db.backref('prusa_jobs', lazy=True))
+
+    def __repr__(self):
+        return f'<PrusaPrintJob {self.id} {self.display_name!r} status={self.status}>'

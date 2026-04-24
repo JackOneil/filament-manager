@@ -43,7 +43,7 @@ from models import (
     PrusaPrinter, PrusaPrintJob,
     User, UserInvite, Notification, ProjectComment,
 )  # noqa: F401
-from utils import get_settings
+from utils import get_settings, utc_now
 from routes import register_all
 from messages import TRANSLATIONS
 
@@ -304,12 +304,12 @@ def _start_bambu_sync_worker(app: Flask) -> None:
                         interval = max(int(setting.bambu_auto_sync_interval_minutes or 60), 5)
                         due = (
                             not setting.bambu_last_sync_at
-                            or setting.bambu_last_sync_at <= datetime.utcnow() - timedelta(minutes=interval)
+                            or setting.bambu_last_sync_at <= utc_now() - timedelta(minutes=interval)
                         )
                         if due:
                             token = decrypt_token(setting.bambu_token)
                             result = do_sync(token, setting.bambu_region or 'global')
-                            setting.bambu_last_sync_at = datetime.utcnow()
+                            setting.bambu_last_sync_at = utc_now()
                             if result.get('error'):
                                 setting.bambu_last_sync_status = f"error: {result['error'][:220]}"
                             else:

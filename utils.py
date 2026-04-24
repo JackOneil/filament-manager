@@ -28,6 +28,28 @@ def get_current_lang():
     return setting.lang if setting else 'cs'
 
 
+def translate(key):
+    """Translate a message key using the current app language.
+
+    This is the Python-side equivalent of the Jinja2 ``t()`` context processor.
+    Use it in route handlers, notification builders, and other non-template code.
+    """
+    from messages import TRANSLATIONS
+    lang = get_current_lang()
+    return TRANSLATIONS.get(lang, TRANSLATIONS['cs']).get(key, key)
+
+
+def utc_now():
+    """Return the current UTC time as a naive datetime.
+
+    Replacement for the deprecated ``datetime.utcnow()`` (removed in Python 3.14).
+    Returns a naive (tzinfo-free) datetime to keep compatibility with the existing
+    SQLite schema which stores all timestamps without timezone info.
+    """
+    from datetime import timezone
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 def get_current_currency():
     setting = get_settings()
     return setting.currency if setting and setting.currency else 'CZK'
@@ -507,7 +529,7 @@ def build_project_metrics(project, setting=None):
 
 
 def build_action_center(now=None):
-    now = now or datetime.utcnow()
+    now = now or utc_now()
     setting = get_settings()
 
     low_stock_rows = []

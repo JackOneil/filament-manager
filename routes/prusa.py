@@ -23,7 +23,7 @@ from models import (
     AppSetting, PrusaPrinter, PrusaPrintJob,
     Filament, Project, PrintHistory, ProjectFilament,
 )
-from utils import deduct_filament_stock, encrypt_token, decrypt_token, log_movement
+from utils import deduct_filament_stock, encrypt_token, decrypt_token, log_movement, utc_now
 
 _LOG = logging.getLogger(__name__)
 
@@ -107,7 +107,7 @@ def do_poll(printer: PrusaPrinter) -> dict:
         {'added': int, 'updated': int, 'error': str|None}
     """
     added = updated = 0
-    now = datetime.utcnow()
+    now = utc_now()
 
     # ── 1. Fetch current status ───────────────────────────────────────────
     status_data = _prusa_request(printer, '/api/v1/status')
@@ -189,12 +189,12 @@ def do_poll(printer: PrusaPrinter) -> dict:
         if existing.status != norm_state:
             existing.status = norm_state
             if norm_state in ('FINISHED', 'STOPPED') and not existing.finished_at:
-                existing.finished_at = datetime.utcnow()
+                existing.finished_at = utc_now()
             changed = True
         if progress is not None and existing.progress != progress:
             existing.progress = progress
             changed = True
-        existing.synced_at = datetime.utcnow()
+        existing.synced_at = utc_now()
         existing.raw_payload = raw_payload
         if changed:
             updated += 1
@@ -207,8 +207,8 @@ def do_poll(printer: PrusaPrinter) -> dict:
                 file_name=raw_file or None,
                 display_name=display_name,
                 status=norm_state,
-                started_at=datetime.utcnow() if norm_state == 'PRINTING' else None,
-                finished_at=datetime.utcnow() if norm_state == 'FINISHED' else None,
+                started_at=utc_now() if norm_state == 'PRINTING' else None,
+                finished_at=utc_now() if norm_state == 'FINISHED' else None,
                 weight_grams=weight_grams,
                 cost_time=time_estimated,
                 progress=progress,

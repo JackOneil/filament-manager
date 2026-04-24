@@ -835,6 +835,13 @@ TRANSLATIONS = {
         'prusa_notes_placeholder': 'Volitelná poznámka',
         'printer_deactivated': '⏸ Deaktivováno',
         'prusa_cannot_connect': 'Nelze se připojit',
+        # ── Notification messages (Python-side)
+        'notify_project_created_title': 'Nový projekt: {name}',
+        'notify_project_created_body': 'Byla vytvořena nová poptávka a čeká na schválení.',
+        'notify_project_status_title': 'Projekt {name}',
+        'notify_project_status_body': 'Stav projektu byl změněn na {status}.',
+        'notify_comment_title': 'Komentář u projektu {name}',
+        'notify_comment_body': '{author} přidal nový komentář.',
     },
     'en': {
         'title': 'Filament Manager',
@@ -1672,5 +1679,12 @@ TRANSLATIONS = {
         'prusa_notes_placeholder': 'Optional note',
         'printer_deactivated': '⏸ Deactivated',
         'prusa_cannot_connect': 'Cannot connect',
+        # ── Notification messages (Python-side)
+        'notify_project_created_title': 'New project: {name}',
+        'notify_project_created_body': 'A new request has been created and is waiting for approval.',
+        'notify_project_status_title': 'Project {name}',
+        'notify_project_status_body': 'Project status has been changed to {status}.',
+        'notify_comment_title': 'Comment on project {name}',
+        'notify_comment_body': '{author} added a new comment.',
     }
 }

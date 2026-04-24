@@ -22,6 +22,7 @@ from utils import (
     log_movement,
     movement_action_label,
     parse_tags,
+    utc_now,
 )
 
 
@@ -93,7 +94,7 @@ def _inventory_stats(f_brand='', f_material='', f_color='', f_tag=''):
 
 def _live_printers():
     live = []
-    freshness_cutoff = datetime.utcnow() - timedelta(minutes=15)
+    freshness_cutoff = utc_now() - timedelta(minutes=15)
 
     # Prusa — real-time local-network printers with progress
     for printer in PrusaPrinter.query.filter_by(enabled=True).all():
@@ -154,7 +155,7 @@ def _live_printers():
 
 
 def _overview_focus(action_center, live_printers, now=None):
-    now = now or datetime.utcnow()
+    now = now or utc_now()
     today_start = datetime(now.year, now.month, now.day)
     tomorrow_start = today_start + timedelta(days=1)
     active_statuses = ('NEW', 'PENDING_APPROVAL', 'APPROVED', 'PRINTING')
@@ -484,7 +485,7 @@ def register(app):
             action_center=action_center,
             live_printers=live_printers,
             overview_focus=_overview_focus(action_center, live_printers),
-            today=datetime.utcnow().date(),
+            today=utc_now().date(),
         )
 
     @app.route('/filaments')

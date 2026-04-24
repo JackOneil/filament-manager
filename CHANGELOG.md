@@ -7,12 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`utc_now()` centralized helper** — New `utc_now()` function in `utils.py` replaces all deprecated `datetime.utcnow()` calls project-wide (Python 3.14+ compatibility). All 14 model column defaults and 30+ runtime calls across 10 files have been migrated.
+- **`translate()` helper** — New Python-side translation helper in `utils.py` for use in route handlers and notification builders where the Jinja2 `t()` context processor is unavailable.
+- **Notification i18n keys** — Added 6 new message keys (`notify_project_created_title/body`, `notify_project_status_title/body`, `notify_comment_title/body`) in both `cs` and `en` locales.
+- **Model `__repr__()` methods** — Added debugging-friendly `__repr__()` to 11 models: `User`, `UserInvite`, `Notification`, `Brand`, `Color`, `Material`, `Filament`, `MovementHistory`, `Project`, `BambuPrintJob`, `PrusaPrintJob`.
+
 ### Changed
+- **Backup module extraction** — Extracted `export_data` and `import_data` logic and associated helpers from `routes/settings.py` into a new `routes/backup.py` file, reducing the monolith settings file by over 750 lines and improving maintainability.
+- **Project detail refactoring** — Modularized the massive 500+ line `project_detail()` view in `routes/projects.py` by extracting sub-logic into dedicated helpers (`_get_project_files_by_category`, `_build_project_next_actions`, `_build_project_activity_events`, `_build_project_comments`, `_paginate_jobs`), vastly improving readability.
 - **Settings form safety** — Replaced 18 instances of unsafe `request.form['key']` with defensive `request.form.get()` across all settings actions (brand, color, material, language, currency, items_per_page, edit/delete entities). Missing form fields now raise `ValueError` with descriptive messages instead of causing HTTP 400/500. (Rule 20 compliance)
 - **Stock deduction consolidation** — `use_filament()` and `remove_spool()` now use the centralized `deduct_filament_stock()` helper from `utils.py` instead of duplicating weight-clamping and quantity-adjustment logic.
 - **LIKE wildcard escaping** — All `ilike()` filters across inventory, projects, API search, and user search now escape `%` and `_` characters in user input via a new `escape_like()` helper, preventing wildcard injection.
 - **Performance: overview page** — Eliminated 3 redundant `Filament.query.all()` calls on the overview dashboard. `build_action_center()` and `_overview_focus()` now load filaments once and reuse the list.
 - **Performance: tag options** — Tag option lists for inventory and project filters now use lightweight column-only SQL queries (`with_entities(tag_text)`) instead of loading full ORM objects.
+- **Notification localization** — Project notification functions (`_notify_project_created`, `_notify_project_status`, `_notify_project_comment`) now use `translate()` with i18n keys instead of hardcoded Czech strings.
+- **Bambu timestamp parsing** — Replaced deprecated `datetime.utcfromtimestamp()` in Bambu Cloud API timestamp parser with `datetime.fromtimestamp(tz=UTC)`.
 
 ### Fixed
 - **README version sync** — Updated README.md from `v1.61.0` to `v1.62.6` to match `APP_VERSION`. (Rule 18 compliance)

@@ -9,6 +9,7 @@ from routes.api import register as register_api
 from routes.calculator import register as register_calculator
 from routes.history import register as register_history
 from routes.settings import register as register_settings
+from routes.backup import register as register_backup
 from routes.projects import register as register_projects
 from routes.bambu import register as register_bambu
 from routes.prusa import register as register_prusa
@@ -24,6 +25,7 @@ def register_all(app):
     register_calculator(app)
     register_history(app)
     register_settings(app)
+    register_backup(app)
     register_projects(app)
     register_bambu(app)
     register_prusa(app)
