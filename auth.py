@@ -121,6 +121,8 @@ SECTION_BY_ENDPOINT = {
     'notifications_index': SECTION_NOTIFICATIONS,
     'notification_mark_read': SECTION_NOTIFICATIONS,
     'notification_mark_all_read': SECTION_NOTIFICATIONS,
+    'notification_delete': SECTION_NOTIFICATIONS,
+    'notification_delete_read': SECTION_NOTIFICATIONS,
 }
 
 

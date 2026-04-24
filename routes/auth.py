@@ -258,21 +258,38 @@ def register(app):
             return redirect(url_for('account_settings'))
         return render_template('account.html', user=user, permissions=user_permissions(user))
 
+    _VALID_NOTIFICATION_KINDS = {'project_new', 'project_status', 'project_comment', 'info', 'project'}
+
     @app.route('/notifications')
     @require_login
     def notifications_index():
         user = get_current_user()
         page = request.args.get('page', 1, type=int)
-        notifications = db.paginate(
-            Notification.query
+        kind_filter = request.args.get('kind', '')
+        if kind_filter not in _VALID_NOTIFICATION_KINDS:
+            kind_filter = ''
+        q = Notification.query.filter_by(user_id=user.id)
+        if kind_filter:
+            q = q.filter(Notification.kind == kind_filter)
+        q = q.order_by(Notification.created_at.desc())
+        notifications = db.paginate(q, page=page, per_page=20, error_out=False)
+        # counts per kind for filter pills
+        from sqlalchemy import func
+        kind_counts = {
+            row.kind: row.cnt
+            for row in db.session.query(Notification.kind, func.count(Notification.id).label('cnt'))
             .filter_by(user_id=user.id)
-            .order_by(Notification.created_at.desc())
-            ,
-            page=page,
-            per_page=20,
-            error_out=False,
+            .group_by(Notification.kind)
+            .all()
+        }
+        total_count = sum(kind_counts.values())
+        return render_template(
+            'notifications.html',
+            notifications=notifications,
+            kind_filter=kind_filter,
+            kind_counts=kind_counts,
+            total_count=total_count,
         )
-        return render_template('notifications.html', notifications=notifications)
 
     @app.route('/notifications/<int:id>/read', methods=['POST'])
     @require_login
@@ -284,16 +301,46 @@ def register(app):
         notification.is_read = True
         db.session.commit()
         next_page = request.form.get('page', 1, type=int)
-        return redirect(request.form.get('next') or url_for('notifications_index', page=next_page))
+        kind_filter = request.form.get('kind', '')
+        return redirect(url_for('notifications_index', page=next_page, kind=kind_filter or None))
 
     @app.route('/notifications/read-all', methods=['POST'])
     @require_login
     def notification_mark_all_read():
         user = get_current_user()
-        Notification.query.filter_by(user_id=user.id, is_read=False).update({'is_read': True})
+        kind_filter = request.form.get('kind', '')
+        q = Notification.query.filter_by(user_id=user.id, is_read=False)
+        if kind_filter and kind_filter in _VALID_NOTIFICATION_KINDS:
+            q = q.filter(Notification.kind == kind_filter)
+        q.update({'is_read': True})
         db.session.commit()
         next_page = request.form.get('page', 1, type=int)
-        return redirect(url_for('notifications_index', page=next_page))
+        return redirect(url_for('notifications_index', page=next_page, kind=kind_filter or None))
+
+    @app.route('/notifications/<int:id>/delete', methods=['POST'])
+    @require_login
+    def notification_delete(id):
+        user = get_current_user()
+        notification = db.session.get(Notification, id)
+        if not notification or notification.user_id != user.id:
+            abort(404)
+        db.session.delete(notification)
+        db.session.commit()
+        next_page = request.form.get('page', 1, type=int)
+        kind_filter = request.form.get('kind', '')
+        return redirect(url_for('notifications_index', page=next_page, kind=kind_filter or None))
+
+    @app.route('/notifications/delete-read', methods=['POST'])
+    @require_login
+    def notification_delete_read():
+        user = get_current_user()
+        kind_filter = request.form.get('kind', '')
+        q = Notification.query.filter_by(user_id=user.id, is_read=True)
+        if kind_filter and kind_filter in _VALID_NOTIFICATION_KINDS:
+            q = q.filter(Notification.kind == kind_filter)
+        q.delete()
+        db.session.commit()
+        return redirect(url_for('notifications_index', kind=kind_filter or None))
 
     @app.context_processor
     def inject_auth_nav():

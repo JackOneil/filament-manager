@@ -1,56 +1,122 @@
 {% extends 'base.html' %}
 
 {% block content %}
+{% set kind_meta = {
+    'project_new':     {'icon': 'fa-folder-plus',    'color': 'text-blue-600',   'bg': 'bg-blue-50 dark:bg-blue-950',   'badge': 'ui-badge-info'},
+    'project_status':  {'icon': 'fa-arrow-right-arrow-left', 'color': 'text-violet-600', 'bg': 'bg-violet-50 dark:bg-violet-950', 'badge': 'ui-badge-info'},
+    'project_comment': {'icon': 'fa-comment',         'color': 'text-amber-600',  'bg': 'bg-amber-50 dark:bg-amber-950',  'badge': 'ui-badge-warning'},
+    'info':            {'icon': 'fa-circle-info',     'color': 'text-gray-500',   'bg': 'bg-gray-50 dark:bg-gray-900',    'badge': ''},
+    'project':         {'icon': 'fa-diagram-project', 'color': 'text-blue-500',   'bg': 'bg-blue-50 dark:bg-blue-950',    'badge': 'ui-badge-info'},
+} %}
+{% set filter_pills = [
+    ('',               t('notifications_kind_all')),
+    ('project_new',    t('notifications_kind_project_new')),
+    ('project_status', t('notifications_kind_project_status')),
+    ('project_comment',t('notifications_kind_project_comment')),
+    ('info',           t('notifications_kind_info')),
+] %}
 <div class="max-w-5xl mx-auto space-y-6">
     <div class="page-hero">
-        <div class="flex items-center justify-between gap-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
                 <h1 class="page-title"><span class="page-title-icon"><i class="fa-solid fa-bell"></i></span><span>{{ t('notifications_nav') }}</span></h1>
                 <p>{{ t('notifications_desc') }}</p>
             </div>
-            <form method="POST" action="{{ url_for('notification_mark_all_read') }}">
-                <input type="hidden" name="page" value="{{ notifications.page }}">
-                <button type="submit" class="ui-badge ui-badge-brand">{{ t('notifications_mark_all_read') }}</button>
-            </form>
+            <div class="flex items-center gap-2 flex-wrap">
+                <form method="POST" action="{{ url_for('notification_mark_all_read') }}">
+                    <input type="hidden" name="page" value="{{ notifications.page }}">
+                    <input type="hidden" name="kind" value="{{ kind_filter }}">
+                    <button type="submit" class="ui-badge ui-badge-brand">{{ t('notifications_mark_all_read') }}</button>
+                </form>
+                <form method="POST" action="{{ url_for('notification_delete_read') }}">
+                    <input type="hidden" name="kind" value="{{ kind_filter }}">
+                    <button type="submit" class="ui-badge ui-badge-danger">{{ t('notifications_delete_read') }}</button>
+                </form>
+                <a href="{{ url_for('account_settings') }}" class="ui-badge"><i class="fa-solid fa-gear mr-1"></i>{{ t('notifications_prefs_heading') }}</a>
+            </div>
         </div>
     </div>
-    <div class="space-y-3">
+
+    {# Kind filter pills #}
+    <div class="flex items-center gap-2 flex-wrap">
+        {% for pill_kind, pill_label in filter_pills %}
+        {% set pill_count = total_count if pill_kind == '' else kind_counts.get(pill_kind, 0) %}
+        {% if pill_kind == '' or pill_count > 0 %}
+        <a href="{{ url_for('notifications_index', kind=pill_kind if pill_kind else None) }}"
+           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors
+                  {% if kind_filter == pill_kind %}bg-[var(--ui-brand)] text-white{% else %}bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700{% endif %}">
+            {% if pill_kind in kind_meta %}
+            <i class="fa-solid {{ kind_meta[pill_kind]['icon'] }} text-xs {% if kind_filter == pill_kind %}text-white{% else %}{{ kind_meta[pill_kind]['color'] }}{% endif %}"></i>
+            {% endif %}
+            {{ pill_label }}
+            {% if pill_count > 0 %}
+            <span class="ml-0.5 text-xs {% if kind_filter == pill_kind %}opacity-75{% else %}text-gray-400{% endif %}">{{ pill_count }}</span>
+            {% endif %}
+        </a>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    {# Notification list #}
+    <div class="space-y-2">
         {% for notification in notifications.items %}
-        <div class="ui-panel flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-                <div class="flex items-center gap-2">
-                    <div class="font-semibold">{{ notification.title }}</div>
-                    {% if not notification.is_read %}
-                    <span class="ui-badge ui-badge-brand">{{ t('notifications_unread') }}</span>
-                    {% endif %}
+        {% set meta = kind_meta.get(notification.kind, kind_meta['info']) %}
+        <div class="ui-panel flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 {% if not notification.is_read %}border-l-4 border-[var(--ui-brand)]{% endif %}">
+            <div class="flex items-start gap-3 min-w-0">
+                <div class="mt-0.5 w-8 h-8 rounded-full {{ meta['bg'] }} flex items-center justify-center flex-shrink-0">
+                    <i class="fa-solid {{ meta['icon'] }} {{ meta['color'] }} text-sm"></i>
                 </div>
-                <div class="text-sm text-gray-500 mt-1">{{ notification.body or '' }}</div>
-                <div class="text-xs text-gray-400 mt-2">{{ notification.created_at.strftime('%d.%m.%Y %H:%M') if notification.created_at else '' }}</div>
+                <div class="min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="font-semibold">{{ notification.title }}</span>
+                        {% if not notification.is_read %}
+                        <span class="ui-badge ui-badge-brand text-xs">{{ t('notifications_unread') }}</span>
+                        {% endif %}
+                    </div>
+                    {% if notification.body %}
+                    <div class="text-sm text-gray-500 mt-0.5">{{ notification.body }}</div>
+                    {% endif %}
+                    <div class="text-xs text-gray-400 mt-1.5">{{ notification.created_at.strftime('%d.%m.%Y %H:%M') if notification.created_at else '' }}</div>
+                </div>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-shrink-0 ml-11 sm:ml-0">
                 {% if notification.link %}
-                <a href="{{ notification.link }}" class="ui-badge">{{ t('project_detail') }}</a>
+                <a href="{{ notification.link }}" class="ui-badge text-xs">{{ t('project_detail') }}</a>
                 {% endif %}
                 {% if not notification.is_read %}
                 <form method="POST" action="{{ url_for('notification_mark_read', id=notification.id) }}">
                     <input type="hidden" name="page" value="{{ notifications.page }}">
-                    <button type="submit" class="ui-badge ui-badge-brand">{{ t('notifications_mark_read') }}</button>
+                    <input type="hidden" name="kind" value="{{ kind_filter }}">
+                    <button type="submit" class="ui-badge ui-badge-brand text-xs">{{ t('notifications_mark_read') }}</button>
                 </form>
                 {% endif %}
+                <form method="POST" action="{{ url_for('notification_delete', id=notification.id) }}"
+                      onsubmit="return confirm('{{ t('notifications_delete_confirm') }}')">
+                    <input type="hidden" name="page" value="{{ notifications.page }}">
+                    <input type="hidden" name="kind" value="{{ kind_filter }}">
+                    <button type="submit" class="ui-badge ui-badge-danger text-xs"><i class="fa-solid fa-trash-can"></i></button>
+                </form>
             </div>
         </div>
         {% else %}
-        <div class="ui-panel text-gray-500">{{ t('notifications_empty') }}</div>
+        <div class="ui-panel flex items-center gap-3 text-gray-500">
+            <i class="fa-solid fa-bell-slash text-gray-300 text-2xl"></i>
+            <span>{{ t('notifications_empty') }}</span>
+        </div>
         {% endfor %}
     </div>
+
+    {# Pagination #}
     {% if notifications.pages > 1 %}
     <div class="flex items-center justify-center gap-2">
         {% if notifications.has_prev %}
-        <a href="{{ url_for('notifications_index', page=notifications.prev_num) }}" class="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm">{{ t('prev_page') }}</a>
+        <a href="{{ url_for('notifications_index', page=notifications.prev_num, kind=kind_filter if kind_filter else None) }}"
+           class="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm">{{ t('prev_page') }}</a>
         {% endif %}
         <span class="text-sm text-gray-500">{{ t('notifications_page_status').format(page=notifications.page, pages=notifications.pages, total=notifications.total) }}</span>
         {% if notifications.has_next %}
-        <a href="{{ url_for('notifications_index', page=notifications.next_num) }}" class="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm">{{ t('next_page') }}</a>
+        <a href="{{ url_for('notifications_index', page=notifications.next_num, kind=kind_filter if kind_filter else None) }}"
+           class="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200 text-sm">{{ t('next_page') }}</a>
         {% endif %}
     </div>
     {% endif %}

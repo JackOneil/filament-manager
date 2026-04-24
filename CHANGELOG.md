@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.65.0] - 2026-04-25
+
+### Added
+- **Notification refactor** — Complete overhaul of the notifications system:
+  - **Specific notification kinds** — Changed from generic `kind='project'` to granular `project_new`, `project_status`, `project_comment` kinds for better differentiation.
+  - **Kind filter pills** — New filter pills on the notifications page allow filtering by notification type (All / New projects / Status changes / Comments / Info) with per-kind counts.
+  - **Delete actions** — Added delete button per notification and a "Delete read" bulk action to clean up the inbox.
+  - **Visual redesign** — Each notification kind now has a distinct icon and color scheme (blue for new projects, violet for status changes, amber for comments).
+  - **Persistent kind filter** — Pagination, mark-as-read, and delete actions all preserve the active kind filter.
+  - **Account page** — Notification preferences now show kind-specific icons and a clear section header.
+  - **New i18n keys** — Added 15 new message keys in both `cs` and `en` for kind labels, delete actions, and preferences.
+
 ## [1.64.0] - 2026-04-24
 
 ### Changed (Performance)

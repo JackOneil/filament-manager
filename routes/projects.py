@@ -232,7 +232,7 @@ def _notify_project_created(project):
                 translate('notify_project_created_title').format(name=project.name),
                 translate('notify_project_created_body'),
                 url_for('project_detail', id=project.id),
-                kind='project',
+                kind='project_new',
             )
 
 
@@ -246,7 +246,7 @@ def _notify_project_status(project):
             title,
             body,
             url_for('project_detail', id=project.id),
-            kind='project',
+            kind='project_status',
         )
     for admin in User.query.filter_by(role='admin', is_active=True).all():
         if admin.notify_project_status_changed:
@@ -255,7 +255,7 @@ def _notify_project_status(project):
                 title,
                 body,
                 url_for('project_detail', id=project.id),
-                kind='project',
+                kind='project_status',
             )
 
 
@@ -278,7 +278,7 @@ def _notify_project_comment(project, author):
             title,
             body,
             url_for('project_detail', id=project.id, tab='overview'),
-            kind='project',
+            kind='project_comment',
         )
 
 

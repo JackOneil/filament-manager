@@ -14,10 +14,26 @@
                 <input type="text" name="name" value="{{ user.name }}" class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
             </div>
             <div class="text-sm text-gray-500">{{ user.email }}</div>
-            <div class="grid grid-cols-1 gap-2 text-sm">
-                <label class="ui-card-soft px-3 py-2 flex items-center gap-2"><input type="checkbox" name="notify_project_created" {% if user.notify_project_created %}checked{% endif %}><span>{{ t('notify_project_created') }}</span></label>
-                <label class="ui-card-soft px-3 py-2 flex items-center gap-2"><input type="checkbox" name="notify_project_status_changed" {% if user.notify_project_status_changed %}checked{% endif %}><span>{{ t('notify_project_status_changed') }}</span></label>
-                <label class="ui-card-soft px-3 py-2 flex items-center gap-2"><input type="checkbox" name="notify_project_comment" {% if user.notify_project_comment %}checked{% endif %}><span>{{ t('notify_project_comment') }}</span></label>
+            <div>
+                <div class="ui-label mb-2">{{ t('notifications_prefs_heading') }}</div>
+                <p class="text-xs text-gray-400 mb-3">{{ t('notifications_prefs_desc') }}</p>
+                <div class="grid grid-cols-1 gap-2 text-sm">
+                    <label class="ui-card-soft px-3 py-2 flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" name="notify_project_created" {% if user.notify_project_created %}checked{% endif %} class="accent-[var(--ui-brand)]">
+                        <i class="fa-solid fa-folder-plus text-blue-500 w-4 text-center"></i>
+                        <span>{{ t('notify_project_created') }}</span>
+                    </label>
+                    <label class="ui-card-soft px-3 py-2 flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" name="notify_project_status_changed" {% if user.notify_project_status_changed %}checked{% endif %} class="accent-[var(--ui-brand)]">
+                        <i class="fa-solid fa-arrow-right-arrow-left text-violet-500 w-4 text-center"></i>
+                        <span>{{ t('notify_project_status_changed') }}</span>
+                    </label>
+                    <label class="ui-card-soft px-3 py-2 flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" name="notify_project_comment" {% if user.notify_project_comment %}checked{% endif %} class="accent-[var(--ui-brand)]">
+                        <i class="fa-solid fa-comment text-amber-500 w-4 text-center"></i>
+                        <span>{{ t('notify_project_comment') }}</span>
+                    </label>
+                </div>
             </div>
             <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-semibold transition">{{ t('save_changes') }}</button>
         </form>
