@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 from flask import abort, current_app, flash, jsonify, redirect, render_template, request, send_from_directory, url_for
 from markupsafe import Markup
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 from werkzeug.utils import secure_filename
 
 from auth import create_notification, get_current_user, is_admin
@@ -523,11 +523,11 @@ def register(app):
             visible_projects = (
                 _project_scope()
                 .options(
-                    joinedload(Project.filaments).joinedload(ProjectFilament.filament),
-                    joinedload(Project.quotes),
-                    joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.filament),
-                    joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.materials),
-                    joinedload(Project.prusa_jobs).joinedload(PrusaPrintJob.filament),
+                    selectinload(Project.filaments).joinedload(ProjectFilament.filament),
+                    selectinload(Project.quotes),
+                    selectinload(Project.bambu_jobs).selectinload(BambuPrintJob.materials),
+                    selectinload(Project.bambu_jobs).joinedload(BambuPrintJob.filament),
+                    selectinload(Project.prusa_jobs).joinedload(PrusaPrintJob.filament),
                 )
                 .filter(Project.id.in_(visible_ids))
                 .all()

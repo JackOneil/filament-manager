@@ -19,7 +19,15 @@ from models import (
 )
 
 
+from flask import g, has_app_context
+
 def get_settings():
+    if has_app_context():
+        if 'app_setting' not in g:
+            from models import AppSetting
+            g.app_setting = AppSetting.query.first()
+        return g.app_setting
+    from models import AppSetting
     return AppSetting.query.first()
 
 

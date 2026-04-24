@@ -199,11 +199,11 @@ class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, default=_utc_now)
-    due_date = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=_utc_now, index=True)
+    due_date = db.Column(db.DateTime, nullable=True, index=True)
     client_name = db.Column(db.String(100), nullable=True)
     estimated_print_time = db.Column(db.Integer, default=0) # in minutes
-    status = db.Column(db.String(20), default='NEW') # PENDING_APPROVAL, APPROVED, REJECTED, PRINTING, DONE
+    status = db.Column(db.String(20), default='NEW', index=True) # PENDING_APPROVAL, APPROVED, REJECTED, PRINTING, DONE
     tag_text = db.Column(db.Text, nullable=True)
     owner_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, index=True)
     owner_name = db.Column(db.String(120), nullable=True)

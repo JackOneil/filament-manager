@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Notification i18n keys** — Added 6 new message keys (`notify_project_created_title/body`, `notify_project_status_title/body`, `notify_comment_title/body`) in both `cs` and `en` locales.
 - **Model `__repr__()` methods** — Added debugging-friendly `__repr__()` to 11 models: `User`, `UserInvite`, `Notification`, `Brand`, `Color`, `Material`, `Filament`, `MovementHistory`, `Project`, `BambuPrintJob`, `PrusaPrintJob`.
 
+### Changed (Performance)
+- **SQLAlchemy Cartesian Product fix** — Replaced `joinedload` with `selectinload` for 1:N relations in `projects_index` to prevent exponential dataset growth during project and kanban list rendering. This reduces the number of hydrated rows per project from hundreds/thousands to just the exact number of related items, solving a 500-700ms loading bottleneck.
+- **Request-Level Caching** — The global setting lookup `get_settings()` and the `PrusaPrinter` enablement check now utilize `flask.g` to cache their results per-request. This eliminates dozens of duplicate SQLite queries fired by the Jinja context processor during template rendering.
+- **Database Indices** — Added `CREATE INDEX` for `Project.status`, `Project.due_date`, and `Project.created_at`. Sorting and Kanban filtering via `db.paginate()` no longer triggers full table scans, massively improving performance for workspaces with large project histories.
+
 ### Changed
 - **Backup module extraction** — Extracted `export_data` and `import_data` logic and associated helpers from `routes/settings.py` into a new `routes/backup.py` file, reducing the monolith settings file by over 750 lines and improving maintainability.
 - **Project detail refactoring** — Modularized the massive 500+ line `project_detail()` view in `routes/projects.py` by extracting sub-logic into dedicated helpers (`_get_project_files_by_category`, `_build_project_next_actions`, `_build_project_activity_events`, `_build_project_comments`, `_paginate_jobs`), vastly improving readability.

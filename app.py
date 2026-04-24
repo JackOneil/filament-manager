@@ -102,8 +102,11 @@ def create_app(test_config=None) -> Flask:
         printer_access = has_section_access('printers', user=current_user) or is_admin(current_user)
         nav_bambu_enabled = bool(setting and setting.bambu_token and printer_access)
         try:
-            from models import PrusaPrinter
-            nav_prusa_enabled = bool(printer_access and PrusaPrinter.query.filter_by(enabled=True).first() is not None)
+            from flask import g
+            if 'nav_prusa_enabled' not in g:
+                from models import PrusaPrinter
+                g.nav_prusa_enabled = bool(printer_access and PrusaPrinter.query.filter_by(enabled=True).first() is not None)
+            nav_prusa_enabled = g.nav_prusa_enabled
         except Exception:
             nav_prusa_enabled = False
 
@@ -201,6 +204,11 @@ def _setup_database(app: Flask) -> None:
         _safe_alter(app, 'ALTER TABLE project ADD COLUMN owner_user_id INTEGER DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE project ADD COLUMN owner_name VARCHAR(120) DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE project ADD COLUMN created_by_user_id INTEGER DEFAULT NULL')
+
+        # Index creations
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_project_status ON project (status)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_project_due_date ON project (due_date)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_project_created_at ON project (created_at)')
 
         # Bambu Lab Cloud integration
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN bambu_token TEXT DEFAULT NULL")
