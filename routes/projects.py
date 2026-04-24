@@ -28,7 +28,7 @@ from models import (
     PrusaPrinter,
     User,
 )
-from utils import build_project_metrics, format_tags, parse_tags, render_markdown, _toggle_markdown_checkbox
+from utils import build_project_metrics, escape_like, format_tags, parse_tags, render_markdown, _toggle_markdown_checkbox
 
 
 ALLOWED_PROJECT_FILE_EXTENSIONS = {
@@ -183,15 +183,11 @@ def _project_write_allowed(project):
 
 def _comment_edit_allowed(comment):
     user = get_current_user()
-    if current_app.config.get('TESTING') and not current_app.config.get('AUTH_REQUIRED_IN_TESTS'):
-        return bool(user and comment.user_id == user.id)
     return bool(user and comment.user_id == user.id)
 
 
 def _comment_delete_allowed(comment):
     user = get_current_user()
-    if current_app.config.get('TESTING') and not current_app.config.get('AUTH_REQUIRED_IN_TESTS'):
-        return bool(user and (is_admin(user) or comment.user_id == user.id))
     return bool(user and (is_admin(user) or comment.user_id == user.id))
 
 
@@ -338,11 +334,11 @@ def register(app):
         hide_done = request.args.get('hide_done') == '1'
 
         if client_filter:
-            base_query = base_query.filter(Project.client_name.ilike(f'%{client_filter}%'))
+            base_query = base_query.filter(Project.client_name.ilike(f'%{escape_like(client_filter)}%'))
         if name_filter:
-            base_query = base_query.filter(Project.name.ilike(f'%{name_filter}%'))
+            base_query = base_query.filter(Project.name.ilike(f'%{escape_like(name_filter)}%'))
         if tag_filter:
-            base_query = base_query.filter(Project.tag_text.ilike(f'%{tag_filter}%'))
+            base_query = base_query.filter(Project.tag_text.ilike(f'%{escape_like(tag_filter)}%'))
         if hide_done:
             base_query = base_query.filter(Project.status != 'DONE')
 
@@ -482,7 +478,7 @@ def register(app):
             return jsonify({'html': html})
             
         client_options = [c[0] for c in _project_scope().with_entities(Project.client_name).distinct().filter(Project.client_name != None, Project.client_name != '').all()]
-        tag_options = sorted({tag for p in _project_scope().all() for tag in parse_tags(p.tag_text)}, key=str.lower)
+        tag_options = sorted({tag for (tag_text,) in _project_scope().with_entities(Project.tag_text).filter(Project.tag_text.isnot(None)).all() for tag in parse_tags(tag_text)}, key=str.lower)
         context['client_options'] = client_options
         context['tag_options'] = tag_options
 

@@ -32,9 +32,9 @@ The project uses a **modular Flask app factory pattern — no Blueprints**. Rout
 ```
 app.py                  # Entry point: create_app(), _setup_database(), _safe_alter(), background workers
 database.py             # Shared db = SQLAlchemy() instance
-models.py               # All ORM models (~20 tables): Brand, Color, Material, Filament,
+models.py               # All ORM models (~23 tables): Brand, Color, Material, Filament,
                         #   MovementHistory, AppSetting, PrintHistory, Project, ProjectFile,
-                        #   ProjectLink, ProjectFilament, ProjectQuote, ProjectComment,
+                        #   ProjectLink, ProjectFilament, ProjectQuote, ProjectComment, ProjectTodo,
                         #   StorageShelf, StoragePlacement, BambuPrinter, BambuPrintJob,
                         #   BambuJobMaterial, PrusaPrinter, PrusaPrintJob, User, UserInvite, Notification
 auth.py                 # Multi-user auth, RBAC, session management, invite system

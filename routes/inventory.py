@@ -15,6 +15,8 @@ from utils import (
     build_action_center,
     build_filament_history_name as _display_filament_name,
     compute_stock_status,
+    deduct_filament_stock,
+    escape_like,
     format_tags,
     get_filament_tags,
     log_movement,
@@ -44,7 +46,7 @@ def _apply_inventory_filters(filaments_query):
     if f_color:
         filaments_query = filaments_query.filter(Filament.color_id == f_color)
     if f_tag:
-        filaments_query = filaments_query.filter(Filament.tag_text.ilike(f'%{f_tag}%'))
+        filaments_query = filaments_query.filter(Filament.tag_text.ilike(f'%{escape_like(f_tag)}%'))
 
     return filaments_query, f_brand, f_material, f_color, f_tag
 
@@ -79,7 +81,7 @@ def _inventory_stats(f_brand='', f_material='', f_color='', f_tag=''):
     if f_color:
         agg_query = agg_query.filter(Filament.color_id == f_color)
     if f_tag:
-        agg_query = agg_query.filter(Filament.tag_text.ilike(f'%{f_tag}%'))
+        agg_query = agg_query.filter(Filament.tag_text.ilike(f'%{escape_like(f_tag)}%'))
 
     agg_result = agg_query.first()
     return {
@@ -210,9 +212,10 @@ def _overview_focus(action_center, live_printers, now=None):
             if 0 <= days_ago < 7:
                  usage_7d[6 - days_ago] += row.weight
                  
-    usage_windows = collect_usage_windows(Filament.query.all(), now=now)
+    all_filaments = Filament.query.all()
+    usage_windows = collect_usage_windows(all_filaments, now=now)
     top_turnover_month = []
-    for f in Filament.query.all():
+    for f in all_filaments:
          usage = usage_windows.get(f.id, {}).get('usage_30', 0.0)
          if usage > 0:
              top_turnover_month.append({'filament': f, 'usage': usage})
@@ -334,8 +337,8 @@ def _inventory_page_context():
     colors = Color.query.order_by(Color.name).all()
     tag_options = sorted({
         tag
-        for filament in Filament.query.order_by(Filament.name).all()
-        for tag in parse_tags(filament.tag_text)
+        for (tag_text,) in db.session.query(Filament.tag_text).filter(Filament.tag_text.isnot(None)).all()
+        for tag in parse_tags(tag_text)
     }, key=str.lower)
 
     stock_alert_pool = [
@@ -697,17 +700,7 @@ def register(app):
         if amount <= 0:
             return redirect(url_for('filaments_index'))
         filament = db.get_or_404(Filament, id)
-        old_weight = filament.weight_remaining
-        filament.weight_remaining -= amount
-        if filament.weight_remaining < 0:
-            filament.weight_remaining = 0
-        actual_amount = old_weight - filament.weight_remaining
-
-        if filament.weight_total > 0:
-            expected_quantity = math.ceil(filament.weight_remaining / filament.weight_total)
-            if expected_quantity < filament.quantity:
-                filament.quantity = expected_quantity
-
+        actual_amount = deduct_filament_stock(filament, amount)
         log_movement(filament, 'remove', actual_amount, note='Manual usage')
         db.session.commit()
         return redirect(url_for('filaments_index'))
@@ -728,11 +721,7 @@ def register(app):
         filament = db.get_or_404(Filament, id)
         if filament.quantity > 0:
             filament.quantity -= 1
-            old_weight = filament.weight_remaining
-            filament.weight_remaining -= filament.weight_total
-            if filament.weight_remaining < 0:
-                filament.weight_remaining = 0
-            actual_amount = old_weight - filament.weight_remaining
+            actual_amount = deduct_filament_stock(filament, filament.weight_total)
             log_movement(filament, 'remove', actual_amount, note='Removed spool')
         db.session.commit()
         return redirect(url_for('filaments_index'))

@@ -139,33 +139,42 @@ def register(app):
             action = request.form.get('action')
             try:
                 if action == 'brand':
-                    brand_name = request.form['name']
+                    brand_name = request.form.get('name', '').strip()
+                    if not brand_name:
+                        raise ValueError('Brand name is required')
                     db.session.add(Brand(name=brand_name))
                     app.logger.debug(f"Added brand: {brand_name}")
 
                 elif action == 'color':
-                    db.session.add(Color(name=request.form['name'], hex_value=request.form['hex_value']))
-                    app.logger.debug(f"Added color: {request.form['name']}")
+                    color_name = request.form.get('name', '').strip()
+                    color_hex = request.form.get('hex_value', '').strip()
+                    if not color_name:
+                        raise ValueError('Color name is required')
+                    db.session.add(Color(name=color_name, hex_value=color_hex))
+                    app.logger.debug(f"Added color: {color_name}")
 
                 elif action == 'material':
-                    db.session.add(Material(name=request.form['name']))
-                    app.logger.debug(f"Added material: {request.form['name']}")
+                    material_name = request.form.get('name', '').strip()
+                    if not material_name:
+                        raise ValueError('Material name is required')
+                    db.session.add(Material(name=material_name))
+                    app.logger.debug(f"Added material: {material_name}")
 
                 elif action == 'language':
                     setting = AppSetting.query.first()
                     old = setting.lang
-                    setting.lang = request.form['lang']
+                    setting.lang = request.form.get('lang', setting.lang)
                     app.logger.debug(f"Language changed: {old} -> {setting.lang}")
 
                 elif action == 'currency':
                     setting = AppSetting.query.first()
                     old = setting.currency
-                    setting.currency = request.form['currency']
+                    setting.currency = request.form.get('currency', setting.currency)
                     app.logger.debug(f"Currency changed: {old} -> {setting.currency}")
 
                 elif action == 'items_per_page':
                     setting = AppSetting.query.first()
-                    setting.items_per_page = int(request.form['items_per_page'])
+                    setting.items_per_page = request.form.get('items_per_page', setting.items_per_page, type=int)
                     app.logger.debug(f"Items per page changed to: {setting.items_per_page}")
 
                 elif action == 'nav_palette':
@@ -186,41 +195,41 @@ def register(app):
                         app.logger.setLevel(logging.INFO)
 
                 elif action == 'edit_brand':
-                    brand = db.session.get(Brand, request.form['id'])
+                    brand = db.session.get(Brand, request.form.get('id', 0, type=int))
                     if brand:
                         old = brand.name
-                        brand.name = request.form['name']
+                        brand.name = request.form.get('name', brand.name).strip() or brand.name
                         brand.shop_url = request.form.get('shop_url', '').strip() or None
                         app.logger.debug(f"Brand edited: {old} -> {brand.name}")
 
                 elif action == 'edit_material':
-                    mat = db.session.get(Material, request.form['id'])
+                    mat = db.session.get(Material, request.form.get('id', 0, type=int))
                     if mat:
                         old = mat.name
-                        mat.name = request.form['name']
+                        mat.name = request.form.get('name', mat.name).strip() or mat.name
                         app.logger.debug(f"Material edited: {old} -> {mat.name}")
 
                 elif action == 'edit_color':
-                    col = db.session.get(Color, request.form['id'])
+                    col = db.session.get(Color, request.form.get('id', 0, type=int))
                     if col:
-                        col.name = request.form['name']
-                        col.hex_value = request.form['hex_value']
+                        col.name = request.form.get('name', col.name).strip() or col.name
+                        col.hex_value = request.form.get('hex_value', col.hex_value).strip()
                         app.logger.debug(f"Color edited: {col.name}")
 
                 elif action == 'delete_brand':
-                    brand = db.session.get(Brand, request.form['id'])
+                    brand = db.session.get(Brand, request.form.get('id', 0, type=int))
                     if brand and len(brand.filaments) == 0:
                         db.session.delete(brand)
                         app.logger.debug(f"Brand deleted: {brand.name}")
 
                 elif action == 'delete_material':
-                    mat = db.session.get(Material, request.form['id'])
+                    mat = db.session.get(Material, request.form.get('id', 0, type=int))
                     if mat and len(mat.filaments) == 0:
                         db.session.delete(mat)
                         app.logger.debug(f"Material deleted: {mat.name}")
 
                 elif action == 'delete_color':
-                    col = db.session.get(Color, request.form['id'])
+                    col = db.session.get(Color, request.form.get('id', 0, type=int))
                     if col and len(col.filaments) == 0:
                         db.session.delete(col)
                         app.logger.debug(f"Color deleted: {col.name}")

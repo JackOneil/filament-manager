@@ -4,15 +4,23 @@ Filament Manager — application entry point.
 Structure:
   database.py          — shared SQLAlchemy instance (db)
   models.py            — ORM models
-  utils.py             — helpers (get_settings, log_movement, …)
+  auth.py              — multi-user auth, RBAC, session management, invite system
+  utils.py             — helpers (get_settings, log_movement, stock logic, …)
+  messages.py          — i18n translation dictionaries (cs + en)
   routes/
     __init__.py        — register_all(app) aggregator
-    inventory.py       — index, add, edit, delete, spool management
-    api.py             — /api/filaments-list  (AJAX)
+    inventory.py       — /, /filaments, /filament/<id>, /add, /edit, /use, /delete, bulk ops
+    api.py             — /api/filaments-list, /api/search  (AJAX)
     calculator.py      — /calculator + print history
     history.py         — /history  (movement log)
-    settings.py        — /settings, /export, /import, /toggle-theme
-  messages.py          — i18n translation dictionaries
+    settings.py        — /settings, /export, /import
+    projects.py        — /projects, /projects/<id>/*, comments, files, todos, quotes
+    bambu.py           — /bambu, Bambu Cloud sync + job mapping
+    prusa.py           — /prusa, PrusaLink polling + job mapping
+    stats.py           — /stats  (dashboard statistics)
+    storage.py         — /storage  (shelf/slot management)
+    auth.py            — /login, /register, /users, /notifications
+    pwa.py             — /manifest.json, /sw.js  (PWA support)
 """
 import os
 import json

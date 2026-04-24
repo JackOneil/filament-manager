@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Settings form safety** — Replaced 18 instances of unsafe `request.form['key']` with defensive `request.form.get()` across all settings actions (brand, color, material, language, currency, items_per_page, edit/delete entities). Missing form fields now raise `ValueError` with descriptive messages instead of causing HTTP 400/500. (Rule 20 compliance)
+- **Stock deduction consolidation** — `use_filament()` and `remove_spool()` now use the centralized `deduct_filament_stock()` helper from `utils.py` instead of duplicating weight-clamping and quantity-adjustment logic.
+- **LIKE wildcard escaping** — All `ilike()` filters across inventory, projects, API search, and user search now escape `%` and `_` characters in user input via a new `escape_like()` helper, preventing wildcard injection.
+- **Performance: overview page** — Eliminated 3 redundant `Filament.query.all()` calls on the overview dashboard. `build_action_center()` and `_overview_focus()` now load filaments once and reuse the list.
+- **Performance: tag options** — Tag option lists for inventory and project filters now use lightweight column-only SQL queries (`with_entities(tag_text)`) instead of loading full ORM objects.
+
+### Fixed
+- **README version sync** — Updated README.md from `v1.61.0` to `v1.62.6` to match `APP_VERSION`. (Rule 18 compliance)
+- **Dead code in comment permissions** — Removed identical TESTING/non-TESTING branches in `_comment_edit_allowed()` and `_comment_delete_allowed()`.
+- **Deprecated `version` key** — Removed `version: '3.8'` from `docker-compose.yml` (deprecated in Docker Compose v2+).
+- **Documentation: app.py docstring** — Updated module docstring to list all 12 route modules (was listing only 5).
+- **Documentation: instruction file** — Added `ProjectTodo` to the model list in `copilot-instructions.md` and updated model count from ~20 to ~23.
+
 ## [1.62.6] - 2026-04-16
 ### Fixed
 - **Visual editor — cursor oscillation after exiting task list** — After typing text in a checkbox row and pressing Enter twice to exit the list, subsequent Enter presses no longer make the cursor jump back and forth between the paragraph and the task list item. Root cause: the exit `<p>` was created with a bare empty text node which browsers (Chrome especially) do not accept as a stable cursor anchor, causing the cursor to silently drift back into the task list. Fixed by creating `<p><br></p>` and placing the cursor with `range.setStart(p, 0)`, matching native browser expectations.

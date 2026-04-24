@@ -69,6 +69,15 @@ def format_tags(raw_value):
     return ', '.join(parse_tags(raw_value))
 
 
+def escape_like(value):
+    """Escape special LIKE wildcard characters in user input.
+
+    Prevents wildcard injection where ``%`` matches any sequence
+    and ``_`` matches any single character.
+    """
+    return value.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+
+
 def _is_safe_markdown_href(href):
     href = (href or '').strip()
     if not href:
@@ -504,8 +513,9 @@ def build_action_center(now=None):
     low_stock_rows = []
     from models import Filament
 
-    usage_windows = collect_usage_windows(Filament.query.all(), now=now)
-    for filament in Filament.query.all():
+    all_filaments = Filament.query.all()
+    usage_windows = collect_usage_windows(all_filaments, now=now)
+    for filament in all_filaments:
         stock = compute_stock_status(
             filament,
             usage_windows.get(filament.id, {}).get('usage_30', 0.0),

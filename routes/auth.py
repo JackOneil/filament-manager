@@ -158,7 +158,8 @@ def register(app):
         users_query = User.query
 
         if q:
-            pattern = f'%{q}%'
+            from utils import escape_like
+            pattern = f'%{escape_like(q)}%'
             users_query = users_query.filter(or_(User.name.ilike(pattern), User.email.ilike(pattern)))
         if role in {'admin', 'user'}:
             users_query = users_query.filter(User.role == role)
