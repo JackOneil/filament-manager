@@ -57,11 +57,11 @@
                         {% if project.status == 'PENDING_APPROVAL' %}
                         <span class="ui-badge ui-badge-warning">{{ t('status_pending_approval') }}</span>
                         {% elif project.status == 'APPROVED' %}
-                        <span class="ui-badge ui-badge-brand">{{ t('status_approved') }}</span>
+                        <span class="ui-badge ui-badge-approved">{{ t('status_approved') }}</span>
                         {% elif project.status == 'REJECTED' %}
                         <span class="ui-badge ui-badge-critical">{{ t('status_rejected') }}</span>
                         {% elif project.status == 'PRINTING' %}
-                        <span class="ui-badge ui-badge-brand">{{ t('status_printing') }}</span>
+                        <span class="ui-badge ui-badge-printing">{{ t('status_printing') }}</span>
                         {% elif project.status == 'DONE' %}
                         <span class="ui-badge ui-badge-success">{{ t('status_done') }}</span>
                         {% else %}

@@ -335,6 +335,7 @@ def register(app):
         name_filter = request.args.get('name', '').strip()
         tag_filter = request.args.get('tag', '').strip()
         ajax_mode = request.args.get('ajax') == '1'
+        hide_done = request.args.get('hide_done') == '1'
 
         if client_filter:
             base_query = base_query.filter(Project.client_name.ilike(f'%{client_filter}%'))
@@ -342,6 +343,8 @@ def register(app):
             base_query = base_query.filter(Project.name.ilike(f'%{name_filter}%'))
         if tag_filter:
             base_query = base_query.filter(Project.tag_text.ilike(f'%{tag_filter}%'))
+        if hide_done:
+            base_query = base_query.filter(Project.status != 'DONE')
 
         if sort_by == 'name':
             order_expr = [Project.name.asc()]
@@ -378,6 +381,7 @@ def register(app):
                 'client': client_filter or None,
                 'name': name_filter or None,
                 'tag': tag_filter or None,
+                'hide_done': '1' if hide_done else None,
                 **{field: request.args.get(field, 1, type=int) for field in status_page_fields.values()},
             }
             params.update(overrides)
@@ -453,6 +457,7 @@ def register(app):
             client_filter=client_filter,
             name_filter=name_filter,
             tag_filter=tag_filter,
+            hide_done=hide_done,
             per_page=per_page,
             project_metrics=project_metrics,
             projects_by_status=projects_by_status,

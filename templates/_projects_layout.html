@@ -18,13 +18,13 @@
                         {% if project.status == 'PENDING_APPROVAL' %}
                         <span class="ui-badge ui-badge-warning">{{ t('status_pending_approval') }}</span>
                         {% elif project.status == 'APPROVED' %}
-                        <span class="ui-badge ui-badge-brand">{{ t('status_approved') }}</span>
+                        <span class="ui-badge ui-badge-approved">{{ t('status_approved') }}</span>
                         {% elif project.status == 'REJECTED' %}
                         <span class="ui-badge ui-badge-critical">{{ t('status_rejected') }}</span>
                         {% elif project.status == 'DONE' %}
                         <span class="ui-badge ui-badge-success">{{ t('status_done') }}</span>
                         {% elif project.status == 'PRINTING' %}
-                        <span class="ui-badge ui-badge-brand">{{ t('status_printing') }}</span>
+                        <span class="ui-badge ui-badge-printing">{{ t('status_printing') }}</span>
                             {% else %}
                             <span class="ui-badge">{{ t('status_new') }}</span>
                             {% endif %}
@@ -42,7 +42,7 @@
         </section>
 
         {% for status, board in projects_by_status.items() %}
-        <section class="dashboard-widget" data-widget-id="status_{{ status|lower }}">
+        <section class="dashboard-widget" data-widget-id="status_{{ status|lower }}"{% if status == 'DONE' %} x-show="!hideCompleted" x-cloak{% endif %}>
             <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                 <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
                 <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('status_' ~ status|lower) }}</span>
@@ -205,7 +205,21 @@
                         <tbody>
                             {% for p in projects.items %}
                             {% set metrics = project_metrics.get(p.id) %}
-                            <tr>
+                            {% set days_due = ((p.due_date - now).days) if p.due_date else none %}
+                            {% if p.due_date and p.status != 'DONE' %}
+                                {% if p.due_date.date() < now.date() %}
+                                    {% set row_class = 'row-overdue' %}
+                                {% elif days_due is not none and days_due <= 3 %}
+                                    {% set row_class = 'row-due-urgent' %}
+                                {% elif days_due is not none and days_due <= 7 %}
+                                    {% set row_class = 'row-due-soon' %}
+                                {% else %}
+                                    {% set row_class = '' %}
+                                {% endif %}
+                            {% else %}
+                                {% set row_class = '' %}
+                            {% endif %}
+                            <tr class="{{ row_class }}">
                                 <td>
                                     <a href="{{ url_for('project_detail', id=p.id) }}" class="font-semibold text-blue-600 hover:underline">{{ p.name }}</a>
                                     {% if p.tag_text %}
@@ -240,13 +254,13 @@
                                     {% if p.status == 'PENDING_APPROVAL' %}
                                     <span class="ui-badge ui-badge-warning">{{ t('status_pending_approval') }}</span>
                                     {% elif p.status == 'APPROVED' %}
-                                    <span class="ui-badge ui-badge-brand">{{ t('status_approved') }}</span>
+                                    <span class="ui-badge ui-badge-approved">{{ t('status_approved') }}</span>
                                     {% elif p.status == 'REJECTED' %}
                                     <span class="ui-badge ui-badge-critical">{{ t('status_rejected') }}</span>
                                     {% elif p.status == 'DONE' %}
                                     <span class="ui-badge ui-badge-success">{{ t('status_done') }}</span>
                                     {% elif p.status == 'PRINTING' %}
-                                    <span class="ui-badge ui-badge-brand">{{ t('status_printing') }}</span>
+                                    <span class="ui-badge ui-badge-printing">{{ t('status_printing') }}</span>
                                     {% else %}
                                     <span class="ui-badge">{{ t('status_new') }}</span>
                                     {% endif %}

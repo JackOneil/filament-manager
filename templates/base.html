@@ -56,6 +56,18 @@
             --status-success-bg: #ecfdf5;
             --status-success-text: #047857;
             --status-success-border: #a7f3d0;
+            --status-approved-bg: #eff6ff;
+            --status-approved-text: #1d4ed8;
+            --status-approved-border: #bfdbfe;
+            --status-printing-bg: #faf5ff;
+            --status-printing-text: #7e22ce;
+            --status-printing-border: #e9d5ff;
+            --row-overdue-bg: rgba(254, 242, 242, 0.75);
+            --row-overdue-border: rgba(252, 165, 165, 0.5);
+            --row-urgent-bg: rgba(255, 247, 237, 0.75);
+            --row-urgent-border: rgba(253, 186, 116, 0.5);
+            --row-soon-bg: rgba(255, 251, 235, 0.75);
+            --row-soon-border: rgba(252, 211, 77, 0.4);
         }
         html.dark {
             --ui-bg: #07111f;
@@ -87,6 +99,18 @@
             --status-success-bg: rgba(6, 78, 59, 0.35);
             --status-success-text: #6ee7b7;
             --status-success-border: rgba(16, 185, 129, 0.28);
+            --status-approved-bg: rgba(30, 58, 138, 0.35);
+            --status-approved-text: #93c5fd;
+            --status-approved-border: rgba(96, 165, 250, 0.3);
+            --status-printing-bg: rgba(88, 28, 135, 0.35);
+            --status-printing-text: #d8b4fe;
+            --status-printing-border: rgba(196, 181, 253, 0.3);
+            --row-overdue-bg: rgba(127, 29, 29, 0.18);
+            --row-overdue-border: rgba(248, 113, 113, 0.3);
+            --row-urgent-bg: rgba(124, 45, 18, 0.18);
+            --row-urgent-border: rgba(251, 146, 60, 0.3);
+            --row-soon-bg: rgba(120, 53, 15, 0.15);
+            --row-soon-border: rgba(251, 191, 36, 0.3);
         }
         html {
             scroll-behavior: smooth;
@@ -203,6 +227,28 @@
             background: var(--ui-brand-soft);
             color: var(--ui-brand);
             border-color: var(--ui-brand-ring);
+        }
+        .ui-badge-approved {
+            background: var(--status-approved-bg);
+            color: var(--status-approved-text);
+            border-color: var(--status-approved-border);
+        }
+        .ui-badge-printing {
+            background: var(--status-printing-bg);
+            color: var(--status-printing-text);
+            border-color: var(--status-printing-border);
+        }
+        .ui-table tbody tr.row-overdue {
+            background: var(--row-overdue-bg);
+            border-left: 3px solid var(--row-overdue-border);
+        }
+        .ui-table tbody tr.row-due-urgent {
+            background: var(--row-urgent-bg);
+            border-left: 3px solid var(--row-urgent-border);
+        }
+        .ui-table tbody tr.row-due-soon {
+            background: var(--row-soon-bg);
+            border-left: 3px solid var(--row-soon-border);
         }
         .ui-input,
         .ui-select,

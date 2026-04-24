@@ -13,6 +13,13 @@
                     <i class="fa-solid fa-plus"></i> {{ t('project_create') }}
                 </a>
 
+                <button @click="toggleHideDone()"
+                        :class="hideCompleted ? 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'"
+                        class="px-4 py-2 rounded-full text-sm font-semibold border transition-all flex items-center gap-2">
+                    <i class="fa-solid" :class="hideCompleted ? 'fa-eye-slash' : 'fa-check-circle'"></i>
+                    <span x-text="hideCompleted ? {{ t('projects_show_done')|tojson }} : {{ t('projects_hide_done')|tojson }}"></span>
+                </button>
+
                 <button id="projectsEditBtn" onclick="toggleProjectsEditMode()"
                         class="px-4 py-2 rounded-full text-sm font-semibold border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-all flex items-center gap-2">
                     <i class="fa-solid fa-pen-to-square"></i>
@@ -99,6 +106,7 @@ function projectsApp() {
         tagQ: {{ tag_filter|default('')|tojson }},
         page: {{ page|default(1)|tojson }},
         sortBy: {{ sort_by|default('due_date')|tojson }},
+        hideCompleted: localStorage.getItem('projects_hide_done') === '1',
         
         statusPages: {
             'PENDING_APPROVAL': 1,
@@ -125,6 +133,9 @@ function projectsApp() {
             this.$watch('clientQ', () => this.fetchContent());
             this.$watch('tagQ', () => this.fetchContent());
             this.$watch('sortBy', () => this.fetchContent());
+            
+            // If hide-done was persisted, trigger initial filtered load
+            if (this.hideCompleted) this.fetchContent();
         },
         
         get hasFilters() {
@@ -159,6 +170,12 @@ function projectsApp() {
             this.tagQ = '';
         },
         
+        toggleHideDone() {
+            this.hideCompleted = !this.hideCompleted;
+            localStorage.setItem('projects_hide_done', this.hideCompleted ? '1' : '0');
+            this.fetchContent();
+        },
+        
         toggleSort(field) {
             this.sortBy = field;
         },
@@ -185,6 +202,7 @@ function projectsApp() {
                 if (this.tagQ) params.append('tag', this.tagQ);
                 if (this.sortBy) params.append('sort_by', this.sortBy);
                 if (this.page) params.append('page', this.page);
+                if (this.hideCompleted) params.append('hide_done', '1');
                 
                 // Add Kanban pages
                 if (this.statusPages['PENDING_APPROVAL'] > 1) params.append('kanban_pending_page', this.statusPages['PENDING_APPROVAL']);
