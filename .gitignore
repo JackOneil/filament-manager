@@ -50,3 +50,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Testing
+test_report.html

@@ -5,9 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.63.0] - 2026-04-24
 
 ### Added
+- **HTML Test Reports** — Configured `pytest` to automatically generate a human-readable HTML summary report (`test_report.html`) when tests are run. This report includes test results, expected vs actual outputs, and detailed traceback information for easier debugging.
 - **`utc_now()` centralized helper** — New `utc_now()` function in `utils.py` replaces all deprecated `datetime.utcnow()` calls project-wide (Python 3.14+ compatibility). All 14 model column defaults and 30+ runtime calls across 10 files have been migrated.
 - **`translate()` helper** — New Python-side translation helper in `utils.py` for use in route handlers and notification builders where the Jinja2 `t()` context processor is unavailable.
 - **Notification i18n keys** — Added 6 new message keys (`notify_project_created_title/body`, `notify_project_status_title/body`, `notify_comment_title/body`) in both `cs` and `en` locales.
