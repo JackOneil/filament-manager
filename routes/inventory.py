@@ -291,7 +291,7 @@ def _inventory_page_context():
         db.session.commit()
 
     view_mode_param = request.args.get('view', None)
-    if view_mode_param and view_mode_param in ['card', 'list']:
+    if view_mode_param and view_mode_param in ['card', 'list', 'compact']:
         setting.view_mode = view_mode_param
         db.session.commit()
 
@@ -389,6 +389,7 @@ def _inventory_page_context():
         'f_material': f_material,
         'f_color': f_color,
         'f_tag': f_tag,
+        'quick_filter': '',
         'tag_options': tag_options,
         'view_mode': view_mode,
         'per_page': per_page,

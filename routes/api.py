@@ -25,6 +25,7 @@ def register(app):
         f_tag = request.args.get('tag', '').strip()
         sort_by = request.args.get('sort_by', 'name')
         sort_direction = request.args.get('sort_direction', 'asc')
+        quick_filter = request.args.get('quick_filter', '').strip()
         view_mode = 'list' if inventory_read_only else request.args.get('view', 'card')
 
         if sort_direction not in ['asc', 'desc']:
@@ -38,6 +39,26 @@ def register(app):
             filaments_query = filaments_query.filter(Filament.color_id == f_color)
         if f_tag:
             filaments_query = filaments_query.filter(Filament.tag_text.ilike(f'%{escape_like(f_tag)}%'))
+
+        # Quick server-side filters (computed from DB columns, no post-load filtering needed)
+        if quick_filter == 'low_stock':
+            # quantity == 0 OR remaining/capacity < 20 %
+            filaments_query = filaments_query.filter(
+                db.or_(
+                    Filament.quantity == 0,
+                    db.and_(
+                        Filament.quantity * Filament.weight_total > 0,
+                        Filament.weight_remaining / (Filament.quantity * Filament.weight_total) < 0.20,
+                    ),
+                )
+            )
+        elif quick_filter == 'reorder':
+            # has a min_stock threshold AND remaining is below it
+            filaments_query = filaments_query.filter(
+                Filament.min_stock_grams > 0,
+                Filament.weight_remaining < Filament.min_stock_grams,
+                Filament.reorder_alert_snoozed == False,  # noqa: E712
+            )
 
         if sort_by == 'brand':
             order_expr = Brand.name
@@ -83,6 +104,13 @@ def register(app):
         if view_mode == 'card':
             html = render_template(
                 '_filament_cards.html',
+                filaments=filaments_paginated.items,
+                app_settings=setting,
+                inventory_read_only=inventory_read_only,
+            )
+        elif view_mode == 'compact':
+            html = render_template(
+                '_filament_compact.html',
                 filaments=filaments_paginated.items,
                 app_settings=setting,
                 inventory_read_only=inventory_read_only,

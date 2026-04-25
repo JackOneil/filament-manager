@@ -22,6 +22,11 @@
                    class="px-3 py-1.5 rounded-full font-semibold text-sm transition-colors bg-transparent border-0 cursor-pointer">
                     <i class="fa-solid fa-list"></i> <span class="hidden sm:inline">{{ t('view_list') }}</span>
                 </button>
+                <button type="button" x-on:click="setView('compact')"
+                   :class="viewMode === 'compact' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'"
+                   class="px-3 py-1.5 rounded-full font-semibold text-sm transition-colors bg-transparent border-0 cursor-pointer">
+                    <i class="fa-solid fa-bars"></i> <span class="hidden sm:inline">{{ t('view_compact') }}</span>
+                </button>
             </div>
         </div>
     </div>
@@ -165,7 +170,7 @@
 </div>
 {% endif %}
 
-<div class="ui-filter-panel mb-4 relative z-30">
+<div class="ui-filter-panel mb-4 relative z-30 sticky top-2 bg-white/95 backdrop-blur-sm shadow-sm">
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
         <div>
             <div class="ui-label">{{ t('inventory_saved_views') }}</div>
@@ -187,6 +192,25 @@
                 <i class="fa-solid fa-floppy-disk"></i> {{ t('inventory_save_current_filter') }}
             </button>
         </div>
+    </div>
+
+    <!-- Quick views -->
+    <div class="flex flex-wrap gap-2 mb-4">
+        <button type="button" @click="setQuickFilter('')"
+            :class="quickFilter === '' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+            class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all border-0 cursor-pointer">
+            <i class="fa-solid fa-layer-group"></i> {{ t('inventory_quick_all') }}
+        </button>
+        <button type="button" @click="setQuickFilter('low_stock')"
+            :class="quickFilter === 'low_stock' ? 'bg-red-600 text-white shadow-sm' : 'bg-red-50 text-red-700 hover:bg-red-100'"
+            class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all border-0 cursor-pointer">
+            <i class="fa-solid fa-triangle-exclamation"></i> {{ t('inventory_quick_low_stock') }}
+        </button>
+        <button type="button" @click="setQuickFilter('reorder')"
+            :class="quickFilter === 'reorder' ? 'bg-amber-600 text-white shadow-sm' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'"
+            class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all border-0 cursor-pointer">
+            <i class="fa-solid fa-cart-shopping"></i> {{ t('inventory_quick_reorder') }}
+        </button>
     </div>
 
 <!-- Filtry -->
@@ -696,10 +720,13 @@ function inventoryApp() {
         tagOpen: false,
         tagOptions: [{% for tag in tag_options %}{{ tag|tojson }}{% if not loop.last %},{% endif %}{% endfor %}],
         viewMode: '{{ view_mode }}',
+        quickFilter: '{{ quick_filter|default("") }}',
         perPage: {{ per_page }},
         currentPage: {{ filaments.page }},
         totalPages: {{ filaments.pages }},
         presets: [],
+        _fetchDebounceTimer: null,
+        _fetchController: null,
 
         // Fulltext filter option lists (embedded from server at render time)
         brandOptions: [{% for b in brands %}{"id":{{ b.id }},"name":{{ b.name|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}],
@@ -717,7 +744,7 @@ function inventoryApp() {
             const serverView = this.viewMode;
             try {
                 const persistedView = localStorage.getItem('filament.inventoryViewMode');
-                if (persistedView === 'card' || persistedView === 'list') {
+                if (persistedView === 'card' || persistedView === 'list' || persistedView === 'compact') {
                     this.viewMode = persistedView;
                 }
             } catch (e) {
@@ -835,6 +862,14 @@ function inventoryApp() {
         },
 
         async fetchContent(page = 1) {
+            // Cancel any in-flight request before starting a new one.
+            if (this._fetchController) {
+                this._fetchController.abort();
+                this._fetchController = null;
+            }
+            const controller = new AbortController();
+            this._fetchController = controller;
+
             const params = new URLSearchParams({
                 sort_by: this.sortBy,
                 sort_direction: this.sortDir,
@@ -843,11 +878,12 @@ function inventoryApp() {
                 color: this.color,
                 tag: this.tagQ,
                 view: this.viewMode,
+                quick_filter: this.quickFilter || '',
                 page,
                 per_page: this.perPage
             });
             try {
-                const resp = await fetch(`/api/filaments-list?${params}`);
+                const resp = await fetch(`/api/filaments-list?${params}`, { signal: controller.signal });
                 const data = await resp.json();
                 
                 this.currentPage = data.current_page || 1;
@@ -855,26 +891,38 @@ function inventoryApp() {
 
                 const wrapper = document.getElementById('filament-content-wrapper');
                 if (wrapper) {
-                    // Explicitly sync layout classes before inserting HTML so the
-                    // correct classes are always present regardless of Alpine flush timing.
-                    // (Alpine's :class reactive flush runs as a queueMicrotask which may
-                    // not have cleared the static SSR card-grid classes yet by the time
-                    // the AJAX response resolves and innerHTML is written.)
-                    if (this.viewMode === 'list') {
+                    if (this.viewMode === 'list' || this.viewMode === 'compact') {
                         wrapper.classList.remove('grid', 'grid-cols-1', 'md:grid-cols-2', 'lg:grid-cols-3', 'gap-6');
                         wrapper.classList.add('space-y-0');
                     } else {
                         wrapper.classList.remove('space-y-0');
                         wrapper.classList.add('grid', 'grid-cols-1', 'md:grid-cols-2', 'lg:grid-cols-3', 'gap-6');
                     }
-                    wrapper.innerHTML = this.viewMode === 'list'
+                    wrapper.innerHTML = (this.viewMode === 'list' || this.viewMode === 'compact')
                         ? buildListBulkToolbarHtml() + buildListHeaderHtml() + data.html
                         : data.html;
                     initBulkSelectionUI();
                 }
             } catch (e) {
-                console.error('Fetch error:', e);
+                if (e.name !== 'AbortError') {
+                    console.error('Fetch error:', e);
+                }
+            } finally {
+                if (this._fetchController === controller) {
+                    this._fetchController = null;
+                }
             }
+        },
+
+        // Debounced variant — used by text-input driven filters (tag input).
+        // Direct interactions (sort, pagination, view-switch, preset apply) call fetchContent() directly.
+        fetchContentDebounced(page = 1, delay = 300) {
+            clearTimeout(this._fetchDebounceTimer);
+            if (this._fetchController) {
+                this._fetchController.abort();
+                this._fetchController = null;
+            }
+            this._fetchDebounceTimer = setTimeout(() => this.fetchContent(page), delay);
         },
 
         toggleSort(field) {
@@ -898,12 +946,18 @@ function inventoryApp() {
             this.fetchContent();
         },
 
-        selectBrand(id, name)   { this.brand = id;    this.brandQ = name;    this.applyFilters(); },
-        selectMaterial(id, name) { this.material = id; this.materialQ = name; this.applyFilters(); },
-        selectColor(id, name)    { this.color = id;    this.colorQ = name;    this.applyFilters(); },
-        selectTag(name)          { this.tagQ = name;   this.tagOpen = false;  this.applyFilters(); },
+        selectBrand(id, name)   { this.brand = id;    this.brandQ = name;    this.quickFilter = ''; this.fetchContent(); },
+        selectMaterial(id, name) { this.material = id; this.materialQ = name; this.quickFilter = ''; this.fetchContent(); },
+        selectColor(id, name)    { this.color = id;    this.colorQ = name;    this.quickFilter = ''; this.fetchContent(); },
+        selectTag(name)          { this.tagQ = name;   this.tagOpen = false;  this.quickFilter = ''; this.fetchContent(); },
 
-        applyFilters() { this.fetchContent(); },
+        // Text input changes are debounced; direct selections (dropdowns, buttons) are immediate.
+        applyFilters() { this.fetchContentDebounced(); },
+
+        setQuickFilter(qf) {
+            this.quickFilter = (this.quickFilter === qf) ? '' : qf;
+            this.fetchContent();
+        },
 
         resetFilters() {
             this.brand = '';
@@ -914,6 +968,7 @@ function inventoryApp() {
             this.colorQ = '';
             this.tagQ = '';
             this.tagOpen = false;
+            this.quickFilter = '';
             this.fetchContent();
         }
     };

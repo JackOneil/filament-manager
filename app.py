@@ -47,7 +47,7 @@ from utils import get_settings, utc_now
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.66.0'
+APP_VERSION = '1.67.0'
 
 csrf = CSRFProtect()
 
@@ -138,6 +138,15 @@ def create_app(test_config=None) -> Flask:
             response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
         return response
 
+    @app.after_request
+    def _invalidate_kpi_on_write(response):
+        """Flush the KPI cache after any successful mutation so the overview stays fresh."""
+        from flask import request as _req
+        if _req.method in ('POST', 'PUT', 'PATCH', 'DELETE') and response.status_code < 400:
+            from utils import invalidate_kpi_cache
+            invalidate_kpi_cache()
+        return response
+
     _setup_database(app)
     _start_bambu_sync_worker(app)
     _start_prusa_sync_worker(app)
@@ -209,6 +218,13 @@ def _setup_database(app: Flask) -> None:
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_project_status ON project (status)')
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_project_due_date ON project (due_date)')
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_project_created_at ON project (created_at)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_bambu_print_job_status ON bambu_print_job (status)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_bambu_print_job_project_id ON bambu_print_job (project_id)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_project_filament_project_id ON project_filament (project_id)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_project_filament_filament_id ON project_filament (filament_id)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_prusa_print_job_status ON prusa_print_job (status)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_prusa_print_job_printer_id ON prusa_print_job (printer_id)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_movement_history_project_id ON movement_history (project_id)')
 
         # Bambu Lab Cloud integration
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN bambu_token TEXT DEFAULT NULL")
@@ -290,12 +306,58 @@ def _safe_alter(app: Flask, sql: str) -> None:
             app.logger.error(f"Error in _safe_alter executing '{sql}': {e}")
 
 
+def _acquire_worker_lock(app: Flask, worker_name: str) -> bool:
+    """Return True if this process should start the named background worker.
+
+    Uses a PID-file in the data directory to prevent duplicate workers when
+    Gunicorn is started with more than one worker process.  The lock is
+    considered stale if the recorded PID no longer exists in the OS process
+    table (e.g. after a crash or restart), at which point the current process
+    takes over.
+    """
+    data_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data')
+    lock_path = os.path.join(data_dir, f'.{worker_name}_worker.pid')
+    my_pid = os.getpid()
+
+    try:
+        # Atomic check-and-write: read existing PID, verify liveness, replace if stale.
+        if os.path.exists(lock_path):
+            with open(lock_path, 'r') as fh:
+                existing_pid = int(fh.read().strip())
+            if existing_pid != my_pid:
+                # Check whether the owning process is still alive.
+                try:
+                    os.kill(existing_pid, 0)  # signal 0 = existence check only
+                    app.logger.info(
+                        '%s-worker already owned by PID %d — skipping start in PID %d',
+                        worker_name, existing_pid, my_pid,
+                    )
+                    return False
+                except (ProcessLookupError, PermissionError):
+                    # Stale lock — the previous owner is gone; take it over.
+                    app.logger.info(
+                        'Stale %s-worker lock (PID %d gone) — taking over in PID %d',
+                        worker_name, existing_pid, my_pid,
+                    )
+
+        with open(lock_path, 'w') as fh:
+            fh.write(str(my_pid))
+        return True
+    except Exception as exc:
+        app.logger.warning('Could not acquire %s-worker lock: %s', worker_name, exc)
+        # Fall back to always starting the worker (original behaviour) so a lock
+        # file permission error doesn't silently break background sync.
+        return True
+
+
 def _start_bambu_sync_worker(app: Flask) -> None:
     if app.config.get('TESTING'):
         return
     if app.debug and os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
         return
     if app.extensions.get('bambu_sync_worker_started'):
+        return
+    if not _acquire_worker_lock(app, 'bambu'):
         return
 
     app.extensions['bambu_sync_worker_started'] = True
@@ -350,6 +412,8 @@ def _start_prusa_sync_worker(app: Flask) -> None:
     if app.debug and os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
         return
     if app.extensions.get('prusa_sync_worker_started'):
+        return
+    if not _acquire_worker_lock(app, 'prusa'):
         return
 
     app.extensions['prusa_sync_worker_started'] = True

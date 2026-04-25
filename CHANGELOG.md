@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.67.0] - 2026-04-25
+
+### Added
+- **DB indexes** — Added missing indexes on frequently-queried columns: `bambu_print_job.status`, `bambu_print_job.project_id`, `project_filament.project_id`, `project_filament.filament_id`, `prusa_print_job.status`, `prusa_print_job.printer_id`, `movement_history.project_id`. Created via `_safe_alter` so existing databases are migrated automatically on startup.
+- **KPI cache** — Added a thread-safe 30-second in-process TTL cache (`_KpiCache`) for `build_action_center()` results (utils.py). The cache is invalidated automatically after every successful POST/PUT/PATCH/DELETE request via a new `after_request` hook in app.py, keeping the overview dashboard responsive without redundant heavy queries on every page load.
+- **AbortController + debounce for AJAX inventory filters** — `fetchContent()` now accepts an `AbortController` and cancels any in-flight request before issuing a new one. A new `fetchContentDebounced()` method (300 ms delay) is used by text-input driven filters (tag field) to prevent unnecessary parallel requests during fast typing. Direct interactions (sort toggles, dropdown selections, pagination, quick views) remain immediate.
+- **Background worker duplicate guard** — `_start_bambu_sync_worker()` and `_start_prusa_sync_worker()` now call `_acquire_worker_lock()` before starting a thread. The lock uses a PID file in `./data/` to detect and skip duplicate workers when Gunicorn is launched with multiple worker processes. Stale PID files (from crashed processes) are automatically reclaimed.
+- **Compact table view** — New third inventory view mode `compact` shows ultra-dense rows (colour swatch, name, stock badge, remaining/capacity, %, inline mini-bar, quick-use and edit icons) for power users managing large inventories. Rendered via new `_filament_compact.html` partial. The view toggle button in the page header gains a third "Compact" option.
+- **Sticky filter bar** — The inventory filter panel is now `position: sticky; top: 8px` so filters stay visible while scrolling through a long filament list. Background uses `bg-white/95 backdrop-blur-sm` for a glass-card effect.
+- **Quick-view filter buttons** — Three one-click filter pills appear inside the filter panel: *All* (reset), *Low stock* (quantity = 0 or remaining < 20 % of capacity — computed server-side), *Reorder needed* (has `min_stock_grams` set and current remaining is below threshold). Active pill is highlighted; clicking the active button resets to *All*.
+
+### Changed
+- **`_safe_alter` index migrations** — Added seven new `CREATE INDEX IF NOT EXISTS` calls in `_setup_database()`. Safe to re-run on existing databases.
+
 ## [1.66.0] - 2026-04-25
 
 ### Added

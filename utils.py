@@ -5,6 +5,8 @@ import math
 import os
 import re
 import socket
+import threading
+import time
 from collections import Counter
 from datetime import datetime, timedelta
 from urllib.parse import urljoin, urlparse, urlunparse
@@ -17,6 +19,41 @@ from models import (
     AppSetting, BambuJobMaterial, BambuPrintJob, MovementHistory,
     Project, PrusaPrintJob, PrusaPrinter,
 )
+
+# ---------------------------------------------------------------------------
+# Short-lived in-process KPI cache (single-worker; invalidated on writes)
+# ---------------------------------------------------------------------------
+_KPI_CACHE_TTL = 30  # seconds
+
+class _KpiCache:
+    """Thread-safe TTL cache for one computed value."""
+    def __init__(self, ttl: int = _KPI_CACHE_TTL):
+        self._lock = threading.Lock()
+        self._data = None
+        self._ts: float = 0.0
+        self._ttl = ttl
+
+    def get(self):
+        with self._lock:
+            if self._data is not None and (time.monotonic() - self._ts) < self._ttl:
+                return self._data
+        return None
+
+    def set(self, data):
+        with self._lock:
+            self._data = data
+            self._ts = time.monotonic()
+
+    def invalidate(self):
+        with self._lock:
+            self._data = None
+            self._ts = 0.0
+
+_action_center_cache: _KpiCache = _KpiCache(ttl=30)
+
+def invalidate_kpi_cache():
+    """Call after any inventory mutation to flush cached KPIs."""
+    _action_center_cache.invalidate()
 
 
 from flask import g, has_app_context
@@ -536,6 +573,14 @@ def build_project_metrics(project, setting=None):
 
 
 def build_action_center(now=None):
+    # Use cached result when called without explicit `now` (i.e. from normal HTTP requests).
+    # The cache has a 30-second TTL to keep KPIs fresh without hammering SQLite.
+    _use_cache = now is None
+    if _use_cache:
+        cached = _action_center_cache.get()
+        if cached is not None:
+            return cached
+
     now = now or utc_now()
     setting = get_settings()
 
@@ -658,7 +703,7 @@ def build_action_center(now=None):
     recent_prints.sort(key=lambda x: x['timestamp'] or datetime.min, reverse=True)
     recent_prints = recent_prints[:6]
 
-    return {
+    result = {
         'low_stock': low_stock_rows[:6],
         'overdue_projects': overdue_projects,
         'unmapped_bambu': unmapped_bambu,
@@ -672,6 +717,9 @@ def build_action_center(now=None):
             'printer_issues': len(printer_issues),
         },
     }
+    if _use_cache:
+        _action_center_cache.set(result)
+    return result
 
 
 def top_tags(items, attr_name='tag_text', limit=10):

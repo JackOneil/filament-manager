@@ -275,8 +275,8 @@ class ProjectLink(db.Model):
 
 class ProjectFilament(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='CASCADE'), nullable=False)
-    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='CASCADE'), nullable=False)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='CASCADE'), nullable=False, index=True)
+    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='CASCADE'), nullable=False, index=True)
     estimated_weight = db.Column(db.Float, nullable=False, default=0.0)
     is_used = db.Column(db.Boolean, default=False)
     project = db.relationship('Project', backref=db.backref('filaments', lazy=True, cascade="all, delete-orphan"))
@@ -320,13 +320,13 @@ class BambuPrintJob(db.Model):
     printer_model = db.Column(db.String(100), nullable=True)
     device_id = db.Column(db.String(100), nullable=True)
     model_name = db.Column(db.String(300), nullable=True)
-    status = db.Column(db.String(50), nullable=True)
+    status = db.Column(db.String(50), nullable=True, index=True)
     started_at = db.Column(db.DateTime, nullable=True)
     finished_at = db.Column(db.DateTime, nullable=True)
     weight_grams = db.Column(db.Float, nullable=True)
     cost_time = db.Column(db.Integer, nullable=True)   # print duration in seconds
     raw_payload = db.Column(db.Text, nullable=True)
-    project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='SET NULL'), nullable=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='SET NULL'), nullable=True, index=True)
     filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='SET NULL'), nullable=True)
     deducted = db.Column(db.Boolean, default=False)
     synced_at = db.Column(db.DateTime, default=_utc_now)
@@ -372,11 +372,11 @@ class PrusaPrinter(db.Model):
 class PrusaPrintJob(db.Model):
     """Print job recorded by polling a PrusaLink printer."""
     id = db.Column(db.Integer, primary_key=True)
-    printer_id = db.Column(db.Integer, db.ForeignKey('prusa_printer.id', ondelete='SET NULL'), nullable=True)
+    printer_id = db.Column(db.Integer, db.ForeignKey('prusa_printer.id', ondelete='SET NULL'), nullable=True, index=True)
     printer_name = db.Column(db.String(200), nullable=True)   # snapshot at time of record
     file_name = db.Column(db.String(300), nullable=True)      # raw filename from printer
     display_name = db.Column(db.String(300), nullable=True)   # human-readable name
-    status = db.Column(db.String(50), nullable=True)          # PRINTING, FINISHED, STOPPED, IDLE
+    status = db.Column(db.String(50), nullable=True, index=True)          # PRINTING, FINISHED, STOPPED, IDLE
     started_at = db.Column(db.DateTime, nullable=True)
     finished_at = db.Column(db.DateTime, nullable=True)
     weight_grams = db.Column(db.Float, nullable=True)         # from g-code metadata
