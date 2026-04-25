@@ -345,4 +345,26 @@ def register(app):
     def export_quote(id):
         quote = db.get_or_404(ProjectQuote, id)
         settings = AppSetting.query.first()
-        return render_template('quote_export.html', quote=quote, settings=settings)
+
+        # Auto-assign a sequential invoice number on first view
+        if not quote.invoice_number:
+            prefix = (settings.invoice_prefix or 'FV') if settings else 'FV'
+            counter = ((settings.invoice_counter or 0) + 1) if settings else 1
+            from utils import utc_now
+            quote.invoice_number = f'{prefix}-{utc_now().year}{counter:04d}'
+            if settings:
+                settings.invoice_counter = counter
+            db.session.commit()
+
+        # Provide the next suggested number for display (not yet claimed)
+        prefix = (settings.invoice_prefix or 'FV') if settings else 'FV'
+        counter = (settings.invoice_counter or 0) if settings else 0
+        from utils import utc_now
+        suggested_invoice_number = f'{prefix}-{utc_now().year}{counter + 1:04d}'
+
+        return render_template(
+            'quote_export.html',
+            quote=quote,
+            settings=settings,
+            suggested_invoice_number=suggested_invoice_number,
+        )

@@ -288,6 +288,7 @@
                     <button type="button" @click="setTab('materials')" :class="workspaceTab === 'materials' ? 'ui-badge ui-badge-brand' : 'ui-badge'">{{ t('project_workspace_tab_materials') }}</button>
                     <button type="button" @click="setTab('files')" :class="workspaceTab === 'files' ? 'ui-badge ui-badge-brand' : 'ui-badge'">{{ t('project_workspace_tab_files') }}</button>
                     <button type="button" @click="setTab('jobs')" :class="workspaceTab === 'jobs' ? 'ui-badge ui-badge-brand' : 'ui-badge'">{{ t('project_workspace_tab_jobs') }}</button>
+                    <button type="button" @click="setTab('activity')" :class="workspaceTab === 'activity' ? 'ui-badge ui-badge-brand' : 'ui-badge'"><i class="fa-solid fa-timeline"></i> {{ t('project_tab_activity') }}</button>
                 </div>
             </div>
 
@@ -815,6 +816,62 @@
                         <p class="text-sm text-gray-400">{{ t('project_no_activity') }}</p>
                         {% endfor %}
                     </div>
+                </div>
+            </div>
+
+            <div x-show="workspaceTab === 'activity'" x-cloak class="space-y-4">
+                <div class="ui-panel">
+                    <div class="ui-label">{{ t('project_tab_activity') }}</div>
+                    <h2 class="text-2xl font-bold mt-1 mb-6">{{ t('project_activity_heading') }}</h2>
+                    {% if activity_events %}
+                    <div class="relative">
+                        <div class="absolute left-5 top-0 bottom-0 w-0.5 bg-gray-200 dark:bg-slate-700"></div>
+                        <div class="space-y-4">
+                        {% for event in activity_events %}
+                        {% if event.kind == 'quote' %}
+                            {% set dot_color = 'bg-indigo-500' %}
+                            {% set icon = 'fa-file-invoice-dollar' %}
+                            {% set label = t('project_activity_quote_label') %}
+                            {% set card_color = 'border-indigo-100 bg-indigo-50/40 dark:border-indigo-900/40 dark:bg-indigo-900/10' %}
+                        {% elif event.kind == 'file' %}
+                            {% set dot_color = 'bg-blue-500' %}
+                            {% set icon = 'fa-file-arrow-up' %}
+                            {% set label = t('project_activity_file_label') %}
+                            {% set card_color = 'border-blue-100 bg-blue-50/40 dark:border-blue-900/40 dark:bg-blue-900/10' %}
+                        {% elif event.kind == 'comment' %}
+                            {% set dot_color = 'bg-slate-500' %}
+                            {% set icon = 'fa-comment' %}
+                            {% set label = t('project_activity_comment_label') %}
+                            {% set card_color = 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800/50' %}
+                        {% elif event.kind == 'todo' %}
+                            {% set dot_color = 'bg-emerald-500' %}
+                            {% set icon = 'fa-check-square' %}
+                            {% set label = t('project_activity_todo_label') %}
+                            {% set card_color = 'border-emerald-100 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-900/10' %}
+                        {% else %}
+                            {% set dot_color = 'bg-gray-400' %}
+                            {% set icon = 'fa-circle-dot' %}
+                            {% set label = event.kind %}
+                            {% set card_color = 'border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-800/50' %}
+                        {% endif %}
+                        <div class="relative pl-12">
+                            <div class="absolute left-3 top-3 w-4 h-4 rounded-full {{ dot_color }} border-2 border-white dark:border-slate-900 shadow z-10 flex items-center justify-center">
+                                <i class="fa-solid {{ icon }} text-white text-[7px]"></i>
+                            </div>
+                            <div class="rounded-2xl border {{ card_color }} px-4 py-3">
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                                    <div class="font-semibold text-gray-800 dark:text-slate-200 text-sm">{{ label }}</div>
+                                    <div class="text-xs text-gray-400">{{ event.created_at.strftime('%d.%m.%Y %H:%M') if event.created_at else '-' }}</div>
+                                </div>
+                                <div class="text-sm text-gray-600 dark:text-slate-400 mt-1 truncate">{{ event.meta }}</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-sm text-gray-400">{{ t('project_activity_empty') }}</p>
+                    {% endif %}
                 </div>
             </div>
         </section>

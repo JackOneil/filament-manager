@@ -396,8 +396,7 @@ def decrypt_token(ciphertext: str) -> str:
 
 def collect_usage_windows(filaments, now=None):
     if now is None:
-        from datetime import datetime as _dt
-        now = _dt.utcnow()
+        now = utc_now()
     by_id = {fil.id: {'usage_30': 0.0, 'usage_90': 0.0} for fil in filaments}
     by_name = {build_filament_history_name(fil): fil.id for fil in filaments}
     since_90 = now - timedelta(days=90)

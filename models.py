@@ -166,6 +166,10 @@ class AppSetting(db.Model):
     company_vat_id = db.Column(db.String(50), nullable=True)  # DIČ
     company_bank_account = db.Column(db.String(100), nullable=True)
 
+    # Invoice / document number sequence
+    invoice_prefix = db.Column(db.String(20), default='FV')
+    invoice_counter = db.Column(db.Integer, default=0)
+
 
 class PrintHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -189,6 +193,7 @@ class ProjectQuote(db.Model):
     margin_amount = db.Column(db.Float, nullable=False, default=0.0)
     final_price = db.Column(db.Float, nullable=False, default=0.0)
     currency = db.Column(db.String(10), nullable=False, default='CZK')
+    invoice_number = db.Column(db.String(50), nullable=True)
     created_at = db.Column(db.DateTime, default=_utc_now)
 
     project = db.relationship('Project', backref=db.backref('quotes', lazy=True, cascade='all, delete-orphan'))

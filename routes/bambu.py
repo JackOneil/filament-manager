@@ -400,10 +400,9 @@ def register(app):
         elif job_filter == 'not_deducted':
             base_q = base_q.filter(_job_not_deducted_filter())
 
-        jobs = (
-            base_q
-            .order_by(BambuPrintJob.started_at.desc().nullslast(), BambuPrintJob.synced_at.desc())
-            .paginate(page=page, per_page=per_page, error_out=False)
+        jobs = db.paginate(
+            base_q.order_by(BambuPrintJob.started_at.desc().nullslast(), BambuPrintJob.synced_at.desc()),
+            page=page, per_page=per_page, error_out=False,
         )
 
         # Counts for filter bar badges

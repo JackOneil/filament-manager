@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.66.0] - 2026-04-25
+
+### Added
+- **Activity timeline tab** — Project detail workspace now has a dedicated *Activity* tab showing a chronological timeline of all project events (quotes saved, files uploaded, comments, tasks) with colour-coded icons and timestamps.
+- **Sequential invoice numbering** — Quote export auto-assigns a sequential invoice number (`{prefix}-{year}{counter}`) on first access. Invoice prefix and counter are configurable in App Settings and persisted in `app_setting` DB table.
+- **Quote export overhaul** — `quote_export.html` rebuilt as fully self-hosted (no CDN), i18n-aware template with company/client data fields, document type selector (invoice, pro forma, detailed, simple) and a footer note field.
+
+### Fixed
+- **PWA routes Blueprint violation** — `routes/pwa.py` was incorrectly using a Flask Blueprint. Converted to direct `@app.route` inside `register(app)` per project Rule 3.
+- **Deprecated `datetime.utcnow()` in utils.py** — `collect_usage_windows()` was using `_dt.utcnow()`; replaced with `utc_now()` per Rule 24.
+- **Deprecated `Query.paginate()` in Bambu / Prusa routes** — Replaced legacy `query.paginate()` calls with `db.paginate(query, ...)` to silence SQLAlchemy 2.x deprecation warnings.
+
+### Changed
+- **Backup schema updated** — `routes/backup.py` export and import now include `invoice_prefix`, `invoice_counter` (AppSetting) and `invoice_number` (ProjectQuote) per Rule 15.
+- **Activity tab route** — `routes/projects.py` validates `'activity'` as a valid project tab and passes all activity events (previously capped at 15).
+
 ## [1.65.0] - 2026-04-25
 
 ### Added

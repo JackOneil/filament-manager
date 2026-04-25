@@ -659,7 +659,7 @@ def register(app):
         show_bambu_jobs = bool(setting and setting.bambu_token)
         show_prusa_jobs = PrusaPrinter.query.filter_by(enabled=True).first() is not None
         active_tab = request.args.get('tab', 'overview')
-        if active_tab not in {'overview', 'materials', 'files', 'jobs'}:
+        if active_tab not in {'overview', 'materials', 'files', 'jobs', 'activity'}:
             active_tab = 'overview'
 
         project_metrics = build_project_metrics(project, setting)
@@ -702,7 +702,7 @@ def register(app):
             model_files=model_files,
             other_files=other_files,
             next_actions=next_actions,
-            activity_events=activity_events[:15],
+            activity_events=activity_events,
             active_tab=active_tab,
             show_bambu_jobs=show_bambu_jobs,
             show_prusa_jobs=show_prusa_jobs,

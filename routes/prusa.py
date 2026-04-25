@@ -295,10 +295,9 @@ def register(app):
                 PrusaPrintJob.status == 'FINISHED',
             )
 
-        jobs = (
-            base_q
-            .order_by(PrusaPrintJob.synced_at.desc())
-            .paginate(page=page, per_page=per_page, error_out=False)
+        jobs = db.paginate(
+            base_q.order_by(PrusaPrintJob.synced_at.desc()),
+            page=page, per_page=per_page, error_out=False,
         )
 
         # Badge counts

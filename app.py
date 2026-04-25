@@ -47,7 +47,7 @@ from utils import get_settings, utc_now
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.65.0'
+APP_VERSION = '1.66.0'
 
 csrf = CSRFProtect()
 
@@ -245,6 +245,11 @@ def _setup_database(app: Flask) -> None:
         _safe_alter(app, 'ALTER TABLE notification ADD COLUMN link VARCHAR(500) DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE notification ADD COLUMN is_read BOOLEAN NOT NULL DEFAULT 0')
         _safe_alter(app, 'ALTER TABLE project_comment ADD COLUMN updated_at DATETIME DEFAULT NULL')
+
+        # ── Invoice / document numbering ─────────────────────────────────────
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN invoice_prefix VARCHAR(20) NOT NULL DEFAULT 'FV'")
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN invoice_counter INTEGER NOT NULL DEFAULT 0")
+        _safe_alter(app, "ALTER TABLE project_quote ADD COLUMN invoice_number VARCHAR(50) DEFAULT NULL")
 
         # ── Seed data (only runs once on fresh database) ─────────────────────
         if not Brand.query.first():

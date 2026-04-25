@@ -172,6 +172,8 @@ def register(app):
                 'company_id': setting.company_id if setting else None,
                 'company_vat_id': setting.company_vat_id if setting else None,
                 'company_bank_account': setting.company_bank_account if setting else None,
+                'invoice_prefix': setting.invoice_prefix if setting else 'FV',
+                'invoice_counter': setting.invoice_counter if setting else 0,
                 # bambu_token intentionally excluded for security
             } if setting else {},
 
@@ -262,6 +264,7 @@ def register(app):
                     'margin_amount': quote.margin_amount,
                     'final_price': quote.final_price,
                     'currency': quote.currency,
+                    'invoice_number': quote.invoice_number,
                     'created_at': quote.created_at.isoformat() if quote.created_at else None,
                 } for quote in proj.quotes],
                 'comments': [{
@@ -482,6 +485,8 @@ def register(app):
                         setting.company_id = s.get('company_id', setting.company_id)
                         setting.company_vat_id = s.get('company_vat_id', setting.company_vat_id)
                         setting.company_bank_account = s.get('company_bank_account', setting.company_bank_account)
+                        setting.invoice_prefix = s.get('invoice_prefix', setting.invoice_prefix)
+                        setting.invoice_counter = s.get('invoice_counter', setting.invoice_counter)
 
                 # ── 2b. Users, invites, notifications ────────────────
                 for user_data in data.get('users', []):
@@ -674,6 +679,7 @@ def register(app):
                                 margin_amount=quote_data.get('margin_amount', 0),
                                 final_price=quote_data.get('final_price', 0),
                                 currency=quote_data.get('currency', 'CZK'),
+                                invoice_number=quote_data.get('invoice_number'),
                                 created_at=quote_ts,
                             ))
 
