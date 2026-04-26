@@ -275,10 +275,10 @@
                         {% endif %}
                         <div class="flex items-center justify-between text-xs text-gray-400 mt-1 gap-2">
                             {% if lp.job.started_at %}
-                            <span>{{ t('overview_started') }} {{ lp.job.started_at | fmt_dt('%d.%m %H:%M') }}</span>
+                            <span>{{ t('overview_started') }} {{ lp.job.started_at | fmt_dt('%d.%m') }} <span class="text-gray-300 dark:text-slate-500 mx-0.5">·</span> {{ lp.job.started_at | fmt_dt('%H:%M') }}</span>
                             {% endif %}
                             {% if lp.eta_at %}
-                            <span class="text-emerald-600 dark:text-emerald-400 font-medium">{{ t('overview_eta') }} {{ lp.eta_at | fmt_dt('%d.%m %H:%M') }}</span>
+                            <span class="text-emerald-600 dark:text-emerald-400 font-medium">{{ t('overview_eta') }} {{ lp.eta_at | fmt_dt('%d.%m') }} <span class="text-emerald-300 dark:text-emerald-700 mx-0.5">·</span> {{ lp.eta_at | fmt_dt('%H:%M') }}</span>
                             {% endif %}
                         </div>
                     </div>

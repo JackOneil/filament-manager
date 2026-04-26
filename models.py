@@ -58,6 +58,31 @@ class Notification(db.Model):
         return f'<Notification {self.id} user={self.user_id} {self.kind!r}>'
 
 
+class AuditLog(db.Model):
+    """Admin action audit trail with request and before/after snapshots."""
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=_utc_now, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True, index=True)
+    user_email = db.Column(db.String(255), nullable=True)
+    user_name = db.Column(db.String(120), nullable=True)
+    session_id = db.Column(db.String(64), nullable=True, index=True)
+    ip_address = db.Column(db.String(64), nullable=True)
+    user_agent = db.Column(db.String(255), nullable=True)
+    method = db.Column(db.String(12), nullable=False)
+    endpoint = db.Column(db.String(120), nullable=True, index=True)
+    path = db.Column(db.String(500), nullable=False)
+    action = db.Column(db.String(120), nullable=False, index=True)
+    object_type = db.Column(db.String(120), nullable=True, index=True)
+    object_id = db.Column(db.String(120), nullable=True, index=True)
+    before_data = db.Column(db.Text, nullable=True)
+    after_data = db.Column(db.Text, nullable=True)
+
+    user = db.relationship('User', backref=db.backref('audit_logs', lazy=True))
+
+    def __repr__(self):
+        return f'<AuditLog {self.id} {self.action!r} user={self.user_id}>'
+
+
 class Brand(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)

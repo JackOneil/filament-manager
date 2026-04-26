@@ -401,7 +401,7 @@ def register(app):
             base_q = base_q.filter(_job_not_deducted_filter())
 
         jobs = db.paginate(
-            base_q.order_by(BambuPrintJob.started_at.desc().nullslast(), BambuPrintJob.synced_at.desc()),
+            base_q.order_by(BambuPrintJob.started_at.desc().nullslast(), BambuPrintJob.synced_at.desc()).statement,
             page=page, per_page=per_page, error_out=False,
         )
 

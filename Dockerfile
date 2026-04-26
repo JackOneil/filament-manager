@@ -13,11 +13,14 @@ COPY templates/ ./templates/
 COPY static/js/ ./static/js/
 RUN npx tailwindcss -i tailwind.input.css -o tailwind.css --minify
 
-# Download Plus Jakarta Sans variable font (single woff2 for weights 200–800)
+# Download Plus Jakarta Sans variable font subsets (weights 200–800).
+# Latin Extended keeps Czech glyphs in the same family instead of browser fallback.
 RUN apk add --no-cache curl && \
     mkdir -p fonts/files && \
     curl -sL "https://cdn.jsdelivr.net/npm/@fontsource-variable/plus-jakarta-sans@5.1.1/files/plus-jakarta-sans-latin-wght-normal.woff2" \
-         -o fonts/files/plus-jakarta-sans-latin-wght-normal.woff2
+         -o fonts/files/plus-jakarta-sans-latin-wght-normal.woff2 && \
+    curl -sL "https://cdn.jsdelivr.net/npm/@fontsource-variable/plus-jakarta-sans@5.1.1/files/plus-jakarta-sans-latin-ext-wght-normal.woff2" \
+         -o fonts/files/plus-jakarta-sans-latin-ext-wght-normal.woff2
 
 # ── Stage 2: Python application ──────────────────────────────────────────────
 FROM python:3.11-slim

@@ -31,7 +31,7 @@ def register(app):
             save_cookie = False
 
         movements_paginated = db.paginate(
-            MovementHistory.query.order_by(MovementHistory.created_at.desc()),
+            MovementHistory.query.order_by(MovementHistory.created_at.desc()).statement,
             page=page, per_page=per_page, error_out=False,
         )
 

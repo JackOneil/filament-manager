@@ -32,11 +32,12 @@ The project uses a **modular Flask app factory pattern — no Blueprints**. Rout
 ```
 app.py                  # Entry point: create_app(), _setup_database(), _safe_alter(), background workers
 database.py             # Shared db = SQLAlchemy() instance
-models.py               # All ORM models (~23 tables): Brand, Color, Material, Filament,
+models.py               # All ORM models (~24 tables): Brand, Color, Material, Filament,
                         #   MovementHistory, AppSetting, PrintHistory, Project, ProjectFile,
                         #   ProjectLink, ProjectFilament, ProjectQuote, ProjectComment, ProjectTodo,
                         #   StorageShelf, StoragePlacement, BambuPrinter, BambuPrintJob,
-                        #   BambuJobMaterial, PrusaPrinter, PrusaPrintJob, User, UserInvite, Notification
+                        #   BambuJobMaterial, PrusaPrinter, PrusaPrintJob, User, UserInvite,
+                        #   Notification, AuditLog
 auth.py                 # Multi-user auth, RBAC, session management, invite system
 messages.py             # i18n translations (cs + en), ~700 keys per language
 utils.py                # Shared helpers: get_settings(), utc_now(), translate(), log_movement(),
@@ -55,7 +56,8 @@ routes/
   stats.py              # /stats — statistics dashboard (charts, forecast, stock health, color palette)
   storage.py            # /storage, /storage/shelf/*, /storage/slot/* — physical shelf management
   settings.py           # /settings, /export, /import, /toggle-theme — app config + full backup
-  auth.py               # /login, /logout, /register, /activate, /account, /users/* — auth routes
+  auth.py               # /login, /logout, /register, /activate, /account, /users/*,
+                        #   /audit — auth, users, notifications, audit log routes
   pwa.py                # /manifest.json, /sw.js — Progressive Web App support
 templates/
   base.html             # Shared layout (nav, toast, Alpine, Tailwind CDN, CSRF injection)
@@ -288,7 +290,7 @@ The `/export` and `/import` functions in `routes/settings.py` must cover the **e
 | Bambu integration    | `BambuPrinter`, `BambuPrintJob`, `BambuJobMaterial`                    |
 | Prusa integration    | `PrusaPrinter` (API keys excluded), `PrusaPrintJob`                    |
 | Storage              | `StorageShelf`, `StoragePlacement`                                     |
-| Users & auth         | `User`, `UserInvite`, `Notification`                                   |
+| Users & auth         | `User`, `UserInvite`, `Notification`, `AuditLog`                       |
 
 - **Referential integrity**: resolve FKs by name/serial before inserting dependent rows. Commit in order: enumerations → filaments → history → projects → integrations → users.
 - **Idempotency**: "skip if already exists" by natural key.

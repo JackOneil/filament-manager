@@ -13,7 +13,7 @@ from models import (
     Brand, Color, Material, AppSetting, Filament, MovementHistory,
     PrintHistory, Project, ProjectFile, ProjectLink, ProjectFilament, ProjectQuote,
     BambuPrinter, BambuPrintJob, BambuJobMaterial, StoragePlacement, StorageShelf,
-    PrusaPrinter, PrusaPrintJob, ProjectComment, ProjectTodo, User, UserInvite, Notification,
+    PrusaPrinter, PrusaPrintJob, ProjectComment, ProjectTodo, User, UserInvite, Notification, AuditLog,
 )
 from utils import encrypt_token, format_tags, utc_now
 
@@ -315,6 +315,24 @@ def register(app):
                 'is_read': notification.is_read,
                 'created_at': notification.created_at.isoformat() if notification.created_at else None,
             } for notification in Notification.query.order_by(Notification.created_at).all()],
+
+            'audit_logs': [{
+                'user': _user_ref(audit.user),
+                'user_email': audit.user_email,
+                'user_name': audit.user_name,
+                'session_id': audit.session_id,
+                'ip_address': audit.ip_address,
+                'user_agent': audit.user_agent,
+                'method': audit.method,
+                'endpoint': audit.endpoint,
+                'path': audit.path,
+                'action': audit.action,
+                'object_type': audit.object_type,
+                'object_id': audit.object_id,
+                'before_data': audit.before_data,
+                'after_data': audit.after_data,
+                'created_at': audit.created_at.isoformat() if audit.created_at else None,
+            } for audit in AuditLog.query.order_by(AuditLog.created_at).all()],
 
             # ── Bambu integration ──────────────────────────────────────
             'bambu_printers': [{
@@ -905,6 +923,36 @@ def register(app):
                             is_read=notification_data.get('is_read', False),
                             created_at=notification_ts,
                         ))
+
+                for audit_data in data.get('audit_logs', []):
+                    audit_ts = datetime.fromisoformat(audit_data['created_at']) if audit_data.get('created_at') else utc_now()
+                    audit_user = _resolve_user_ref(audit_data.get('user'))
+                    exists_audit = AuditLog.query.filter_by(
+                        user_id=audit_user.id if audit_user else None,
+                        endpoint=audit_data.get('endpoint'),
+                        path=audit_data.get('path', ''),
+                        action=audit_data.get('action', ''),
+                        created_at=audit_ts,
+                    ).first()
+                    if exists_audit:
+                        continue
+                    db.session.add(AuditLog(
+                        user_id=audit_user.id if audit_user else None,
+                        user_email=audit_data.get('user_email'),
+                        user_name=audit_data.get('user_name'),
+                        session_id=audit_data.get('session_id'),
+                        ip_address=audit_data.get('ip_address'),
+                        user_agent=audit_data.get('user_agent'),
+                        method=audit_data.get('method', 'POST'),
+                        endpoint=audit_data.get('endpoint'),
+                        path=audit_data.get('path', ''),
+                        action=audit_data.get('action', ''),
+                        object_type=audit_data.get('object_type'),
+                        object_id=audit_data.get('object_id'),
+                        before_data=audit_data.get('before_data'),
+                        after_data=audit_data.get('after_data'),
+                        created_at=audit_ts,
+                    ))
 
             app.logger.debug(f"Import finished: {imported_filaments} filaments, projects and Bambu jobs processed.")
         except Exception as e:

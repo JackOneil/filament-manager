@@ -296,7 +296,7 @@ def register(app):
             )
 
         jobs = db.paginate(
-            base_q.order_by(PrusaPrintJob.synced_at.desc()),
+            base_q.order_by(PrusaPrintJob.synced_at.desc()).statement,
             page=page, per_page=per_page, error_out=False,
         )
 

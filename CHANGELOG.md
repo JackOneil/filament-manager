@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.69.2] - 2026-04-26
+
+### Fixed
+- **Czech glyph rendering** — Added the Plus Jakarta Sans Latin Extended font subset to the self-hosted font bundle. Czech characters such as `ř`, `ě`, `ů`, and `č` now render in the same font family instead of falling back to a visually different system font.
+
+## [1.69.1] - 2026-04-26
+
+### Changed
+- **Overview active print timestamps** — Improved readability of the active print start/ETA timestamps by visually separating the date and time (`26.04 · 17:18`) instead of rendering them as one dense string.
+
+## [1.69.0] - 2026-04-26
+
+### Added
+- **Admin audit log** — Added persistent `AuditLog` records for successful administrator mutations. Each entry stores user, email/name snapshot, action, endpoint/path, object type/id, IP address, session identifier, user agent, and before/after JSON snapshots with sensitive form fields redacted.
+- **Audit log UI** — New `/audit` admin-only page lists audit records with filters for action and object type, full-text search, pagination, and expandable before/after snapshots.
+
+### Changed
+- **Modern SQLAlchemy pagination** — All `db.paginate()` calls now receive `Select` statements (`query.statement`) instead of legacy `Query` objects, removing the Flask-SQLAlchemy deprecation warnings during tests.
+- **Backup schema** — Full export/import now includes `AuditLog` records and preserves their user references, request metadata, and before/after snapshots.
+
+### Fixed
+- **Endpoint authorization map** — Added missing `api_search`, `calculator_project`, and `audit_logs` entries to `SECTION_BY_ENDPOINT` so access control remains explicit for every route.
+
 ## [1.68.2] - 2026-04-26
 
 ### Changed

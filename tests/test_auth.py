@@ -6,7 +6,7 @@ import unittest
 from app import create_app
 from auth import hash_password, password_needs_rehash
 from database import db
-from models import Filament, Brand, Color, Material, Notification, Project, User
+from models import AuditLog, Filament, Brand, Color, Material, Notification, Project, User
 
 
 class AuthAccessTests(unittest.TestCase):
@@ -95,6 +95,35 @@ class AuthAccessTests(unittest.TestCase):
         response = self.client.get('/users')
         self.assertEqual(response.status_code, 200)
         self.assertIn('user@example.com', response.data.decode('utf-8'))
+
+    def test_admin_action_is_written_to_audit_log(self):
+        self.login('admin@example.com')
+        response = self.client.post('/users', data={
+            'action': 'invite',
+            'email': 'invite@example.com',
+            'role': 'user',
+            'perm_overview': 'on',
+            'perm_filaments': 'on',
+            'perm_projects': 'on',
+        }, follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            row = AuditLog.query.order_by(AuditLog.created_at.desc()).first()
+            self.assertIsNotNone(row)
+            self.assertEqual(row.user_email, 'admin@example.com')
+            self.assertEqual(row.endpoint, 'users_index')
+            self.assertEqual(row.action, 'invite')
+            self.assertEqual(row.object_type, 'UserInvite')
+            self.assertIn('invite@example.com', row.after_data)
+
+    def test_audit_log_page_is_admin_only(self):
+        self.login('admin@example.com')
+        admin_response = self.client.get('/audit')
+        self.assertEqual(admin_response.status_code, 200)
+        self.assertIn('Administrátorské akce', admin_response.data.decode('utf-8'))
+        self.login('user@example.com')
+        user_response = self.client.get('/audit')
+        self.assertEqual(user_response.status_code, 403)
 
     def test_admin_can_open_user_detail(self):
         self.login('admin@example.com')

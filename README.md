@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.68.2***
+*Current version: **v1.69.2***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -23,6 +23,7 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 - **Role-Based Access** — Administrators have full read/write access; regular users see only permitted sections and their own projects.
 - **Self-Registration & Invites** — Users register themselves or receive invite codes with pre-configured role and section permissions.
 - **Project Collaboration** — Project ownership, approval workflow (Pending → Approved/Rejected), per-project comments, and in-app notifications.
+- **Admin Audit Log** — Successful administrator actions are recorded with user, IP/session, endpoint, target object, and before/after snapshots.
 
 ### Printer Integrations
 - **Bambu Lab Cloud** — Sync print jobs from Bambu Cloud API. Assign filaments and projects, deduct stock per-AMS-slot, background auto-sync.
@@ -66,7 +67,7 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 filament/
 ├── app.py                  # App factory, DB migrations, background workers
 ├── database.py             # Shared SQLAlchemy instance
-├── models.py               # All ORM models (~20 tables)
+├── models.py               # All ORM models (~24 tables)
 ├── messages.py             # i18n dictionaries (cs + en)
 ├── auth.py                 # Multi-user auth, RBAC, sessions
 ├── utils.py                # Shared helpers (stock logic, encryption, link preview)
@@ -202,6 +203,7 @@ Tests cover: authentication flows, Bambu sync idempotency, stock deduction logic
 - Statistics dashboard with drag-and-drop layout
 - Storage shelf visualization
 - Full backup/restore system
+- Admin audit log for privileged actions
 - PWA support
 - CSRF protection and security hardening
 - Bilingual UI (CS/EN)

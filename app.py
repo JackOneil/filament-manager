@@ -41,13 +41,13 @@ from models import (
     ProjectLink, ProjectFilament, ProjectQuote, StorageShelf, StoragePlacement,
     BambuPrinter, BambuPrintJob, BambuJobMaterial,
     PrusaPrinter, PrusaPrintJob,
-    User, UserInvite, Notification, ProjectComment,
+    User, UserInvite, Notification, AuditLog, ProjectComment,
 )  # noqa: F401
 from utils import get_settings, utc_now
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.68.2'
+APP_VERSION = '1.69.2'
 
 csrf = CSRFProtect()
 
@@ -251,6 +251,10 @@ def _setup_database(app: Flask) -> None:
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_prusa_print_job_status ON prusa_print_job (status)')
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_prusa_print_job_printer_id ON prusa_print_job (printer_id)')
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_movement_history_project_id ON movement_history (project_id)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_audit_log_created_at ON audit_log (created_at)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_audit_log_user_id ON audit_log (user_id)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_audit_log_endpoint ON audit_log (endpoint)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_audit_log_object ON audit_log (object_type, object_id)')
 
         # Bambu Lab Cloud integration
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN bambu_token TEXT DEFAULT NULL")

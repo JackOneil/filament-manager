@@ -10,7 +10,7 @@ import unittest
 from app import create_app
 from database import db
 from models import (
-    BambuPrintJob, Brand, Color, Filament, Material, MovementHistory,
+    AuditLog, BambuPrintJob, Brand, Color, Filament, Material, MovementHistory,
     Project, ProjectFile, ProjectFilament, ProjectQuote, StoragePlacement, StorageShelf, User,
 )
 
@@ -183,6 +183,53 @@ class ImportAtomicityTests(unittest.TestCase):
             quote = ProjectQuote.query.first()
             self.assertIsNotNone(quote)
             self.assertEqual(quote.final_price, 80.6)
+
+    def test_export_and_import_preserve_audit_logs(self):
+        with self.app.app_context():
+            admin = User(email='audit-admin@example.com', name='Audit Admin', password_hash='hash', role='admin')
+            db.session.add(admin)
+            db.session.flush()
+            db.session.add(AuditLog(
+                user_id=admin.id,
+                user_email=admin.email,
+                user_name=admin.name,
+                session_id='session-1',
+                ip_address='127.0.0.1',
+                user_agent='UnitTest',
+                method='POST',
+                endpoint='settings',
+                path='/settings',
+                action='brand_add',
+                object_type='Brand',
+                object_id='1',
+                before_data='{"object":null}',
+                after_data='{"form":{"name":"Audit Brand"}}',
+            ))
+            db.session.commit()
+
+        exported, exported_files = unpack_backup_response(self.client.get('/export'))
+        self.assertEqual(exported['audit_logs'][0]['action'], 'brand_add')
+        self.assertEqual(exported['audit_logs'][0]['user_email'], 'audit-admin@example.com')
+
+        with self.app.app_context():
+            db.drop_all()
+            db.create_all()
+
+        import_response = self.client.post(
+            '/import',
+            data={'file': (encode_backup_payload(exported, exported_files), 'backup.tar.gz')},
+            content_type='multipart/form-data',
+            follow_redirects=False,
+        )
+
+        self.assertEqual(import_response.status_code, 302)
+
+        with self.app.app_context():
+            audit = AuditLog.query.first()
+            self.assertIsNotNone(audit)
+            self.assertEqual(audit.action, 'brand_add')
+            self.assertEqual(audit.user_email, 'audit-admin@example.com')
+            self.assertEqual(audit.after_data, '{"form":{"name":"Audit Brand"}}')
 
     def test_export_and_import_preserve_project_owner_name(self):
         with self.app.app_context():

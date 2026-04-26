@@ -91,7 +91,7 @@ def register(app):
         if per_page not in [12, 24, 48, 96]:
             per_page = default_per_page
 
-        filaments_paginated = db.paginate(filaments_query, page=page, per_page=per_page, error_out=False)
+        filaments_paginated = db.paginate(filaments_query.statement, page=page, per_page=per_page, error_out=False)
         usage_map = collect_usage_windows(filaments_paginated.items)
         for fil in filaments_paginated.items:
             fil.stock_metrics = compute_stock_status(

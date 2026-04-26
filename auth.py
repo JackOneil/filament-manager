@@ -6,10 +6,11 @@ from functools import wraps
 from urllib.parse import urljoin, urlsplit
 
 from flask import abort, current_app, flash, g, redirect, request, session, url_for
+from sqlalchemy import inspect as sa_inspect
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from database import db
-from models import Notification, User, UserInvite
+from models import AuditLog, Notification, User, UserInvite
 
 SECTION_OVERVIEW = 'overview'
 SECTION_FILAMENTS = 'filaments'
@@ -60,7 +61,9 @@ SECTION_BY_ENDPOINT = {
     'inventory_bulk': SECTION_FILAMENTS,
     'filament_update_meta': SECTION_FILAMENTS,
     'filament_toggle_reorder_snooze': SECTION_FILAMENTS,
+    'api_search': SECTION_OVERVIEW,
     'calculator': SECTION_CALCULATOR,
+    'calculator_project': SECTION_CALCULATOR,
     'delete_history': SECTION_CALCULATOR,
     'delete_quote': SECTION_PROJECTS,
     'export_quote': SECTION_PROJECTS,
@@ -123,6 +126,7 @@ SECTION_BY_ENDPOINT = {
     'notification_mark_all_read': SECTION_NOTIFICATIONS,
     'notification_delete': SECTION_NOTIFICATIONS,
     'notification_delete_read': SECTION_NOTIFICATIONS,
+    'audit_logs': SECTION_USERS,
 }
 
 
@@ -294,10 +298,233 @@ def ensure_endpoint_access():
     abort(403)
 
 
+_AUDIT_REDACT_KEYS = ('password', 'token', 'secret', 'api_key', 'csrf', 'fernet')
+
+
+def _audit_should_capture(user):
+    if not user or not is_admin(user):
+        return False
+    if request.method not in ('POST', 'PUT', 'PATCH', 'DELETE'):
+        return False
+    if current_app.config.get('TESTING') and not current_app.config.get('AUTH_REQUIRED_IN_TESTS'):
+        return False
+    if (request.endpoint or '') in PUBLIC_ENDPOINTS:
+        return False
+    return request.endpoint not in {'audit_logs'}
+
+
+def _audit_json_dumps(payload):
+    if payload is None:
+        return None
+    return json.dumps(payload, ensure_ascii=True, sort_keys=True, default=str, separators=(',', ':'))
+
+
+def _audit_safe_value(value):
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
+
+
+def _audit_snapshot_model(obj):
+    if obj is None:
+        return None
+    snapshot = {}
+    mapper = sa_inspect(obj.__class__)
+    for attr in mapper.column_attrs:
+        key = attr.key
+        value = getattr(obj, key)
+        if any(marker in key.lower() for marker in _AUDIT_REDACT_KEYS):
+            snapshot[key] = '[redacted]' if value else None
+        else:
+            snapshot[key] = _audit_safe_value(value)
+    return snapshot
+
+
+def _audit_sanitized_form():
+    data = {}
+    for key in request.form.keys():
+        values = request.form.getlist(key)
+        if any(marker in key.lower() for marker in _AUDIT_REDACT_KEYS):
+            data[key] = '[redacted]' if len(values) <= 1 else ['[redacted]' for _ in values]
+        else:
+            data[key] = values[0] if len(values) == 1 else values
+    if request.files:
+        data['_files'] = sorted(request.files.keys())
+    return data
+
+
+def _audit_client_ip():
+    if request.access_route:
+        return request.access_route[0]
+    return request.remote_addr
+
+
+def _audit_target():
+    endpoint = request.endpoint or ''
+    view_args = dict(request.view_args or {})
+
+    from models import (
+        AppSetting, BambuPrintJob, Filament, MovementHistory, PrintHistory,
+        Project, ProjectComment, ProjectFile, ProjectFilament, ProjectLink,
+        ProjectQuote, PrusaPrinter, PrusaPrintJob, StoragePlacement,
+        StorageShelf,
+    )
+
+    explicit = {
+        'user_detail': (User, 'user_id'),
+        'filament_detail': (Filament, 'id'),
+        'filament_update_meta': (Filament, 'id'),
+        'filament_toggle_reorder_snooze': (Filament, 'id'),
+        'edit': (Filament, 'id'),
+        'use_filament': (Filament, 'id'),
+        'add_spool': (Filament, 'id'),
+        'remove_spool': (Filament, 'id'),
+        'delete': (Filament, 'id'),
+        'project_detail': (Project, 'id'),
+        'project_edit': (Project, 'id'),
+        'project_delete': (Project, 'id'),
+        'project_upload_file': (Project, 'id'),
+        'project_add_link': (Project, 'id'),
+        'project_delete_link': (ProjectLink, 'link_id'),
+        'project_refresh_link': (ProjectLink, 'link_id'),
+        'project_add_filament': (Project, 'id'),
+        'project_remove_filament': (ProjectFilament, 'pf_id'),
+        'project_update_filament': (ProjectFilament, 'pf_id'),
+        'project_status': (Project, 'id'),
+        'project_consume_filament': (ProjectFilament, 'pf_id'),
+        'project_delete_file': (ProjectFile, 'file_id'),
+        'project_add_comment': (Project, 'id'),
+        'project_update_comment': (ProjectComment, 'comment_id'),
+        'project_delete_comment': (ProjectComment, 'comment_id'),
+        'project_toggle_comment_checkbox': (ProjectComment, 'comment_id'),
+        'project_toggle_description_checkbox': (Project, 'id'),
+        'project_add_todo': (Project, 'id'),
+        'project_toggle_todo': (Project, 'id'),
+        'project_delete_todo': (Project, 'id'),
+        'delete_history': (PrintHistory, 'id'),
+        'delete_quote': (ProjectQuote, 'id'),
+        'export_quote': (ProjectQuote, 'id'),
+        'bambu_job_map': (BambuPrintJob, 'job_id'),
+        'bambu_job_deduct_slot': (BambuPrintJob, 'job_id'),
+        'bambu_job_delete': (BambuPrintJob, 'job_id'),
+        'prusa_printer_sync': (PrusaPrinter, 'printer_id'),
+        'prusa_printer_test': (PrusaPrinter, 'printer_id'),
+        'prusa_job_map': (PrusaPrintJob, 'job_id'),
+        'prusa_job_delete': (PrusaPrintJob, 'job_id'),
+        'storage_update_shelf': (StorageShelf, 'shelf_id'),
+        'storage_delete_shelf': (StorageShelf, 'shelf_id'),
+        'storage_move_placement': (StoragePlacement, 'placement_id'),
+        'storage_update_orientation': (StoragePlacement, 'placement_id'),
+        'storage_delete_placement': (StoragePlacement, 'placement_id'),
+        'notification_mark_read': (Notification, 'id'),
+        'notification_delete': (Notification, 'id'),
+    }
+    model_pair = explicit.get(endpoint)
+    if model_pair:
+        model, arg_name = model_pair
+        object_id = view_args.get(arg_name)
+        return {
+            'object_type': model.__name__,
+            'object_id': str(object_id) if object_id is not None else None,
+            'object': db.session.get(model, object_id) if object_id is not None else None,
+        }
+    if endpoint in {'settings', 'toggle_theme', 'import_data', 'export_data'}:
+        setting = AppSetting.query.first()
+        return {'object_type': 'AppSetting', 'object_id': str(setting.id) if setting else None, 'object': setting}
+    if endpoint == 'history' or endpoint == 'clear_history':
+        return {'object_type': 'MovementHistory', 'object_id': None, 'object': None}
+    if endpoint == 'inventory_bulk':
+        selected_ids = request.form.getlist('selected_ids')
+        return {'object_type': 'Filament', 'object_id': ','.join(selected_ids), 'object': None}
+    if endpoint == 'users_index':
+        return {'object_type': 'UserInvite', 'object_id': None, 'object': None}
+    if endpoint == 'storage_add_shelf':
+        return {'object_type': 'StorageShelf', 'object_id': None, 'object': None}
+    if endpoint == 'storage_assign_slot':
+        return {'object_type': 'StoragePlacement', 'object_id': None, 'object': None}
+    if endpoint in {'bambu_sync', 'prusa_jobs'}:
+        return {'object_type': endpoint, 'object_id': None, 'object': None}
+    return {'object_type': endpoint or None, 'object_id': None, 'object': None}
+
+
+def _audit_prepare_request():
+    user = get_current_user()
+    if not _audit_should_capture(user):
+        return
+    if '_audit_sid' not in session:
+        session['_audit_sid'] = secrets.token_hex(12)
+    target = _audit_target()
+    g.audit_context = {
+        'user_id': user.id,
+        'user_email': user.email,
+        'user_name': user.name,
+        'session_id': session.get('_audit_sid'),
+        'ip_address': _audit_client_ip(),
+        'user_agent': (request.headers.get('User-Agent') or '')[:255] or None,
+        'method': request.method,
+        'endpoint': request.endpoint,
+        'path': request.full_path.rstrip('?'),
+        'action': request.form.get('action') or request.endpoint or request.method.lower(),
+        'object_type': target.get('object_type'),
+        'object_id': target.get('object_id'),
+        'before': {
+            'object': _audit_snapshot_model(target.get('object')),
+            'route_args': {key: _audit_safe_value(value) for key, value in (request.view_args or {}).items()},
+        },
+        'form': _audit_sanitized_form(),
+    }
+
+
+def _audit_finish_request(response):
+    ctx = getattr(g, 'audit_context', None)
+    if not ctx or response.status_code >= 400:
+        return response
+    target = _audit_target()
+    after_payload = {
+        'object': _audit_snapshot_model(target.get('object')),
+        'form': ctx.get('form') or {},
+    }
+    if target.get('object_id') and not ctx.get('object_id'):
+        ctx['object_id'] = target.get('object_id')
+    try:
+        row = AuditLog(
+            user_id=ctx.get('user_id'),
+            user_email=ctx.get('user_email'),
+            user_name=ctx.get('user_name'),
+            session_id=ctx.get('session_id'),
+            ip_address=ctx.get('ip_address'),
+            user_agent=ctx.get('user_agent'),
+            method=ctx.get('method') or request.method,
+            endpoint=ctx.get('endpoint'),
+            path=ctx.get('path') or request.path,
+            action=ctx.get('action') or request.endpoint or request.method.lower(),
+            object_type=ctx.get('object_type'),
+            object_id=ctx.get('object_id'),
+            before_data=_audit_json_dumps(ctx.get('before')),
+            after_data=_audit_json_dumps(after_payload),
+        )
+        db.session.add(row)
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        current_app.logger.warning('Audit log write failed: %s', exc)
+    return response
+
+
 def init_app(app):
     @app.before_request
     def _load_auth():
-        return ensure_endpoint_access()
+        result = ensure_endpoint_access()
+        if result is not None:
+            return result
+        _audit_prepare_request()
+        return None
+
+    @app.after_request
+    def _write_audit(response):
+        return _audit_finish_request(response)
 
 
 def create_notification(user, title, body=None, link=None, kind='info'):

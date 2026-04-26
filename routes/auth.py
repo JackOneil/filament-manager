@@ -24,7 +24,7 @@ from auth import (
     verify_password,
 )
 from database import db
-from models import Notification, User, UserInvite
+from models import AuditLog, Notification, User, UserInvite
 
 
 def _bool_field(name):
@@ -272,7 +272,7 @@ def register(app):
         if kind_filter:
             q = q.filter(Notification.kind == kind_filter)
         q = q.order_by(Notification.created_at.desc())
-        notifications = db.paginate(q, page=page, per_page=20, error_out=False)
+        notifications = db.paginate(q.statement, page=page, per_page=20, error_out=False)
         # counts per kind for filter pills
         from sqlalchemy import func
         kind_counts = {
@@ -341,6 +341,54 @@ def register(app):
         q.delete()
         db.session.commit()
         return redirect(url_for('notifications_index', kind=kind_filter or None))
+
+    @app.route('/audit')
+    @require_admin
+    def audit_logs():
+        page = request.args.get('page', 1, type=int)
+        q = (request.args.get('q', '') or '').strip()
+        action_filter = (request.args.get('action', '') or '').strip()
+        object_filter = (request.args.get('object_type', '') or '').strip()
+
+        logs_query = AuditLog.query
+        if q:
+            from utils import escape_like
+            pattern = f'%{escape_like(q)}%'
+            logs_query = logs_query.filter(or_(
+                AuditLog.user_email.ilike(pattern),
+                AuditLog.user_name.ilike(pattern),
+                AuditLog.endpoint.ilike(pattern),
+                AuditLog.path.ilike(pattern),
+                AuditLog.object_id.ilike(pattern),
+            ))
+        if action_filter:
+            logs_query = logs_query.filter(AuditLog.action == action_filter)
+        if object_filter:
+            logs_query = logs_query.filter(AuditLog.object_type == object_filter)
+
+        logs_query = logs_query.order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+        logs = db.paginate(logs_query.statement, page=page, per_page=30, error_out=False)
+        actions = [
+            value for (value,) in db.session.query(AuditLog.action)
+            .filter(AuditLog.action.isnot(None))
+            .distinct()
+            .order_by(AuditLog.action.asc())
+            .all()
+        ]
+        object_types = [
+            value for (value,) in db.session.query(AuditLog.object_type)
+            .filter(AuditLog.object_type.isnot(None))
+            .distinct()
+            .order_by(AuditLog.object_type.asc())
+            .all()
+        ]
+        return render_template(
+            'audit.html',
+            logs=logs,
+            filters={'q': q, 'action': action_filter, 'object_type': object_filter},
+            actions=actions,
+            object_types=object_types,
+        )
 
     @app.context_processor
     def inject_auth_nav():

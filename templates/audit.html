@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    <div class="page-hero">
+        <h1 class="page-title"><span class="page-title-icon"><i class="fa-solid fa-shield-halved"></i></span><span>{{ t('audit_nav') }}</span></h1>
+        <p>{{ t('audit_desc') }}</p>
+    </div>
+
+    <form method="GET" class="ui-panel">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('filter_search') }}</label>
+                <input type="text" name="q" value="{{ filters.q }}" placeholder="{{ t('audit_search_placeholder') }}" class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('audit_action') }}</label>
+                <select name="action" class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
+                    <option value="">{{ t('filter_all') }}</option>
+                    {% for action in actions %}
+                    <option value="{{ action }}" {% if filters.action == action %}selected{% endif %}>{{ action }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('audit_object_type') }}</label>
+                <select name="object_type" class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
+                    <option value="">{{ t('filter_all') }}</option>
+                    {% for object_type in object_types %}
+                    <option value="{{ object_type }}" {% if filters.object_type == object_type %}selected{% endif %}>{{ object_type }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="mt-3">
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-semibold transition">{{ t('filter_apply') }}</button>
+        </div>
+    </form>
+
+    <div class="ui-panel overflow-hidden">
+        <div class="flex items-center justify-between gap-3 mb-4">
+            <div>
+                <div class="ui-label">{{ t('audit_list_title') }}</div>
+                <h2 class="text-2xl font-bold mt-1">{{ t('audit_list_heading') }}</h2>
+            </div>
+            <div class="text-sm text-gray-500">{{ t('audit_page_status').format(page=logs.page, pages=logs.pages, total=logs.total) }}</div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead>
+                    <tr class="text-left text-gray-500 border-b border-gray-200">
+                        <th class="py-3 pr-4">{{ t('date') }}</th>
+                        <th class="py-3 pr-4">{{ t('users_nav') }}</th>
+                        <th class="py-3 pr-4">{{ t('audit_action') }}</th>
+                        <th class="py-3 pr-4">{{ t('audit_object') }}</th>
+                        <th class="py-3 pr-4">{{ t('audit_request') }}</th>
+                        <th class="py-3">{{ t('detail') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in logs.items %}
+                    <tr class="border-b border-gray-100 last:border-b-0 align-top">
+                        <td class="py-3 pr-4 whitespace-nowrap text-gray-600">{{ row.created_at | fmt_dt('%d.%m.%Y %H:%M:%S') }}</td>
+                        <td class="py-3 pr-4">
+                            <div class="font-semibold text-gray-800">{{ row.user_name or '-' }}</div>
+                            <div class="text-xs text-gray-500">{{ row.user_email or '-' }}</div>
+                            <div class="text-xs text-gray-400">{{ row.ip_address or '-' }}</div>
+                        </td>
+                        <td class="py-3 pr-4">
+                            <span class="ui-badge">{{ row.action }}</span>
+                            <div class="text-xs text-gray-500 mt-1">{{ row.endpoint or '-' }}</div>
+                        </td>
+                        <td class="py-3 pr-4">
+                            <div class="font-semibold text-gray-700">{{ row.object_type or '-' }}</div>
+                            <div class="text-xs text-gray-500">{{ row.object_id or '-' }}</div>
+                        </td>
+                        <td class="py-3 pr-4">
+                            <div class="font-mono text-xs text-gray-600">{{ row.method }} {{ row.path }}</div>
+                            <div class="text-xs text-gray-400">{{ row.session_id or '-' }}</div>
+                        </td>
+                        <td class="py-3">
+                            <details class="max-w-xl">
+                                <summary class="cursor-pointer text-blue-600 hover:text-blue-800 font-semibold">{{ t('audit_show_snapshots') }}</summary>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                                    <div>
+                                        <div class="text-xs font-bold uppercase text-gray-500 mb-1">{{ t('audit_before') }}</div>
+                                        <pre class="text-xs bg-gray-50 border border-gray-200 rounded-xl p-3 overflow-auto max-h-72">{{ row.before_data or '-' }}</pre>
+                                    </div>
+                                    <div>
+                                        <div class="text-xs font-bold uppercase text-gray-500 mb-1">{{ t('audit_after') }}</div>
+                                        <pre class="text-xs bg-gray-50 border border-gray-200 rounded-xl p-3 overflow-auto max-h-72">{{ row.after_data or '-' }}</pre>
+                                    </div>
+                                </div>
+                            </details>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="py-10 text-center text-gray-500">{{ t('audit_empty') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if logs.pages > 1 %}
+        <div class="flex flex-wrap items-center justify-center gap-2 pt-4 mt-4 border-t border-gray-100">
+            {% for page_num in logs.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if page_num %}
+                    <a href="{{ url_for('audit_logs', page=page_num, q=filters.q or None, action=filters.action or None, object_type=filters.object_type or None) }}" class="px-3 py-1.5 rounded-lg text-sm font-semibold {% if page_num == logs.page %}bg-blue-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">{{ page_num }}</a>
+                {% else %}
+                    <span class="px-2 text-gray-400">…</span>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

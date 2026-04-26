@@ -1129,6 +1129,10 @@
                 <i class="fa-solid fa-users-gear text-lg w-8 text-center flex-shrink-0"></i>
                 <span class="ml-2 font-semibold opacity-0 group-[.pinned]:opacity-100 transition-opacity">{{ t('users_nav') }}</span>
             </a>
+            <a href="{{ url_for('audit_logs') }}" class="flex items-center px-4 py-3 text-[var(--ui-text)] hover:bg-[var(--ui-brand-soft)] hover:text-[var(--ui-brand-strong)] transition-colors whitespace-nowrap {% if endpoint == 'audit_logs' %}bg-[var(--ui-brand-soft)] text-[var(--ui-brand-strong)] border-r-2 border-[var(--ui-brand-strong)]{% endif %}" title="{{ t('audit_nav') }}">
+                <i class="fa-solid fa-shield-halved text-lg w-8 text-center flex-shrink-0"></i>
+                <span class="ml-2 font-semibold opacity-0 group-[.pinned]:opacity-100 transition-opacity">{{ t('audit_nav') }}</span>
+            </a>
             {% endif %}
         </nav>
 
@@ -1227,6 +1231,9 @@
                 <a href="{{ url_for('users_index') }}" class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
                     <i class="fa-solid fa-users-gear text-sky-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('users_nav') }}</span>
                 </a>
+                <a href="{{ url_for('audit_logs') }}" class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
+                    <i class="fa-solid fa-shield-halved text-rose-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('audit_nav') }}</span>
+                </a>
                 {% endif %}
                 {% if auth_has_section_access('history') or auth_is_admin(current_user) %}
                 <a href="{{ url_for('history') }}" class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
@@ -1284,8 +1291,10 @@
                         <span>{{ t('settings') }}</span>
                     {% elif endpoint in ['history'] %}
                         <span>{{ t('movement_history') }}</span>
+                    {% elif endpoint in ['audit_logs'] %}
+                        <span>{{ t('audit_nav') }}</span>
                     {% else %}
-                         <span>Navigation</span>
+                         <span>{{ t('nav_admin_tools') }}</span>
                     {% endif %}
                 </div>
             </div>
@@ -1508,6 +1517,7 @@
         {% endif %}
         {% if auth_has_section_access('users') or auth_is_admin(current_user) %}
         {{ comma() }}{{ {'label': t('users_nav'), 'note': t('nav_users_note'), 'href': url_for('users_index'), 'icon': 'fa-users-gear', 'section': t('nav_admin_tools')}|tojson }}
+        {{ comma() }}{{ {'label': t('audit_nav'), 'note': t('nav_audit_note'), 'href': url_for('audit_logs'), 'icon': 'fa-shield-halved', 'section': t('nav_admin_tools')}|tojson }}
         {% endif %}
         {{ comma() }}{{ {'label': t('notifications_nav'), 'note': t('nav_notifications_note'), 'href': url_for('notifications_index'), 'icon': 'fa-bell', 'section': t('auth_account')}|tojson }}
         {{ comma() }}{{ {'label': t('auth_account'), 'note': t('nav_account_note'), 'href': url_for('account_settings'), 'icon': 'fa-user', 'section': t('auth_account')}|tojson }}

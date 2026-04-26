@@ -87,7 +87,7 @@ def translate(key):
 def utc_now():
     """Return the current UTC time as a naive datetime.
 
-    Replacement for the deprecated ``datetime.utcnow()`` (removed in Python 3.14).
+    Replacement for the deprecated naive UTC helper removed in Python 3.14.
     Returns a naive (tzinfo-free) datetime to keep compatibility with the existing
     SQLite schema which stores all timestamps without timezone info.
     """

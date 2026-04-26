@@ -251,7 +251,7 @@ def register(app):
             per_page = 10
 
         histories_paginated = db.paginate(
-            PrintHistory.query.order_by(PrintHistory.created_at.desc()),
+            PrintHistory.query.order_by(PrintHistory.created_at.desc()).statement,
             page=page, per_page=per_page, error_out=False,
         )
 

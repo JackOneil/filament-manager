@@ -458,7 +458,7 @@ def register(app):
             Project.created_at.desc(),
         ]
 
-        projects = db.paginate(base_query.order_by(*order_expr), page=page, per_page=per_page, error_out=False)
+        projects = db.paginate(base_query.order_by(*order_expr).statement, page=page, per_page=per_page, error_out=False)
 
         status_page_fields = {
             'PENDING_APPROVAL': 'kanban_pending_page',
@@ -486,7 +486,7 @@ def register(app):
         for status, field_name in status_page_fields.items():
             status_page = max(request.args.get(field_name, 1, type=int), 1)
             pag = db.paginate(
-                base_query.filter(Project.status == status).order_by(*kanban_order),
+                base_query.filter(Project.status == status).order_by(*kanban_order).statement,
                 page=status_page,
                 per_page=kanban_per_page,
                 error_out=False,

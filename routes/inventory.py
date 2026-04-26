@@ -344,7 +344,7 @@ def _inventory_page_context():
 
     stats = _inventory_stats(f_brand, f_material, f_color, f_tag)
 
-    filaments_paginated = db.paginate(filaments_query, page=page, per_page=per_page, error_out=False)
+    filaments_paginated = db.paginate(filaments_query.statement, page=page, per_page=per_page, error_out=False)
     usage_map = collect_usage_windows(filaments_paginated.items)
     filaments_paginated.items[:] = [_decorate_filament(fil, usage_map) for fil in filaments_paginated.items]
 
@@ -532,7 +532,7 @@ def register(app):
         ).filter(
             db.or_(MovementHistory.filament_id == filament.id, MovementHistory.filament_name == _display_filament_name(filament))
         ).order_by(MovementHistory.created_at.desc())
-        timeline_paginated = db.paginate(timeline_rows, page=timeline_page, per_page=detail_per_page, error_out=False)
+        timeline_paginated = db.paginate(timeline_rows.statement, page=timeline_page, per_page=detail_per_page, error_out=False)
 
         timeline = [{
             'created_at': row.created_at,
@@ -555,7 +555,7 @@ def register(app):
                 BambuPrintJob.materials.any(BambuJobMaterial.filament_id == filament.id),
             )
         ).order_by(BambuPrintJob.started_at.desc().nullslast())
-        related_jobs_paginated = db.paginate(related_jobs_query, page=jobs_page, per_page=detail_per_page, error_out=False)
+        related_jobs_paginated = db.paginate(related_jobs_query.statement, page=jobs_page, per_page=detail_per_page, error_out=False)
 
         m = filament.stock_metrics
         daily_usage = m['usage_30'] / 30.0 if m['usage_30'] > 0 else 0.0
