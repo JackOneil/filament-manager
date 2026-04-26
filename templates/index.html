@@ -32,27 +32,33 @@
     </div>
 </div>
 
-<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-    <div class="ui-kpi">
-        <div class="ui-label">{{ t('total_spools') }}</div>
-        <div class="text-3xl font-bold mt-2">{{ stats.spools }}</div>
-    </div>
-    <div class="ui-kpi">
-        <div class="ui-label">{{ t('total_remaining') }}</div>
-        <div class="text-3xl font-bold mt-2">{{ '%0.1f'| format(stats.remaining / 1000) }} <span class="text-lg font-semibold text-gray-400">kg</span></div>
-    </div>
-    <div class="ui-kpi">
-        <div class="ui-label">{{ t('total_value') }}</div>
-        <div class="text-3xl font-bold mt-2">{{ '{:0.2f}'.format(stats.value) }} <span class="text-lg font-semibold text-gray-400">{{ current_currency }}</span></div>
-    </div>
-    <div class="ui-kpi">
-        <div class="ui-label">{{ t('inventory_low_stock_title') }}</div>
-        <div class="text-3xl font-bold mt-2">{{ stock_alert_count }}</div>
-        <div class="text-sm text-gray-500 mt-2">{{ t('inventory_low_stock_desc') }}</div>
-    </div>
-</div>
+<div x-data="{ highlightsOpen: JSON.parse(localStorage.getItem('filament.highlightsOpen') ?? 'false') }" x-init="$watch('highlightsOpen', v => localStorage.setItem('filament.highlightsOpen', JSON.stringify(v)))" class="mb-4">
+    <!-- Compact summary bar – always visible, acts as toggle -->
+    <button type="button" @click="highlightsOpen = !highlightsOpen"
+        class="w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl border border-gray-200 bg-white/80 hover:bg-gray-50 transition-colors shadow-sm text-left">
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs font-bold text-gray-500 uppercase tracking-wide mr-1">{{ t('inventory_focus_title') }}</span>
+            {% if inventory_highlights.critical_count > 0 %}
+            <span class="ui-badge ui-badge-critical"><i class="fa-solid fa-triangle-exclamation"></i> {{ inventory_highlights.critical_count }}</span>
+            {% endif %}
+            {% if inventory_highlights.warning_count > 0 %}
+            <span class="ui-badge ui-badge-warning"><i class="fa-solid fa-gauge-low"></i> {{ inventory_highlights.warning_count }}</span>
+            {% endif %}
+            <span class="ui-badge ui-badge-success"><i class="fa-solid fa-circle-check"></i> {{ inventory_highlights.stable_count }}</span>
+            {% if inventory_highlights.color_mix %}
+            <span class="flex items-center gap-1 ml-2">
+                {% for item in inventory_highlights.color_mix[:5] %}
+                <span class="w-4 h-4 rounded-full border border-white shadow-sm flex-shrink-0" style="background-color: {{ item.hex }};"></span>
+                {% endfor %}
+            </span>
+            {% endif %}
+        </div>
+        <i class="fa-solid fa-chevron-down text-gray-400 text-xs flex-shrink-0 transition-transform duration-200" :class="highlightsOpen ? 'rotate-180' : ''"></i>
+    </button>
 
-<div class="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-4 mb-6">
+    <!-- Expandable detail panels -->
+    <div x-show="highlightsOpen" x-cloak x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" class="mt-2">
+        <div class="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-4">
     <div class="ui-panel">
         <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
             <div>
@@ -137,38 +143,8 @@
         </div>
     </div>
 </div>
-
-{% if stock_alerts %}
-<div class="ui-panel mb-6">
-    <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
-        <div>
-            <div class="ui-label">{{ t('inventory_low_stock_title') }}</div>
-            <h2 class="text-2xl font-bold mt-2">{{ t('inventory_low_stock_heading') }}</h2>
-            <p class="text-sm text-gray-500 mt-2">{{ t('inventory_low_stock_help') }}</p>
-        </div>
-        <a href="{{ url_for('stats') }}" class="ui-badge ui-badge-brand"><i class="fa-solid fa-chart-column"></i> {{ t('stats_nav') }}</a>
-    </div>
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {% for fil in stock_alerts %}
-        <a href="{{ url_for('filament_detail', id=fil.id) }}" class="ui-card-soft p-4 hover:border-blue-300 transition">
-            <div class="flex items-center justify-between gap-3">
-                <div class="font-semibold text-gray-800">{{ fil.name }}</div>
-                <span class="ui-badge {% if fil.stock_metrics.status == 'critical' %}ui-badge-critical{% else %}ui-badge-warning{% endif %}">
-                    {% if fil.stock_metrics.status == 'critical' %}{{ t('out_of_stock') }}{% else %}{{ t('low_stock') }}{% endif %}
-                </span>
-            </div>
-            <div class="text-sm text-gray-500 mt-2">{{ fil.brand.name }} · {{ fil.material.name }}</div>
-            <div class="text-xs mt-2 {% if fil.stock_metrics.status == 'critical' %}text-red-600{% else %}text-amber-600{% endif %}">
-                {{ t('remaining') }} {{ fil.stock_metrics.remaining }} g
-                {% if fil.stock_metrics.recommended_spools > 0 %}
-                · {{ t('stats_recommend_buy') }} {{ fil.stock_metrics.recommended_spools }} {{ t('pieces') }} ({{ fil.stock_metrics.recommended_order_grams | int }} g)
-                {% endif %}
-            </div>
-        </a>
-        {% endfor %}
     </div>
 </div>
-{% endif %}
 
 <div class="ui-filter-panel mb-4 relative z-30 sticky top-2 bg-white/95 backdrop-blur-sm shadow-sm">
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
@@ -757,7 +733,7 @@ function inventoryApp() {
             if (mm) this.materialQ = mm.name;
             const cm = this.colorOptions.find(o => o.id == this.color);
             if (cm) this.colorQ = cm.name;
-            if (this.viewMode !== serverView) {
+            if (this.viewMode !== serverView || this.viewMode === 'compact') {
                 this.fetchContent(this.currentPage);
             }
         },

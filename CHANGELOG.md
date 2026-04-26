@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.68.2] - 2026-04-26
+
+### Changed
+- **Inventory page — removed KPI cards** — The four summary cards (*Celkem civek*, *Celkem zbyva*, *Celkova hodnota*, *Nizky stav skladu*) above the filament list have been removed to reduce clutter.
+- **Inventory page — collapsible Smart Highlights** — The Smart Highlights and Color Mix panels are now wrapped in a collapsible accordion. The section is collapsed by default; a compact summary bar shows critical/warning/stable badge counts and five colour swatches at a glance. State is persisted in `localStorage['filament.highlightsOpen']`.
+- **Inventory page — removed Low Stock section** — The full low-stock filament grid below the main inventory list has been removed.
+
+### Fixed
+- **Compact view persistence bug** — When compact view was saved as the active mode in the database, refreshing the page showed list rows with the compact button highlighted instead of actual compact cards. `inventoryApp.init()` now always triggers `fetchContent()` when `viewMode === 'compact'` because the server-side template only renders compact HTML via the AJAX partial, never in the initial full-page render.
+
 ## [1.68.1] - 2026-04-26
 
 ### Added
