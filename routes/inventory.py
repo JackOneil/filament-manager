@@ -10,7 +10,7 @@ from sqlalchemy.orm import joinedload
 
 from database import db
 from auth import get_current_user, is_admin
-from models import AppSetting, PrusaPrinter, BambuJobMaterial, BambuPrintJob, PrusaPrintJob, Brand, Color, Filament, Material, MovementHistory, Notification, Project, ProjectComment, ProjectFilament, ProjectQuote
+from models import AppSetting, PrusaPrinter, BambuJobMaterial, BambuPrintJob, BambuPrinter, PrusaPrintJob, Brand, Color, Filament, Material, MovementHistory, Notification, Project, ProjectComment, ProjectFilament, ProjectQuote
 from utils import (
     build_action_center,
     build_filament_history_name as _display_filament_name,
@@ -156,9 +156,13 @@ def _live_printers():
         bambu_progress_pct = None
         bambu_eta_at = None
         if job.started_at and job.cost_time and job.cost_time > 0:
+            # Look up per-printer pre-job calibration offset
+            bambu_printer = BambuPrinter.query.filter_by(device_id=job.device_id).first() if job.device_id else None
+            pre_job_secs = (bambu_printer.pre_job_time_minutes or 0) * 60 if bambu_printer else 0
+            total_secs = job.cost_time + pre_job_secs
             elapsed = (now_dt - job.started_at).total_seconds()
-            bambu_progress_pct = min(99, int(elapsed / job.cost_time * 100))
-            bambu_eta_at = job.started_at + timedelta(seconds=job.cost_time)
+            bambu_progress_pct = min(99, int(elapsed / total_secs * 100))
+            bambu_eta_at = job.started_at + timedelta(seconds=total_secs)
         live.append({'printer': fake_printer, 'job': fake_job, 'type': 'bambu',
                      'progress_pct': bambu_progress_pct, 'eta_at': bambu_eta_at})
 

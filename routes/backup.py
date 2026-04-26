@@ -322,6 +322,7 @@ def register(app):
                 'name': bp.name,
                 'printer_model': bp.printer_model,
                 'notes': bp.notes,
+                'pre_job_time_minutes': bp.pre_job_time_minutes or 0,
             } for bp in BambuPrinter.query.all()],
 
             'bambu_jobs': [{
@@ -728,6 +729,7 @@ def register(app):
                             name=bp.get('name', ''),
                             printer_model=bp.get('printer_model'),
                             notes=bp.get('notes'),
+                            pre_job_time_minutes=bp.get('pre_job_time_minutes', 0),
                         ))
 
                 # ── 7. Bambu jobs ─────────────────────────────────────

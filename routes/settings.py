@@ -174,7 +174,11 @@ def register(app):
                         new_name = request.form.get('name', '').strip()
                         if new_name:
                             printer.name = new_name
-                            app.logger.debug(f"Renamed printer {printer.device_id} → {new_name}")
+                        try:
+                            printer.pre_job_time_minutes = max(0, int(request.form.get('pre_job_time_minutes', 0)))
+                        except (ValueError, TypeError):
+                            pass
+                        app.logger.debug(f"Edited Bambu printer {printer.device_id}: name={printer.name}, pre_job={printer.pre_job_time_minutes}min")
 
                 elif action == 'printer_energy_settings':
                     setting = AppSetting.query.first()

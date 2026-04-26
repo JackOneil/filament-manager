@@ -312,6 +312,7 @@ class BambuPrinter(db.Model):
     name = db.Column(db.String(200), nullable=False)
     printer_model = db.Column(db.String(50), nullable=True)
     notes = db.Column(db.Text, nullable=True)
+    pre_job_time_minutes = db.Column(db.Integer, default=0)  # calibration/warmup time before print
     created_at = db.Column(db.DateTime, default=_utc_now)
 
 

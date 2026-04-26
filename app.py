@@ -47,7 +47,7 @@ from utils import get_settings, utc_now
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.68.0'
+APP_VERSION = '1.68.1'
 
 csrf = CSRFProtect()
 
@@ -260,6 +260,7 @@ def _setup_database(app: Flask) -> None:
         _safe_alter(app, "ALTER TABLE filament ADD COLUMN shop_url TEXT DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN reorder_shop_url TEXT DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE brand ADD COLUMN shop_url TEXT DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE bambu_printer ADD COLUMN pre_job_time_minutes INTEGER NOT NULL DEFAULT 0")
 
         # PrusaLink integration — new tables are created by db.create_all() above;
         # these alters guard against columns added in future versions.

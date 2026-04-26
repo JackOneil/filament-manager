@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.68.1] - 2026-04-26
+
+### Added
+- **Bambu per-printer pre-job time** — Each Bambu printer in Settings now has an editable *Pre-job preparation* field (minutes). This value represents the calibration/warmup phase before the print actually starts. The time is stored on the `BambuPrinter` record and is added to the estimated finish time (ETA) shown on the Overview dashboard for running Bambu jobs.
+
 ## [1.68.0] - 2026-04-26
 
 ### Added

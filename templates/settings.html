@@ -66,18 +66,15 @@
         </div>
     </div>
 
-    <!-- Nyní bude 4 sloupcový grid na velkých displejích (Obecná natavení + Značky, Materiály, Barvy) -->
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8">
-        
-        <!-- Obecná nastavení karty -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col xl:col-span-1">
-            <div class="flex items-center gap-2 mb-4 border-b pb-3">
-                <i class="fa-solid fa-sliders text-blue-500"></i>
-                <h2 class="text-xl font-bold text-gray-800">{{ t('general_settings') }}</h2>
-            </div>
-            
-            <div class="flex flex-col gap-5 justify-between h-full">
-                <div class="flex flex-col gap-4">
+    <!-- Obecná nastavení – plná šířka -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center gap-2 mb-4 border-b pb-3">
+            <i class="fa-solid fa-sliders text-blue-500"></i>
+            <h2 class="text-xl font-bold text-gray-800">{{ t('general_settings') }}</h2>
+        </div>
+
+        <div class="flex flex-col gap-5">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                     <form method="POST" class="flex flex-col gap-1.5 border border-gray-100 bg-gray-50 p-3 rounded-lg shadow-sm">
                         <input type="hidden" name="action" value="currency">
                         <label class="font-semibold text-gray-600 text-sm flex items-center gap-2"><i class="fa-solid fa-coins text-gray-400 w-4 text-center"></i> {{ t('currency') }}:</label>
@@ -158,19 +155,23 @@
                         </select>
                     </form>
                 </div>
+            </div>
 
-                <div class="mt-4 pt-4 border-t border-gray-100">
-                    <form method="POST" class="flex items-center justify-between">
-                        <input type="hidden" name="action" value="debug_logging">
-                        <label class="font-semibold text-gray-600 text-sm flex items-center gap-2"><i class="fa-solid fa-bug text-red-400 w-4 text-center"></i> {{ t('debug_logging') }}</label>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" name="debug_logging" onchange="this.form.submit()" class="sr-only peer" {% if app_settings.debug_logging %}checked{% endif %}>
-                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500"></div>
-                        </label>
-                    </form>
-                </div>
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <form method="POST" class="flex items-center justify-between max-w-xs">
+                    <input type="hidden" name="action" value="debug_logging">
+                    <label class="font-semibold text-gray-600 text-sm flex items-center gap-2"><i class="fa-solid fa-bug text-red-400 w-4 text-center"></i> {{ t('debug_logging') }}</label>
+                    <label class="relative inline-flex items-center cursor-pointer ml-4">
+                        <input type="checkbox" name="debug_logging" onchange="this.form.submit()" class="sr-only peer" {% if app_settings.debug_logging %}checked{% endif %}>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500"></div>
+                    </label>
+                </form>
             </div>
         </div>
+    </div>
+
+    <!-- Značky / Materiály / Barvy -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
 
         <!-- Značky -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col">
@@ -178,7 +179,7 @@
                 <i class="fa-solid fa-industry text-blue-500"></i>
                 <h2 class="text-xl font-bold text-gray-800">{{ t('brands_list') }}</h2>
             </div>
-            <ul class="mb-6 text-sm flex-grow overflow-y-auto filter drop-shadow-sm space-y-2 pr-2" style="max-height: 250px;">
+            <ul class="mb-6 text-sm flex-grow overflow-y-auto filter drop-shadow-sm space-y-2 pr-2" style="max-height: 500px;">
                 {% for b in brands %}
                 <li class="py-2 px-3 bg-gray-50 border border-gray-100 rounded flex justify-between group relative">
                     <form method="POST" class="flex flex-col gap-1 w-full pr-6">
@@ -233,7 +234,7 @@
                 <i class="fa-solid fa-cubes-stacked text-green-500"></i>
                 <h2 class="text-xl font-bold text-gray-800">{{ t('materials_list') }}</h2>
             </div>
-            <ul class="mb-6 text-sm flex-grow overflow-y-auto filter drop-shadow-sm space-y-2 pr-2" style="max-height: 250px;">
+            <ul class="mb-6 text-sm flex-grow overflow-y-auto filter drop-shadow-sm space-y-2 pr-2" style="max-height: 500px;">
                 {% for m in materials %}
                 <li class="py-2 px-3 bg-gray-50 border border-gray-100 rounded flex justify-between group relative">
                     <form method="POST" class="flex items-center gap-2 w-full pr-6">
@@ -273,7 +274,7 @@
                 <i class="fa-solid fa-palette text-purple-500"></i>
                 <h2 class="text-xl font-bold text-gray-800">{{ t('colors_list') }}</h2>
             </div>
-            <ul class="mb-6 text-sm flex-grow overflow-y-auto filter drop-shadow-sm space-y-2 pr-2" style="max-height: 250px;">
+            <ul class="mb-6 text-sm flex-grow overflow-y-auto filter drop-shadow-sm space-y-2 pr-2" style="max-height: 500px;">
                 {% for c in colors %}
                 <li class="py-2 px-3 bg-gray-50 border border-gray-100 rounded flex justify-between items-center group relative">
                     <form method="POST" class="flex items-center gap-2 w-full pr-6">
@@ -485,6 +486,11 @@
                             {% if p.printer_model %}
                             <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{{ p.printer_model }}</span>
                             {% endif %}
+                            {% if p.pre_job_time_minutes %}
+                            <span class="text-xs text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <i class="fa-solid fa-hourglass-start"></i> {{ p.pre_job_time_minutes }} {{ t('bambu_pre_job_time_unit') }}
+                            </span>
+                            {% endif %}
                             {% if p.device_id %}
                             <span class="text-xs text-gray-400 font-mono">{{ p.device_id }}</span>
                             {% endif %}
@@ -493,16 +499,29 @@
                                 <i class="fa-solid fa-pen"></i> {{ t('bambu_printer_rename') }}
                             </button>
                         </div>
-                        <form method="POST" x-show="editing" x-cloak class="flex gap-2 mt-1">
+                        <form method="POST" x-show="editing" x-cloak class="flex flex-col gap-2 mt-1">
                             <input type="hidden" name="action" value="edit_bambu_printer">
                             <input type="hidden" name="id" value="{{ p.id }}">
-                            <input type="text" name="name" value="{{ p.name }}"
-                                class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                placeholder="{{ t('bambu_printer_name_label') }}">
-                            <button type="submit"
-                                class="bg-blue-600 hover:bg-blue-700 transition-colors text-white font-semibold py-1.5 px-4 rounded-lg text-sm">
-                                <i class="fa-solid fa-save"></i>
-                            </button>
+                            <div class="flex gap-2">
+                                <input type="text" name="name" value="{{ p.name }}"
+                                    class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder="{{ t('bambu_printer_name_label') }}">
+                                <button type="submit"
+                                    class="bg-blue-600 hover:bg-blue-700 transition-colors text-white font-semibold py-1.5 px-4 rounded-lg text-sm">
+                                    <i class="fa-solid fa-save"></i>
+                                </button>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="text-xs text-gray-500 whitespace-nowrap flex items-center gap-1.5">
+                                    <i class="fa-solid fa-hourglass-start text-gray-400"></i>
+                                    {{ t('bambu_pre_job_time_label') }}:
+                                </label>
+                                <input type="number" name="pre_job_time_minutes" min="0" max="120"
+                                    value="{{ p.pre_job_time_minutes or 0 }}"
+                                    class="w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                                <span class="text-xs text-gray-400">{{ t('bambu_pre_job_time_unit') }}</span>
+                            </div>
+                            <p class="text-xs text-gray-400">{{ t('bambu_pre_job_time_desc') }}</p>
                         </form>
                     </li>
                     {% endfor %}
