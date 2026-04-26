@@ -240,23 +240,15 @@ def _notify_project_status(project):
     status_label = translate(f'project_status_{project.status.lower()}') if project.status else project.status
     title = translate('notify_project_status_title').format(name=project.name)
     body = translate('notify_project_status_body').format(status=status_label)
+    link = url_for('project_detail', id=project.id)
+    seen = set()
     if project.owner and project.owner.notify_project_status_changed:
-        create_notification(
-            project.owner,
-            title,
-            body,
-            url_for('project_detail', id=project.id),
-            kind='project_status',
-        )
+        seen.add(project.owner.id)
+        create_notification(project.owner, title, body, link, kind='project_status')
     for admin in User.query.filter_by(role='admin', is_active=True).all():
-        if admin.notify_project_status_changed:
-            create_notification(
-                admin,
-                title,
-                body,
-                url_for('project_detail', id=project.id),
-                kind='project_status',
-            )
+        if admin.notify_project_status_changed and admin.id not in seen:
+            seen.add(admin.id)
+            create_notification(admin, title, body, link, kind='project_status')
 
 
 def _notify_project_comment(project, author):
@@ -321,6 +313,7 @@ def _build_project_activity_events(project):
         activity_events.append({
             'created_at': quote.created_at,
             'label': f'Quote saved: {quote.final_price:.2f} {quote.currency}',
+            'detail': f'{quote.filament_name} · {quote.weight} g · {quote.final_price:.2f} {quote.currency}',
             'meta': f'{quote.filament_name} · {quote.weight} g',
             'kind': 'quote',
         })
@@ -328,6 +321,7 @@ def _build_project_activity_events(project):
         activity_events.append({
             'created_at': project_file.uploaded_at,
             'label': f'File uploaded: {project_file.filename}',
+            'detail': project_file.filename,
             'meta': _get_extension(project_file.filename).upper() or 'FILE',
             'kind': 'file',
         })
@@ -335,6 +329,7 @@ def _build_project_activity_events(project):
         activity_events.append({
             'created_at': comment.updated_at or comment.created_at,
             'label': f'Comment: {(comment.body or "")[:60]}',
+            'detail': (comment.body or '')[:200],
             'meta': comment.user.name if comment.user else '-',
             'kind': 'comment',
         })
@@ -342,7 +337,8 @@ def _build_project_activity_events(project):
         activity_events.append({
             'created_at': todo.completed_at or todo.created_at,
             'label': f'TODO: {todo.body}',
-            'meta': 'Done' if todo.is_done else 'Open',
+            'detail': todo.body or '',
+            'meta': 'done' if todo.is_done else 'open',
             'kind': 'todo',
         })
     activity_events.sort(key=lambda item: item['created_at'] or datetime.min, reverse=True)

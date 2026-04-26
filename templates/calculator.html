@@ -180,7 +180,7 @@
                         <tbody class="text-gray-700 text-sm">
                             {% for h in histories.items %}
                             <tr class="border-b hover:bg-gray-50 transition-colors">
-                                <td class="py-3 px-4">{{ h.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                                <td class="py-3 px-4">{{ h.created_at | fmt_dt('%d.%m.%Y %H:%M') }}</td>
                                 <td class="py-3 px-4 font-semibold">{{ h.filament_name }}</td>
                                 <td class="py-3 px-4">{{ '{:0.1f}'.format(h.weight) }} g</td>
                                 <td class="py-3 px-4 font-bold text-green-600">{{ '{:0.2f}'.format(h.total_cost) }}</td>

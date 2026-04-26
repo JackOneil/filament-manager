@@ -48,7 +48,7 @@
                 {% for invite in invites %}
                 <div class="ui-card-soft p-3 text-sm">
                     <div class="font-semibold text-gray-800">{{ invite.email or t('users_invite_without_email') }}</div>
-                    <div class="text-xs text-gray-500 mt-1">{{ invite.role }} · {{ invite.created_at.strftime('%d.%m.%Y %H:%M') if invite.created_at else '-' }}</div>
+                    <div class="text-xs text-gray-500 mt-1">{{ invite.role }} · {{ invite.created_at | fmt_dt('%d.%m.%Y %H:%M') or '-' }}</div>
                 </div>
                 {% endfor %}
             </div>
@@ -150,8 +150,8 @@
                                 <td class="py-3 pr-4">
                                     <span class="ui-badge {% if user.role == 'admin' %}ui-badge-brand{% endif %}">{{ t('users_role_admin') if user.role == 'admin' else t('users_role_user') }}</span>
                                 </td>
-                                <td class="py-3 pr-4 text-gray-600">{{ user.created_at.strftime('%d.%m.%Y %H:%M') if user.created_at else '-' }}</td>
-                                <td class="py-3 pr-4 text-gray-600">{{ user.last_login_at.strftime('%d.%m.%Y %H:%M') if user.last_login_at else t('users_never_logged_in') }}</td>
+                                <td class="py-3 pr-4 text-gray-600">{{ user.created_at | fmt_dt('%d.%m.%Y %H:%M') or '-' }}</td>
+                                <td class="py-3 pr-4 text-gray-600">{{ user.last_login_at | fmt_dt('%d.%m.%Y %H:%M') or t('users_never_logged_in') }}</td>
                                 <td class="py-3 pr-4">
                                     <span class="ui-badge {% if user.is_active %}ui-badge-success{% else %}ui-badge-warning{% endif %}">
                                         {{ t('users_status_active') if user.is_active else t('users_status_inactive') }}

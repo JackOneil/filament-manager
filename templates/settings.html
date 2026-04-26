@@ -33,7 +33,7 @@
                     </form>
                 </div>
                 <div class="text-sm text-gray-500 mt-3">
-                    {% if app_settings and app_settings.bambu_last_sync_at %}Last sync: {{ app_settings.bambu_last_sync_at.strftime('%d.%m.%Y %H:%M') }}{% else %}{{ t('bambu_no_sync_yet') }}{% endif %}
+                    {% if app_settings and app_settings.bambu_last_sync_at %}Last sync: {{ app_settings.bambu_last_sync_at | fmt_dt('%d.%m.%Y %H:%M') }}{% else %}{{ t('bambu_no_sync_yet') }}{% endif %}
                 </div>
                 <div class="text-sm mt-2 {% if bambu_sync_status.error %}text-red-600{% else %}text-gray-500{% endif %}">
                     {% if bambu_sync_status.error %}{{ bambu_sync_status.error }}{% elif bambu_sync_status.ok %}Added {{ bambu_sync_status.added }}, updated {{ bambu_sync_status.updated }}, skipped {{ bambu_sync_status.skipped }}{% else %}{{ t('settings_no_status_data') }}{% endif %}
@@ -49,8 +49,8 @@
                             <div class="font-semibold text-gray-800">{{ printer.name }}</div>
                             <div class="text-sm text-gray-500">{{ printer.host }}</div>
                             <div class="text-xs mt-1 {% if sync and sync.error %}text-red-600{% else %}text-gray-400{% endif %}">
-                                {% if printer.last_sync_at %}Last sync {{ printer.last_sync_at.strftime('%d.%m.%Y %H:%M') }}{% else %}{{ t('prusa_no_sync_yet') }}{% endif %}
-                                {% if printer.last_success_at %} · success {{ printer.last_success_at.strftime('%d.%m.%Y %H:%M') }}{% endif %}
+                                {% if printer.last_sync_at %}Last sync {{ printer.last_sync_at | fmt_dt('%d.%m.%Y %H:%M') }}{% else %}{{ t('prusa_no_sync_yet') }}{% endif %}
+                                {% if printer.last_success_at %} · success {{ printer.last_success_at | fmt_dt('%d.%m.%Y %H:%M') }}{% endif %}
                                 {% if sync and sync.error %} · {{ sync.error }}{% endif %}
                             </div>
                         </div>
@@ -95,6 +95,44 @@
                             <option value="cs" {% if current_lang == 'cs' %}selected{% endif %}>Čeština (CZ)</option>
                             <option value="en" {% if current_lang == 'en' %}selected{% endif %}>English (EN)</option>
                         </select>
+                    </form>
+
+                    <form method="POST" class="flex flex-col gap-1.5 border border-gray-100 bg-gray-50 p-3 rounded-lg shadow-sm">
+                        <input type="hidden" name="action" value="app_timezone">
+                        <label class="font-semibold text-gray-600 text-sm flex items-center gap-2"><i class="fa-solid fa-clock text-gray-400 w-4 text-center"></i> {{ t('settings_timezone') }}:</label>
+                        <select name="app_timezone" onchange="this.form.submit()" class="border-gray-300 rounded px-2 py-1 text-sm focus:ring-blue-500 w-full outline-none">
+                            {% set cur_tz = app_settings.app_timezone if app_settings and app_settings.app_timezone else 'Europe/Prague' %}
+                            <optgroup label="Europe">
+                                <option value="Europe/Prague" {% if cur_tz == 'Europe/Prague' %}selected{% endif %}>Europe/Prague (CET/CEST)</option>
+                                <option value="Europe/London" {% if cur_tz == 'Europe/London' %}selected{% endif %}>Europe/London (GMT/BST)</option>
+                                <option value="Europe/Paris" {% if cur_tz == 'Europe/Paris' %}selected{% endif %}>Europe/Paris (CET/CEST)</option>
+                                <option value="Europe/Berlin" {% if cur_tz == 'Europe/Berlin' %}selected{% endif %}>Europe/Berlin (CET/CEST)</option>
+                                <option value="Europe/Warsaw" {% if cur_tz == 'Europe/Warsaw' %}selected{% endif %}>Europe/Warsaw (CET/CEST)</option>
+                                <option value="Europe/Vienna" {% if cur_tz == 'Europe/Vienna' %}selected{% endif %}>Europe/Vienna (CET/CEST)</option>
+                                <option value="Europe/Bratislava" {% if cur_tz == 'Europe/Bratislava' %}selected{% endif %}>Europe/Bratislava (CET/CEST)</option>
+                                <option value="Europe/Helsinki" {% if cur_tz == 'Europe/Helsinki' %}selected{% endif %}>Europe/Helsinki (EET/EEST)</option>
+                                <option value="Europe/Kyiv" {% if cur_tz == 'Europe/Kyiv' %}selected{% endif %}>Europe/Kyiv (EET/EEST)</option>
+                                <option value="Europe/Moscow" {% if cur_tz == 'Europe/Moscow' %}selected{% endif %}>Europe/Moscow (MSK)</option>
+                            </optgroup>
+                            <optgroup label="UTC">
+                                <option value="UTC" {% if cur_tz == 'UTC' %}selected{% endif %}>UTC</option>
+                            </optgroup>
+                            <optgroup label="Americas">
+                                <option value="America/New_York" {% if cur_tz == 'America/New_York' %}selected{% endif %}>America/New_York (ET)</option>
+                                <option value="America/Chicago" {% if cur_tz == 'America/Chicago' %}selected{% endif %}>America/Chicago (CT)</option>
+                                <option value="America/Denver" {% if cur_tz == 'America/Denver' %}selected{% endif %}>America/Denver (MT)</option>
+                                <option value="America/Los_Angeles" {% if cur_tz == 'America/Los_Angeles' %}selected{% endif %}>America/Los_Angeles (PT)</option>
+                                <option value="America/Sao_Paulo" {% if cur_tz == 'America/Sao_Paulo' %}selected{% endif %}>America/Sao_Paulo (BRT)</option>
+                            </optgroup>
+                            <optgroup label="Asia / Pacific">
+                                <option value="Asia/Dubai" {% if cur_tz == 'Asia/Dubai' %}selected{% endif %}>Asia/Dubai (GST)</option>
+                                <option value="Asia/Kolkata" {% if cur_tz == 'Asia/Kolkata' %}selected{% endif %}>Asia/Kolkata (IST)</option>
+                                <option value="Asia/Shanghai" {% if cur_tz == 'Asia/Shanghai' %}selected{% endif %}>Asia/Shanghai (CST)</option>
+                                <option value="Asia/Tokyo" {% if cur_tz == 'Asia/Tokyo' %}selected{% endif %}>Asia/Tokyo (JST)</option>
+                                <option value="Australia/Sydney" {% if cur_tz == 'Australia/Sydney' %}selected{% endif %}>Australia/Sydney (AEST/AEDT)</option>
+                            </optgroup>
+                        </select>
+                        <p class="text-xs text-gray-400 mt-1">{{ t('settings_timezone_desc') }}</p>
                     </form>
 
                     <form method="POST" class="flex flex-col gap-1.5 border border-gray-100 bg-gray-50 p-3 rounded-lg shadow-sm">
@@ -400,7 +438,7 @@
                     </div>
                     {% if app_settings and app_settings.bambu_last_sync_at %}
                     <div class="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                        {{ t('bambu_last_sync_at') }}: {{ app_settings.bambu_last_sync_at.strftime('%d.%m.%Y %H:%M') }}
+                        {{ t('bambu_last_sync_at') }}: {{ app_settings.bambu_last_sync_at | fmt_dt('%d.%m.%Y %H:%M') }}
                         {% if app_settings.bambu_last_sync_status %}
                         <span class="text-gray-400">|</span> {{ app_settings.bambu_last_sync_status }}
                         {% endif %}

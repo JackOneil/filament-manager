@@ -229,6 +229,18 @@ def register(app):
                     setting.reorder_shop_url = url_raw or None
                     app.logger.debug(f'Reorder shop URL updated: {setting.reorder_shop_url}')
 
+                elif action == 'app_timezone':
+                    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+                    setting = AppSetting.query.first()
+                    tz_raw = request.form.get('app_timezone', '').strip()
+                    if tz_raw:
+                        try:
+                            ZoneInfo(tz_raw)  # validate the zone name
+                            setting.app_timezone = tz_raw
+                            app.logger.debug(f'App timezone set to: {tz_raw}')
+                        except (ZoneInfoNotFoundError, KeyError):
+                            app.logger.warning(f'Invalid timezone rejected: {tz_raw}')
+
                 elif action == 'billing_settings':
                     setting = AppSetting.query.first()
                     setting.company_name = request.form.get('company_name', '').strip() or None

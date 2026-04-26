@@ -170,6 +170,9 @@ class AppSetting(db.Model):
     invoice_prefix = db.Column(db.String(20), default='FV')
     invoice_counter = db.Column(db.Integer, default=0)
 
+    # Display timezone
+    app_timezone = db.Column(db.String(50), default='Europe/Prague')
+
 
 class PrintHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)

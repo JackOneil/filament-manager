@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.68.0] - 2026-04-26
+
+### Added
+- **Configurable display timezone** — A new *Timezone* selector has been added to the General Settings page. All timestamp displays throughout the app (history, projects, print jobs, notifications, users, calculator) are now converted from UTC to the configured local timezone before rendering. The default is `Europe/Prague`. Data continues to be stored as UTC.
+- **Docker timezone** — `TZ: Europe/Prague` added to `docker-compose.yml` so the container OS clock matches Prague local time.
+- **`fmt_dt` Jinja2 filter** — A `fmt_dt(fmt)` template filter is registered in `app.py`. It converts a naive-UTC `datetime` to the app timezone and formats it; pure `date` objects are formatted without conversion; `None` returns an empty string.
+
+## [1.67.1] - 2026-04-26
+
+### Fixed
+- **Duplicate project status notifications** — `_notify_project_status()` now uses a `seen` set (same pattern as `_notify_project_comment`) so admin users who are also a project owner receive only one notification when the project status changes, not two.
+- **Live Printers widget — filament grams & progress bar** — The standalone "Aktuálně tisknoucí zařízení" card on the Overview dashboard now shows:
+  - Bambu: per-material gram weights next to each colour swatch; a time-based estimated progress bar and percentage badge computed from `started_at + cost_time`; estimated finish time (ETA).
+  - Prusa: filament weight in grams; corrected progress percentage (was rendering 0 % because the stored `0.0–1.0` value was not multiplied by 100).
+
 ## [1.67.0] - 2026-04-25
 
 ### Added

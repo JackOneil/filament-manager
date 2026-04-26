@@ -135,10 +135,10 @@
                     </span>
                     {% endif %}
                     {% if job.started_at %}
-                    <span class="text-xs text-gray-500">{{ job.started_at.strftime('%d.%m.%Y') }}</span>
-                    <span class="text-xs text-gray-400">{{ job.started_at.strftime('%H:%M') }}</span>
+                    <span class="text-xs text-gray-500">{{ job.started_at | fmt_dt('%d.%m.%Y') }}</span>
+                    <span class="text-xs text-gray-400">{{ job.started_at | fmt_dt('%H:%M') }}</span>
                     {% elif job.synced_at %}
-                    <span class="text-xs text-gray-400">{{ job.synced_at.strftime('%d.%m.%Y') }}</span>
+                    <span class="text-xs text-gray-400">{{ job.synced_at | fmt_dt('%d.%m.%Y') }}</span>
                     {% endif %}
                 </div>
 
@@ -178,7 +178,7 @@
                         {% if job.finished_at %}
                         <span class="text-xs text-gray-400">
                             <i class="fa-solid fa-flag-checkered mr-0.5"></i>
-                            {{ job.finished_at.strftime('%d.%m.%Y %H:%M') }}
+                            {{ job.finished_at | fmt_dt('%d.%m.%Y %H:%M') }}
                         </span>
                         {% endif %}
                     </div>

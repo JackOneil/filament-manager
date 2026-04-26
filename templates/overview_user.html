@@ -87,7 +87,7 @@
                     <a href="{{ url_for('project_detail', id=comment.project_id) }}" class="ui-card-soft block p-4 hover:border-blue-300 transition">
                         <div class="font-semibold text-gray-800">{{ comment.project.name if comment.project else t('projects') }}</div>
                         <div class="text-sm text-gray-600 mt-2">{{ comment.body[:140] }}{% if comment.body|length > 140 %}…{% endif %}</div>
-                        <div class="text-xs text-gray-400 mt-2">{{ comment.created_at.strftime('%d.%m.%Y %H:%M') if comment.created_at else '' }}</div>
+                        <div class="text-xs text-gray-400 mt-2">{{ comment.created_at | fmt_dt('%d.%m.%Y %H:%M') }}</div>
                     </a>
                     {% else %}
                     <div class="ui-card-soft p-4 text-gray-500">{{ t('user_dashboard_comments_empty') }}</div>
@@ -110,7 +110,7 @@
                         {% if notification.body %}
                         <div class="text-sm text-gray-600 mt-2">{{ notification.body }}</div>
                         {% endif %}
-                        <div class="text-xs text-gray-400 mt-2">{{ notification.created_at.strftime('%d.%m.%Y %H:%M') if notification.created_at else '' }}</div>
+                        <div class="text-xs text-gray-400 mt-2">{{ notification.created_at | fmt_dt('%d.%m.%Y %H:%M') }}</div>
                     </a>
                     {% else %}
                     <div class="ui-card-soft p-4 text-gray-500">{{ t('notifications_empty') }}</div>

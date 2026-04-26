@@ -174,6 +174,7 @@ def register(app):
                 'company_bank_account': setting.company_bank_account if setting else None,
                 'invoice_prefix': setting.invoice_prefix if setting else 'FV',
                 'invoice_counter': setting.invoice_counter if setting else 0,
+                'app_timezone': setting.app_timezone if setting and setting.app_timezone else 'Europe/Prague',
                 # bambu_token intentionally excluded for security
             } if setting else {},
 
@@ -487,6 +488,7 @@ def register(app):
                         setting.company_bank_account = s.get('company_bank_account', setting.company_bank_account)
                         setting.invoice_prefix = s.get('invoice_prefix', setting.invoice_prefix)
                         setting.invoice_counter = s.get('invoice_counter', setting.invoice_counter)
+                        setting.app_timezone = s.get('app_timezone', setting.app_timezone)
 
                 # ── 2b. Users, invites, notifications ────────────────
                 for user_data in data.get('users', []):

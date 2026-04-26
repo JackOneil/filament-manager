@@ -15,11 +15,11 @@
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div class="ui-kpi">
             <div class="ui-label">{{ t('users_created_at') }}</div>
-            <div class="text-lg font-bold mt-2">{{ managed_user.created_at.strftime('%d.%m.%Y %H:%M') if managed_user.created_at else '-' }}</div>
+            <div class="text-lg font-bold mt-2">{{ managed_user.created_at | fmt_dt('%d.%m.%Y %H:%M') or '-' }}</div>
         </div>
         <div class="ui-kpi">
             <div class="ui-label">{{ t('users_last_login_at') }}</div>
-            <div class="text-lg font-bold mt-2">{{ managed_user.last_login_at.strftime('%d.%m.%Y %H:%M') if managed_user.last_login_at else t('users_never_logged_in') }}</div>
+            <div class="text-lg font-bold mt-2">{{ managed_user.last_login_at | fmt_dt('%d.%m.%Y %H:%M') or t('users_never_logged_in') }}</div>
         </div>
         <div class="ui-kpi">
             <div class="ui-label">{{ t('project_owner') }}</div>
@@ -27,7 +27,7 @@
         </div>
         <div class="ui-kpi">
             <div class="ui-label">{{ t('users_last_project_at') }}</div>
-            <div class="text-lg font-bold mt-2">{{ user_last_project_at.strftime('%d.%m.%Y %H:%M') if user_last_project_at else '-' }}</div>
+            <div class="text-lg font-bold mt-2">{{ user_last_project_at | fmt_dt('%d.%m.%Y %H:%M') or '-' }}</div>
         </div>
     </div>
 

@@ -47,7 +47,7 @@ from utils import get_settings, utc_now
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.67.0'
+APP_VERSION = '1.68.0'
 
 csrf = CSRFProtect()
 
@@ -85,6 +85,32 @@ def create_app(test_config=None) -> Flask:
     csrf.init_app(app)
     init_auth(app)
     register_all(app)
+
+    # ── Timezone-aware datetime formatting filter ─────────────────────────────
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+    from datetime import date as _date
+
+    @app.template_filter('fmt_dt')
+    def _fmt_dt_filter(value, fmt='%d.%m.%Y %H:%M'):
+        """Format a naive-UTC datetime into the configured app timezone.
+
+        Returns an empty string for None/falsy values.
+        Pure ``date`` objects (no time component) are formatted without
+        timezone conversion since they carry no time-of-day information.
+        """
+        if not value:
+            return ''
+        if type(value) is _date:
+            # Pure date — no conversion, just format.
+            return value.strftime(fmt)
+        try:
+            from utils import get_settings as _get_settings
+            setting = _get_settings()
+            tz_name = (setting.app_timezone if setting and setting.app_timezone else 'Europe/Prague')
+            local = value.replace(tzinfo=ZoneInfo('UTC')).astimezone(ZoneInfo(tz_name))
+            return local.strftime(fmt)
+        except (ZoneInfoNotFoundError, Exception):
+            return value.strftime(fmt)
 
     @app.context_processor
     def inject_globals():
@@ -266,6 +292,9 @@ def _setup_database(app: Flask) -> None:
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN invoice_prefix VARCHAR(20) NOT NULL DEFAULT 'FV'")
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN invoice_counter INTEGER NOT NULL DEFAULT 0")
         _safe_alter(app, "ALTER TABLE project_quote ADD COLUMN invoice_number VARCHAR(50) DEFAULT NULL")
+
+        # ── Display timezone ─────────────────────────────────────────────────
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN app_timezone VARCHAR(50) NOT NULL DEFAULT 'Europe/Prague'")
 
         # ── Seed data (only runs once on fresh database) ─────────────────────
         if not Brand.query.first():

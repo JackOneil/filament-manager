@@ -94,7 +94,8 @@ def _inventory_stats(f_brand='', f_material='', f_color='', f_tag=''):
 
 def _live_printers():
     live = []
-    freshness_cutoff = utc_now() - timedelta(minutes=15)
+    now_dt = utc_now()
+    freshness_cutoff = now_dt - timedelta(minutes=15)
 
     # Prusa — real-time local-network printers with progress
     for printer in PrusaPrinter.query.filter_by(enabled=True).all():
@@ -109,7 +110,10 @@ def _live_printers():
             and job.synced_at
             and job.synced_at >= freshness_cutoff
         ):
-            live.append({'printer': printer, 'job': job, 'type': 'prusa'})
+            prusa_progress_pct = int(job.progress * 100)
+            prusa_eta_at = (job.started_at + timedelta(seconds=job.cost_time)) if (job.started_at and job.cost_time) else None
+            live.append({'printer': printer, 'job': job, 'type': 'prusa',
+                         'progress_pct': prusa_progress_pct, 'eta_at': prusa_eta_at})
 
     # Bambu Cloud — jobs with RUNNING or PAUSED status fetched from Cloud API.
     # NOTE: Bambu Cloud API sometimes reports actively printing jobs as PAUSED
@@ -142,14 +146,21 @@ def _live_printers():
             display_name=job.model_name,
             file_name=None,
             id=job.id,
-            progress=None,   # No real-time progress for Bambu Cloud jobs
             finished_at=None,
             weight_grams=job.weight_grams,
             cost_time=job.cost_time,        # seconds
             started_at=job.started_at,
             material_swatches=material_swatches,
         )
-        live.append({'printer': fake_printer, 'job': fake_job, 'type': 'bambu'})
+        # Compute time-based progress estimate for Bambu (no real-time progress from Cloud API)
+        bambu_progress_pct = None
+        bambu_eta_at = None
+        if job.started_at and job.cost_time and job.cost_time > 0:
+            elapsed = (now_dt - job.started_at).total_seconds()
+            bambu_progress_pct = min(99, int(elapsed / job.cost_time * 100))
+            bambu_eta_at = job.started_at + timedelta(seconds=job.cost_time)
+        live.append({'printer': fake_printer, 'job': fake_job, 'type': 'bambu',
+                     'progress_pct': bambu_progress_pct, 'eta_at': bambu_eta_at})
 
     return live
 

@@ -194,8 +194,8 @@
                                         <div class="text-sm font-semibold {% if todo.is_done %}line-through text-gray-500{% else %}text-gray-800 dark:text-slate-200{% endif %}">{{ todo.body }}</div>
                                         <div class="text-xs text-gray-400 mt-1">
                                             {% if todo.user %}{{ todo.user.name }} · {% endif %}
-                                            {{ todo.created_at.strftime('%d.%m.%Y %H:%M') if todo.created_at else '' }}
-                                            {% if todo.is_done and todo.completed_at %} · {{ t('project_todo_done_at') }} {{ todo.completed_at.strftime('%d.%m.%Y %H:%M') }}{% endif %}
+                                            {{ todo.created_at | fmt_dt('%d.%m.%Y %H:%M') }}
+                                            {% if todo.is_done and todo.completed_at %} · {{ t('project_todo_done_at') }} {{ todo.completed_at | fmt_dt('%d.%m.%Y %H:%M') }}{% endif %}
                                         </div>
                                     </div>
                                 </div>
@@ -359,8 +359,8 @@
                                 <div>
                                     <div class="font-semibold">{{ comment.user.name if comment.user else t('project_comment_unknown_user') }}</div>
                                     <div class="text-xs text-gray-400 mt-1">
-                                        {{ comment.created_at.strftime('%d.%m.%Y %H:%M') if comment.created_at else '' }}
-                                        {% if comment.updated_at %} · {{ t('project_comment_edited') }} {{ comment.updated_at.strftime('%d.%m.%Y %H:%M') }}{% endif %}
+                                        {{ comment.created_at | fmt_dt('%d.%m.%Y %H:%M') }}
+                                        {% if comment.updated_at %} · {{ t('project_comment_edited') }} {{ comment.updated_at | fmt_dt('%d.%m.%Y %H:%M') }}{% endif %}
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-2">
@@ -742,7 +742,7 @@
                                     <div class="text-sm text-gray-500 mt-1">
                                         {% if item.printer_name %}{{ item.printer_name }} · {% endif %}
                                         {{ item.status or '-' }}
-                                        {% if item.timestamp and item.timestamp.year > 1900 %} · {{ item.timestamp.strftime('%d.%m.%Y %H:%M') }}{% endif %}
+                                        {% if item.timestamp and item.timestamp.year > 1900 %} · {{ item.timestamp | fmt_dt('%d.%m.%Y %H:%M') }}{% endif %}
                                     </div>
                                     <div class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-gray-500">
                                         {% if item.filament_name %}
@@ -797,26 +797,6 @@
                     {% endif %}
                 </div>
                 {% endif %}
-
-                <div class="ui-panel">
-                    <div class="ui-label">{{ t('project_activity_title') }}</div>
-                    <h2 class="text-2xl font-bold mt-1 mb-4">{{ t('project_activity_heading') }}</h2>
-                    <div class="space-y-3">
-                        {% for event in activity_events %}
-                        <div class="ui-card-soft p-4">
-                            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                                <div>
-                                    <div class="font-semibold text-gray-800">{{ event.label }}</div>
-                                    <div class="text-xs text-gray-500 mt-1">{{ event.created_at.strftime('%d.%m.%Y %H:%M') if event.created_at else '-' }}</div>
-                                </div>
-                                <div class="text-sm text-gray-500">{{ event.meta }}</div>
-                            </div>
-                        </div>
-                        {% else %}
-                        <p class="text-sm text-gray-400">{{ t('project_no_activity') }}</p>
-                        {% endfor %}
-                    </div>
-                </div>
             </div>
 
             <div x-show="workspaceTab === 'activity'" x-cloak class="space-y-4">
@@ -844,10 +824,10 @@
                             {% set label = t('project_activity_comment_label') %}
                             {% set card_color = 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800/50' %}
                         {% elif event.kind == 'todo' %}
-                            {% set dot_color = 'bg-emerald-500' %}
-                            {% set icon = 'fa-check-square' %}
+                            {% set dot_color = 'bg-emerald-500' if event.meta == 'done' else 'bg-amber-400' %}
+                            {% set icon = 'fa-check-square' if event.meta == 'done' else 'fa-square' %}
                             {% set label = t('project_activity_todo_label') %}
-                            {% set card_color = 'border-emerald-100 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-900/10' %}
+                            {% set card_color = 'border-emerald-100 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-900/10' if event.meta == 'done' else 'border-amber-100 bg-amber-50/40 dark:border-amber-900/40 dark:bg-amber-900/10' %}
                         {% else %}
                             {% set dot_color = 'bg-gray-400' %}
                             {% set icon = 'fa-circle-dot' %}
@@ -860,10 +840,28 @@
                             </div>
                             <div class="rounded-2xl border {{ card_color }} px-4 py-3">
                                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                                    <div class="font-semibold text-gray-800 dark:text-slate-200 text-sm">{{ label }}</div>
-                                    <div class="text-xs text-gray-400">{{ event.created_at.strftime('%d.%m.%Y %H:%M') if event.created_at else '-' }}</div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">{{ label }}</span>
+                                        {% if event.kind == 'todo' %}
+                                            {% if event.meta == 'done' %}
+                                            <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-900/40 px-2 py-0.5 rounded-full"><i class="fa-solid fa-check text-[9px]"></i> {{ t('project_activity_todo_done') }}</span>
+                                            {% else %}
+                                            <span class="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-100 dark:text-amber-300 dark:bg-amber-900/40 px-2 py-0.5 rounded-full"><i class="fa-solid fa-hourglass-half text-[9px]"></i> {{ t('project_activity_todo_open') }}</span>
+                                            {% endif %}
+                                        {% elif event.kind == 'file' %}
+                                        <span class="text-xs font-mono font-medium text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/40 px-1.5 py-0.5 rounded">{{ event.meta }}</span>
+                                        {% elif event.kind == 'comment' %}
+                                        <span class="text-xs text-gray-500 dark:text-slate-400"><i class="fa-solid fa-user text-[9px] mr-1"></i>{{ event.meta }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-xs text-gray-400">{{ event.created_at | fmt_dt('%d.%m.%Y %H:%M') or '-' }}</div>
                                 </div>
-                                <div class="text-sm text-gray-600 dark:text-slate-400 mt-1 truncate">{{ event.meta }}</div>
+                                {% if event.detail %}
+                                <div class="text-sm font-medium text-gray-800 dark:text-slate-200 mt-2 leading-snug">{{ event.detail }}</div>
+                                {% endif %}
+                                {% if event.kind == 'quote' %}
+                                <div class="text-xs text-gray-500 dark:text-slate-400 mt-1">{{ event.meta }}</div>
+                                {% endif %}
                             </div>
                         </div>
                         {% endfor %}

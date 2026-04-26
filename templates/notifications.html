@@ -76,7 +76,7 @@
                     {% if notification.body %}
                     <div class="text-sm text-gray-500 mt-0.5">{{ notification.body }}</div>
                     {% endif %}
-                    <div class="text-xs text-gray-400 mt-1.5">{{ notification.created_at.strftime('%d.%m.%Y %H:%M') if notification.created_at else '' }}</div>
+                    <div class="text-xs text-gray-400 mt-1.5">{{ notification.created_at | fmt_dt('%d.%m.%Y %H:%M') }}</div>
                 </div>
             </div>
             <div class="flex items-center gap-2 flex-shrink-0 ml-11 sm:ml-0">
