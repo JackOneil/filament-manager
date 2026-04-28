@@ -198,6 +198,9 @@ class AppSetting(db.Model):
     # Display timezone
     app_timezone = db.Column(db.String(50), default='Europe/Prague')
 
+    # Onboarding
+    onboarding_dismissed = db.Column(db.Boolean, default=False)
+
 
 class PrintHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -286,7 +289,10 @@ class ProjectFile(db.Model):
     filename = db.Column(db.String(255), nullable=False)
     filepath = db.Column(db.String(255), nullable=False)
     uploaded_at = db.Column(db.DateTime, default=_utc_now)
+    version = db.Column(db.Integer, nullable=False, default=1)
+    parent_file_id = db.Column(db.Integer, db.ForeignKey('project_file.id', ondelete='SET NULL'), nullable=True)
     project = db.relationship('Project', backref=db.backref('files', lazy=True, cascade="all, delete-orphan"))
+    versions = db.relationship('ProjectFile', backref=db.backref('parent', remote_side='ProjectFile.id'), lazy=True, cascade='all, delete-orphan')
 
 
 class ProjectLink(db.Model):
@@ -423,3 +429,20 @@ class PrusaPrintJob(db.Model):
 
     def __repr__(self):
         return f'<PrusaPrintJob {self.id} {self.display_name!r} status={self.status}>'
+
+
+class PrinterMaintenance(db.Model):
+    """Service record for Bambu or Prusa printers (nozzle changes, calibration, faults, etc.)."""
+    id = db.Column(db.Integer, primary_key=True)
+    printer_type = db.Column(db.String(20), nullable=False)   # 'bambu' or 'prusa'
+    printer_id = db.Column(db.Integer, nullable=True)          # FK to BambuPrinter or PrusaPrinter
+    printer_name = db.Column(db.String(200), nullable=False)   # denormalized snapshot
+    maintenance_type = db.Column(db.String(50), nullable=False, default='other')
+    # nozzle_change, calibration, service, fault, other
+    notes = db.Column(db.Text, nullable=True)
+    performed_at = db.Column(db.DateTime, nullable=False, default=_utc_now)
+    next_service_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=_utc_now)
+
+    def __repr__(self):
+        return f'<PrinterMaintenance {self.id} {self.printer_name!r} {self.maintenance_type!r}>'

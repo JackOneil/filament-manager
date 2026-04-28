@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800">{{ t('maintenance_title') }}</h1>
+            <p class="text-gray-500 mt-1">{{ t('maintenance_desc') }}</p>
+        </div>
+        <button onclick="document.getElementById('addMaintenanceModal').classList.remove('hidden')"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl shadow transition flex items-center gap-2">
+            <i class="fa-solid fa-plus"></i> {{ t('maintenance_add') }}
+        </button>
+    </div>
+
+    <!-- Filters -->
+    <div class="flex flex-wrap gap-3 items-center">
+        <a href="{{ url_for('maintenance_index') }}"
+           class="ui-badge {% if not filter_printer and not filter_type %}ui-badge-brand{% else %}ui-badge-neutral{% endif %}">
+            {{ t('all') }}
+        </a>
+        {% for pname in all_printer_names %}
+        <a href="{{ url_for('maintenance_index', printer=pname, type=filter_type) }}"
+           class="ui-badge {% if filter_printer == pname %}ui-badge-brand{% else %}ui-badge-neutral{% endif %}">
+            {{ pname }}
+        </a>
+        {% endfor %}
+        {% if all_printer_names %}<span class="text-gray-300">|</span>{% endif %}
+        {% for mt in maintenance_types %}
+        <a href="{{ url_for('maintenance_index', printer=filter_printer, type=mt) }}"
+           class="ui-badge {% if filter_type == mt %}ui-badge-brand{% else %}ui-badge-neutral{% endif %}">
+            {{ t('maintenance_type_' ~ mt) }}
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Records list -->
+    {% if records %}
+    <div class="space-y-3">
+        {% for item in records %}
+        {% set rec = item.rec %}
+        <div class="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-4 flex flex-col md:flex-row md:items-center gap-3">
+            <!-- Type icon -->
+            <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center
+                {% if rec.maintenance_type == 'fault' %}bg-red-100 text-red-600
+                {% elif rec.maintenance_type == 'nozzle_change' %}bg-blue-100 text-blue-600
+                {% elif rec.maintenance_type == 'calibration' %}bg-purple-100 text-purple-600
+                {% elif rec.maintenance_type == 'service' %}bg-green-100 text-green-600
+                {% else %}bg-gray-100 text-gray-600{% endif %}">
+                {% if rec.maintenance_type == 'fault' %}<i class="fa-solid fa-triangle-exclamation"></i>
+                {% elif rec.maintenance_type == 'nozzle_change' %}<i class="fa-solid fa-circle-dot"></i>
+                {% elif rec.maintenance_type == 'calibration' %}<i class="fa-solid fa-sliders"></i>
+                {% elif rec.maintenance_type == 'service' %}<i class="fa-solid fa-screwdriver-wrench"></i>
+                {% else %}<i class="fa-solid fa-wrench"></i>{% endif %}
+            </div>
+            <!-- Content -->
+            <div class="flex-grow min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="font-semibold text-gray-800">{{ rec.printer_name }}</span>
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full
+                        {% if rec.maintenance_type == 'fault' %}bg-red-100 text-red-700
+                        {% elif rec.maintenance_type == 'nozzle_change' %}bg-blue-100 text-blue-700
+                        {% elif rec.maintenance_type == 'calibration' %}bg-purple-100 text-purple-700
+                        {% elif rec.maintenance_type == 'service' %}bg-green-100 text-green-700
+                        {% else %}bg-gray-100 text-gray-700{% endif %}">
+                        {{ t('maintenance_type_' ~ rec.maintenance_type) }}
+                    </span>
+                    {% if item.is_overdue %}
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                        <i class="fa-solid fa-clock-rotate-left mr-1"></i>{{ t('maintenance_overdue') }}
+                    </span>
+                    {% elif item.is_due_soon %}
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                        <i class="fa-solid fa-bell mr-1"></i>{{ t('maintenance_due_soon') }}
+                    </span>
+                    {% endif %}
+                </div>
+                {% if rec.notes %}
+                <p class="text-sm text-gray-600 mt-1 truncate">{{ rec.notes }}</p>
+                {% endif %}
+                <div class="text-xs text-gray-400 mt-1 flex flex-wrap gap-3">
+                    <span><i class="fa-solid fa-calendar-day mr-1"></i>{{ rec.performed_at | fmt_dt('%d.%m.%Y %H:%M') }}</span>
+                    {% if rec.next_service_at %}
+                    <span class="{% if item.is_overdue %}text-red-500{% elif item.is_due_soon %}text-orange-500{% endif %}">
+                        <i class="fa-solid fa-calendar-clock mr-1"></i>{{ t('maintenance_next') }}: {{ rec.next_service_at | fmt_dt('%d.%m.%Y') }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            <!-- Delete -->
+            <form method="POST" action="{{ url_for('maintenance_delete', rec_id=rec.id) }}"
+                  onsubmit="return confirm('{{ t('confirm_delete') }}')">
+                <button type="submit" class="text-gray-300 hover:text-red-500 transition" title="{{ t('delete') }}">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if paginated.pages > 1 %}
+    <div class="flex justify-center gap-2 pt-4">
+        {% for p in range(1, paginated.pages + 1) %}
+        <a href="{{ url_for('maintenance_index', page=p, printer=filter_printer, type=filter_type) }}"
+           class="ui-badge {% if p == paginated.page %}ui-badge-brand{% else %}ui-badge-neutral{% endif %}">{{ p }}</a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="text-center py-20 text-gray-400">
+        <i class="fa-solid fa-wrench text-5xl mb-4 block"></i>
+        <p class="text-lg">{{ t('maintenance_empty') }}</p>
+        <p class="text-sm mt-1">{{ t('maintenance_empty_hint') }}</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Add Maintenance Modal -->
+<div id="addMaintenanceModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 space-y-5">
+        <div class="flex items-center justify-between">
+            <h2 class="text-xl font-bold text-gray-800">{{ t('maintenance_add') }}</h2>
+            <button onclick="document.getElementById('addMaintenanceModal').classList.add('hidden')"
+                    class="text-gray-400 hover:text-gray-700 transition text-xl">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+        <form method="POST" action="{{ url_for('maintenance_add') }}" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="ui-label">{{ t('maintenance_printer_type') }}</label>
+                    <select name="printer_type" id="mPrinterType" onchange="updatePrinterNames()"
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="bambu">Bambu Lab</option>
+                        <option value="prusa">Prusa</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="ui-label">{{ t('maintenance_printer_name') }}</label>
+                    <select name="printer_id" id="mPrinterId" onchange="setMPrinterName()"
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                        {% for p in bambu_printers %}
+                        <option value="{{ p.id }}" data-type="bambu" data-name="{{ p.name }}">{{ p.name }}</option>
+                        {% endfor %}
+                        {% for p in prusa_printers %}
+                        <option value="{{ p.id }}" data-type="prusa" data-name="{{ p.name }}">{{ p.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="hidden" name="printer_name" id="mPrinterNameHidden" value="">
+                </div>
+            </div>
+            <div>
+                <label class="ui-label">{{ t('maintenance_type_label') }}</label>
+                <select name="maintenance_type"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    {% for mt in maintenance_types %}
+                    <option value="{{ mt }}">{{ t('maintenance_type_' ~ mt) }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="ui-label">{{ t('maintenance_notes') }}</label>
+                <textarea name="notes" rows="2"
+                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                          placeholder="{{ t('maintenance_notes_placeholder') }}"></textarea>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="ui-label">{{ t('maintenance_performed_at') }}</label>
+                    <input type="datetime-local" name="performed_at" id="mPerformedAt"
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="ui-label">{{ t('maintenance_next_service_at') }}</label>
+                    <input type="date" name="next_service_at"
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 pt-2">
+                <button type="button"
+                        onclick="document.getElementById('addMaintenanceModal').classList.add('hidden')"
+                        class="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
+                    {{ t('cancel') }}
+                </button>
+                <button type="submit"
+                        class="px-5 py-2 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow transition">
+                    <i class="fa-solid fa-save mr-1"></i>{{ t('save') }}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+const bambuPrinters = {{ bambu_printers | map(attribute='name') | list | tojson }};
+const prusaPrinters = {{ prusa_printers | map(attribute='name') | list | tojson }};
+
+function updatePrinterNames() {
+    const type = document.getElementById('mPrinterType').value;
+    const sel = document.getElementById('mPrinterId');
+    const options = sel.querySelectorAll('option');
+    options.forEach(opt => {
+        opt.style.display = opt.dataset.type === type ? '' : 'none';
+    });
+    // Select first visible
+    const visible = [...options].filter(o => o.dataset.type === type);
+    if (visible.length) visible[0].selected = true;
+    setMPrinterName();
+}
+
+function setMPrinterName() {
+    const sel = document.getElementById('mPrinterId');
+    const selected = sel.options[sel.selectedIndex];
+    document.getElementById('mPrinterNameHidden').value = selected ? (selected.dataset.name || '') : '';
+}
+
+// Set default datetime to now
+document.addEventListener('DOMContentLoaded', function() {
+    const now = new Date();
+    const local = now.toISOString().slice(0, 16);
+    document.getElementById('mPerformedAt').value = local;
+    updatePrinterNames();
+    setMPrinterName();
+});
+</script>
+{% endblock %}

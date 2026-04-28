@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.70.0] - 2026-04-28
+
+### Added
+- **Mini consumption chart** — Filament detail page now shows a 6-month bar chart of filament consumption driven by movement history.
+- **Operator / Admin UI mode toggle** — Admins can switch to an "Operator" view (read-only, simplified layout) without logging out. An amber indicator badge is shown in the top bar while in operator mode.
+- **Onboarding checklist** — A guided setup checklist appears after first installation until dismissed. Checks currency, energy cost, printer connection, and first filament.
+- **Settings page tabs** — Settings are now organised into six tabs: General, Printers, Integrations, Company, Data, and Dictionaries.
+- **CSV / Excel filament import** — New two-step import wizard at `/filaments/import-csv`. Parses CSV/TSV, shows a preview table, and creates missing brands/materials/colors automatically on confirm.
+- **Printer maintenance module** — New `/maintenance` page for logging nozzle changes, calibrations, services, faults, and other events per printer. Supports overdue and due-soon badge indicators.
+- **Project file versioning** — Re-uploading a file with the same name to a project automatically creates a new version. The files tab groups all versions under the root file with an expandable history panel.
+
 ## [1.69.2] - 2026-04-26
 
 ### Fixed

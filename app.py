@@ -42,12 +42,13 @@ from models import (
     BambuPrinter, BambuPrintJob, BambuJobMaterial,
     PrusaPrinter, PrusaPrintJob,
     User, UserInvite, Notification, AuditLog, ProjectComment,
+    PrinterMaintenance,
 )  # noqa: F401
 from utils import get_settings, utc_now
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.69.2'
+APP_VERSION = '1.70.0'
 
 csrf = CSRFProtect()
 
@@ -136,6 +137,9 @@ def create_app(test_config=None) -> Flask:
         except Exception:
             nav_prusa_enabled = False
 
+        from flask import session as _session
+        ui_mode = _session.get('ui_mode', 'admin')  # 'admin' or 'operator'
+
         return dict(
             t=t,
             current_lang=lang,
@@ -148,6 +152,7 @@ def create_app(test_config=None) -> Flask:
             current_user=current_user,
             auth_has_section_access=has_section_access,
             auth_is_admin=is_admin,
+            ui_mode=ui_mode,
         )
 
     @app.errorhandler(403)
@@ -300,6 +305,13 @@ def _setup_database(app: Flask) -> None:
 
         # ── Display timezone ─────────────────────────────────────────────────
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN app_timezone VARCHAR(50) NOT NULL DEFAULT 'Europe/Prague'")
+
+        # ── Onboarding checklist ─────────────────────────────────────────────
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN onboarding_dismissed BOOLEAN NOT NULL DEFAULT 0")
+
+        # ── Project file versioning ──────────────────────────────────────────
+        _safe_alter(app, "ALTER TABLE project_file ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
+        _safe_alter(app, "ALTER TABLE project_file ADD COLUMN parent_file_id INTEGER DEFAULT NULL")
 
         # ── Seed data (only runs once on fresh database) ─────────────────────
         if not Brand.query.first():

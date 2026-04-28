@@ -1,4 +1,6 @@
 """Inventory routes: listing, CRUD, spool management, and filament detail."""
+import csv
+import io
 import math
 from collections import Counter
 from datetime import datetime, timedelta
@@ -495,6 +497,22 @@ def register(app):
             )
         action_center = build_action_center()
         live_printers = _live_printers()
+        from models import AppSetting, PrusaPrinter, BambuPrinter
+        app_settings = AppSetting.query.first()
+        has_filament = Filament.query.first() is not None
+        has_printer = (BambuPrinter.query.first() is not None or
+                       PrusaPrinter.query.first() is not None)
+        show_onboarding = (
+            app_settings and not app_settings.onboarding_dismissed and
+            not (has_filament and has_printer and
+                 app_settings.currency and app_settings.kwh_price)
+        )
+        onboarding_steps = {
+            'currency': bool(app_settings and app_settings.currency not in (None, 'CZK')),
+            'energy': bool(app_settings and app_settings.kwh_price and app_settings.printer_power),
+            'printer': has_printer,
+            'filament': has_filament,
+        }
         return render_template(
             'overview.html',
             stats=_inventory_stats(),
@@ -502,6 +520,8 @@ def register(app):
             live_printers=live_printers,
             overview_focus=_overview_focus(action_center, live_printers),
             today=utc_now().date(),
+            show_onboarding=show_onboarding,
+            onboarding_steps=onboarding_steps,
         )
 
     @app.route('/filaments')
@@ -561,6 +581,28 @@ def register(app):
         daily_usage = m['usage_30'] / 30.0 if m['usage_30'] > 0 else 0.0
         detail_days_left = round(m['remaining'] / daily_usage) if daily_usage > 0 else None
 
+        # ── Monthly consumption chart (last 6 months) ────────────────────────
+        now = utc_now()
+        chart_labels = []
+        chart_data = []
+        for i in range(5, -1, -1):
+            month_start = (now.replace(day=1) - timedelta(days=i * 28)).replace(day=1)
+            if i > 0:
+                next_month_start = (month_start + timedelta(days=32)).replace(day=1)
+            else:
+                next_month_start = now + timedelta(days=1)
+            consumed = db.session.query(func.sum(MovementHistory.weight)).filter(
+                db.or_(
+                    MovementHistory.filament_id == filament.id,
+                    MovementHistory.filament_name == _display_filament_name(filament),
+                ),
+                MovementHistory.action_type.in_(['remove', 'bambu_print', 'prusa_print', 'bulk_delete']),
+                MovementHistory.created_at >= month_start,
+                MovementHistory.created_at < next_month_start,
+            ).scalar() or 0.0
+            chart_labels.append(month_start.strftime('%b %Y'))
+            chart_data.append(round(consumed, 1))
+
         from utils import get_settings
         app_settings = get_settings()
 
@@ -575,6 +617,8 @@ def register(app):
             formatted_tags=format_tags(filament.tag_text),
             detail_days_left=detail_days_left,
             app_settings=app_settings,
+            chart_labels=chart_labels,
+            chart_data=chart_data,
         )
 
     @app.route('/filament/<int:id>/meta', methods=['POST'])
@@ -753,3 +797,213 @@ def register(app):
         db.session.delete(filament)
         db.session.commit()
         return redirect(url_for('filaments_index'))
+
+    # ── Operator / Admin mode toggle ──────────────────────────────────────────
+
+    @app.route('/toggle-ui-mode', methods=['POST'])
+    def toggle_ui_mode():
+        from flask import session
+        from auth import get_current_user, is_admin
+        user = get_current_user()
+        if not is_admin(user):
+            return redirect(request.referrer or url_for('index'))
+        current = session.get('ui_mode', 'admin')
+        session['ui_mode'] = 'operator' if current == 'admin' else 'admin'
+        return redirect(request.referrer or url_for('index'))
+
+    # ── CSV filament import ───────────────────────────────────────────────────
+
+    @app.route('/filaments/import-csv', methods=['GET', 'POST'])
+    def filament_import_csv():
+        import csv
+        import io
+        _require_inventory_admin()
+        from utils import translate
+
+        REQUIRED_COLS = {'name', 'brand', 'material', 'color', 'weight_total', 'price'}
+        COL_ALIASES = {
+            'name': ['name', 'název', 'nazev'],
+            'brand': ['brand', 'značka', 'znacka', 'výrobce', 'vyrobce'],
+            'material': ['material', 'materiál'],
+            'color': ['color', 'barva', 'colour'],
+            'weight_total': ['weight_total', 'weight total', 'celková váha', 'celkova vaha', 'weight total (g)', 'celková váha (g)'],
+            'weight_remaining': ['weight_remaining', 'weight remaining', 'zbývající váha', 'zbyvajici vaha', 'weight remaining (g)', 'zbývající váha (g)'],
+            'price': ['price', 'cena'],
+            'quantity': ['quantity', 'počet', 'pocet', 'qty'],
+            'nozzle_temp': ['nozzle_temp', 'nozzle temp', 'teplota trysky'],
+            'bed_temp': ['bed_temp', 'bed temp', 'teplota podložky', 'teplota podlozky'],
+        }
+
+        def _norm_header(h):
+            return h.strip().lower()
+
+        def _map_headers(headers):
+            """Return dict {canonical_key: col_index} from raw headers."""
+            norm = [_norm_header(h) for h in headers]
+            mapping = {}
+            for key, aliases in COL_ALIASES.items():
+                for i, h in enumerate(norm):
+                    if h in aliases:
+                        mapping[key] = i
+                        break
+            return mapping
+
+        if request.method == 'GET':
+            if request.args.get('template') == '1':
+                import flask
+                CSV_TEMPLATE_HEADER = 'name,brand,material,color,weight_total,weight_remaining,price,quantity,nozzle_temp,bed_temp\n'
+                CSV_TEMPLATE_ROW = 'Example Filament,Bambu,PLA,Red,1000,1000,25.00,1,220,60\n'
+                output = '\ufeff' + CSV_TEMPLATE_HEADER + CSV_TEMPLATE_ROW
+                response = flask.make_response(output)
+                response.headers['Content-Type'] = 'text/csv; charset=utf-8-sig'
+                response.headers['Content-Disposition'] = 'attachment; filename="filament_import_template.csv"'
+                return response
+            return render_template('filament_import_csv.html', step='upload')
+
+        # POST — could be 'upload' (parse preview) or 'confirm' (do import)
+        step = request.form.get('step', 'upload')
+
+        if step == 'upload':
+            file = request.files.get('csv_file')
+            if not file or file.filename == '':
+                return render_template('filament_import_csv.html', step='upload',
+                                       error=translate('import_csv_error_no_file'))
+            separator = request.form.get('separator', ',')
+            try:
+                content = file.read().decode('utf-8-sig')
+                reader = csv.reader(io.StringIO(content), delimiter=separator)
+                rows = list(reader)
+            except Exception:
+                return render_template('filament_import_csv.html', step='upload',
+                                       error=translate('import_csv_error_bad_format'))
+            if len(rows) < 2:
+                return render_template('filament_import_csv.html', step='upload',
+                                       error=translate('import_csv_error_bad_format'))
+            col_map = _map_headers(rows[0])
+            missing = REQUIRED_COLS - col_map.keys()
+            if missing:
+                return render_template('filament_import_csv.html', step='upload',
+                                       error=translate('import_csv_error_missing_cols').replace(
+                                           '{cols}', ', '.join(sorted(missing))))
+            preview_rows = []
+            for row in rows[1:]:
+                if not any(c.strip() for c in row):
+                    continue
+                def _get(key, default=''):
+                    idx = col_map.get(key)
+                    if idx is None or idx >= len(row):
+                        return default
+                    return row[idx].strip()
+                preview_rows.append({
+                    'name': _get('name'),
+                    'brand': _get('brand'),
+                    'material': _get('material'),
+                    'color': _get('color'),
+                    'weight_total': _get('weight_total'),
+                    'weight_remaining': _get('weight_remaining'),
+                    'price': _get('price'),
+                    'quantity': _get('quantity', '1'),
+                    'nozzle_temp': _get('nozzle_temp'),
+                    'bed_temp': _get('bed_temp'),
+                })
+            import json as _json
+            csv_payload = _json.dumps({'separator': separator, 'col_map': {k: v for k, v in col_map.items()}, 'rows': preview_rows})
+            return render_template('filament_import_csv.html', step='preview',
+                                   preview_rows=preview_rows, csv_payload=csv_payload)
+
+        if step == 'confirm':
+            import json as _json
+            try:
+                payload = _json.loads(request.form.get('csv_payload', '{}'))
+                rows = payload.get('rows', [])
+            except Exception:
+                return redirect(url_for('filament_import_csv'))
+            imported = 0
+            for row in rows:
+                name = row.get('name', '').strip()
+                if not name:
+                    continue
+                brand_name = row.get('brand', '').strip() or 'Unknown'
+                material_name = row.get('material', '').strip() or 'PLA'
+                color_name = row.get('color', '').strip() or 'Unknown'
+                try:
+                    weight_total = float(row.get('weight_total') or 0)
+                    weight_remaining_raw = row.get('weight_remaining', '').strip()
+                    weight_remaining = float(weight_remaining_raw) if weight_remaining_raw else weight_total
+                    price = float(row.get('price') or 0)
+                    quantity = max(int(row.get('quantity') or 1), 1)
+                except (TypeError, ValueError):
+                    continue
+                brand = Brand.query.filter_by(name=brand_name).first()
+                if not brand:
+                    brand = Brand(name=brand_name)
+                    db.session.add(brand)
+                    db.session.flush()
+                material = Material.query.filter_by(name=material_name).first()
+                if not material:
+                    material = Material(name=material_name)
+                    db.session.add(material)
+                    db.session.flush()
+                color = Color.query.filter_by(name=color_name).first()
+                if not color:
+                    color = Color(name=color_name)
+                    db.session.add(color)
+                    db.session.flush()
+                try:
+                    nozzle_temp = int(row.get('nozzle_temp') or 0) or None
+                    bed_temp = int(row.get('bed_temp') or 0) or None
+                except (TypeError, ValueError):
+                    nozzle_temp = None
+                    bed_temp = None
+                db.session.add(Filament(
+                    name=name,
+                    brand_id=brand.id,
+                    material_id=material.id,
+                    color_id=color.id,
+                    weight_total=weight_total,
+                    weight_remaining=weight_remaining,
+                    price=price,
+                    quantity=quantity,
+                    recommended_nozzle_temp=nozzle_temp,
+                    recommended_bed_temp=bed_temp,
+                ))
+                imported += 1
+            db.session.commit()
+            return redirect(url_for('filaments_index',
+                                    _anchor='import_ok',
+                                    imported=imported))
+
+    # ── CSV filament export ───────────────────────────────────────────────────
+
+    @app.route('/filaments/export-csv', methods=['GET'])
+    def filament_export_csv():
+        import flask
+        _require_inventory_admin()
+        filaments = Filament.query.order_by(Filament.name).all()
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([
+            'name', 'brand', 'material', 'color',
+            'weight_total', 'weight_remaining', 'price', 'quantity',
+            'nozzle_temp', 'bed_temp',
+        ])
+        for f in filaments:
+            writer.writerow([
+                f.name,
+                f.brand.name if f.brand else '',
+                f.material.name if f.material else '',
+                f.color.name if f.color else '',
+                f.weight_total,
+                f.weight_remaining,
+                f.price,
+                f.quantity,
+                f.recommended_nozzle_temp or '',
+                f.recommended_bed_temp or '',
+            ])
+        csv_content = output.getvalue()
+        # Prepend UTF-8 BOM so Excel and other tools correctly detect Czech characters
+        response = flask.make_response('\ufeff' + csv_content)
+        response.headers['Content-Type'] = 'text/csv; charset=utf-8-sig'
+        response.headers['Content-Disposition'] = 'attachment; filename="filaments_export.csv"'
+        return response
+

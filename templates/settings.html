@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="max-w-7xl mx-auto space-y-6">
-    <div class="flex items-center gap-3 mb-6 pb-4 border-b border-gray-200">
+<div class="max-w-7xl mx-auto space-y-6" x-data="{ activeTab: (new URLSearchParams(location.search).get('tab') || 'general') }">
+    <div class="flex items-center gap-3 mb-2 pb-4 border-b border-gray-200">
         <i class="fa-solid fa-cog text-3xl text-gray-400"></i>
         <div>
             <h1 class="text-3xl font-bold text-gray-800">{{ t('settings_title') }}</h1>
@@ -9,6 +9,27 @@
         </div>
     </div>
 
+    <!-- Tab navigation -->
+    <div class="flex flex-wrap gap-1 border-b border-gray-200 dark:border-slate-700 pb-0 -mb-px">
+        {% for tab_id, tab_key, tab_icon in [
+            ('general', 'settings_tab_general', 'fa-sliders'),
+            ('printers', 'settings_tab_printers', 'fa-plug-circle-bolt'),
+            ('integrations', 'settings_tab_integrations', 'fa-link'),
+            ('company', 'settings_tab_company', 'fa-building'),
+            ('data', 'settings_tab_data', 'fa-database'),
+            ('dicts', 'settings_tab_dicts', 'fa-list'),
+        ] %}
+        <button type="button" @click="activeTab = '{{ tab_id }}'"
+                :class="activeTab === '{{ tab_id }}' ? 'border-b-2 border-[var(--ui-brand)] text-[var(--ui-brand-strong)] bg-[var(--ui-brand-soft)]' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200'"
+                class="px-4 py-2.5 text-sm font-semibold rounded-t-lg transition-colors flex items-center gap-2 whitespace-nowrap">
+            <i class="fa-solid {{ tab_icon }}"></i>
+            {{ t(tab_key) }}
+        </button>
+        {% endfor %}
+    </div>
+
+    <!-- TAB: Printers (diagnostics) -->
+    <div x-show="activeTab === 'printers'" x-cloak>
     <div id="printer-diagnostics" class="ui-panel">
         <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
             <div>
@@ -65,7 +86,10 @@
             </div>
         </div>
     </div>
+    </div> <!-- end tab: printers -->
 
+    <!-- TAB: General settings -->
+    <div x-show="activeTab === 'general'" x-cloak>
     <!-- Obecná nastavení – plná šířka -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div class="flex items-center gap-2 mb-4 border-b pb-3">
@@ -168,6 +192,10 @@
                 </form>
             </div>
     </div>
+    </div> <!-- end tab: general -->
+
+    <!-- TAB: Dictionaries (Brands / Materials / Colors) -->
+    <div x-show="activeTab === 'dicts'" x-cloak>
 
     <!-- Značky / Materiály / Barvy -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -378,9 +406,13 @@
             </div>
         </form>
     </div>
+    </div> <!-- end tab: dicts -->
+
+    <!-- TAB: Integrations (Bambu + PrusaLink configuration) -->
+    <div x-show="activeTab === 'integrations'" x-cloak>
 
     <!-- Bambu Lab Cloud integration -->
-    <div id="bambu-cloud" class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <div id="bambu-cloud" class="mt-0 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div class="flex items-center gap-2 mb-4 border-b pb-3">
             <i class="fa-solid fa-print text-blue-500"></i>
             <h2 class="text-xl font-bold text-gray-800">{{ t('bambu_cloud_title') }}</h2>
@@ -742,9 +774,13 @@
             </div>
         </div>
     </div>
+    </div> <!-- end tab: integrations -->
+
+    <!-- TAB: Company / Billing settings -->
+    <div x-show="activeTab === 'company'" x-cloak>
 
     <!-- Billing settings -->
-    <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <div class="mt-0 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div class="flex items-center gap-2 mb-4 border-b pb-3">
             <i class="fa-solid fa-file-invoice text-indigo-500"></i>
             <h2 class="text-xl font-bold text-gray-800">{{ t('billing_settings_title') if t('billing_settings_title') != 'billing_settings_title' else 'Fakturační údaje' }}</h2>
@@ -795,9 +831,13 @@
             </div>
         </form>
     </div>
+    </div> <!-- end tab: company -->
+
+    <!-- TAB: Data (Export / Import) -->
+    <div x-show="activeTab === 'data'" x-cloak>
 
     <!-- Export / Import -->
-    <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <div class="mt-0 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div class="flex items-center gap-2 mb-4 border-b pb-3">
             <i class="fa-solid fa-database text-green-500"></i>
             <h2 class="text-xl font-bold text-gray-800">{{ t('database_backup') }}</h2>
@@ -816,8 +856,7 @@
                 </button>
             </form>
         </div>
-    </div>
-</div>
+    </div> <!-- end tab: data -->
 
 <!-- Modal for Bambu token help -->
 <div id="bambuTokenHelpModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
@@ -882,4 +921,5 @@ document.addEventListener('keydown', function(e) {
     }
 });
 </script>
+</div> <!-- end x-data settings -->
 {% endblock %}

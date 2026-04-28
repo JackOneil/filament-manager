@@ -277,6 +277,9 @@ def _notify_project_comment(project, author):
 def _get_project_files_by_category(project):
     images, model_files, other_files = [], [], []
     for project_file in project.files:
+        # Skip version files (children) — they appear under the parent
+        if project_file.parent_file_id is not None:
+            continue
         ext = _get_extension(project_file.filename)
         if ext in IMAGE_EXTENSIONS:
             images.append(project_file)
@@ -770,7 +773,31 @@ def register(app):
             stored_filename = _build_storage_name(project.id, original_filename)
             filepath = os.path.join(upload_folder, stored_filename)
             file.save(filepath)
-            db.session.add(ProjectFile(project_id=project.id, filename=original_filename, filepath=filepath))
+            # ── Versioning: check if a file with the same name already exists ──
+            existing = ProjectFile.query.filter_by(
+                project_id=project.id, filename=original_filename, parent_file_id=None
+            ).order_by(ProjectFile.version.desc()).first()
+            if existing:
+                # Find latest version in the chain
+                latest = ProjectFile.query.filter_by(
+                    project_id=project.id, filename=original_filename
+                ).order_by(ProjectFile.version.desc()).first()
+                new_version = (latest.version or 1) + 1
+                # Mark the old "current" file by linking it: set its parent to itself (self-link as root)
+                db.session.add(ProjectFile(
+                    project_id=project.id,
+                    filename=original_filename,
+                    filepath=filepath,
+                    version=new_version,
+                    parent_file_id=existing.id,
+                ))
+            else:
+                db.session.add(ProjectFile(
+                    project_id=project.id,
+                    filename=original_filename,
+                    filepath=filepath,
+                    version=1,
+                ))
             uploaded_any = True
         if uploaded_any:
             db.session.commit()

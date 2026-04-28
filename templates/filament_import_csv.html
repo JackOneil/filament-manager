@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+    <div class="flex items-center gap-3 mb-2">
+        <a href="{{ url_for('filaments_index') }}" class="text-gray-500 hover:text-blue-600 transition">
+            <i class="fa-solid fa-arrow-left text-xl"></i>
+        </a>
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800">{{ t('import_csv_title') }}</h1>
+            <p class="text-gray-500 mt-1">{{ t('import_csv_desc') }}</p>
+        </div>
+    </div>
+
+    {% if error %}
+    <div class="rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-800 px-5 py-4 text-red-700 dark:text-red-400">
+        <i class="fa-solid fa-circle-exclamation mr-2"></i> {{ error }}
+    </div>
+    {% endif %}
+
+    {% if step == 'upload' %}
+    <div class="ui-panel">
+        <form method="POST" enctype="multipart/form-data" class="space-y-5">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">{{ t('import_csv_file_label') }}</label>
+                <input type="file" name="csv_file" accept=".csv,.txt" required
+                       class="block w-full text-sm text-gray-700 border border-gray-300 rounded-lg px-3 py-2 cursor-pointer focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">{{ t('import_csv_separator_label') }}</label>
+                <select name="separator" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    <option value=",">, (comma)</option>
+                    <option value=";">; (semicolon)</option>
+                    <option value="&#9;">&#9; (tab)</option>
+                </select>
+            </div>
+            <div class="flex items-center gap-4">
+                <button type="submit" name="step" value="upload"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl shadow transition">
+                    <i class="fa-solid fa-magnifying-glass mr-2"></i>{{ t('import_csv_preview_title') }}
+                </button>
+                <a href="{{ url_for('filament_import_csv') }}?template=1" class="text-sm text-blue-600 hover:underline">
+                    <i class="fa-solid fa-download mr-1"></i>{{ t('import_csv_download_template') }}
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <div class="ui-panel">
+        <div class="ui-label mb-3">{{ t('import_csv_col_name') }} — {{ t('import_csv_col_brand') }} — {{ t('import_csv_col_material') }} — …</div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs text-gray-600 border-collapse">
+                <thead>
+                    <tr class="bg-gray-50 border-b border-gray-200">
+                        <th class="px-3 py-2 text-left font-semibold">{{ t('import_csv_col_name') }}</th>
+                        <th class="px-3 py-2 text-left font-semibold">{{ t('import_csv_col_brand') }}</th>
+                        <th class="px-3 py-2 text-left font-semibold">{{ t('import_csv_col_material') }}</th>
+                        <th class="px-3 py-2 text-left font-semibold">{{ t('import_csv_col_color') }}</th>
+                        <th class="px-3 py-2 text-left font-semibold">{{ t('import_csv_col_weight_total') }}</th>
+                        <th class="px-3 py-2 text-left font-semibold">{{ t('import_csv_col_weight_remaining') }}</th>
+                        <th class="px-3 py-2 text-left font-semibold">{{ t('import_csv_col_price') }}</th>
+                        <th class="px-3 py-2 text-left font-semibold">{{ t('import_csv_col_quantity') }}</th>
+                        <th class="px-3 py-2 text-left font-semibold">{{ t('import_csv_col_nozzle_temp') }}</th>
+                        <th class="px-3 py-2 text-left font-semibold">{{ t('import_csv_col_bed_temp') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="border-b border-gray-100 text-gray-400 italic">
+                        <td class="px-3 py-2">Prusament PLA Lipstick Red</td>
+                        <td class="px-3 py-2">Prusament</td>
+                        <td class="px-3 py-2">PLA</td>
+                        <td class="px-3 py-2">Červená</td>
+                        <td class="px-3 py-2">1000</td>
+                        <td class="px-3 py-2">850</td>
+                        <td class="px-3 py-2">699</td>
+                        <td class="px-3 py-2">1</td>
+                        <td class="px-3 py-2">215</td>
+                        <td class="px-3 py-2">60</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% elif step == 'preview' %}
+    <div class="ui-panel">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">{{ t('import_csv_preview_title') }}</h2>
+                <p class="text-sm text-gray-500 mt-1">{{ t('import_csv_preview_desc') }}</p>
+                <p class="text-xs text-gray-400 mt-1">{{ t('import_csv_rows_found').replace('{n}', preview_rows|length|string) }}</p>
+            </div>
+        </div>
+        <div class="overflow-x-auto mb-6">
+            <table class="w-full text-xs text-gray-700 border-collapse">
+                <thead>
+                    <tr class="bg-gray-50 border-b border-gray-200">
+                        <th class="px-3 py-2 text-left font-semibold">#</th>
+                        <th class="px-3 py-2 text-left font-semibold">{{ t('import_csv_col_name') }}</th>
+                        <th class="px-3 py-2 text-left font-semibold">{{ t('import_csv_col_brand') }}</th>
+                        <th class="px-3 py-2 text-left font-semibold">{{ t('import_csv_col_material') }}</th>
+                        <th class="px-3 py-2 text-left font-semibold">{{ t('import_csv_col_color') }}</th>
+                        <th class="px-3 py-2 text-left font-semibold">{{ t('import_csv_col_weight_total') }}</th>
+                        <th class="px-3 py-2 text-left font-semibold">{{ t('import_csv_col_price') }}</th>
+                        <th class="px-3 py-2 text-left font-semibold">{{ t('import_csv_col_quantity') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in preview_rows %}
+                    <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                        <td class="px-3 py-2 text-gray-400">{{ loop.index }}</td>
+                        <td class="px-3 py-2 font-medium">{{ row.name }}</td>
+                        <td class="px-3 py-2">{{ row.brand }}</td>
+                        <td class="px-3 py-2">{{ row.material }}</td>
+                        <td class="px-3 py-2">{{ row.color }}</td>
+                        <td class="px-3 py-2">{{ row.weight_total }} g</td>
+                        <td class="px-3 py-2">{{ row.price }}</td>
+                        <td class="px-3 py-2">{{ row.quantity or 1 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <form method="POST" class="flex items-center gap-4">
+            <input type="hidden" name="step" value="confirm">
+            <input type="hidden" name="csv_payload" value="{{ csv_payload }}">
+            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2.5 rounded-xl shadow transition">
+                <i class="fa-solid fa-check mr-2"></i>{{ t('import_csv_confirm') }}
+            </button>
+            <a href="{{ url_for('filament_import_csv') }}" class="text-sm text-gray-600 hover:text-gray-800 font-semibold">
+                <i class="fa-solid fa-arrow-left mr-1"></i>{{ t('import_csv_back') }}
+            </a>
+        </form>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

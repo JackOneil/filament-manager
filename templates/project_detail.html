@@ -571,22 +571,56 @@
                             <div class="ui-label">{{ t('project_files') }}</div>
                             <div class="space-y-3 mt-3">
                                 {% for file in model_files %}
-                                <div class="flex items-center justify-between gap-3">
-                                    <div>
-                                        <div class="font-semibold text-gray-800">{{ file.filename }}</div>
-                                        <div class="text-xs text-gray-500">{{ file.filename.rsplit('.', 1)[-1].upper() if '.' in file.filename else 'FILE' }}</div>
+                                <div class="border border-gray-100 rounded-xl bg-white overflow-hidden">
+                                    <div class="flex items-center justify-between gap-3 px-4 py-3">
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2 flex-wrap">
+                                                <span class="font-semibold text-gray-800 truncate">{{ file.filename }}</span>
+                                                <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">v{{ file.version }}</span>
+                                                {% if file.versions %}
+                                                <span class="text-xs text-gray-400">+{{ file.versions|length }} {{ t('file_version_older') }}</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="text-xs text-gray-500">{{ file.filename.rsplit('.', 1)[-1].upper() if '.' in file.filename else 'FILE' }}</div>
+                                        </div>
+                                        <div class="flex gap-2 flex-shrink-0">
+                                            <button type="button" @click="modelViewerOpen = true; modelViewerTitle = '{{ file.filename|escape }}'; modelViewerDownload = '{{ url_for('project_download_file', id=project.id, file_id=file.id) }}'; modelViewerUrl = '{{ url_for('project_view_file', id=project.id, file_id=file.id, filename=file.filename) }}'; open3DViewer(modelViewerUrl, modelViewerColor)" class="ui-badge ui-badge-brand">
+                                                <i class="fa-solid fa-cube"></i> {{ t('project_preview_3d') }}
+                                            </button>
+                                            <a href="{{ url_for('project_download_file', id=project.id, file_id=file.id) }}" class="ui-badge"><i class="fa-solid fa-download"></i></a>
+                                            {% if can_edit_project %}
+                                            <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=file.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');">
+                                                <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-trash"></i></button>
+                                            </form>
+                                            {% endif %}
+                                        </div>
                                     </div>
-                                    <div class="flex gap-2">
-                                        <button type="button" @click="modelViewerOpen = true; modelViewerTitle = '{{ file.filename|escape }}'; modelViewerDownload = '{{ url_for('project_download_file', id=project.id, file_id=file.id) }}'; modelViewerUrl = '{{ url_for('project_view_file', id=project.id, file_id=file.id, filename=file.filename) }}'; open3DViewer(modelViewerUrl, modelViewerColor)" class="ui-badge ui-badge-brand">
-                                            <i class="fa-solid fa-cube"></i> {{ t('project_preview_3d') }}
-                                        </button>
-                                        <a href="{{ url_for('project_download_file', id=project.id, file_id=file.id) }}" class="ui-badge"><i class="fa-solid fa-download"></i></a>
-                                        {% if can_edit_project %}
-                                        <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=file.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');">
-                                            <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-trash"></i></button>
-                                        </form>
-                                        {% endif %}
-                                    </div>
+                                    {% if file.versions %}
+                                    <details class="border-t border-gray-100">
+                                        <summary class="px-4 py-2 text-xs text-gray-500 cursor-pointer hover:bg-gray-50 transition list-none flex items-center gap-1">
+                                            <i class="fa-solid fa-clock-rotate-left text-gray-400"></i> {{ t('file_version_history') }} ({{ file.versions|length }})
+                                        </summary>
+                                        <div class="divide-y divide-gray-50">
+                                            {% for ver in file.versions|sort(attribute='version') %}
+                                            <div class="flex items-center justify-between gap-3 px-4 py-2 bg-gray-50">
+                                                <div class="flex items-center gap-2 min-w-0">
+                                                    <span class="text-xs font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">v{{ ver.version }}</span>
+                                                    <span class="text-sm text-gray-700 truncate">{{ ver.filename }}</span>
+                                                    <span class="text-xs text-gray-400">{{ ver.uploaded_at | fmt_dt('%d.%m.%Y %H:%M') }}</span>
+                                                </div>
+                                                <div class="flex gap-2 flex-shrink-0">
+                                                    <a href="{{ url_for('project_download_file', id=project.id, file_id=ver.id) }}" class="ui-badge text-xs"><i class="fa-solid fa-download"></i></a>
+                                                    {% if can_edit_project %}
+                                                    <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=ver.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');">
+                                                        <button type="submit" class="ui-badge ui-badge-critical text-xs"><i class="fa-solid fa-trash"></i></button>
+                                                    </form>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </details>
+                                    {% endif %}
                                 </div>
                                 {% else %}
                                 <p class="text-sm text-gray-400">{{ t('project_no_files') }}</p>

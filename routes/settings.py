@@ -294,3 +294,11 @@ def register(app):
             db.session.commit()
             app.logger.debug(f"Theme changed to: {new_theme}")
         return redirect(request.referrer or url_for('index'))
+
+    @app.route('/onboarding/dismiss', methods=['POST'])
+    def onboarding_dismiss():
+        setting = AppSetting.query.first()
+        if setting:
+            setting.onboarding_dismissed = True
+            db.session.commit()
+        return redirect(request.referrer or url_for('index'))

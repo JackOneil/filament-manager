@@ -1117,6 +1117,13 @@
             </a>
             {% endif %}
 
+            {% if auth_is_admin(current_user) %}
+            <a href="{{ url_for('maintenance_index') }}" class="flex items-center px-4 py-3 text-[var(--ui-text)] hover:bg-[var(--ui-brand-soft)] hover:text-[var(--ui-brand-strong)] transition-colors whitespace-nowrap {% if endpoint == 'maintenance_index' %}bg-[var(--ui-brand-soft)] text-[var(--ui-brand-strong)] border-r-2 border-[var(--ui-brand-strong)]{% endif %}" title="{{ t('maintenance_title') }}">
+                <i class="fa-solid fa-screwdriver-wrench text-lg w-8 text-center flex-shrink-0"></i>
+                <span class="ml-2 font-semibold opacity-0 group-[.pinned]:opacity-100 transition-opacity">{{ t('maintenance_title') }}</span>
+            </a>
+            {% endif %}
+
             {% if auth_has_section_access('history') or auth_is_admin(current_user) %}
             <a href="{{ url_for('history') }}" class="flex items-center px-4 py-3 text-[var(--ui-text)] hover:bg-[var(--ui-brand-soft)] hover:text-[var(--ui-brand-strong)] transition-colors whitespace-nowrap {% if endpoint == 'history' %}bg-[var(--ui-brand-soft)] text-[var(--ui-brand-strong)] border-r-2 border-[var(--ui-brand-strong)]{% endif %}" title="{{ t('movement_history') }}">
                 <i class="fa-solid fa-clock-rotate-left text-lg w-8 text-center flex-shrink-0"></i>
@@ -1144,6 +1151,18 @@
                     <span class="ml-2 font-semibold opacity-0 group-[.pinned]:opacity-100 transition-opacity">{% if theme == 'dark' %}{{ t('light_theme') }}{% else %}{{ t('dark_theme') }}{% endif %}</span>
                 </button>
             </form>
+            {% if auth_is_admin(current_user) %}
+            <form method="POST" action="{{ url_for('toggle_ui_mode') }}" class="w-full">
+                <button type="submit" class="w-full flex items-center px-2 py-3 transition-colors whitespace-nowrap rounded
+                    {% if ui_mode == 'operator' %}text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30{% else %}text-[var(--ui-text)] hover:bg-[var(--ui-brand-soft)] hover:text-[var(--ui-brand-strong)]{% endif %}"
+                    title="{{ t('ui_mode_switch_operator') if ui_mode == 'admin' else t('ui_mode_switch_admin') }}">
+                    <i class="fa-solid {% if ui_mode == 'operator' %}fa-user-tie{% else %}fa-user-gear{% endif %} text-lg w-8 text-center flex-shrink-0"></i>
+                    <span class="ml-2 font-semibold opacity-0 group-[.pinned]:opacity-100 transition-opacity">
+                        {{ t('ui_mode_switch_operator') if ui_mode == 'admin' else t('ui_mode_switch_admin') }}
+                    </span>
+                </button>
+            </form>
+            {% endif %}
             {% if current_user %}
             <a href="{{ url_for('account_settings') }}" class="flex items-center px-2 py-3 text-[var(--ui-text)] hover:bg-[var(--ui-brand-soft)] hover:text-[var(--ui-brand-strong)] transition-colors whitespace-nowrap rounded" title="{{ current_user.name }}">
                 <i class="fa-solid fa-user text-lg w-8 text-center flex-shrink-0"></i>
@@ -1309,7 +1328,11 @@
                 <button type="button" @click="openCommand()" class="sm:hidden p-2 text-gray-500 hover:text-[var(--ui-brand)]">
                     <i class="fa-solid fa-magnifying-glass"></i>
                 </button>
-                
+                {% if auth_is_admin(current_user) and ui_mode == 'operator' %}
+                <span class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-300 dark:bg-amber-900/40 dark:text-amber-400 dark:border-amber-700">
+                    <i class="fa-solid fa-user-tie"></i> {{ t('ui_mode_operator') }}
+                </span>
+                {% endif %}
                 <a href="{{ url_for('notifications_index') }}" class="relative p-2 text-gray-500 hover:text-blue-600 transition-colors">
                     <i class="fa-solid fa-bell text-lg"></i>
                     {% if nav_notifications_unread %}

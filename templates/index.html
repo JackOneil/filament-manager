@@ -11,6 +11,12 @@
             <a href="{{ url_for('add') }}" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2.5 rounded-xl shadow font-bold transition-colors text-center whitespace-nowrap">
                 <i class="fa-solid fa-plus"></i> {{ t('new') }}
             </a>
+            <a href="{{ url_for('filament_import_csv') }}" class="bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 px-4 py-2.5 rounded-xl shadow-sm font-semibold text-sm transition-colors text-center whitespace-nowrap flex items-center gap-2">
+                <i class="fa-solid fa-file-import text-blue-500"></i> {{ t('import_csv_title') }}
+            </a>
+            <a href="{{ url_for('filament_export_csv') }}" class="bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 px-4 py-2.5 rounded-xl shadow-sm font-semibold text-sm transition-colors text-center whitespace-nowrap flex items-center gap-2">
+                <i class="fa-solid fa-file-export text-green-600"></i> {{ t('export_csv_btn') }}
+            </a>
             <div class="ui-card-soft rounded-full flex gap-1 p-1">
                 <button type="button" x-on:click="setView('card')"
                    :class="viewMode === 'card' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'"
