@@ -68,10 +68,8 @@
         
         <!-- Akční tlačítka -->
         <div class="col-span-3 sm:col-span-2 flex gap-1 sm:gap-2 justify-end">
-            <button type="button" onclick="openUseFilamentModal({{ fil.id }}, '{{ fil.name }}', {{ fil.weight_remaining }})" title="{{ t('subtract_usage') }}" class="text-blue-400 hover:text-blue-600 transition-colors text-sm sm:text-base"><i class="fa-solid fa-droplet"></i></button>
-            <form action="{{ url_for('add_spool', id=fil.id) }}" method="POST">
-                <button type="submit" title="{{ t('add_spool') }}" class="text-green-500 hover:text-green-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-plus-circle"></i></button>
-            </form>
+            <button type="button" onclick='openUseFilamentModal({{ fil.id }}, {{ fil.name|tojson }}, {{ fil.weight_remaining }})' title="{{ t('subtract_usage') }}" class="text-blue-400 hover:text-blue-600 transition-colors text-sm sm:text-base"><i class="fa-solid fa-droplet"></i></button>
+            <button type="button" onclick='openAddSpoolModal({{ fil.id }}, {{ fil.name|tojson }})' title="{{ t('add_spool') }}" class="text-green-500 hover:text-green-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-plus-circle"></i></button>
             <form action="{{ url_for('remove_spool', id=fil.id) }}" method="POST">
                 <button type="submit" title="{{ t('remove_spool') }}" class="text-yellow-500 hover:text-yellow-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-minus-circle"></i></button>
             </form>

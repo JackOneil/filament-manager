@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.71.0] - 2026-04-29
+
+### Added
+- **Inventory quick add quantity** — The filament list quick-add action now opens a quantity modal so multiple spools can be added at once.
+- **No-refresh quick add** — Adding spools from the inventory list now uses AJAX and refreshes only the filament list content, preserving the current scroll position.
+
 ## [1.70.0] - 2026-04-28
 
 ### Added

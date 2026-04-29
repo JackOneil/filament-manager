@@ -58,7 +58,7 @@
         {# Actions #}
         {% if not inventory_read_only %}
         <div class="col-span-1 flex gap-1 justify-end">
-            <button type="button" onclick="openUseFilamentModal({{ fil.id }}, '{{ fil.name }}', {{ fil.weight_remaining }})" title="{{ t('subtract_usage') }}" class="text-blue-400 hover:text-blue-600 transition-colors"><i class="fa-solid fa-droplet text-xs"></i></button>
+            <button type="button" onclick='openUseFilamentModal({{ fil.id }}, {{ fil.name|tojson }}, {{ fil.weight_remaining }})' title="{{ t('subtract_usage') }}" class="text-blue-400 hover:text-blue-600 transition-colors"><i class="fa-solid fa-droplet text-xs"></i></button>
             <a href="{{ url_for('edit', id=fil.id) }}" title="{{ t('edit') }}" class="text-gray-400 hover:text-blue-500 transition-colors"><i class="fa-solid fa-edit text-xs"></i></a>
         </div>
         {% endif %}

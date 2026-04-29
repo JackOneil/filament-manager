@@ -464,9 +464,7 @@
                     </form>
 
                     <div class="flex gap-4 pt-2 sm:pt-0">
-                        <form action="{{ url_for('add_spool', id=fil.id) }}" method="POST">
-                            <button type="submit" title="{{ t('add_spool') }}" class="text-green-500 hover:text-green-700 transition-colors"><i class="fa-solid fa-plus-circle"></i></button>
-                        </form>
+                        <button type="button" onclick='openAddSpoolModal({{ fil.id }}, {{ fil.name|tojson }})' title="{{ t('add_spool') }}" class="text-green-500 hover:text-green-700 transition-colors"><i class="fa-solid fa-plus-circle"></i></button>
                         <form action="{{ url_for('remove_spool', id=fil.id) }}" method="POST">
                             <button type="submit" title="{{ t('remove_spool') }}" class="text-yellow-500 hover:text-yellow-700 transition-colors"><i class="fa-solid fa-minus-circle"></i></button>
                         </form>
@@ -605,10 +603,8 @@
             
             <!-- Akční tlačítka -->
             <div class="col-span-3 sm:col-span-2 flex gap-1 sm:gap-2 justify-end">
-                <button type="button" onclick="openUseFilamentModal({{ fil.id }}, '{{ fil.name }}', {{ fil.weight_remaining }})" title="{{ t('subtract_usage') }}" class="text-blue-400 hover:text-blue-600 transition-colors text-sm sm:text-base"><i class="fa-solid fa-droplet"></i></button>
-                <form action="{{ url_for('add_spool', id=fil.id) }}" method="POST">
-                    <button type="submit" title="{{ t('add_spool') }}" class="text-green-500 hover:text-green-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-plus-circle"></i></button>
-                </form>
+                <button type="button" onclick='openUseFilamentModal({{ fil.id }}, {{ fil.name|tojson }}, {{ fil.weight_remaining }})' title="{{ t('subtract_usage') }}" class="text-blue-400 hover:text-blue-600 transition-colors text-sm sm:text-base"><i class="fa-solid fa-droplet"></i></button>
+                <button type="button" onclick='openAddSpoolModal({{ fil.id }}, {{ fil.name|tojson }})' title="{{ t('add_spool') }}" class="text-green-500 hover:text-green-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-plus-circle"></i></button>
                 <form action="{{ url_for('remove_spool', id=fil.id) }}" method="POST">
                     <button type="submit" title="{{ t('remove_spool') }}" class="text-yellow-500 hover:text-yellow-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-minus-circle"></i></button>
                 </form>
@@ -682,6 +678,23 @@
             <div class="flex gap-3 justify-end">
                 <button type="button" onclick="closeUseFilamentModal()" class="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">{{ t('cancel') }}</button>
                 <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors">{{ t('subtract_usage') }}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add Spool Modal Dialog -->
+<div id="addSpoolModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-sm w-full">
+        <h3 class="text-lg font-semibold mb-4 dark:text-white" id="addSpoolModalTitle">{{ t('add_spool_modal_title') }}</h3>
+        <form id="addSpoolForm" method="POST">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2" for="addSpoolQuantity">{{ t('add_spool_quantity') }}</label>
+                <input type="number" id="addSpoolQuantity" name="quantity" min="1" step="1" value="1" required class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white" />
+            </div>
+            <div class="flex gap-3 justify-end">
+                <button type="button" onclick="closeAddSpoolModal()" class="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">{{ t('cancel') }}</button>
+                <button type="submit" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors">{{ t('add_spool_submit') }}</button>
             </div>
         </form>
     </div>
@@ -1034,6 +1047,21 @@ function closeUseFilamentModal() {
     document.getElementById('useFilamentModal').classList.add('hidden');
 }
 
+// =============================================
+// Add-spool modal (called from AJAX-loaded partials)
+// =============================================
+function openAddSpoolModal(filamentId, filamentName) {
+    document.getElementById('addSpoolModalTitle').textContent = '{{ t("add_spool_modal_title") }} - ' + filamentName;
+    document.getElementById('addSpoolQuantity').value = '1';
+    document.getElementById('addSpoolForm').action = '/add_spool/' + filamentId;
+    document.getElementById('addSpoolModal').classList.remove('hidden');
+    document.getElementById('addSpoolQuantity').focus();
+}
+
+function closeAddSpoolModal() {
+    document.getElementById('addSpoolModal').classList.add('hidden');
+}
+
 // ── Open reorder shop search ──────────────────────────────────────────────────
 function openReorderShop(name, template) {
     const url = template.replace(/\{[^}]+\}/g, encodeURIComponent(name));
@@ -1096,6 +1124,36 @@ document.addEventListener('DOMContentLoaded', function () {
     if (modal) {
         modal.addEventListener('click', function (e) {
             if (e.target === this) closeUseFilamentModal();
+        });
+    }
+    const addSpoolModal = document.getElementById('addSpoolModal');
+    if (addSpoolModal) {
+        addSpoolModal.addEventListener('click', function (e) {
+            if (e.target === this) closeAddSpoolModal();
+        });
+    }
+    const addSpoolForm = document.getElementById('addSpoolForm');
+    if (addSpoolForm) {
+        addSpoolForm.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            const submitButton = addSpoolForm.querySelector('button[type="submit"]');
+            if (submitButton) submitButton.disabled = true;
+            try {
+                const response = await fetch(addSpoolForm.action, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                    body: new FormData(addSpoolForm),
+                });
+                if (!response.ok) throw new Error('add_spool_failed');
+                closeAddSpoolModal();
+                if (window.__inv) {
+                    await window.__inv.fetchContent(window.__inv.currentPage || 1);
+                }
+            } catch (e) {
+                alert('{{ t("add_spool_error") }}');
+            } finally {
+                if (submitButton) submitButton.disabled = false;
+            }
         });
     }
     initBulkSelectionUI();

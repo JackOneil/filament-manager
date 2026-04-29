@@ -72,9 +72,7 @@
                 </form>
                 
                 <div class="flex gap-4 pt-2 sm:pt-0">
-                    <form action="{{ url_for('add_spool', id=fil.id) }}" method="POST">
-                        <button type="submit" title="{{ t('add_spool') }}" class="text-green-500 hover:text-green-700 transition-colors"><i class="fa-solid fa-plus-circle"></i></button>
-                    </form>
+                    <button type="button" onclick='openAddSpoolModal({{ fil.id }}, {{ fil.name|tojson }})' title="{{ t('add_spool') }}" class="text-green-500 hover:text-green-700 transition-colors"><i class="fa-solid fa-plus-circle"></i></button>
                     <form action="{{ url_for('remove_spool', id=fil.id) }}" method="POST">
                         <button type="submit" title="{{ t('remove_spool') }}" class="text-yellow-500 hover:text-yellow-700 transition-colors"><i class="fa-solid fa-minus-circle"></i></button>
                     </form>

@@ -6,7 +6,7 @@ from collections import Counter
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
-from flask import abort, render_template, request, redirect, url_for
+from flask import abort, jsonify, render_template, request, redirect, url_for
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
@@ -24,6 +24,7 @@ from utils import (
     log_movement,
     movement_action_label,
     parse_tags,
+    translate,
     utc_now,
 )
 
@@ -769,11 +770,32 @@ def register(app):
     @app.route('/add_spool/<int:id>', methods=['POST'])
     def add_spool(id):
         _require_inventory_admin()
+        try:
+            spool_count = request.form.get('quantity', 1, type=int) or 1
+        except (TypeError, ValueError):
+            spool_count = 1
+        spool_count = max(spool_count, 1)
+
         filament = db.get_or_404(Filament, id)
-        filament.quantity += 1
-        filament.weight_remaining += filament.weight_total
-        log_movement(filament, 'add', filament.weight_total, note='Added spool')
+        added_weight = filament.weight_total * spool_count
+        filament.quantity += spool_count
+        filament.weight_remaining += added_weight
+        log_movement(
+            filament,
+            'add',
+            added_weight,
+            note=translate('movement_note_added_spools').format(count=spool_count),
+        )
         db.session.commit()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.accept_mimetypes.best == 'application/json':
+            return jsonify({
+                'ok': True,
+                'filament_id': filament.id,
+                'quantity': filament.quantity,
+                'weight_remaining': filament.weight_remaining,
+                'added_spools': spool_count,
+                'added_weight': added_weight,
+            })
         return redirect(url_for('filaments_index'))
 
     @app.route('/remove_spool/<int:id>', methods=['POST'])
@@ -1006,4 +1028,3 @@ def register(app):
         response.headers['Content-Type'] = 'text/csv; charset=utf-8-sig'
         response.headers['Content-Disposition'] = 'attachment; filename="filaments_export.csv"'
         return response
-
