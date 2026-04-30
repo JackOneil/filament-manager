@@ -314,6 +314,11 @@ The `/export` and `/import` functions in `routes/settings.py` must cover the **e
 - Bump `APP_VERSION` in `app.py` when introducing feature additions or structural fixes.
 - Record changes in `CHANGELOG.md` under the new version (Keep a Changelog format).
 - Update the version tag at the top of `README.md`.
+- **When adding or significantly modifying major functionality, update `README.md` content as well:**
+  - Add new features to the relevant section under **Key Features**.
+  - Update the **Project Structure** section if new route files or modules were added.
+  - Move completed items to the **Completed** list in the Roadmap if they were previously listed as future work.
+  - Correct any outdated technology descriptions (e.g. CDN vs. self-hosted assets).
 
 ### Rule 19 — Testing
 - Security-sensitive helpers require automated regression tests under `tests/`.
@@ -393,6 +398,7 @@ After every set of feature additions or structural fixes:
 2. ✅ Bump `APP_VERSION` in `app.py` (SemVer: major.minor.patch)
 3. ✅ Update `CHANGELOG.md` under the new version section
 4. ✅ Update `README.md` version tag
+5. ✅ If major functionality added or changed → update `README.md` content (key features, project structure, roadmap) per rule 18
 5. ✅ `docker compose up -d --build` → verify HTTP 200
 6. ✅ If DB schema changed → verify `/export` and `/import` updated (rule 15)
 7. ✅ If user-facing text added → verify `messages.py` updated in both languages (rule 1)
