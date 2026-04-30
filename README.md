@@ -7,8 +7,10 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 ## ✨ Key Features
 
 ### Inventory Management
-- **Filament Stock Browser** — Card/list views with progress bars, low-stock indicators, filtering by brand/material/color/tag, sorting, pagination, and saved views at `/filaments`.
-- **Filament Detail** — Per-spool timeline, quality log (stringing, adhesion, drying, profiles), min/max stock guardrails, and automatic reorder recommendations.
+- **Filament Stock Browser** — Card/list/compact views with progress bars, low-stock indicators, filtering by brand/material/color/tag, sorting, pagination, and saved views at `/filaments`.
+- **Filament Detail** — Per-spool timeline, quality log (stringing, adhesion, drying, profiles), min/max stock guardrails, automatic reorder recommendations, and a 6-month consumption bar chart.
+- **Quick-View Filter Pills** — One-click filter buttons for *All*, *Low stock*, and *Reorder needed* inside the sticky filter bar.
+- **CSV / Excel Import** — Two-step import wizard at `/filaments/import-csv` that parses CSV/TSV, shows a preview table, and auto-creates missing brands/materials/colors on confirm.
 - **Bulk Operations** — Select multiple filaments and batch-apply spool changes, weight updates, tags, min-stock values, or deletion.
 - **Movement History** — Full audit log of every weight change with reasons, timestamps, and linked projects/jobs.
 - **Storage Shelf Map** — Visual grid layout of physical shelf positions. Assign spools to named slots, drag-and-drop moves, and stock-level fill indicators.
@@ -16,30 +18,37 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 ### Projects & Client Workflow
 - **Project Management** — Track 3D print jobs as unified projects with client names, due dates, statuses (NEW → PRINTING → DONE), file attachments, and external links with rich preview cards.
 - **Kanban Board** — Overview of all projects by status with paginated columns, due-date calendar strip, and estimate-vs-actual metrics.
-- **Print Cost Calculator** — Enter model weight and print time, see exact material + electricity cost. Save quotes to projects with margin and customer pricing, and export them into customized basic, detailed, or fully compliant invoice PDF templates.
+- **Activity Timeline** — Dedicated project tab showing a chronological timeline of all project events (quotes, uploads, comments, tasks) with colour-coded icons.
+- **File Versioning** — Re-uploading a file with the same name automatically creates a versioned history grouped under the root file.
+- **Print Cost Calculator** — Enter model weight and print time, see exact material + electricity cost. Save quotes to projects with margin and customer pricing, and export them using fully self-hosted invoice templates (simple, detailed, or pro-forma) with sequential invoice numbering.
 - **3D Model Viewer** — Interactive in-browser preview of `.stl` and `.3mf` files attached to projects.
 
 ### Multi-User Workspace
 - **Role-Based Access** — Administrators have full read/write access; regular users see only permitted sections and their own projects.
 - **Self-Registration & Invites** — Users register themselves or receive invite codes with pre-configured role and section permissions.
+- **Operator Mode** — Admins can switch to a read-only Operator view without logging out; an amber indicator badge appears in the top bar.
 - **Project Collaboration** — Project ownership, approval workflow (Pending → Approved/Rejected), per-project comments, and in-app notifications.
 - **Admin Audit Log** — Successful administrator actions are recorded with user, IP/session, endpoint, target object, and before/after snapshots.
 
 ### Printer Integrations
-- **Bambu Lab Cloud** — Sync print jobs from Bambu Cloud API. Assign filaments and projects, deduct stock per-AMS-slot, background auto-sync.
+- **Bambu Lab Cloud** — Sync print jobs from Bambu Cloud API. Assign filaments and projects, deduct stock per-AMS-slot, background auto-sync with configurable pre-job time offset.
 - **PrusaLink** — Poll local Prusa printers via REST API (no cloud required). Automatic job capture, progress tracking, and filament mapping.
+- **Printer Maintenance Log** — Dedicated `/maintenance` module for logging nozzle changes, calibrations, services, and faults per printer, with overdue and due-soon badge indicators.
 - **Live Printer Dashboard** — Overview page shows active print jobs with real-time progress bars, ETA, material swatches, and brand badges.
 
 ### Analytics & Operations
 - **Statistics Dashboard** — Executive KPI panel, usage/purchase trend charts, stock depletion forecast, reorder recommendations, profitable projects, color palette. Draggable sections with hide/show and per-card row limits.
 - **Action Center** — Highlights low-stock alerts, overdue projects, unmapped print jobs, and printer sync issues in one place.
 - **Automatic Purchase Recommendations** — Based on 30/90-day real usage, recommends what to order next with spool counts and purchase price.
+- **Configurable Timezone** — All timestamps are displayed in the configured local timezone (default: Europe/Prague) while data is stored as UTC.
 
 ### Platform
 - **Progressive Web App** — Install on desktop or mobile device with offline-capable shell.
 - **Dark Mode** — Full dark theme support with per-user persistence.
 - **Bilingual** — Complete Czech and English translations (700+ keys).
 - **Full Backup / Restore** — Compressed `.tar.gz` export with `manifest.json` plus real uploaded project files stored directly in the archive. Import also supports older `.json.gz` and legacy plain JSON backups.
+- **Settings Tabs** — Settings page is organized into six tabs: General, Printers, Integrations, Company, Data, and Dictionaries.
+- **Onboarding Checklist** — Guided setup checklist after first installation (currency, energy cost, printer connection, first filament) with auto-dismiss.
 - **Toast Notifications** — Non-blocking pop-up notifications with auto-dismiss via Alpine.js.
 - **Custom Dictionaries** — Pre-seeded brands, materials, and colors. All freely expandable, renamable, and safely deletable.
 
@@ -52,10 +61,10 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 | Backend        | Python 3.11, Flask 3.0, Gunicorn                        |
 | Database       | SQLite via Flask-SQLAlchemy                              |
 | Templates      | Jinja2 (server-side rendering)                           |
-| Frontend       | TailwindCSS (CDN), Alpine.js 3.x (CDN)                  |
-| Charts         | Chart.js (CDN)                                           |
-| 3D Viewer      | Online3DViewer (CDN)                                     |
-| Icons          | FontAwesome                                              |
+| Frontend       | TailwindCSS (self-hosted), Alpine.js 3.x (self-hosted)   |
+| Charts         | Chart.js (self-hosted)                                   |
+| 3D Viewer      | Online3DViewer (self-hosted)                             |
+| Icons          | FontAwesome (self-hosted)                                |
 | Security       | Flask-WTF (CSRF), cryptography (Fernet), scrypt hashing  |
 | Infrastructure | Docker & Docker Compose                                  |
 
@@ -74,16 +83,18 @@ filament/
 │
 ├── routes/                 # HTTP route modules (no Blueprints)
 │   ├── __init__.py         #   Central registration
-│   ├── inventory.py        #   Inventory CRUD and overview
-│   ├── api.py              #   AJAX filament list endpoint
+│   ├── inventory.py        #   Inventory CRUD, CSV import, overview
+│   ├── api.py              #   AJAX filament list / search endpoints
 │   ├── calculator.py       #   Print cost calculator
 │   ├── history.py          #   Movement history
-│   ├── projects.py         #   Projects CRUD, uploads, comments
+│   ├── projects.py         #   Projects CRUD, uploads, versioning, comments
 │   ├── bambu.py            #   Bambu Lab Cloud integration
 │   ├── prusa.py            #   PrusaLink integration
+│   ├── maintenance.py      #   Printer maintenance log
 │   ├── stats.py            #   Statistics dashboard
 │   ├── storage.py          #   Physical shelf management
-│   ├── settings.py         #   App settings, export/import
+│   ├── settings.py         #   App settings, timezone, tabs
+│   ├── backup.py           #   Full export / import (backup & restore)
 │   ├── auth.py             #   Auth routes (login, register, users)
 │   └── pwa.py              #   PWA manifest and service worker
 │
@@ -195,17 +206,25 @@ Tests cover: authentication flows, Bambu sync idempotency, stock deduction logic
 ## 🗺️ Roadmap / Current Status
 
 ### ✅ Completed
-- Core inventory management with progress tracking and stock alerts
-- Multi-user authentication with RBAC and invite system
-- Project management with Kanban, files, links, quotes, and comments
-- Bambu Lab Cloud integration (auto-sync, per-AMS deduction)
+- Core inventory management with progress tracking, stock alerts, and compact view
+- CSV/Excel filament import wizard
+- Multi-user authentication with RBAC, invite system, and operator mode
+- Project management with Kanban, files, versioning, links, quotes, and comments
+- Project activity timeline
+- Sequential invoice numbering with fully self-hosted export templates
+- Bambu Lab Cloud integration (auto-sync, per-AMS deduction, pre-job time offset)
 - PrusaLink integration (local network, auto-poll)
+- Printer maintenance log module
 - Statistics dashboard with drag-and-drop layout
 - Storage shelf visualization
-- Full backup/restore system
+- Configurable display timezone
+- Full backup/restore system with `.tar.gz` archive and legacy JSON support
 - Admin audit log for privileged actions
+- Onboarding checklist for first-time setup
+- Tabbed settings page
 - PWA support
 - CSRF protection and security hardening
+- Fully self-hosted static assets (no CDN dependencies)
 - Bilingual UI (CS/EN)
 
 ### 🔮 Potential Future Work

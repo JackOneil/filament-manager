@@ -135,18 +135,18 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
+            <div class="flex items-start">
                 {% for status in status_flow %}
                 {% set is_completed = current_idx >= loop.index0 %}
                 {% set is_current = project.status == status %}
-                <div class="rounded-2xl border px-4 py-4 {% if is_current %}border-blue-300 bg-blue-50/80 dark:border-blue-700 dark:bg-blue-900/30{% elif is_completed %}border-emerald-200 bg-emerald-50/70 dark:border-emerald-700 dark:bg-emerald-900/25{% else %}border-gray-200 bg-white/70 dark:border-slate-700 dark:bg-slate-800/50{% endif %}">
-                    <div class="flex items-center justify-between gap-2">
-                        <span class="text-xs font-semibold uppercase tracking-[0.18em] {% if is_current %}text-blue-700 dark:text-blue-300{% elif is_completed %}text-emerald-700 dark:text-emerald-400{% else %}text-gray-400{% endif %}">{{ loop.index }}</span>
-                        <span class="w-8 h-8 rounded-full flex items-center justify-center {% if is_current %}bg-blue-600 text-white{% elif is_completed %}bg-emerald-500 text-white{% else %}bg-gray-100 dark:bg-slate-700 text-gray-400{% endif %}">
-                            <i class="fa-solid {% if is_completed %}fa-check{% else %}fa-circle-dot{% endif %} text-xs"></i>
-                        </span>
+                <div class="flex-1 flex flex-col items-center relative min-w-0">
+                    {% if not loop.first %}
+                    <div class="absolute top-3 right-1/2 w-full h-0.5 {% if is_completed %}bg-emerald-400{% else %}bg-gray-200 dark:bg-slate-600{% endif %}"></div>
+                    {% endif %}
+                    <div class="relative z-10 w-6 h-6 rounded-full flex items-center justify-center shrink-0 {% if is_current %}bg-blue-600 ring-4 ring-blue-100 dark:ring-blue-900{% elif is_completed %}bg-emerald-500{% else %}bg-gray-200 dark:bg-slate-600{% endif %}">
+                        <i class="fa-solid {% if is_completed and not is_current %}fa-check{% else %}fa-circle-dot{% endif %} text-[9px] {% if is_current or is_completed %}text-white{% else %}text-gray-400{% endif %}"></i>
                     </div>
-                    <div class="font-semibold mt-4 {% if is_current %}text-blue-900 dark:text-blue-200{% else %}text-gray-800 dark:text-slate-200{% endif %}">{{ t('status_' ~ status|lower) }}</div>
+                    <div class="mt-1.5 px-0.5 text-center text-[10px] sm:text-xs font-semibold leading-tight {% if is_current %}text-blue-700 dark:text-blue-300{% elif is_completed %}text-emerald-600 dark:text-emerald-400{% else %}text-gray-400{% endif %}">{{ t('status_' ~ status|lower) }}</div>
                 </div>
                 {% endfor %}
             </div>
@@ -155,6 +155,16 @@
                 <strong>{{ t('status_rejected') }}</strong> · {{ t('project_workspace_rejected_note') }}
             </div>
             {% endif %}
+        </div>
+    </div>
+
+    <div class="ui-panel sticky top-0 z-20 !rounded-xl">
+        <div class="flex flex-wrap gap-2">
+            <button type="button" @click="setTab('overview')" :class="workspaceTab === 'overview' ? 'ui-badge ui-badge-brand' : 'ui-badge'">{{ t('project_workspace_tab_overview') }}</button>
+            <button type="button" @click="setTab('materials')" :class="workspaceTab === 'materials' ? 'ui-badge ui-badge-brand' : 'ui-badge'">{{ t('project_workspace_tab_materials') }}</button>
+            <button type="button" @click="setTab('files')" :class="workspaceTab === 'files' ? 'ui-badge ui-badge-brand' : 'ui-badge'">{{ t('project_workspace_tab_files') }}</button>
+            <button type="button" @click="setTab('jobs')" :class="workspaceTab === 'jobs' ? 'ui-badge ui-badge-brand' : 'ui-badge'">{{ t('project_workspace_tab_jobs') }}</button>
+            <button type="button" @click="setTab('activity')" :class="workspaceTab === 'activity' ? 'ui-badge ui-badge-brand' : 'ui-badge'"><i class="fa-solid fa-timeline"></i> {{ t('project_tab_activity') }}</button>
         </div>
     </div>
 
@@ -282,16 +292,6 @@
         </aside>
 
         <section class="space-y-4 xl:order-1">
-            <div class="ui-panel">
-                <div class="flex flex-wrap gap-2">
-                    <button type="button" @click="setTab('overview')" :class="workspaceTab === 'overview' ? 'ui-badge ui-badge-brand' : 'ui-badge'">{{ t('project_workspace_tab_overview') }}</button>
-                    <button type="button" @click="setTab('materials')" :class="workspaceTab === 'materials' ? 'ui-badge ui-badge-brand' : 'ui-badge'">{{ t('project_workspace_tab_materials') }}</button>
-                    <button type="button" @click="setTab('files')" :class="workspaceTab === 'files' ? 'ui-badge ui-badge-brand' : 'ui-badge'">{{ t('project_workspace_tab_files') }}</button>
-                    <button type="button" @click="setTab('jobs')" :class="workspaceTab === 'jobs' ? 'ui-badge ui-badge-brand' : 'ui-badge'">{{ t('project_workspace_tab_jobs') }}</button>
-                    <button type="button" @click="setTab('activity')" :class="workspaceTab === 'activity' ? 'ui-badge ui-badge-brand' : 'ui-badge'"><i class="fa-solid fa-timeline"></i> {{ t('project_tab_activity') }}</button>
-                </div>
-            </div>
-
             <div x-show="workspaceTab === 'overview'" x-cloak class="space-y-4">
                 <div class="ui-panel">
                     <div class="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-5">
