@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.72.1] - 2026-05-02
+
+### Changed
+- **Print pieces AJAX** — The +/- increment/decrement buttons in the print items panel no longer trigger a full page reload. Counts and progress bars update instantly via AJAX.
+- **Collapsible print items panel** — The "Pieces to print" panel can now be collapsed to show only the aggregate progress bar. The collapsed/expanded state is persisted per-project in `localStorage`.
+
+## [1.72.0] - 2026-05-01
+
+### Added
+- **Print pieces tracking** — Projects now support a list of print items (models), each with a target quantity and a printed count. Items can be added, edited, incremented/decremented, and deleted from the project detail overview tab.
+- **Pieces progress bar** — Each print item shows a progress bar and percentage. An aggregate bar at the top of the section shows overall pieces completion for the project.
+- **Kanban pieces stats** — The projects kanban board now shows a mini progress bar and `N/M pieces printed` indicator on each card when print items exist.
+- **Overview pieces stats** — The active projects panel on the main overview page shows a mini pieces progress bar and printed count for each project that has print items defined.
+- **Backup support** — `ProjectPrintItem` records are fully covered by the export and import in `routes/backup.py`.
+- **i18n** — All new labels added to both `cs` and `en` in `messages.py`.
+
 ## [1.71.0] - 2026-04-29
 
 ### Added

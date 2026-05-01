@@ -317,6 +317,23 @@ class ProjectFilament(db.Model):
     filament = db.relationship('Filament')
 
 
+class ProjectPrintItem(db.Model):
+    """Tracks individual print models and their completion counts within a project."""
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='CASCADE'), nullable=False, index=True)
+    name = db.Column(db.String(200), nullable=False)
+    quantity_total = db.Column(db.Integer, nullable=False, default=1)
+    quantity_done = db.Column(db.Integer, nullable=False, default=0)
+    notes = db.Column(db.Text, nullable=True)
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=_utc_now)
+
+    project = db.relationship('Project', backref=db.backref('print_items', lazy=True, cascade='all, delete-orphan'))
+
+    def __repr__(self):
+        return f'<ProjectPrintItem {self.id} {self.name!r} {self.quantity_done}/{self.quantity_total}>'
+
+
 class StorageShelf(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False, unique=True)

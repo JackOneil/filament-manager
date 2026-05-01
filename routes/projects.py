@@ -22,6 +22,7 @@ from models import (
     ProjectFile,
     ProjectFilament,
     ProjectLink,
+    ProjectPrintItem,
     ProjectQuote,
     ProjectTodo,
     PrusaPrintJob,
@@ -688,6 +689,12 @@ def register(app):
             key=lambda item: (item.is_done, item.completed_at or datetime.max, item.created_at or datetime.min),
         )
         todo_done_count = len([todo for todo in project_todos if todo.is_done])
+        project_print_items = sorted(
+            getattr(project, 'print_items', []) or [],
+            key=lambda item: (item.sort_order, item.created_at or datetime.min),
+        )
+        print_items_total = sum(i.quantity_total for i in project_print_items)
+        print_items_done = sum(i.quantity_done for i in project_print_items)
         return render_template(
             'project_detail.html',
             project=project,
@@ -710,6 +717,9 @@ def register(app):
             project_comments=project_comments,
             project_todos=project_todos,
             todo_done_count=todo_done_count,
+            project_print_items=project_print_items,
+            print_items_total=print_items_total,
+            print_items_done=print_items_done,
             can_edit_project=_project_write_allowed(project),
             can_manage_project=is_admin(),
         )
@@ -1113,4 +1123,100 @@ def register(app):
             abort(404)
         db.session.delete(todo)
         db.session.commit()
+        return _project_detail_redirect(id, 'overview')
+
+    # ── Print items (pieces tracking) ─────────────────────────────────────────
+
+    @app.route('/projects/<int:id>/printitems/add', methods=['POST'])
+    def project_add_print_item(id):
+        project = _project_or_404(id)
+        if not _project_write_allowed(project):
+            abort(403)
+        name = (request.form.get('name', '') or '').strip()
+        if not name:
+            return _project_detail_redirect(id, 'overview')
+        try:
+            quantity_total = int(request.form.get('quantity_total', 1) or 1)
+            quantity_total = max(1, quantity_total)
+        except (TypeError, ValueError):
+            quantity_total = 1
+        notes = (request.form.get('notes', '') or '').strip() or None
+        item = ProjectPrintItem(
+            project_id=id,
+            name=name[:200],
+            quantity_total=quantity_total,
+            quantity_done=0,
+            notes=notes,
+        )
+        db.session.add(item)
+        db.session.commit()
+        return _project_detail_redirect(id, 'overview')
+
+    @app.route('/projects/<int:id>/printitems/<int:item_id>/edit', methods=['POST'])
+    def project_edit_print_item(id, item_id):
+        project = _project_or_404(id)
+        if not _project_write_allowed(project):
+            abort(403)
+        item = db.get_or_404(ProjectPrintItem, item_id)
+        if item.project_id != id:
+            abort(404)
+        name = (request.form.get('name', '') or '').strip()
+        if name:
+            item.name = name[:200]
+        try:
+            quantity_total = int(request.form.get('quantity_total', item.quantity_total) or item.quantity_total)
+            item.quantity_total = max(1, quantity_total)
+        except (TypeError, ValueError):
+            pass
+        try:
+            quantity_done = int(request.form.get('quantity_done', item.quantity_done) or 0)
+            item.quantity_done = max(0, min(item.quantity_total, quantity_done))
+        except (TypeError, ValueError):
+            pass
+        item.notes = (request.form.get('notes', '') or '').strip() or None
+        db.session.commit()
+        return _project_detail_redirect(id, 'overview')
+
+    @app.route('/projects/<int:id>/printitems/<int:item_id>/delete', methods=['POST'])
+    def project_delete_print_item(id, item_id):
+        project = _project_or_404(id)
+        if not _project_write_allowed(project):
+            abort(403)
+        item = db.get_or_404(ProjectPrintItem, item_id)
+        if item.project_id != id:
+            abort(404)
+        db.session.delete(item)
+        db.session.commit()
+        return _project_detail_redirect(id, 'overview')
+
+    @app.route('/projects/<int:id>/printitems/<int:item_id>/increment', methods=['POST'])
+    def project_increment_print_item(id, item_id):
+        project = _project_or_404(id)
+        if not _project_write_allowed(project):
+            abort(403)
+        item = db.get_or_404(ProjectPrintItem, item_id)
+        if item.project_id != id:
+            abort(404)
+        if item.quantity_done < item.quantity_total:
+            item.quantity_done += 1
+            db.session.commit()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            pct = int(item.quantity_done / item.quantity_total * 100) if item.quantity_total > 0 else 0
+            return jsonify({'quantity_done': item.quantity_done, 'quantity_total': item.quantity_total, 'pct': pct})
+        return _project_detail_redirect(id, 'overview')
+
+    @app.route('/projects/<int:id>/printitems/<int:item_id>/decrement', methods=['POST'])
+    def project_decrement_print_item(id, item_id):
+        project = _project_or_404(id)
+        if not _project_write_allowed(project):
+            abort(403)
+        item = db.get_or_404(ProjectPrintItem, item_id)
+        if item.project_id != id:
+            abort(404)
+        if item.quantity_done > 0:
+            item.quantity_done -= 1
+            db.session.commit()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            pct = int(item.quantity_done / item.quantity_total * 100) if item.quantity_total > 0 else 0
+            return jsonify({'quantity_done': item.quantity_done, 'quantity_total': item.quantity_total, 'pct': pct})
         return _project_detail_redirect(id, 'overview')

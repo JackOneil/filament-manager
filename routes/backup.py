@@ -13,7 +13,7 @@ from models import (
     Brand, Color, Material, AppSetting, Filament, MovementHistory,
     PrintHistory, Project, ProjectFile, ProjectLink, ProjectFilament, ProjectQuote,
     BambuPrinter, BambuPrintJob, BambuJobMaterial, StoragePlacement, StorageShelf,
-    PrusaPrinter, PrusaPrintJob, ProjectComment, ProjectTodo, User, UserInvite, Notification, AuditLog,
+    PrusaPrinter, PrusaPrintJob, ProjectComment, ProjectTodo, ProjectPrintItem, User, UserInvite, Notification, AuditLog,
 )
 from utils import encrypt_token, format_tags, utc_now
 
@@ -281,6 +281,14 @@ def register(app):
                     'created_at': todo.created_at.isoformat() if todo.created_at else None,
                     'completed_at': todo.completed_at.isoformat() if todo.completed_at else None,
                 } for todo in proj.todos],
+                'print_items': [{
+                    'name': pi.name,
+                    'quantity_total': pi.quantity_total,
+                    'quantity_done': pi.quantity_done,
+                    'notes': pi.notes,
+                    'sort_order': pi.sort_order,
+                    'created_at': pi.created_at.isoformat() if pi.created_at else None,
+                } for pi in proj.print_items],
             } for proj in Project.query.order_by(Project.created_at).all()],
 
             'users': [{
@@ -737,6 +745,24 @@ def register(app):
                                 is_done=todo_data.get('is_done', False),
                                 created_at=todo_ts,
                                 completed_at=datetime.fromisoformat(todo_data['completed_at']) if todo_data.get('completed_at') else None,
+                            ))
+
+                    for pi_data in proj_data.get('print_items', []):
+                        pi_ts = datetime.fromisoformat(pi_data['created_at']) if pi_data.get('created_at') else utc_now()
+                        existing_pi = ProjectPrintItem.query.filter_by(
+                            project_id=proj.id,
+                            name=pi_data.get('name', ''),
+                            created_at=pi_ts,
+                        ).first()
+                        if not existing_pi:
+                            db.session.add(ProjectPrintItem(
+                                project_id=proj.id,
+                                name=(pi_data.get('name') or '')[:200],
+                                quantity_total=max(1, int(pi_data.get('quantity_total', 1) or 1)),
+                                quantity_done=max(0, int(pi_data.get('quantity_done', 0) or 0)),
+                                notes=pi_data.get('notes'),
+                                sort_order=int(pi_data.get('sort_order', 0) or 0),
+                                created_at=pi_ts,
                             ))
 
                 # ── 6. Bambu printers ─────────────────────────────────

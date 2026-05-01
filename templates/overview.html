@@ -182,6 +182,8 @@
                     <div class="text-xl font-bold mt-1 mb-4">{{ t('overview_command_center_focus_projects') }}</div>
                     <div class="space-y-3">
                         {% for project in overview_focus.active_projects %}
+                        {% set pi_total = project.print_items | sum(attribute='quantity_total') %}
+                        {% set pi_done = project.print_items | sum(attribute='quantity_done') %}
                         <a href="{{ url_for('project_detail', id=project.id) }}" class="block rounded-2xl border border-white/60 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60 px-4 py-3 hover:border-blue-200 dark:hover:border-blue-700 transition">
                             <div class="flex items-center justify-between gap-3">
                                 <div class="font-semibold text-gray-800 dark:text-slate-100 truncate">{{ project.name }}</div>
@@ -191,6 +193,16 @@
                                 {{ project.client_name or t('project_client_missing_label') }}
                                 {% if project.due_date %} · {{ project.due_date.strftime('%d.%m.%Y') }}{% endif %}
                             </div>
+                            {% if pi_total > 0 %}
+                            <div class="mt-2 flex items-center gap-2">
+                                <span class="text-xs font-semibold {% if pi_done == pi_total %}text-emerald-600{% else %}text-blue-600{% endif %}">{{ pi_done }}/{{ pi_total }}</span>
+                                <div class="flex-1 h-1.5 rounded-full bg-slate-200/80 dark:bg-slate-700 overflow-hidden">
+                                    {% set pi_pct = ((pi_done / pi_total) * 100) | int %}
+                                    <div class="h-full rounded-full {% if pi_pct == 100 %}bg-emerald-500{% else %}bg-blue-500{% endif %}" style="width: {{ pi_pct }}%"></div>
+                                </div>
+                                <span class="text-xs text-gray-400">{{ t('project_print_items_summary') }}</span>
+                            </div>
+                            {% endif %}
                         </a>
                         {% else %}
                         <div class="rounded-2xl border border-dashed border-gray-200 dark:border-slate-700 px-4 py-8 text-center text-sm text-gray-400">{{ t('overview_all_clear') }}</div>
