@@ -14,6 +14,7 @@ from models import (
     PrintHistory, Project, ProjectFile, ProjectLink, ProjectFilament, ProjectQuote,
     BambuPrinter, BambuPrintJob, BambuJobMaterial, StoragePlacement, StorageShelf,
     PrusaPrinter, PrusaPrintJob, ProjectComment, ProjectTodo, ProjectPrintItem, User, UserInvite, Notification, AuditLog,
+    PrinterMaintenance,
 )
 from utils import encrypt_token, format_tags, utc_now
 
@@ -424,6 +425,18 @@ def register(app):
                 'filament_ref': _filament_ref(j.filament),
                 'project_name': j.project.name if j.project else None,
             } for j in PrusaPrintJob.query.order_by(PrusaPrintJob.synced_at).all()],
+
+            # ── Printer maintenance records ───────────────────────────
+            'printer_maintenance': [{
+                'printer_type': m.printer_type,
+                'printer_id': m.printer_id,
+                'printer_name': m.printer_name,
+                'maintenance_type': m.maintenance_type,
+                'notes': m.notes,
+                'performed_at': m.performed_at.isoformat() if m.performed_at else None,
+                'next_service_at': m.next_service_at.isoformat() if m.next_service_at else None,
+                'created_at': m.created_at.isoformat() if m.created_at else None,
+            } for m in PrinterMaintenance.query.order_by(PrinterMaintenance.performed_at).all()],
         }
 
         app.logger.debug(
@@ -978,6 +991,27 @@ def register(app):
                         before_data=audit_data.get('before_data'),
                         after_data=audit_data.get('after_data'),
                         created_at=audit_ts,
+                    ))
+
+                # ── 12. Printer maintenance records ───────────────────
+                for m_data in data.get('printer_maintenance', []):
+                    performed_at = datetime.fromisoformat(m_data['performed_at']) if m_data.get('performed_at') else utc_now()
+                    exists_m = PrinterMaintenance.query.filter_by(
+                        printer_name=m_data.get('printer_name', ''),
+                        maintenance_type=m_data.get('maintenance_type', 'other'),
+                        performed_at=performed_at,
+                    ).first()
+                    if exists_m:
+                        continue
+                    db.session.add(PrinterMaintenance(
+                        printer_type=m_data.get('printer_type', 'bambu'),
+                        printer_id=m_data.get('printer_id'),
+                        printer_name=m_data.get('printer_name', ''),
+                        maintenance_type=m_data.get('maintenance_type', 'other'),
+                        notes=m_data.get('notes'),
+                        performed_at=performed_at,
+                        next_service_at=datetime.fromisoformat(m_data['next_service_at']) if m_data.get('next_service_at') else None,
+                        created_at=datetime.fromisoformat(m_data['created_at']) if m_data.get('created_at') else utc_now(),
                     ))
 
             app.logger.debug(f"Import finished: {imported_filaments} filaments, projects and Bambu jobs processed.")

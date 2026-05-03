@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.72.4] - 2026-05-03
+
+### Fixed
+- **Auth — PWA service worker now public** — `PUBLIC_ENDPOINTS` in `auth.py` contained the stale name `sw`; the actual registered endpoint is `service_worker`. Non-authenticated browsers could not install the PWA because `/sw.js` was blocked by the auth guard.
+- **Backup — PrinterMaintenance now exported/imported** — `PrinterMaintenance` records were silently omitted from `/export` and `/import`. They are now included as a `printer_maintenance` section in the backup package (Rule 15).
+- **Translations — maintenance.html** — Multiple `t()` keys used in `maintenance.html` were missing from `messages.py` (`maintenance_empty`, `maintenance_empty_hint`, `maintenance_next`, `maintenance_notes`, `maintenance_notes_placeholder`, `maintenance_performed_at`, `maintenance_next_service_at`, `maintenance_printer_name`, `maintenance_printer_type`, `all`). Keys now added to both `cs` and `en` dicts.
+- **Translations — settings / calculator** — `billing_settings_title`, `calc_energy_settings`, `calc_project_margin_hint`, `calc_project_mode_desc`, `quote_unit_price` were used in templates with inline fallbacks but were missing from `messages.py`. Added to both languages.
+- **maintenance.html — wrong confirm key** — The delete confirmation dialog used `t('confirm_delete')` (undefined); changed to `t('maintenance_delete_confirm')` which already existed with the correct text.
+- **Project detail — removed redundant Markdown hint** — The "Popis projektu podporuje Markdown" hint above the project description was removed; the description area already renders Markdown visually.
+
 ## [1.72.3] - 2026-05-03
 
 ### Changed

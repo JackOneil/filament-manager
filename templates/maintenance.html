@@ -89,7 +89,7 @@
             </div>
             <!-- Delete -->
             <form method="POST" action="{{ url_for('maintenance_delete', rec_id=rec.id) }}"
-                  onsubmit="return confirm('{{ t('confirm_delete') }}')">
+                  onsubmit="return confirm('{{ t('maintenance_delete_confirm') }}')">
                 <button type="submit" class="text-gray-300 hover:text-red-500 transition" title="{{ t('delete') }}">
                     <i class="fa-solid fa-trash-can"></i>
                 </button>

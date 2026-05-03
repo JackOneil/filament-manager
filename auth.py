@@ -43,7 +43,7 @@ PUBLIC_ENDPOINTS = {
     'register_account',
     'activate_invite',
     'manifest',
-    'sw',
+    'service_worker',
     'static',
 }
 
