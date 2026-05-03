@@ -837,6 +837,8 @@ TRANSLATIONS = {
         'audit_show_snapshots': 'Zobrazit před/po',
         'audit_before': 'Před',
         'audit_after': 'Po',
+        'audit_view_diff': 'Diff',
+        'audit_view_split': 'Před / Po',
         'audit_empty': 'Zatím zde nejsou žádné auditní záznamy.',
         'nav_audit_note': 'Administrátorský audit akcí a změn.',
         # ── PrusaLink integration
@@ -1903,6 +1905,8 @@ TRANSLATIONS = {
         'audit_show_snapshots': 'Show before/after',
         'audit_before': 'Before',
         'audit_after': 'After',
+        'audit_view_diff': 'Diff',
+        'audit_view_split': 'Before / After',
         'audit_empty': 'There are no audit records yet.',
         'nav_audit_note': 'Administrator audit of actions and changes.',
         # ── PrusaLink integration

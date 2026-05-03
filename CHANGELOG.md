@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.72.3] - 2026-05-03
+
+### Changed
+- **Audit log — full-width expand row** — The "Show before/after" detail now expands into a second table row spanning all columns (`colspan="6"`), using multiple `<tbody x-data>` elements for correct Alpine.js scoping. Each entry has its own independent open/close state.
+- **Audit log — JSON pretty-print** — Added a `pretty_json` Jinja2 template filter in `app.py`. Before/after snapshots are automatically pretty-printed with 2-space indentation; non-JSON values fall back to raw text.
+- **Audit log — unified diff view** — Detail panel now defaults to a GitHub-style unified diff (LCS algorithm, red `-` / green `+` line highlighting). A toggle switches between diff and side-by-side split view. Data is passed via `data-before` / `data-after` HTML attributes to avoid JSON/HTML attribute quoting conflicts.
+- **Overview — removed KPI summary card** — The widget containing “Celkem cívek / Celkem zbývá / Celková hodnota / Akční centrum” miniature was removed from the overview page and from the JS `defaultOrder` array. The full Action Center widget is unchanged.
+
+## [1.72.2] - 2026-05-03
+
+### Changed
+- **Project progress card** — The workspace progress percentage now combines both materials completion and print-item progress (printed pieces) into a single blended score. The card also shows the printed pieces count when items exist.
+- **Project workspace** — Removed the redundant standalone progress bar below the summary cards (it was already shown inside the print items panel).
+- **Audit log** — The "Show before/after" snapshot panel is now wider (full column span, `xl:grid-cols-2`), the `<pre>` blocks have a larger height limit (`max-h-[32rem]`), and text wraps properly with `whitespace-pre-wrap`.
+- **Sidebar** — Removed the "Switch to operator" button from the sidebar footer; the operator mode toggle did nothing visible and cluttered the navigation.
+
 ## [1.72.1] - 2026-05-02
 
 ### Changed

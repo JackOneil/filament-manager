@@ -48,7 +48,7 @@ from utils import get_settings, utc_now
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.72.1'
+APP_VERSION = '1.72.3'
 
 csrf = CSRFProtect()
 
@@ -86,6 +86,21 @@ def create_app(test_config=None) -> Flask:
     csrf.init_app(app)
     init_auth(app)
     register_all(app)
+
+    # ── Pretty-print JSON filter ───────────────────────────────────────────────
+    import json as _json
+
+    @app.template_filter('pretty_json')
+    def _pretty_json_filter(value):
+        """Try to parse value as JSON and return an indented string.
+        Falls back to the original value if parsing fails."""
+        if not value:
+            return value
+        try:
+            parsed = _json.loads(value)
+            return _json.dumps(parsed, indent=2, ensure_ascii=False)
+        except (ValueError, TypeError):
+            return value
 
     # ── Timezone-aware datetime formatting filter ─────────────────────────────
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError

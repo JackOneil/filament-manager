@@ -58,8 +58,15 @@
                     </tr>
                 </thead>
                 <tbody>
+                    {% if not logs.items %}
+                    <tr>
+                        <td colspan="6" class="py-10 text-center text-gray-500">{{ t('audit_empty') }}</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
                     {% for row in logs.items %}
-                    <tr class="border-b border-gray-100 last:border-b-0 align-top">
+                    <tbody x-data="{ open: false }" class="border-b border-gray-100 last:border-b-0">
+                    <tr class="align-top">
                         <td class="py-3 pr-4 whitespace-nowrap text-gray-600">{{ row.created_at | fmt_dt('%d.%m.%Y %H:%M:%S') }}</td>
                         <td class="py-3 pr-4">
                             <div class="font-semibold text-gray-800">{{ row.user_name or '-' }}</div>
@@ -79,27 +86,48 @@
                             <div class="text-xs text-gray-400">{{ row.session_id or '-' }}</div>
                         </td>
                         <td class="py-3">
-                            <details class="max-w-xl">
-                                <summary class="cursor-pointer text-blue-600 hover:text-blue-800 font-semibold">{{ t('audit_show_snapshots') }}</summary>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                                    <div>
-                                        <div class="text-xs font-bold uppercase text-gray-500 mb-1">{{ t('audit_before') }}</div>
-                                        <pre class="text-xs bg-gray-50 border border-gray-200 rounded-xl p-3 overflow-auto max-h-72">{{ row.before_data or '-' }}</pre>
-                                    </div>
-                                    <div>
-                                        <div class="text-xs font-bold uppercase text-gray-500 mb-1">{{ t('audit_after') }}</div>
-                                        <pre class="text-xs bg-gray-50 border border-gray-200 rounded-xl p-3 overflow-auto max-h-72">{{ row.after_data or '-' }}</pre>
-                                    </div>
-                                </div>
-                            </details>
+                            <button type="button" @click="open = !open"
+                                    class="text-blue-600 hover:text-blue-800 font-semibold text-sm flex items-center gap-1 whitespace-nowrap">
+                                <i class="fa-solid fa-chevron-right text-xs transition-transform duration-200" :class="open ? 'rotate-90' : ''"></i>
+                                {{ t('audit_show_snapshots') }}
+                            </button>
                         </td>
                     </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="6" class="py-10 text-center text-gray-500">{{ t('audit_empty') }}</td>
+                    <tr x-show="open" x-cloak class="bg-slate-50/60 dark:bg-slate-800/30">
+                        <td colspan="6" class="px-4 pb-5 pt-3"
+                            x-data="auditDiffPanel($el)"
+                            data-before="{{ row.before_data | e }}"
+                            data-after="{{ row.after_data | e }}">
+                            <!-- View toggle -->
+                            <div class="flex items-center gap-2 mb-3">
+                                <button type="button" @click="view='diff'"
+                                        :class="view==='diff' ? 'ui-badge ui-badge-brand' : 'ui-badge'">
+                                    <i class="fa-solid fa-code-compare"></i> {{ t('audit_view_diff') }}
+                                </button>
+                                <button type="button" @click="view='split'"
+                                        :class="view==='split' ? 'ui-badge ui-badge-brand' : 'ui-badge'">
+                                    <i class="fa-solid fa-table-columns"></i> {{ t('audit_view_split') }}
+                                </button>
+                            </div>
+                            <!-- Unified diff view -->
+                            <div x-show="view==='diff'">
+                                <pre class="text-xs bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-600 rounded-xl overflow-auto min-h-[6rem] max-h-[32rem] font-mono leading-relaxed" x-html="diffHtml"></pre>
+                            </div>
+                            <!-- Side-by-side split view -->
+                            <div x-show="view==='split'" class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                <div>
+                                    <div class="text-xs font-bold uppercase text-gray-500 mb-1">{{ t('audit_before') }}</div>
+                                    <pre class="text-xs bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-600 rounded-xl p-4 overflow-auto min-h-[6rem] max-h-[32rem] whitespace-pre-wrap break-words font-mono leading-relaxed" x-text="beforeText || '-'"></pre>
+                                </div>
+                                <div>
+                                    <div class="text-xs font-bold uppercase text-gray-500 mb-1">{{ t('audit_after') }}</div>
+                                    <pre class="text-xs bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-600 rounded-xl p-4 overflow-auto min-h-[6rem] max-h-[32rem] whitespace-pre-wrap break-words font-mono leading-relaxed" x-text="afterText || '-'"></pre>
+                                </div>
+                            </div>
+                        </td>
                     </tr>
+                    </tbody>
                     {% endfor %}
-                </tbody>
             </table>
         </div>
 
@@ -116,4 +144,74 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+function _auditEscHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function _auditPrettyJson(raw) {
+    if (!raw) return '';
+    try { return JSON.stringify(JSON.parse(raw), null, 2); }
+    catch (e) { return raw; }
+}
+
+// Myers-style LCS diff on arrays of strings
+function _auditLcsDiff(before, after) {
+    const m = before.length, n = after.length;
+    // Build LCS DP table (only 2 rows needed)
+    const dp = Array.from({ length: m + 1 }, () => new Int32Array(n + 1));
+    for (let i = 1; i <= m; i++)
+        for (let j = 1; j <= n; j++)
+            dp[i][j] = before[i-1] === after[j-1] ? dp[i-1][j-1] + 1 : Math.max(dp[i-1][j], dp[i][j-1]);
+    // Backtrack
+    const ops = [];
+    let i = m, j = n;
+    while (i > 0 || j > 0) {
+        if (i > 0 && j > 0 && before[i-1] === after[j-1]) {
+            ops.unshift({ t: '=', v: before[i-1] }); i--; j--;
+        } else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) {
+            ops.unshift({ t: '+', v: after[j-1] }); j--;
+        } else {
+            ops.unshift({ t: '-', v: before[i-1] }); i--;
+        }
+    }
+    return ops;
+}
+
+function auditDiffPanel(el) {
+    return {
+        view: 'diff',
+        beforeText: _auditPrettyJson(el.dataset.before || ''),
+        afterText:  _auditPrettyJson(el.dataset.after  || ''),
+        get diffHtml() {
+            const b = this.beforeText, a = this.afterText;
+            if (!b && !a) return '<span class="p-4 text-gray-400">-</span>';
+            const bLines = b ? b.split('\n') : [];
+            const aLines = a ? a.split('\n') : [];
+            if (!b) return aLines.map(l =>
+                `<div class="px-4 py-px bg-emerald-50 dark:bg-emerald-950/40"><span class="select-none text-emerald-500 mr-2 font-bold">+</span><span class="text-emerald-800 dark:text-emerald-300">${_auditEscHtml(l)}</span></div>`
+            ).join('');
+            if (!a) return bLines.map(l =>
+                `<div class="px-4 py-px bg-red-50 dark:bg-red-950/40"><span class="select-none text-red-500 mr-2 font-bold">-</span><span class="text-red-800 dark:text-red-300">${_auditEscHtml(l)}</span></div>`
+            ).join('');
+            const ops = _auditLcsDiff(bLines, aLines);
+            // Count changes for context collapsing
+            let html = '';
+            for (let idx = 0; idx < ops.length; idx++) {
+                const op = ops[idx];
+                const esc = _auditEscHtml(op.v);
+                if (op.t === '=') {
+                    html += `<div class="px-4 py-px text-gray-600 dark:text-gray-300"><span class="select-none text-gray-300 dark:text-gray-600 mr-2"> </span>${esc}</div>`;
+                } else if (op.t === '-') {
+                    html += `<div class="px-4 py-px bg-red-50 dark:bg-red-950/40"><span class="select-none text-red-500 mr-2 font-bold">-</span><span class="text-red-800 dark:text-red-300">${esc}</span></div>`;
+                } else {
+                    html += `<div class="px-4 py-px bg-emerald-50 dark:bg-emerald-950/40"><span class="select-none text-emerald-500 mr-2 font-bold">+</span><span class="text-emerald-800 dark:text-emerald-300">${esc}</span></div>`;
+                }
+            }
+            return html || '<span class="p-4 text-gray-400 italic">Žádné změny</span>';
+        }
+    };
+}
+</script>
 {% endblock %}
