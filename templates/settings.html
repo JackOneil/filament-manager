@@ -529,6 +529,13 @@
                                 class="text-xs text-blue-500 hover:text-blue-700 transition-colors flex-shrink-0">
                                 <i class="fa-solid fa-pen"></i> {{ t('bambu_printer_rename') }}
                             </button>
+                            <form method="POST" onsubmit="return confirm('{{ t('bambu_delete_printer_confirm') }}');" class="flex-shrink-0">
+                                <input type="hidden" name="action" value="delete_bambu_printer">
+                                <input type="hidden" name="id" value="{{ p.id }}">
+                                <button type="submit" class="text-xs text-red-400 hover:text-red-600 transition-colors" title="{{ t('delete') }}">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </form>
                         </div>
                         <form method="POST" x-show="editing" x-cloak class="flex flex-col gap-2 mt-1">
                             <input type="hidden" name="action" value="edit_bambu_printer">
@@ -551,6 +558,15 @@
                                     value="{{ p.pre_job_time_minutes or 0 }}"
                                     class="w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                                 <span class="text-xs text-gray-400">{{ t('bambu_pre_job_time_unit') }}</span>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-500 whitespace-nowrap flex items-center gap-1.5">
+                                    <i class="fa-solid fa-note-sticky text-gray-400"></i>
+                                    {{ t('bambu_printer_notes_label') }}:
+                                </label>
+                                <input type="text" name="notes" value="{{ p.notes or '' }}"
+                                    class="w-full border border-gray-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder="{{ t('bambu_printer_notes_placeholder') }}">
                             </div>
                             <p class="text-xs text-gray-400">{{ t('bambu_pre_job_time_desc') }}</p>
                         </form>

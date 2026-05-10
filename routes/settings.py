@@ -178,7 +178,14 @@ def register(app):
                             printer.pre_job_time_minutes = max(0, int(request.form.get('pre_job_time_minutes', 0)))
                         except (ValueError, TypeError):
                             pass
-                        app.logger.debug(f"Edited Bambu printer {printer.device_id}: name={printer.name}, pre_job={printer.pre_job_time_minutes}min")
+                        printer.notes = request.form.get('notes', '').strip() or None
+                        app.logger.debug(f"Edited Bambu printer {printer.device_id}: name={printer.name}, pre_job={printer.pre_job_time_minutes}min, notes={printer.notes}")
+
+                elif action == 'delete_bambu_printer':
+                    printer = db.session.get(BambuPrinter, request.form.get('id', type=int))
+                    if printer:
+                        db.session.delete(printer)
+                        app.logger.debug(f'Deleted Bambu printer: {printer.name} ({printer.device_id})')
 
                 elif action == 'printer_energy_settings':
                     setting = AppSetting.query.first()
