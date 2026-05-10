@@ -87,13 +87,20 @@
                     {% endif %}
                 </div>
             </div>
-            <!-- Delete -->
-            <form method="POST" action="{{ url_for('maintenance_delete', rec_id=rec.id) }}"
-                  onsubmit="return confirm('{{ t('maintenance_delete_confirm') }}')">
-                <button type="submit" class="text-gray-300 hover:text-red-500 transition" title="{{ t('delete') }}">
-                    <i class="fa-solid fa-trash-can"></i>
+            <!-- Edit / Delete -->
+            <div class="flex items-center gap-2 flex-shrink-0">
+                <button type="button"
+                        onclick="openEditModal({{ rec.id }})"
+                        class="text-gray-300 hover:text-blue-500 transition" title="{{ t('maintenance_edit') }}">
+                    <i class="fa-solid fa-pen-to-square"></i>
                 </button>
-            </form>
+                <form method="POST" action="{{ url_for('maintenance_delete', rec_id=rec.id) }}"
+                      onsubmit="return confirm('{{ t('maintenance_delete_confirm') }}')" class="inline">
+                    <button type="submit" class="text-gray-300 hover:text-red-500 transition" title="{{ t('delete') }}">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </form>
+            </div>
         </div>
         {% endfor %}
     </div>
@@ -193,9 +200,99 @@
     </div>
 </div>
 
+<!-- Edit Maintenance Modal -->
+<div id="editMaintenanceModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 space-y-5">
+        <div class="flex items-center justify-between">
+            <h2 class="text-xl font-bold text-gray-800">{{ t('maintenance_edit_title') }}</h2>
+            <button onclick="document.getElementById('editMaintenanceModal').classList.add('hidden')"
+                    class="text-gray-400 hover:text-gray-700 transition text-xl">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+        <form method="POST" id="editMaintenanceForm" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="ui-label">{{ t('maintenance_printer_type') }}</label>
+                    <select name="printer_type" id="ePrinterType" onchange="eUpdatePrinterNames()"
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="bambu">Bambu Lab</option>
+                        <option value="prusa">Prusa</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="ui-label">{{ t('maintenance_printer_name') }}</label>
+                    <select name="printer_id" id="ePrinterId" onchange="eSetPrinterName()"
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                        {% for p in bambu_printers %}
+                        <option value="{{ p.id }}" data-type="bambu" data-name="{{ p.name }}">{{ p.name }}</option>
+                        {% endfor %}
+                        {% for p in prusa_printers %}
+                        <option value="{{ p.id }}" data-type="prusa" data-name="{{ p.name }}">{{ p.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="hidden" name="printer_name" id="ePrinterNameHidden" value="">
+                </div>
+            </div>
+            <div>
+                <label class="ui-label">{{ t('maintenance_type_label') }}</label>
+                <select name="maintenance_type" id="eMaintenanceType"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    {% for mt in maintenance_types %}
+                    <option value="{{ mt }}">{{ t('maintenance_type_' ~ mt) }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="ui-label">{{ t('maintenance_notes') }}</label>
+                <textarea name="notes" id="eNotes" rows="2"
+                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                          placeholder="{{ t('maintenance_notes_placeholder') }}"></textarea>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="ui-label">{{ t('maintenance_performed_at') }}</label>
+                    <input type="datetime-local" name="performed_at" id="ePerformedAt"
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="ui-label">{{ t('maintenance_next_service_at') }}</label>
+                    <input type="date" name="next_service_at" id="eNextServiceAt"
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 pt-2">
+                <button type="button"
+                        onclick="document.getElementById('editMaintenanceModal').classList.add('hidden')"
+                        class="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
+                    {{ t('cancel') }}
+                </button>
+                <button type="submit"
+                        class="px-5 py-2 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow transition">
+                    <i class="fa-solid fa-save mr-1"></i>{{ t('maintenance_edit_save') }}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 const bambuPrinters = {{ bambu_printers | map(attribute='name') | list | tojson }};
 const prusaPrinters = {{ prusa_printers | map(attribute='name') | list | tojson }};
+
+const maintenanceRecords = {
+{% for item in records %}{% set rec = item.rec %}
+    {{ rec.id }}: {
+        printer_type: {{ rec.printer_type | tojson }},
+        printer_id: {{ rec.printer_id | tojson }},
+        printer_name: {{ rec.printer_name | tojson }},
+        maintenance_type: {{ rec.maintenance_type | tojson }},
+        notes: {{ rec.notes | tojson }},
+        performed_at: {{ (rec.performed_at.strftime('%Y-%m-%dT%H:%M') if rec.performed_at else '') | tojson }},
+        next_service_at: {{ (rec.next_service_at.strftime('%Y-%m-%d') if rec.next_service_at else '') | tojson }}
+    }{% if not loop.last %},{% endif %}
+{% endfor %}
+};
 
 function updatePrinterNames() {
     const type = document.getElementById('mPrinterType').value;
@@ -214,6 +311,52 @@ function setMPrinterName() {
     const sel = document.getElementById('mPrinterId');
     const selected = sel.options[sel.selectedIndex];
     document.getElementById('mPrinterNameHidden').value = selected ? (selected.dataset.name || '') : '';
+}
+
+// ── Edit modal helpers ──
+function openEditModal(id) {
+    const rec = maintenanceRecords[id];
+    if (!rec) return;
+
+    const form = document.getElementById('editMaintenanceForm');
+    form.action = '{{ url_for("maintenance_edit", rec_id=99999) }}'.replace('99999', id);
+
+    document.getElementById('ePrinterType').value = rec.printer_type;
+    document.getElementById('eMaintenanceType').value = rec.maintenance_type;
+    document.getElementById('eNotes').value = rec.notes || '';
+    document.getElementById('ePerformedAt').value = rec.performed_at || '';
+    document.getElementById('eNextServiceAt').value = rec.next_service_at || '';
+
+    eUpdatePrinterNames();
+    if (rec.printer_id) {
+        const sel = document.getElementById('ePrinterId');
+        for (let i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value === String(rec.printer_id) && sel.options[i].dataset.type === rec.printer_type) {
+                sel.selectedIndex = i;
+                break;
+            }
+        }
+    }
+    document.getElementById('ePrinterNameHidden').value = rec.printer_name;
+    document.getElementById('editMaintenanceModal').classList.remove('hidden');
+}
+
+function eUpdatePrinterNames() {
+    const type = document.getElementById('ePrinterType').value;
+    const sel = document.getElementById('ePrinterId');
+    const options = sel.querySelectorAll('option');
+    options.forEach(opt => {
+        opt.style.display = opt.dataset.type === type ? '' : 'none';
+    });
+    const visible = [...options].filter(o => o.dataset.type === type);
+    if (visible.length) visible[0].selected = true;
+    eSetPrinterName();
+}
+
+function eSetPrinterName() {
+    const sel = document.getElementById('ePrinterId');
+    const selected = sel.options[sel.selectedIndex];
+    document.getElementById('ePrinterNameHidden').value = selected ? (selected.dataset.name || '') : '';
 }
 
 // Set default datetime to now

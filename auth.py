@@ -129,6 +129,7 @@ SECTION_BY_ENDPOINT = {
     'filament_export_csv': SECTION_FILAMENTS,
     'maintenance_index': SECTION_PRINTERS,
     'maintenance_add': SECTION_PRINTERS,
+    'maintenance_edit': SECTION_PRINTERS,
     'maintenance_delete': SECTION_PRINTERS,
     'users_index': SECTION_USERS,
     'user_detail': SECTION_USERS,

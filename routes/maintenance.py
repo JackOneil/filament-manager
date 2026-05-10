@@ -99,6 +99,45 @@ def register(app):
         db.session.commit()
         return redirect(url_for('maintenance_index'))
 
+    @app.route('/maintenance/<int:rec_id>/edit', methods=['POST'])
+    def maintenance_edit(rec_id):
+        from auth import get_current_user, is_admin
+        user = get_current_user()
+        if not is_admin(user):
+            abort(403)
+        rec = db.get_or_404(PrinterMaintenance, rec_id)
+
+        printer_type = request.form.get('printer_type', 'bambu')
+        printer_id = request.form.get('printer_id', type=int)
+        printer_name = request.form.get('printer_name', '').strip()
+        maintenance_type = request.form.get('maintenance_type', 'other')
+        if maintenance_type not in ('nozzle_change', 'calibration', 'service', 'fault', 'other'):
+            maintenance_type = 'other'
+        notes = request.form.get('notes', '').strip() or None
+
+        try:
+            performed_at_raw = request.form.get('performed_at', '').strip()
+            performed_at = datetime.strptime(performed_at_raw, '%Y-%m-%dT%H:%M') if performed_at_raw else utc_now()
+        except (TypeError, ValueError):
+            performed_at = utc_now()
+
+        try:
+            next_service_raw = request.form.get('next_service_at', '').strip()
+            next_service_at = datetime.strptime(next_service_raw, '%Y-%m-%d') if next_service_raw else None
+        except (TypeError, ValueError):
+            next_service_at = None
+
+        rec.printer_type = printer_type
+        rec.printer_id = printer_id
+        rec.printer_name = printer_name
+        rec.maintenance_type = maintenance_type
+        rec.notes = notes
+        rec.performed_at = performed_at
+        rec.next_service_at = next_service_at
+
+        db.session.commit()
+        return redirect(url_for('maintenance_index'))
+
     @app.route('/maintenance/<int:rec_id>/delete', methods=['POST'])
     def maintenance_delete(rec_id):
         from auth import get_current_user, is_admin
