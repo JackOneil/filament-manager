@@ -854,6 +854,15 @@ def register(app):
             'quantity': ['quantity', 'počet', 'pocet', 'qty'],
             'nozzle_temp': ['nozzle_temp', 'nozzle temp', 'teplota trysky'],
             'bed_temp': ['bed_temp', 'bed temp', 'teplota podložky', 'teplota podlozky'],
+            'min_stock_grams': ['min_stock_grams', 'min stock', 'min stock (g)', 'minimum zásoby', 'minimum zasoby'],
+            'max_stock_grams': ['max_stock_grams', 'max stock', 'max stock (g)', 'maximum zásoby', 'maximum zasoby'],
+            'tags': ['tags', 'tagy', 'štítky', 'stitky'],
+            'shop_url': ['shop_url', 'shop url', 'url eshopu', 'e-shop url', 'link'],
+            'quality_drying': ['quality_drying', 'drying', 'sušení', 'suseni'],
+            'quality_stringing': ['quality_stringing', 'stringing', 'stringing hodnocení'],
+            'quality_adhesion': ['quality_adhesion', 'adhesion', 'přilnavost', 'prilnavost'],
+            'quality_profile': ['quality_profile', 'profile', 'print profile', 'tiskový profil'],
+            'quality_notes': ['quality_notes', 'notes', 'poznámky', 'poznamky'],
         }
 
         def _norm_header(h):
@@ -873,8 +882,8 @@ def register(app):
         if request.method == 'GET':
             if request.args.get('template') == '1':
                 import flask
-                CSV_TEMPLATE_HEADER = 'name,brand,material,color,weight_total,weight_remaining,price,quantity,nozzle_temp,bed_temp\n'
-                CSV_TEMPLATE_ROW = 'Example Filament,Bambu,PLA,Red,1000,1000,25.00,1,220,60\n'
+                CSV_TEMPLATE_HEADER = 'name,brand,material,color,weight_total,weight_remaining,price,quantity,nozzle_temp,bed_temp,min_stock_grams,max_stock_grams,tags,shop_url,quality_drying,quality_stringing,quality_adhesion,quality_profile,quality_notes\n'
+                CSV_TEMPLATE_ROW = 'Example Filament,Bambu,PLA,Red,1000,1000,25.00,1,220,60,100,0,,,,,,\n'
                 output = '\ufeff' + CSV_TEMPLATE_HEADER + CSV_TEMPLATE_ROW
                 response = flask.make_response(output)
                 response.headers['Content-Type'] = 'text/csv; charset=utf-8-sig'
@@ -927,6 +936,15 @@ def register(app):
                     'quantity': _get('quantity', '1'),
                     'nozzle_temp': _get('nozzle_temp'),
                     'bed_temp': _get('bed_temp'),
+                    'min_stock_grams': _get('min_stock_grams'),
+                    'max_stock_grams': _get('max_stock_grams'),
+                    'tags': _get('tags'),
+                    'shop_url': _get('shop_url'),
+                    'quality_drying': _get('quality_drying'),
+                    'quality_stringing': _get('quality_stringing'),
+                    'quality_adhesion': _get('quality_adhesion'),
+                    'quality_profile': _get('quality_profile'),
+                    'quality_notes': _get('quality_notes'),
                 })
             import json as _json
             csv_payload = _json.dumps({'separator': separator, 'col_map': {k: v for k, v in col_map.items()}, 'rows': preview_rows})
@@ -949,10 +967,10 @@ def register(app):
                 material_name = row.get('material', '').strip() or 'PLA'
                 color_name = row.get('color', '').strip() or 'Unknown'
                 try:
-                    weight_total = float(row.get('weight_total') or 0)
+                    weight_total = math.floor(float(row.get('weight_total') or 0) * 100) / 100
                     weight_remaining_raw = row.get('weight_remaining', '').strip()
-                    weight_remaining = float(weight_remaining_raw) if weight_remaining_raw else weight_total
-                    price = float(row.get('price') or 0)
+                    weight_remaining = math.floor((float(weight_remaining_raw) if weight_remaining_raw else weight_total) * 100) / 100
+                    price = math.floor(float(row.get('price') or 0) * 100) / 100
                     quantity = max(int(row.get('quantity') or 1), 1)
                 except (TypeError, ValueError):
                     continue
@@ -977,6 +995,13 @@ def register(app):
                 except (TypeError, ValueError):
                     nozzle_temp = None
                     bed_temp = None
+                try:
+                    min_stock = math.floor(float(row.get('min_stock_grams') or 0) * 100) / 100
+                    max_stock = math.floor(float(row.get('max_stock_grams') or 0) * 100) / 100
+                except (TypeError, ValueError):
+                    min_stock = 0.0
+                    max_stock = 0.0
+                from utils import format_tags
                 db.session.add(Filament(
                     name=name,
                     brand_id=brand.id,
@@ -988,6 +1013,15 @@ def register(app):
                     quantity=quantity,
                     recommended_nozzle_temp=nozzle_temp,
                     recommended_bed_temp=bed_temp,
+                    min_stock_grams=min_stock,
+                    max_stock_grams=max_stock,
+                    tag_text=format_tags(row.get('tags', '')) or None,
+                    shop_url=row.get('shop_url', '').strip() or None,
+                    quality_drying=row.get('quality_drying', '').strip() or None,
+                    quality_stringing=row.get('quality_stringing', '').strip() or None,
+                    quality_adhesion=row.get('quality_adhesion', '').strip() or None,
+                    quality_profile=row.get('quality_profile', '').strip() or None,
+                    quality_notes=row.get('quality_notes', '').strip() or None,
                 ))
                 imported += 1
             db.session.commit()
@@ -1002,12 +1036,23 @@ def register(app):
         import flask
         _require_inventory_admin()
         filaments = Filament.query.order_by(Filament.name).all()
+
+        def _floor2(v):
+            """Floor a float to 2 decimal places to avoid floating-point noise."""
+            if v is None:
+                return ''
+            return math.floor(float(v) * 100) / 100
+
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow([
             'name', 'brand', 'material', 'color',
             'weight_total', 'weight_remaining', 'price', 'quantity',
             'nozzle_temp', 'bed_temp',
+            'min_stock_grams', 'max_stock_grams',
+            'tags', 'shop_url',
+            'quality_drying', 'quality_stringing', 'quality_adhesion',
+            'quality_profile', 'quality_notes',
         ])
         for f in filaments:
             writer.writerow([
@@ -1015,12 +1060,21 @@ def register(app):
                 f.brand.name if f.brand else '',
                 f.material.name if f.material else '',
                 f.color.name if f.color else '',
-                f.weight_total,
-                f.weight_remaining,
-                f.price,
+                _floor2(f.weight_total),
+                _floor2(f.weight_remaining),
+                _floor2(f.price),
                 f.quantity,
                 f.recommended_nozzle_temp or '',
                 f.recommended_bed_temp or '',
+                _floor2(f.min_stock_grams) if f.min_stock_grams else '',
+                _floor2(f.max_stock_grams) if f.max_stock_grams else '',
+                f.tag_text or '',
+                f.shop_url or '',
+                f.quality_drying or '',
+                f.quality_stringing or '',
+                f.quality_adhesion or '',
+                f.quality_profile or '',
+                f.quality_notes or '',
             ])
         csv_content = output.getvalue()
         # Prepend UTF-8 BOM so Excel and other tools correctly detect Czech characters

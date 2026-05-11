@@ -88,8 +88,8 @@
                 {
                     title: { cs: 'Import z CSV', en: 'CSV Import' },
                     text: {
-                        cs: 'V nabídce akcí (⋮) zvolte „Import CSV" a nahrajte soubor se sloupci: brand, material, color, weight_total, weight_remaining. Existující záznamy (stejný výrobce + barva + materiál) se přeskočí.',
-                        en: 'From the actions menu (⋮) choose "Import CSV" and upload a file with columns: brand, material, color, weight_total, weight_remaining. Existing records (same brand + colour + material) are skipped.'
+                        cs: 'V nabídce akcí (⋮) zvolte „Import CSV" a nahrajte soubor se sloupci: name, brand, material, color, weight_total, weight_remaining, price, quantity, nozzle_temp, bed_temp, min_stock_grams, max_stock_grams, tags, shop_url, quality_drying, quality_stringing, quality_adhesion, quality_profile, quality_notes. Existující záznamy (stejný výrobce + barva + materiál) se přeskočí.',
+                        en: 'From the actions menu (⋮) choose "Import CSV" and upload a file with columns: name, brand, material, color, weight_total, weight_remaining, price, quantity, nozzle_temp, bed_temp, min_stock_grams, max_stock_grams, tags, shop_url, quality_drying, quality_stringing, quality_adhesion, quality_profile, quality_notes. Existing records (same brand + colour + material) are skipped.'
                     }
                 },
                 {

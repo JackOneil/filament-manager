@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.72.6] - 2026-05-11
+
+### Fixed
+- **CSV Export — floating-point noise in weight values** — `weight_remaining` (and `weight_total`, `price`) were exported with full IEEE 754 noise (e.g. `2456.6300000000006`). All numeric float values are now floored to exactly 2 decimal places (`math.floor(x * 100) / 100`) before writing to the CSV.
+
+### Changed
+- **CSV Export/Import — full field parity** — The CSV format now includes all Filament model fields:
+  `min_stock_grams`, `max_stock_grams`, `tags`, `shop_url`, `quality_drying`, `quality_stringing`, `quality_adhesion`, `quality_profile`, `quality_notes`.
+  The import parser, column aliases, preview row builder, confirm logic, and template CSV download (`?template=1`) are all updated accordingly.
+- **CSV Import — floor rounding on ingest** — `weight_total`, `weight_remaining`, `price`, `min_stock_grams`, and `max_stock_grams` are floor-rounded to 2 decimal places on import to prevent storing noisy float values.
+- **`filament_import_csv.html`** — Format documentation table and preview table updated to show all new columns.
+
 ## [1.72.5] - 2026-05-11
 
 ### Added
