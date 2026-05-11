@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.73.0***
+*Current version: **v1.73.1***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -39,7 +39,7 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 - **Live Printer Dashboard** — Overview page shows active print jobs with real-time progress bars, ETA, material swatches, and brand badges.
 
 ### Analytics & Operations
-- **Statistics Dashboard** — Executive KPI panel, usage/purchase trend charts, stock depletion forecast, reorder recommendations, profitable projects, color palette. Draggable sections with hide/show and per-card row limits, enhanced drag ghost, clearer drop zones, and mini in-UI drag guide.
+- **Statistics Dashboard** — Executive KPI panel, usage/purchase trend charts, stock depletion forecast, reorder recommendations, profitable projects, color palette. Draggable sections with hide/show and per-card row limits, enhanced drag ghost, clearer drop zones, mini in-UI drag guide, and direct row links from key widgets to related filament/project detail.
 - **Action Center** — Highlights low-stock alerts, overdue projects, unmapped print jobs, and printer sync issues in one place.
 - **Automatic Purchase Recommendations** — Based on 30/90-day real usage, recommends what to order next with spool counts and purchase price.
 - **Configurable Timezone** — All timestamps are displayed in the configured local timezone (default: Europe/Prague) while data is stored as UTC.

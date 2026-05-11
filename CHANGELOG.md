@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.73.1] - 2026-05-11
+
+### Added
+- **Statistics quick navigation links** — In the Stats dashboard, rows in stock depletion forecast now link to filament detail, rows in largest projects now link to project detail, and rows in recent stock replenishment now link to filament detail for faster drill-down.
+
 ## [1.73.0] - 2026-05-11
 
 ### Added

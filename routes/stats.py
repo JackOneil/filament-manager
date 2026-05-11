@@ -81,7 +81,8 @@ def _project_usage_rows():
         if grams <= 0:
             continue
 
-        row = rows[job.project.name]
+        row = rows[job.project.id]
+        row['project_name'] = job.project.name
         row['grams'] += grams
         row['jobs'] += 1
         row['source'].add('bambu')
@@ -93,14 +94,16 @@ def _project_usage_rows():
     for link in manual_links:
         if not link.project or link.estimated_weight <= 0:
             continue
-        row = rows[link.project.name]
+        row = rows[link.project.id]
+        row['project_name'] = link.project.name
         row['grams'] += link.estimated_weight
         row['source'].add('manual')
 
     result = []
-    for project_name, data in rows.items():
+    for project_id, data in rows.items():
         result.append({
-            'project_name': project_name,
+            'project_id': project_id,
+            'project_name': data.get('project_name') or '',
             'grams': round(data['grams'], 1),
             'jobs': data['jobs'],
             'source': ', '.join(sorted(data['source'])),
@@ -126,7 +129,10 @@ def register(app):
             joinedload(Filament.material),
             joinedload(Filament.color),
         ).order_by(Filament.name.asc()).all()
-        filament_name_map = {_display_filament_name(f): f for f in filaments}
+        filament_name_map = {}
+        for filament in filaments:
+            filament_name_map[_display_filament_name(filament)] = filament
+            filament_name_map[filament.name] = filament
 
         movement_rows = MovementHistory.query.filter(
             MovementHistory.created_at >= since_dt
@@ -153,8 +159,10 @@ def register(app):
                     material_daily[material_name][day_key] += row.weight
             elif row.action_type == 'add':
                 purchase_daily[day_key] += row.weight
+                linked_filament = filament_name_map.get(row.filament_name)
                 purchase_filament_rows.append({
                     'date': row.created_at.strftime('%d.%m.%Y'),
+                    'filament_id': linked_filament.id if linked_filament else None,
                     'filament_name': row.filament_name,
                     'weight': round(row.weight, 1),
                     'cost': round(row.cost, 2),
