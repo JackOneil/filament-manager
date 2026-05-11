@@ -48,7 +48,7 @@ from utils import get_settings, utc_now
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.72.6'
+APP_VERSION = '1.73.0'
 
 csrf = CSRFProtect()
 
@@ -154,6 +154,19 @@ def create_app(test_config=None) -> Flask:
 
         from flask import session as _session
         ui_mode = _session.get('ui_mode', 'admin')  # 'admin' or 'operator'
+        pending_inventory_undo = None
+        raw_undo = _session.get('inventory_pending_undo')
+        if isinstance(raw_undo, dict):
+            expires_raw = raw_undo.get('expires_at')
+            try:
+                expires_at = datetime.fromisoformat(expires_raw) if expires_raw else None
+            except (TypeError, ValueError):
+                expires_at = None
+
+            if expires_at and expires_at > utc_now():
+                pending_inventory_undo = raw_undo
+            else:
+                _session.pop('inventory_pending_undo', None)
 
         return dict(
             t=t,
@@ -168,6 +181,7 @@ def create_app(test_config=None) -> Flask:
             auth_has_section_access=has_section_access,
             auth_is_admin=is_admin,
             ui_mode=ui_mode,
+            pending_inventory_undo=pending_inventory_undo,
         )
 
     @app.errorhandler(403)

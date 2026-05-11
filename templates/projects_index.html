@@ -34,6 +34,9 @@
     <div id="projectsEditHint" class="hidden bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 text-sm text-blue-700 mb-4 transition-all duration-300" x-bind:class="editingLayout ? '!flex' : ''">
         <i class="fa-solid fa-arrows-up-down-left-right"></i>
         <span>{{ t('stats_drag_hint') }}</span>
+        <span class="ui-badge ui-badge-brand"><strong>1</strong> {{ t('dashboard_drag_step_pick') }}</span>
+        <span class="ui-badge ui-badge-brand"><strong>2</strong> {{ t('dashboard_drag_step_move') }}</span>
+        <span class="ui-badge ui-badge-brand"><strong>3</strong> {{ t('dashboard_drag_step_drop') }}</span>
         <span class="text-blue-500 opacity-50">·</span>
         <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
         <span>{{ t('overview_resize_hint') }}</span>
@@ -64,8 +67,21 @@
     </section>
 
     <!-- Content wrapper for AJAX reload -->
-    <div id="projects-inner-wrapper" class="relative transition-opacity duration-300" :class="loading ? 'opacity-50 pointer-events-none' : 'opacity-100'">
-        {% include '_projects_layout.html' %}
+    <div id="projects-inner-wrapper" class="relative transition-opacity duration-300" :class="loading ? 'opacity-60 pointer-events-none' : 'opacity-100'">
+        <div id="projects-loading-overlay" class="hidden absolute inset-0 z-20 pointer-events-none">
+            <div class="absolute inset-0 rounded-2xl bg-white/65 dark:bg-slate-900/55 backdrop-blur-[1px]"></div>
+            <div class="relative p-4 md:p-5 grid grid-cols-1 xl:grid-cols-4 gap-4 md:gap-6">
+                <div class="xl:col-span-4 h-12 rounded-xl bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+                <div class="xl:col-span-4 h-11 rounded-xl bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+                <div class="h-44 rounded-2xl bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+                <div class="h-44 rounded-2xl bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+                <div class="h-44 rounded-2xl bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+                <div class="h-44 rounded-2xl bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+            </div>
+        </div>
+        <div id="projects-content">
+            {% include '_projects_layout.html' %}
+        </div>
     </div>
 
 </div>
@@ -211,17 +227,20 @@ function projectsApp() {
                 if (this.statusPages['DONE'] > 1) params.append('kanban_done_page', this.statusPages['DONE']);
                 if (this.statusPages['REJECTED'] > 1) params.append('kanban_rejected_page', this.statusPages['REJECTED']);
 
+                const wrapper = document.getElementById('projects-content');
+                const overlay = document.getElementById('projects-loading-overlay');
+                if (overlay) overlay.classList.remove('hidden');
+
                 const res = await fetch(`{{ url_for('projects_index') }}?${params.toString()}`);
                 const data = await res.json();
                 
-                if (data.html) {
+                if (data.html && wrapper) {
                     // Capture focus state before replacement
                     let activeEl = document.activeElement;
                     let focusedId = activeEl ? activeEl.id : null;
                     let cursorPos = activeEl && ('selectionStart' in activeEl) ? activeEl.selectionStart : null;
                     let currentVal = activeEl && ('value' in activeEl) ? activeEl.value : null;
 
-                    const wrapper = document.getElementById('projects-inner-wrapper');
                     wrapper.innerHTML = data.html;
                     
                     // Restore focus and precise value after micro-delay to allow browser/Alpine hydration
@@ -256,6 +275,8 @@ function projectsApp() {
                 console.error(err);
             } finally {
                 this.loading = false;
+                const overlay = document.getElementById('projects-loading-overlay');
+                if (overlay) overlay.classList.add('hidden');
             }
         }
     }

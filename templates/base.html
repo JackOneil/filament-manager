@@ -761,14 +761,43 @@
         .dashboard-widget {
             position: relative;
             min-width: 0; /* prevent grid blowout */
+            transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease, outline-color 180ms ease;
         }
         .dashboard-widget.drag-over {
             outline: 2px dashed #3b82f6;
             outline-offset: 4px;
             border-radius: 1rem;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.16);
+            transform: translateY(-2px);
+        }
+        .dashboard-widget.drag-source {
+            outline: 2px solid rgba(59, 130, 246, 0.55);
+            outline-offset: 3px;
+            border-radius: 1rem;
         }
         .dashboard-widget.is-dragging {
-            opacity: 0.35;
+            opacity: 0.18;
+            transform: scale(0.985);
+            filter: saturate(0.86);
+        }
+        .layout-edit-mode .drag-session .dashboard-widget:not(.is-dragging):not(.drag-over) {
+            opacity: 0.84;
+        }
+        .layout-edit-mode .dashboard-widget:not(.is-dragging):not(.drag-over) {
+            opacity: 0.94;
+        }
+        .dashboard-widget.drop-pulse {
+            animation: dashboard-drop-pulse 240ms ease-out;
+        }
+        @keyframes dashboard-drop-pulse {
+            0% {
+                transform: scale(0.985);
+                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.35);
+            }
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+            }
         }
         .dashboard-edit-bar {
             display: none;
@@ -1582,7 +1611,7 @@
         <div class="w-full px-4 md:px-8 max-w-[1600px] mx-auto">
             <div class="app-surface" style="min-height: calc(100vh - 140px)">
         {% with flashes = get_flashed_messages(with_categories=true) %}
-            {% if flashes %}
+            {% if flashes or pending_inventory_undo %}
                 <div class="fixed top-20 right-4 z-50 flex flex-col gap-3 w-full max-w-sm px-4 sm:px-0 pointer-events-none">
                     {% for category, message in flashes %}
                         <div x-data="{ show: true }" 
@@ -1609,6 +1638,41 @@
                             </button>
                         </div>
                     {% endfor %}
+
+                    {% if pending_inventory_undo %}
+                        <div x-data="{ show: true }"
+                             x-init="setTimeout(() => show = false, 14000)"
+                             x-show="show"
+                             x-transition:enter="transition ease-out duration-300"
+                             x-transition:enter-start="opacity-0 translate-x-8"
+                             x-transition:enter-end="opacity-100 translate-x-0"
+                             x-transition:leave="transition ease-in duration-200"
+                             x-transition:leave-start="opacity-100"
+                             x-transition:leave-end="opacity-0 translate-x-8"
+                             class="rounded-lg border px-4 py-3 shadow-xl flex items-start gap-3 backdrop-blur-md pointer-events-auto bg-amber-50/95 border-amber-200 text-amber-900 dark:bg-amber-900/95 dark:border-amber-700 dark:text-amber-100">
+                            <div class="mt-0.5 text-amber-600 dark:text-amber-300">
+                                <i class="fa-solid fa-rotate-left"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="font-semibold">{{ t(pending_inventory_undo.title_key) }}</div>
+                                {% if pending_inventory_undo.detail %}
+                                <div class="text-sm opacity-85 truncate mt-0.5">{{ pending_inventory_undo.detail }}</div>
+                                {% endif %}
+                                <div class="mt-2">
+                                    <form method="POST" action="{{ url_for('inventory_undo') }}" class="inline">
+                                        <input type="hidden" name="token" value="{{ pending_inventory_undo.token }}">
+                                        <button type="submit" class="inline-flex items-center gap-1 rounded-full border border-amber-400/60 bg-white/80 dark:bg-amber-800/40 px-3 py-1 text-xs font-semibold hover:bg-white dark:hover:bg-amber-800/70 transition">
+                                            <i class="fa-solid fa-rotate-left"></i>
+                                            <span>{{ t('undo_toast_button') }}</span>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                            <button @click="show = false" class="opacity-60 hover:opacity-100 focus:outline-none transition-opacity">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    {% endif %}
                 </div>
             {% endif %}
         {% endwith %}

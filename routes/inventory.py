@@ -2,11 +2,13 @@
 import csv
 import io
 import math
+import secrets
+import threading
 from collections import Counter
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
-from flask import abort, jsonify, render_template, request, redirect, url_for
+from flask import abort, flash, jsonify, render_template, request, redirect, session, url_for
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
@@ -448,6 +450,176 @@ def _require_inventory_admin():
         abort(403)
 
 
+_UNDO_CACHE_LOCK = threading.Lock()
+_UNDO_CACHE = {}
+_UNDO_TTL_SECONDS = 15 * 60
+_UNDO_SESSION_KEY = 'inventory_pending_undo'
+
+
+def _purge_undo_cache(now_ts=None):
+    ts = now_ts if now_ts is not None else utc_now().timestamp()
+    stale_tokens = [
+        token for token, entry in _UNDO_CACHE.items()
+        if float(entry.get('expires_at', 0.0)) <= ts
+    ]
+    for token in stale_tokens:
+        _UNDO_CACHE.pop(token, None)
+
+
+def _clear_pending_undo_session(remove_cache=True):
+    pending = session.pop(_UNDO_SESSION_KEY, None)
+    if not remove_cache or not pending:
+        return
+    token = pending.get('token')
+    if not token:
+        return
+    with _UNDO_CACHE_LOCK:
+        _UNDO_CACHE.pop(token, None)
+
+
+def _queue_inventory_undo(payload, title_key, detail_text=''):
+    user = get_current_user()
+    if not user:
+        return
+
+    _clear_pending_undo_session(remove_cache=True)
+
+    token = secrets.token_urlsafe(16)
+    expires_at = utc_now() + timedelta(seconds=_UNDO_TTL_SECONDS)
+
+    with _UNDO_CACHE_LOCK:
+        _purge_undo_cache()
+        _UNDO_CACHE[token] = {
+            'user_id': user.id,
+            'payload': payload,
+            'expires_at': expires_at.timestamp(),
+        }
+
+    session[_UNDO_SESSION_KEY] = {
+        'token': token,
+        'title_key': title_key,
+        'detail': detail_text,
+        'expires_at': expires_at.isoformat(timespec='seconds'),
+    }
+
+
+def _pop_cached_undo_payload(token, user_id):
+    if not token:
+        return None
+    with _UNDO_CACHE_LOCK:
+        _purge_undo_cache()
+        entry = _UNDO_CACHE.pop(token, None)
+    if not entry:
+        return None
+    if entry.get('user_id') != user_id:
+        return None
+    return entry.get('payload')
+
+
+def _serialize_filament_snapshot(filament):
+    return {
+        'id': filament.id,
+        'name': filament.name,
+        'brand_id': filament.brand_id,
+        'color_id': filament.color_id,
+        'material_id': filament.material_id,
+        'weight_total': float(filament.weight_total or 0.0),
+        'weight_remaining': float(filament.weight_remaining or 0.0),
+        'price': float(filament.price or 0.0),
+        'quantity': int(filament.quantity or 0),
+        'min_stock_grams': float(filament.min_stock_grams or 0.0),
+        'max_stock_grams': float(filament.max_stock_grams or 0.0),
+        'tag_text': filament.tag_text,
+        'quality_stringing': filament.quality_stringing,
+        'quality_adhesion': filament.quality_adhesion,
+        'quality_drying': filament.quality_drying,
+        'quality_profile': filament.quality_profile,
+        'quality_notes': filament.quality_notes,
+        'recommended_nozzle_temp': filament.recommended_nozzle_temp,
+        'recommended_bed_temp': filament.recommended_bed_temp,
+        'reorder_alert_snoozed': bool(filament.reorder_alert_snoozed),
+        'shop_url': filament.shop_url,
+    }
+
+
+def _build_filament_restore_bundle(filament):
+    project_filaments = []
+    for row in ProjectFilament.query.filter_by(filament_id=filament.id).all():
+        project_filaments.append({
+            'project_id': row.project_id,
+            'estimated_weight': float(row.estimated_weight or 0.0),
+            'is_used': bool(row.is_used),
+        })
+
+    project_quote_ids = [
+        row.id
+        for row in ProjectQuote.query.filter_by(filament_id=filament.id).all()
+    ]
+
+    return {
+        'filament': _serialize_filament_snapshot(filament),
+        'project_filaments': project_filaments,
+        'project_quote_ids': project_quote_ids,
+    }
+
+
+def _restore_filament_snapshot(snapshot):
+    restored = db.session.get(Filament, snapshot['id'])
+    if restored:
+        return restored
+
+    restored = Filament(
+        id=snapshot['id'],
+        name=snapshot['name'],
+        brand_id=snapshot['brand_id'],
+        color_id=snapshot['color_id'],
+        material_id=snapshot['material_id'],
+        weight_total=snapshot['weight_total'],
+        weight_remaining=snapshot['weight_remaining'],
+        price=snapshot['price'],
+        quantity=snapshot['quantity'],
+        min_stock_grams=snapshot['min_stock_grams'],
+        max_stock_grams=snapshot['max_stock_grams'],
+        tag_text=snapshot['tag_text'],
+        quality_stringing=snapshot['quality_stringing'],
+        quality_adhesion=snapshot['quality_adhesion'],
+        quality_drying=snapshot['quality_drying'],
+        quality_profile=snapshot['quality_profile'],
+        quality_notes=snapshot['quality_notes'],
+        recommended_nozzle_temp=snapshot['recommended_nozzle_temp'],
+        recommended_bed_temp=snapshot['recommended_bed_temp'],
+        reorder_alert_snoozed=snapshot['reorder_alert_snoozed'],
+        shop_url=snapshot['shop_url'],
+    )
+    db.session.add(restored)
+    db.session.flush()
+    return restored
+
+
+def _restore_project_relations(filament_id, project_filaments, project_quote_ids):
+    for row in project_filaments:
+        existing = ProjectFilament.query.filter_by(
+            project_id=row['project_id'],
+            filament_id=filament_id,
+        ).first()
+        if existing:
+            existing.estimated_weight = row['estimated_weight']
+            existing.is_used = row['is_used']
+        else:
+            db.session.add(ProjectFilament(
+                project_id=row['project_id'],
+                filament_id=filament_id,
+                estimated_weight=row['estimated_weight'],
+                is_used=row['is_used'],
+            ))
+
+    if project_quote_ids:
+        ProjectQuote.query.filter(
+            ProjectQuote.id.in_(project_quote_ids),
+            ProjectQuote.filament_id.is_(None),
+        ).update({'filament_id': filament_id}, synchronize_session=False)
+
+
 def _user_dashboard_context(user):
     owned_projects = (
         Project.query
@@ -660,6 +832,8 @@ def register(app):
         if not selected:
             return redirect(url_for('filaments_index'))
 
+        undo_entries = [_build_filament_restore_bundle(filament) for filament in selected]
+
         selected_ids = [f.id for f in selected]
         ProjectFilament.query.filter(ProjectFilament.filament_id.in_(selected_ids)).delete(synchronize_session=False)
         ProjectQuote.query.filter(ProjectQuote.filament_id.in_(selected_ids)).update({'filament_id': None}, synchronize_session=False)
@@ -668,6 +842,14 @@ def register(app):
             db.session.delete(filament)
 
         db.session.commit()
+        _queue_inventory_undo(
+            {
+                'type': 'bulk_delete',
+                'entries': undo_entries,
+            },
+            'undo_toast_bulk_delete_title',
+            detail_text=translate('undo_toast_bulk_delete_detail').format(count=len(undo_entries)),
+        )
         return redirect(url_for('filaments_index'))
 
     @app.route('/add', methods=['GET', 'POST'])
@@ -802,23 +984,128 @@ def register(app):
     def remove_spool(id):
         _require_inventory_admin()
         filament = db.get_or_404(Filament, id)
+        removed_weight = 0.0
         if filament.quantity > 0:
             filament.quantity -= 1
             actual_amount = deduct_filament_stock(filament, filament.weight_total)
             log_movement(filament, 'remove', actual_amount, note='Removed spool')
+            removed_weight = float(actual_amount or 0.0)
         db.session.commit()
+        if removed_weight > 0:
+            _queue_inventory_undo(
+                {
+                    'type': 'remove_spool',
+                    'filament_id': filament.id,
+                    'restore_quantity': 1,
+                    'restore_weight': removed_weight,
+                },
+                'undo_toast_remove_spool_title',
+                detail_text=filament.name,
+            )
         return redirect(url_for('filaments_index'))
 
     @app.route('/delete/<int:id>', methods=['POST'])
     def delete(id):
         _require_inventory_admin()
         filament = db.get_or_404(Filament, id)
+        undo_entry = _build_filament_restore_bundle(filament)
         log_movement(filament, 'remove', filament.weight_remaining, note='Deleted filament')
         ProjectFilament.query.filter_by(filament_id=filament.id).delete()
         ProjectQuote.query.filter_by(filament_id=filament.id).update({'filament_id': None})
         db.session.delete(filament)
         db.session.commit()
+        _queue_inventory_undo(
+            {
+                'type': 'delete_filament',
+                'entry': undo_entry,
+            },
+            'undo_toast_delete_title',
+            detail_text=undo_entry['filament']['name'],
+        )
         return redirect(url_for('filaments_index'))
+
+    @app.route('/inventory/undo', methods=['POST'])
+    def inventory_undo():
+        _require_inventory_admin()
+        pending = session.get(_UNDO_SESSION_KEY) or {}
+        token = (request.form.get('token', '') or '').strip()
+        user = get_current_user()
+        user_id = user.id if user else None
+
+        if not token or token != pending.get('token'):
+            flash('undo_toast_not_available', 'error')
+            _clear_pending_undo_session(remove_cache=False)
+            return redirect(request.referrer or url_for('filaments_index'))
+
+        payload = _pop_cached_undo_payload(token, user_id)
+        _clear_pending_undo_session(remove_cache=False)
+        if not payload:
+            flash('undo_toast_not_available', 'error')
+            return redirect(request.referrer or url_for('filaments_index'))
+
+        try:
+            payload_type = payload.get('type')
+            if payload_type == 'remove_spool':
+                filament = db.session.get(Filament, payload.get('filament_id'))
+                if filament is None:
+                    raise ValueError('filament_not_found')
+                restore_quantity = int(payload.get('restore_quantity', 1) or 1)
+                restore_weight = float(payload.get('restore_weight', 0.0) or 0.0)
+                filament.quantity = int(filament.quantity or 0) + max(restore_quantity, 0)
+                filament.weight_remaining = float(filament.weight_remaining or 0.0) + max(restore_weight, 0.0)
+                log_movement(
+                    filament,
+                    'add',
+                    max(restore_weight, 0.0),
+                    note=translate('movement_note_undo_remove_spool'),
+                )
+
+            elif payload_type == 'delete_filament':
+                entry = payload.get('entry') or {}
+                snapshot = entry.get('filament')
+                if not snapshot:
+                    raise ValueError('missing_snapshot')
+                filament = _restore_filament_snapshot(snapshot)
+                _restore_project_relations(
+                    filament.id,
+                    entry.get('project_filaments') or [],
+                    entry.get('project_quote_ids') or [],
+                )
+                log_movement(
+                    filament,
+                    'add',
+                    float(filament.weight_remaining or 0.0),
+                    note=translate('movement_note_undo_delete'),
+                )
+
+            elif payload_type == 'bulk_delete':
+                entries = payload.get('entries') or []
+                for entry in entries:
+                    snapshot = entry.get('filament')
+                    if not snapshot:
+                        continue
+                    filament = _restore_filament_snapshot(snapshot)
+                    _restore_project_relations(
+                        filament.id,
+                        entry.get('project_filaments') or [],
+                        entry.get('project_quote_ids') or [],
+                    )
+                    log_movement(
+                        filament,
+                        'add',
+                        float(filament.weight_remaining or 0.0),
+                        note=translate('movement_note_undo_bulk_delete'),
+                    )
+            else:
+                raise ValueError('unsupported_undo_type')
+
+            db.session.commit()
+            flash('undo_toast_applied', 'success')
+        except Exception:
+            db.session.rollback()
+            flash('undo_toast_failed', 'error')
+
+        return redirect(request.referrer or url_for('filaments_index'))
 
     # ── Operator / Admin mode toggle ──────────────────────────────────────────
 

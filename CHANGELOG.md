@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.73.0] - 2026-05-11
+
+### Added
+- **Inventory undo toast for destructive actions** — Added one-click Undo after inventory filament delete, bulk delete, and spool removal. Undo restores filament data and related project links (`ProjectFilament`, `ProjectQuote`) where possible.
+
+### Changed
+- **Inventory AJAX reload UX** — Replaced abrupt list redraw with animated skeleton loading placeholders in card/list/compact modes during filter/sort/pagination reloads.
+- **Projects AJAX reload UX** — Added non-destructive skeleton overlay during `/projects` AJAX refreshes to improve perceived performance without breaking active filter input focus.
+- **Dashboard drag-mode visuals** — Improved drag-and-drop affordance across Overview, Projects, and Stats: custom drag ghost preview, stronger drop-zone highlighting, source-card emphasis, drop pulse feedback, and a compact 3-step mini guide in edit hints.
+
+### Fixed
+- **Undo action consistency** — The undo flow now validates action ownership/token expiry and reports unavailable/failed undo states with localized toast feedback.
+
 ## [1.72.6] - 2026-05-11
 
 ### Fixed

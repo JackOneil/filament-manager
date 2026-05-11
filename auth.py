@@ -59,6 +59,7 @@ SECTION_BY_ENDPOINT = {
     'remove_spool': SECTION_FILAMENTS,
     'delete': SECTION_FILAMENTS,
     'inventory_bulk': SECTION_FILAMENTS,
+    'inventory_undo': SECTION_FILAMENTS,
     'filament_update_meta': SECTION_FILAMENTS,
     'filament_toggle_reorder_snooze': SECTION_FILAMENTS,
     'api_search': SECTION_OVERVIEW,

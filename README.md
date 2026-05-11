@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.72.6***
+*Current version: **v1.73.0***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -12,6 +12,8 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 - **Quick-View Filter Pills** — One-click filter buttons for *All*, *Low stock*, and *Reorder needed* inside the sticky filter bar.
 - **CSV / Excel Import** — Two-step import wizard at `/filaments/import-csv` that parses CSV/TSV, shows a preview table, and auto-creates missing brands/materials/colors on confirm.
 - **Bulk Operations** — Select multiple filaments and batch-apply spool changes, weight updates, tags, min-stock values, or deletion.
+- **Smooth AJAX Skeleton Loading** — Inventory and project list reloads now render animated skeleton placeholders to avoid abrupt content jumps during filtering, sorting, and pagination.
+- **Undo for Destructive Inventory Actions** — After filament deletion, bulk delete, or spool removal, a dedicated toast allows one-click rollback of the last destructive action.
 - **Movement History** — Full audit log of every weight change with reasons, timestamps, and linked projects/jobs.
 - **Storage Shelf Map** — Visual grid layout of physical shelf positions. Assign spools to named slots, drag-and-drop moves, and stock-level fill indicators.
 
@@ -37,7 +39,7 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 - **Live Printer Dashboard** — Overview page shows active print jobs with real-time progress bars, ETA, material swatches, and brand badges.
 
 ### Analytics & Operations
-- **Statistics Dashboard** — Executive KPI panel, usage/purchase trend charts, stock depletion forecast, reorder recommendations, profitable projects, color palette. Draggable sections with hide/show and per-card row limits.
+- **Statistics Dashboard** — Executive KPI panel, usage/purchase trend charts, stock depletion forecast, reorder recommendations, profitable projects, color palette. Draggable sections with hide/show and per-card row limits, enhanced drag ghost, clearer drop zones, and mini in-UI drag guide.
 - **Action Center** — Highlights low-stock alerts, overdue projects, unmapped print jobs, and printer sync issues in one place.
 - **Automatic Purchase Recommendations** — Based on 30/90-day real usage, recommends what to order next with spool counts and purchase price.
 - **Configurable Timezone** — All timestamps are displayed in the configured local timezone (default: Europe/Prague) while data is stored as UTC.

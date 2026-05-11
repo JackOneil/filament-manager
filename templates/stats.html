@@ -3,8 +3,15 @@
 <script src="{{ url_for('static', filename='js/chart.min.js') }}"></script>
 <style>
 .stats-section { position: relative; }
-.stats-section.drag-over { outline: 2px dashed #3b82f6; outline-offset: 4px; border-radius: 1rem; }
-.stats-section.is-dragging { opacity: 0.35; }
+.stats-section.drag-over { outline: 2px dashed #3b82f6; outline-offset: 4px; border-radius: 1rem; box-shadow: 0 0 0 4px rgba(59,130,246,0.16); transform: translateY(-2px); }
+.stats-section.drag-source { outline: 2px solid rgba(59,130,246,0.55); outline-offset: 3px; border-radius: 1rem; }
+.stats-section.is-dragging { opacity: 0.18; transform: scale(0.985); filter: saturate(0.86); }
+.edit-mode.drag-session .stats-section:not(.is-dragging):not(.drag-over) { opacity: 0.86; }
+.stats-section.drop-pulse { animation: stats-drop-pulse 240ms ease-out; }
+@keyframes stats-drop-pulse {
+    0% { transform: scale(0.985); box-shadow: 0 0 0 0 rgba(59,130,246,0.35); }
+    100% { transform: scale(1); box-shadow: 0 0 0 10px rgba(59,130,246,0); }
+}
 .section-edit-bar, .card-edit-bar { display: none; }
 .edit-mode .section-edit-bar { display: flex; }
 .edit-mode .card-edit-bar { display: flex; }
@@ -70,6 +77,9 @@ html.dark .widget-color-picker > div {
     <div id="editModeHint" class="hidden bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/40 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 text-sm text-blue-700 dark:text-blue-300">
         <i class="fa-solid fa-arrows-up-down-left-right"></i>
         <span>{{ t('stats_drag_hint') }}</span>
+        <span class="ui-badge ui-badge-brand"><strong>1</strong> {{ t('dashboard_drag_step_pick') }}</span>
+        <span class="ui-badge ui-badge-brand"><strong>2</strong> {{ t('dashboard_drag_step_move') }}</span>
+        <span class="ui-badge ui-badge-brand"><strong>3</strong> {{ t('dashboard_drag_step_drop') }}</span>
         <span class="text-blue-500 opacity-50">·</span>
         <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
         <span>{{ t('overview_resize_hint') }}</span>
@@ -1002,11 +1012,43 @@ function moveSectionDown(sectionId) {
 
 // ── Drag & drop ───────────────────────────────────────────────────────────────
 let dragSrc = null;
+let dragGhostEl = null;
+
+function makeSectionDragGhost(section) {
+    const rect = section.getBoundingClientRect();
+    const ghost = section.cloneNode(true);
+    ghost.classList.remove('drag-over', 'is-dragging', 'drag-source');
+    ghost.style.position = 'fixed';
+    ghost.style.top = '-9999px';
+    ghost.style.left = '-9999px';
+    ghost.style.width = `${Math.min(rect.width, 500)}px`;
+    ghost.style.maxHeight = '220px';
+    ghost.style.overflow = 'hidden';
+    ghost.style.pointerEvents = 'none';
+    ghost.style.opacity = '0.92';
+    ghost.style.transform = 'rotate(1deg)';
+    ghost.style.boxShadow = '0 24px 55px rgba(15, 23, 42, 0.24)';
+    ghost.style.borderRadius = '14px';
+    ghost.style.zIndex = '9999';
+    document.body.appendChild(ghost);
+    return ghost;
+}
 
 function onDragStart(e) {
     dragSrc = this;
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', this.dataset.sectionId);
+    this.classList.add('drag-source');
+    document.getElementById('stats-page').classList.add('drag-session');
+    try {
+        dragGhostEl = makeSectionDragGhost(this);
+        e.dataTransfer.setDragImage(dragGhostEl, 28, 22);
+    } catch (_err) {
+        if (dragGhostEl && dragGhostEl.parentNode) {
+            dragGhostEl.parentNode.removeChild(dragGhostEl);
+        }
+        dragGhostEl = null;
+    }
     setTimeout(() => this.classList.add('is-dragging'), 0);
 }
 function onDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
@@ -1022,11 +1064,20 @@ function onDrop(e) {
         if (si < di) page.insertBefore(dragSrc, this.nextSibling);
         else page.insertBefore(dragSrc, this);
         saveLayout();
+        const dropTarget = this;
+        dropTarget.classList.add('drop-pulse');
+        setTimeout(() => dropTarget.classList.remove('drop-pulse'), 240);
     }
 }
 function onDragEnd() {
     this.classList.remove('is-dragging');
-    document.querySelectorAll('[data-section-id]').forEach(s => s.classList.remove('drag-over'));
+    this.classList.remove('drag-source');
+    document.querySelectorAll('[data-section-id]').forEach(s => s.classList.remove('drag-over', 'drop-pulse'));
+    document.getElementById('stats-page').classList.remove('drag-session');
+    if (dragGhostEl && dragGhostEl.parentNode) {
+        dragGhostEl.parentNode.removeChild(dragGhostEl);
+    }
+    dragGhostEl = null;
     dragSrc = null;
 }
 
@@ -1051,7 +1102,13 @@ function disableDrag() {
         s.removeEventListener('dragleave', onDragLeave);
         s.removeEventListener('drop', onDrop);
         s.removeEventListener('dragend', onDragEnd);
+        s.classList.remove('drag-over', 'is-dragging', 'drag-source', 'drop-pulse');
     });
+    document.getElementById('stats-page').classList.remove('drag-session');
+    if (dragGhostEl && dragGhostEl.parentNode) {
+        dragGhostEl.parentNode.removeChild(dragGhostEl);
+    }
+    dragGhostEl = null;
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────

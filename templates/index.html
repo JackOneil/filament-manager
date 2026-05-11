@@ -877,6 +877,19 @@ function inventoryApp() {
                 page,
                 per_page: this.perPage
             });
+
+            const wrapper = document.getElementById('filament-content-wrapper');
+            if (wrapper) {
+                if (this.viewMode === 'list' || this.viewMode === 'compact') {
+                    wrapper.classList.remove('grid', 'grid-cols-1', 'md:grid-cols-2', 'lg:grid-cols-3', 'gap-6');
+                    wrapper.classList.add('space-y-0');
+                } else {
+                    wrapper.classList.remove('space-y-0');
+                    wrapper.classList.add('grid', 'grid-cols-1', 'md:grid-cols-2', 'lg:grid-cols-3', 'gap-6');
+                }
+                wrapper.innerHTML = buildInventorySkeletonHtml(this.viewMode);
+            }
+
             try {
                 const resp = await fetch(`/api/filaments-list?${params}`, { signal: controller.signal });
                 const data = await resp.json();
@@ -884,7 +897,6 @@ function inventoryApp() {
                 this.currentPage = data.current_page || 1;
                 this.totalPages = data.total_pages || 1;
 
-                const wrapper = document.getElementById('filament-content-wrapper');
                 if (wrapper) {
                     if (this.viewMode === 'list' || this.viewMode === 'compact') {
                         wrapper.classList.remove('grid', 'grid-cols-1', 'md:grid-cols-2', 'lg:grid-cols-3', 'gap-6');
@@ -1029,6 +1041,73 @@ function buildListBulkToolbarHtml() {
                 <i class="fa-solid fa-trash"></i> {{ t('bulk_delete_selected') }}
             </button>
         </form>`;
+}
+
+function buildInventorySkeletonHtml(mode) {
+    if (mode === 'list' || mode === 'compact') {
+        return buildInventoryListSkeletonHtml();
+    }
+    return buildInventoryCardSkeletonHtml();
+}
+
+function buildInventoryCardSkeletonHtml() {
+    const cards = Array.from({ length: 6 }).map(() => `
+        <div class="ui-panel p-4 ui-panel-hover">
+            <div class="flex items-start gap-3 mb-4">
+                <div class="w-3 h-14 rounded-full bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+                <div class="flex-1 space-y-2">
+                    <div class="h-4 w-3/4 rounded bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+                    <div class="h-3 w-1/2 rounded bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+                </div>
+                <div class="h-6 w-16 rounded-full bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+            </div>
+            <div class="space-y-2.5">
+                <div class="h-2.5 w-full rounded bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+                <div class="h-2.5 w-5/6 rounded bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+            </div>
+            <div class="mt-4 flex justify-between">
+                <div class="h-3 w-16 rounded bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+                <div class="h-3 w-10 rounded bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+            </div>
+        </div>
+    `).join('');
+    return cards;
+}
+
+function buildInventoryListSkeletonHtml() {
+    const rows = Array.from({ length: 8 }).map(() => `
+        <div class="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-4 py-3 grid grid-cols-12 gap-3 items-center">
+            <div class="col-span-1 h-5 w-5 rounded bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+            <div class="col-span-5 sm:col-span-3 flex items-center gap-2">
+                <div class="w-3 h-10 rounded-full bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+                <div class="flex-1 space-y-2">
+                    <div class="h-3.5 w-4/5 rounded bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+                    <div class="h-3 w-2/5 rounded bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+                </div>
+            </div>
+            <div class="hidden sm:block sm:col-span-2 h-3.5 w-3/4 justify-self-center rounded bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+            <div class="hidden sm:block sm:col-span-1 h-3.5 w-8 justify-self-center rounded bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+            <div class="hidden sm:block sm:col-span-1 h-3.5 w-12 justify-self-center rounded bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+            <div class="hidden sm:block sm:col-span-1 h-3.5 w-12 justify-self-center rounded bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+            <div class="col-span-3 sm:col-span-1 h-6 w-12 justify-self-center rounded-full bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+            <div class="col-span-3 sm:col-span-2 flex justify-end gap-1.5">
+                <div class="h-6 w-6 rounded bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+                <div class="h-6 w-6 rounded bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+                <div class="h-6 w-6 rounded bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+            </div>
+        </div>
+    `).join('');
+
+    return `
+        <div class="bg-white dark:bg-slate-800 p-2.5 rounded-t-lg border border-gray-100 dark:border-slate-700 border-b-0 mb-0 flex items-center justify-between gap-2">
+            <div class="h-4 w-40 rounded bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+            <div class="h-8 w-32 rounded bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+        </div>
+        <div class="hidden sm:grid grid-cols-12 gap-3 bg-gray-100 dark:bg-slate-900 border-b border-gray-300 dark:border-slate-700 px-4 py-2 sticky top-0 z-10 rounded-t-lg mb-0">
+            <div class="col-span-12 h-3.5 w-full rounded bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+        </div>
+        ${rows}
+    `;
 }
 
 // =============================================

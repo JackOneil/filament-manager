@@ -201,6 +201,7 @@ function createWidgetLayoutManager(config) {
     var layout       = loadLayout();
     var editMode     = false;
     var dragSrc      = null;
+    var dragGhostEl  = null;
     var resizeState  = null;
 
     // ── Storage ───────────────────────────────────────────────────────────────
@@ -468,12 +469,45 @@ function createWidgetLayoutManager(config) {
         applyLayout();
     }
 
+    function makeDragGhost(item) {
+        var rect = item.getBoundingClientRect();
+        var ghost = item.cloneNode(true);
+        ghost.classList.remove('drag-over', 'is-dragging', 'drag-source');
+        ghost.style.position = 'fixed';
+        ghost.style.top = '-9999px';
+        ghost.style.left = '-9999px';
+        ghost.style.width = Math.min(rect.width, 460) + 'px';
+        ghost.style.maxHeight = '220px';
+        ghost.style.overflow = 'hidden';
+        ghost.style.pointerEvents = 'none';
+        ghost.style.opacity = '0.92';
+        ghost.style.transform = 'rotate(1deg)';
+        ghost.style.boxShadow = '0 24px 55px rgba(15, 23, 42, 0.24)';
+        ghost.style.borderRadius = '14px';
+        ghost.style.zIndex = '9999';
+        document.body.appendChild(ghost);
+        return ghost;
+    }
+
     // ── Drag-to-reorder ───────────────────────────────────────────────────────
     function onDragStart(e) {
         if (resizeState) { e.preventDefault(); return; }
         dragSrc = this;
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', this.dataset.widgetId);
+        container.classList.add('drag-session');
+        this.classList.add('drag-source');
+
+        try {
+            dragGhostEl = makeDragGhost(this);
+            e.dataTransfer.setDragImage(dragGhostEl, 28, 22);
+        } catch (_err) {
+            if (dragGhostEl && dragGhostEl.parentNode) {
+                dragGhostEl.parentNode.removeChild(dragGhostEl);
+            }
+            dragGhostEl = null;
+        }
+
         var self = this;
         setTimeout(function() { self.classList.add('is-dragging'); }, 0);
     }
@@ -490,11 +524,22 @@ function createWidgetLayoutManager(config) {
             if (srcIdx < dstIdx) container.insertBefore(dragSrc, this.nextSibling);
             else                 container.insertBefore(dragSrc, this);
             saveLayout();
+            var dropTarget = this;
+            dropTarget.classList.add('drop-pulse');
+            setTimeout(function() {
+                dropTarget.classList.remove('drop-pulse');
+            }, 240);
         }
     }
     function onDragEnd() {
         this.classList.remove('is-dragging');
+        this.classList.remove('drag-source');
         items().forEach(function(i) { i.classList.remove('drag-over'); });
+        container.classList.remove('drag-session');
+        if (dragGhostEl && dragGhostEl.parentNode) {
+            dragGhostEl.parentNode.removeChild(dragGhostEl);
+        }
+        dragGhostEl = null;
         dragSrc = null;
     }
 
@@ -519,8 +564,13 @@ function createWidgetLayoutManager(config) {
             item.removeEventListener('dragleave', onDragLeave);
             item.removeEventListener('drop',      onDrop);
             item.removeEventListener('dragend',   onDragEnd);
-            item.classList.remove('drag-over', 'is-dragging');
+            item.classList.remove('drag-over', 'is-dragging', 'drag-source', 'drop-pulse');
         });
+        container.classList.remove('drag-session');
+        if (dragGhostEl && dragGhostEl.parentNode) {
+            dragGhostEl.parentNode.removeChild(dragGhostEl);
+        }
+        dragGhostEl = null;
     }
 
     // ── Visibility panel (shown in edit mode, lists all widgets) ─────────────
