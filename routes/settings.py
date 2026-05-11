@@ -267,7 +267,33 @@ def register(app):
             except Exception as e:
                 db.session.rollback()
                 app.logger.error(f"Settings action error: {str(e)}")
-            return redirect(url_for('settings'))
+            _dicts_actions = {
+                'brand', 'color', 'material',
+                'edit_brand', 'edit_material', 'edit_color',
+                'delete_brand', 'delete_material', 'delete_color',
+            }
+            _printers_actions = {
+                'printer_energy_settings',
+                'edit_bambu_printer', 'delete_bambu_printer',
+            }
+            _integrations_actions = {
+                'bambu_cloud_settings', 'bambu_cloud_disconnect',
+                'reorder_shop_settings',
+                'add_prusa_printer', 'edit_prusa_printer', 'delete_prusa_printer',
+                'delete_filament_tag', 'delete_project_tag',
+            }
+            _company_actions = {'billing_settings'}
+            if action in _dicts_actions:
+                tab = 'dicts'
+            elif action in _printers_actions:
+                tab = 'printers'
+            elif action in _integrations_actions:
+                tab = 'integrations'
+            elif action in _company_actions:
+                tab = 'company'
+            else:
+                tab = 'general'
+            return redirect(url_for('settings') + f'?tab={tab}')
 
         brands = Brand.query.order_by(Brand.name).all()
         colors = Color.query.order_by(Color.name).all()

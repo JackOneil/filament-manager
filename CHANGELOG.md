@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.72.5] - 2026-05-11
+
+### Added
+- **Interactive Help System** — A floating `?` button (bottom-right corner) available on every page opens a slide-out help panel. The panel provides contextual tips for the current page (highlighted at the top), a full-text search across all tips, and an accordion list of all application features grouped by section. Content is bilingual (cs / en) and automatically switches with the application language. Implemented as a standalone `static/js/help.js` module loaded globally via `base.html`.
+
+### Fixed
+- **Settings — active tab preserved after save** — Saving a dictionary entry (brand, colour, material), printer settings, integration settings, or company settings now redirects back to the same tab (`?tab=dicts`, `?tab=printers`, etc.) instead of always returning to the General tab.
+
 ## [1.72.4] - 2026-05-03
 
 ### Fixed
