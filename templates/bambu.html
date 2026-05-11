@@ -217,9 +217,10 @@
                 {# Linked project & filament pills #}
                 <div class="flex flex-col gap-1.5 min-w-[160px] max-w-[220px]">
                     {% if job.project %}
-                    <span class="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded-full font-medium truncate">
+                    <a href="{{ url_for('project_detail', id=job.project.id) }}"
+                       class="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded-full font-medium truncate hover:bg-indigo-100 transition-colors">
                         <i class="fa-solid fa-folder-open flex-shrink-0"></i> {{ job.project.name }}
-                    </span>
+                    </a>
                     {% endif %}
                     {% if display_filament %}
                     <span class="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full font-medium truncate">
