@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.74.1] - 2026-05-14
+
+### Fixed
+- Added 6 missing i18n translation keys (`account`, `filament`, `history`, `note`, `project`, `today`) to both `cs` and `en` dictionaries in `messages.py`; these were used via `{{ t('key') }}` in templates but caused the key name to render literally instead of the translated string.
+- Added `onboarding_dismissed` field to backup export and import in `routes/backup.py` so the setting is preserved across full backups.
+- Removed dead-code `else 'Note'` fallback in `templates/history.html`; `t()` never returns a falsy value so the branch was unreachable.
+
 ## [1.74.0] - 2026-05-14
 
 ### Added

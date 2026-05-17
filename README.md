@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.74.0***
+*Current version: **v1.74.1***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -15,6 +15,7 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 - **Smooth AJAX Skeleton Loading** — Inventory and project list reloads now render animated skeleton placeholders to avoid abrupt content jumps during filtering, sorting, and pagination.
 - **Undo for Destructive Inventory Actions** — After filament deletion, bulk delete, or spool removal, a dedicated toast allows one-click rollback of the last destructive action.
 - **Movement History** — Full audit log of every weight change with reasons, timestamps, and linked projects/jobs.
+- **Waste / Scrap Tracker** — Record failed prints with categorised failure reason (stringing, warping, bed adhesion, clogging, layer shift, spaghetti, broken support), weight, linked filament, and optional project. Filterable list at `/waste` with cumulative waste stats bar.
 - **Storage Shelf Map** — Visual grid layout of physical shelf positions. Assign spools to named slots, drag-and-drop moves, and stock-level fill indicators.
 
 ### Projects & Client Workflow
@@ -35,7 +36,7 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 ### Printer Integrations
 - **Bambu Lab Cloud** — Sync print jobs from Bambu Cloud API. Assign filaments and projects, deduct stock per-AMS-slot, background auto-sync with configurable pre-job time offset.
 - **PrusaLink** — Poll local Prusa printers via REST API (no cloud required). Automatic job capture, progress tracking, and filament mapping.
-- **Printer Maintenance Log** — Dedicated `/maintenance` module for logging nozzle changes, calibrations, services, and faults per printer, with overdue and due-soon badge indicators.
+- **Printer Maintenance Log** — Dedicated `/maintenance` module for logging nozzle changes, calibrations, services, and faults per printer, with overdue and due-soon badge indicators. Supports recurring schedules (hours/days/months) with auto-calculated next service dates and `.ics` calendar export for Google Calendar / Outlook.
 - **Live Printer Dashboard** — Overview page shows active print jobs with real-time progress bars, ETA, material swatches, and brand badges.
 
 ### Analytics & Operations
@@ -46,6 +47,7 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 
 ### Platform
 - **Progressive Web App** — Install on desktop or mobile device with offline-capable shell.
+- **Interactive Help System** — Floating `?` button on every page opens a slide-out panel with contextual tips for the current section, full-text search across all tips, and a bilingual accordion of all features. Automatically switches language with the app.
 - **Dark Mode** — Full dark theme support with per-user persistence.
 - **Bilingual** — Complete Czech and English translations (700+ keys).
 - **Full Backup / Restore** — Compressed `.tar.gz` export with `manifest.json` plus real uploaded project files stored directly in the archive. Import also supports older `.json.gz` and legacy plain JSON backups.
@@ -92,11 +94,12 @@ filament/
 │   ├── projects.py         #   Projects CRUD, uploads, versioning, comments
 │   ├── bambu.py            #   Bambu Lab Cloud integration
 │   ├── prusa.py            #   PrusaLink integration
-│   ├── maintenance.py      #   Printer maintenance log
+│   ├── maintenance.py      #   Printer maintenance log, recurring intervals, ICS export
 │   ├── stats.py            #   Statistics dashboard
 │   ├── storage.py          #   Physical shelf management
 │   ├── settings.py         #   App settings, timezone, tabs
 │   ├── backup.py           #   Full export / import (backup & restore)
+│   ├── waste.py            #   Waste/scrap tracking
 │   ├── auth.py             #   Auth routes (login, register, users)
 │   └── pwa.py              #   PWA manifest and service worker
 │
@@ -225,6 +228,9 @@ Tests cover: authentication flows, Bambu sync idempotency, stock deduction logic
 - Onboarding checklist for first-time setup
 - Tabbed settings page
 - PWA support
+- Interactive help system with contextual tips and full-text search
+- Waste/scrap tracking with failure reason codes and filament linkage
+- Printer maintenance recurring intervals and ICS calendar export
 - CSRF protection and security hardening
 - Fully self-hosted static assets (no CDN dependencies)
 - Bilingual UI (CS/EN)

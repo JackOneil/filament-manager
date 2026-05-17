@@ -1149,6 +1149,13 @@ TRANSLATIONS = {
         # ── Filament detail mini chart ────────────────────────────────────────
         'detail_chart_title': 'Měsíční spotřeba',
         'detail_chart_grams': 'g spotřeba',
+        # ── Generic single-word labels ───────────────────────────────────────────
+        'account': 'Účet',
+        'filament': 'Filament',
+        'history': 'Pohyby',
+        'note': 'Poznámka',
+        'project': 'Projekt',
+        'today': 'Dnes',
     },
     'en': {
         'title': 'Filament Manager',
@@ -2300,5 +2307,12 @@ TRANSLATIONS = {
         # ── Filament detail mini chart ────────────────────────────────────────
         'detail_chart_title': 'Monthly consumption',
         'detail_chart_grams': 'g consumed',
+        # ── Generic single-word labels ───────────────────────────────────────────
+        'account': 'Account',
+        'filament': 'Filament',
+        'history': 'History',
+        'note': 'Note',
+        'project': 'Project',
+        'today': 'Today',
     }
 }
