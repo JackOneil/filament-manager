@@ -14,7 +14,7 @@ from models import (
     PrintHistory, Project, ProjectFile, ProjectLink, ProjectFilament, ProjectQuote,
     BambuPrinter, BambuPrintJob, BambuJobMaterial, StoragePlacement, StorageShelf,
     PrusaPrinter, PrusaPrintJob, ProjectComment, ProjectTodo, ProjectPrintItem, User, UserInvite, Notification, AuditLog,
-    PrinterMaintenance,
+    PrinterMaintenance, WasteRecord,
 )
 from utils import encrypt_token, format_tags, utc_now
 
@@ -435,8 +435,24 @@ def register(app):
                 'notes': m.notes,
                 'performed_at': m.performed_at.isoformat() if m.performed_at else None,
                 'next_service_at': m.next_service_at.isoformat() if m.next_service_at else None,
+                'recurrence_type': m.recurrence_type,
+                'recurrence_value': m.recurrence_value,
+                'recurrence_enabled': m.recurrence_enabled,
+                'last_renewed_at': m.last_renewed_at.isoformat() if m.last_renewed_at else None,
                 'created_at': m.created_at.isoformat() if m.created_at else None,
             } for m in PrinterMaintenance.query.order_by(PrinterMaintenance.performed_at).all()],
+
+            # ── Waste records ────────────────────────────────────────────
+            'waste_records': [{
+                'filament_name': w.filament.name if w.filament else None,
+                'filament_ref': _filament_ref(w.filament),
+                'project_name': w.project.name if w.project else None,
+                'reason': w.reason,
+                'weight_grams': w.weight_grams,
+                'notes': w.notes,
+                'created_at': w.created_at.isoformat() if w.created_at else None,
+                'recorded_by': _user_ref(w.recorded_by),
+            } for w in WasteRecord.query.order_by(WasteRecord.created_at).all()],
         }
 
         app.logger.debug(
@@ -1011,7 +1027,31 @@ def register(app):
                         notes=m_data.get('notes'),
                         performed_at=performed_at,
                         next_service_at=datetime.fromisoformat(m_data['next_service_at']) if m_data.get('next_service_at') else None,
+                        recurrence_type=m_data.get('recurrence_type', 'none'),
+                        recurrence_value=m_data.get('recurrence_value', 0),
+                        recurrence_enabled=m_data.get('recurrence_enabled', False),
+                        last_renewed_at=datetime.fromisoformat(m_data['last_renewed_at']) if m_data.get('last_renewed_at') else None,
                         created_at=datetime.fromisoformat(m_data['created_at']) if m_data.get('created_at') else utc_now(),
+                    ))
+
+                # ── 12b. Waste records ─────────────────────────────────
+                for w_data in data.get('waste_records', []):
+                    filament = _resolve_filament_ref(w_data.get('filament_ref'), w_data.get('filament_name'))
+                    project_id = None
+                    project_name = w_data.get('project_name', '').strip()
+                    if project_name:
+                        proj = Project.query.filter_by(name=project_name).first()
+                        if proj:
+                            project_id = proj.id
+                    recorded_by = _resolve_user_ref(w_data.get('recorded_by'))
+                    db.session.add(WasteRecord(
+                        filament_id=filament.id if filament else None,
+                        project_id=project_id,
+                        reason=w_data.get('reason', 'other'),
+                        weight_grams=w_data.get('weight_grams', 0.0) or 0.0,
+                        notes=w_data.get('notes'),
+                        created_at=datetime.fromisoformat(w_data['created_at']) if w_data.get('created_at') else utc_now(),
+                        recorded_by_user_id=recorded_by.id if recorded_by else None,
                     ))
 
             app.logger.debug(f"Import finished: {imported_filaments} filaments, projects and Bambu jobs processed.")

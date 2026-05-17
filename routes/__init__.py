@@ -17,6 +17,7 @@ from routes.stats import register as register_stats
 from routes.storage import register as register_storage
 from routes.pwa import register as register_pwa
 from routes.maintenance import register as register_maintenance
+from routes.waste import register as register_waste
 
 
 def register_all(app):
@@ -34,3 +35,4 @@ def register_all(app):
     register_storage(app)
     register_pwa(app)
     register_maintenance(app)
+    register_waste(app)

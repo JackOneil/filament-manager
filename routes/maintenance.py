@@ -1,12 +1,12 @@
 """Printer maintenance routes — service records, nozzle changes, calibration, fault history."""
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from flask import abort, redirect, render_template, request, url_for
+from flask import abort, redirect, render_template, request, url_for, Response
 
 from auth import require_admin
 from database import db
 from models import BambuPrinter, PrinterMaintenance, PrusaPrinter
-from utils import utc_now
+from utils import translate, utc_now
 
 
 def register(app):
@@ -42,10 +42,21 @@ def register(app):
             is_overdue = rec.next_service_at and rec.next_service_at < now
             is_due_soon = (rec.next_service_at and not is_overdue and
                            (rec.next_service_at - now).days <= 14)
+            recurrence_text = ''
+            if rec.recurrence_enabled and rec.recurrence_type != 'none':
+                unit = rec.recurrence_type
+                val = rec.recurrence_value
+                if unit == 'hours':
+                    recurrence_text = translate('maintenance_recurrence_every_hours').format(hours=val)
+                elif unit == 'days':
+                    recurrence_text = translate('maintenance_recurrence_every_days').format(days=val)
+                elif unit == 'months':
+                    recurrence_text = translate('maintenance_recurrence_every_months').format(months=val)
             records.append({
                 'rec': rec,
                 'is_overdue': is_overdue,
                 'is_due_soon': is_due_soon,
+                'recurrence_text': recurrence_text,
             })
 
         return render_template(
@@ -58,6 +69,7 @@ def register(app):
             filter_printer=filter_printer,
             filter_type=filter_type,
             maintenance_types=['nozzle_change', 'calibration', 'service', 'fault', 'other'],
+            recurrence_types=[('none', translate('maintenance_recurrence_none')), ('hours', translate('maintenance_recurrence_hours')), ('days', translate('maintenance_recurrence_days')), ('months', translate('maintenance_recurrence_months'))],
         )
 
     @app.route('/maintenance/add', methods=['POST'])
@@ -87,6 +99,21 @@ def register(app):
         except (TypeError, ValueError):
             next_service_at = None
 
+        recurrence_type = request.form.get('recurrence_type', 'none')
+        if recurrence_type not in ('none', 'hours', 'days', 'months'):
+            recurrence_type = 'none'
+        recurrence_value = request.form.get('recurrence_value', 0, type=int) or 0
+        recurrence_enabled = request.form.get('recurrence_enabled') == '1'
+
+        # If recurrence is enabled and next_service_at is not explicitly set, auto-calculate it
+        if recurrence_enabled and recurrence_type != 'none' and recurrence_value > 0 and not next_service_at:
+            if recurrence_type == 'hours':
+                next_service_at = performed_at + timedelta(hours=recurrence_value)
+            elif recurrence_type == 'days':
+                next_service_at = performed_at + timedelta(days=recurrence_value)
+            elif recurrence_type == 'months':
+                next_service_at = performed_at + timedelta(days=recurrence_value * 30)
+
         db.session.add(PrinterMaintenance(
             printer_type=printer_type,
             printer_id=printer_id,
@@ -95,6 +122,9 @@ def register(app):
             notes=notes,
             performed_at=performed_at,
             next_service_at=next_service_at,
+            recurrence_type=recurrence_type,
+            recurrence_value=recurrence_value,
+            recurrence_enabled=recurrence_enabled,
         ))
         db.session.commit()
         return redirect(url_for('maintenance_index'))
@@ -135,8 +165,70 @@ def register(app):
         rec.performed_at = performed_at
         rec.next_service_at = next_service_at
 
+        recurrence_type = request.form.get('recurrence_type', 'none')
+        if recurrence_type not in ('none', 'hours', 'days', 'months'):
+            recurrence_type = 'none'
+        recurrence_value = request.form.get('recurrence_value', 0, type=int) or 0
+        recurrence_enabled = request.form.get('recurrence_enabled') == '1'
+
+        # If recurrence is enabled and next_service_at is not explicitly set, auto-calculate it
+        if recurrence_enabled and recurrence_type != 'none' and recurrence_value > 0 and not next_service_at:
+            if recurrence_type == 'hours':
+                next_service_at = performed_at + timedelta(hours=recurrence_value)
+            elif recurrence_type == 'days':
+                next_service_at = performed_at + timedelta(days=recurrence_value)
+            elif recurrence_type == 'months':
+                next_service_at = performed_at + timedelta(days=recurrence_value * 30)
+            rec.next_service_at = next_service_at
+
+        rec.recurrence_type = recurrence_type
+        rec.recurrence_value = recurrence_value
+        rec.recurrence_enabled = recurrence_enabled
+
         db.session.commit()
         return redirect(url_for('maintenance_index'))
+
+    @app.route('/maintenance/calendar.ics')
+    def maintenance_ics():
+        from auth import get_current_user, is_admin
+        user = get_current_user()
+        if not is_admin(user):
+            abort(403)
+
+        rows = PrinterMaintenance.query.filter(PrinterMaintenance.next_service_at.isnot(None)).order_by(PrinterMaintenance.next_service_at).all()
+
+        def _fmt_dt(dt):
+            return dt.strftime('%Y%m%dT%H%M%SZ')
+
+        lines = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//Filament Manager//Maintenance Calendar//EN',
+            'CALSCALE:GREGORIAN',
+            'METHOD:PUBLISH',
+        ]
+        for rec in rows:
+            if not rec.next_service_at:
+                continue
+            uid = f'filament-maint-{rec.id}@filament-manager'
+            dtstart = _fmt_dt(rec.next_service_at)
+            dtend = _fmt_dt(rec.next_service_at + timedelta(hours=1))
+            summary = f"{translate('maintenance_type_' + rec.maintenance_type)} — {rec.printer_name}"
+            lines.extend([
+                'BEGIN:VEVENT',
+                f'UID:{uid}',
+                f'DTSTART:{dtstart}',
+                f'DTEND:{dtend}',
+                f'SUMMARY:{summary}',
+                f'DESCRIPTION:{rec.notes or ""}',
+                f'CATEGORIES:3D Printer Maintenance',
+                'END:VEVENT',
+            ])
+        lines.append('END:VCALENDAR')
+        ics_content = '\r\n'.join(lines)
+        return Response(ics_content, mimetype='text/calendar', headers={
+            'Content-Disposition': 'attachment; filename=maintenance_calendar.ics'
+        })
 
     @app.route('/maintenance/<int:rec_id>/delete', methods=['POST'])
     def maintenance_delete(rec_id):

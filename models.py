@@ -459,7 +459,31 @@ class PrinterMaintenance(db.Model):
     notes = db.Column(db.Text, nullable=True)
     performed_at = db.Column(db.DateTime, nullable=False, default=_utc_now)
     next_service_at = db.Column(db.DateTime, nullable=True)
+    recurrence_type = db.Column(db.String(20), nullable=False, default='none')
+    # none, hours, days, months
+    recurrence_value = db.Column(db.Integer, nullable=False, default=0)
+    recurrence_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    last_renewed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=_utc_now)
 
     def __repr__(self):
         return f'<PrinterMaintenance {self.id} {self.printer_name!r} {self.maintenance_type!r}>'
+
+
+class WasteRecord(db.Model):
+    """Record of failed/scrapped prints with reason, weight, and filament reference."""
+    id = db.Column(db.Integer, primary_key=True)
+    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id'), nullable=False)
+    filament = db.relationship('Filament', backref=db.backref('waste_records', lazy=True))
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
+    project = db.relationship('Project', backref=db.backref('waste_records', lazy=True))
+    reason = db.Column(db.String(50), nullable=False, default='other')
+    # stringing, warping, bed_adhesion, clogging, layer_shift, spaghetti, broken_support, other
+    weight_grams = db.Column(db.Float, nullable=False, default=0.0)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utc_now)
+    recorded_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    recorded_by = db.relationship('User', backref=db.backref('waste_records', lazy=True))
+
+    def __repr__(self):
+        return f'<WasteRecord {self.id} {self.filament.name if self.filament else "?"} {self.weight_grams}g {self.reason}>'

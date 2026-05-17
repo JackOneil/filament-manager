@@ -7,10 +7,16 @@
             <h1 class="text-3xl font-bold text-gray-800">{{ t('maintenance_title') }}</h1>
             <p class="text-gray-500 mt-1">{{ t('maintenance_desc') }}</p>
         </div>
-        <button onclick="document.getElementById('addMaintenanceModal').classList.remove('hidden')"
-                class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl shadow transition flex items-center gap-2">
-            <i class="fa-solid fa-plus"></i> {{ t('maintenance_add') }}
-        </button>
+        <div class="flex gap-3">
+            <button onclick="document.getElementById('addMaintenanceModal').classList.remove('hidden')"
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl shadow transition flex items-center gap-2">
+                <i class="fa-solid fa-plus"></i> {{ t('maintenance_add') }}
+            </button>
+            <a href="{{ url_for('maintenance_ics') }}"
+               class="bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl shadow-sm font-semibold text-sm transition flex items-center gap-2">
+                <i class="fa-solid fa-calendar-days text-orange-500"></i> {{ t('maintenance_ics_export') }}
+            </a>
+        </div>
     </div>
 
     <!-- Filters -->
@@ -84,6 +90,9 @@
                     <span class="{% if item.is_overdue %}text-red-500{% elif item.is_due_soon %}text-orange-500{% endif %}">
                         <i class="fa-solid fa-calendar-clock mr-1"></i>{{ t('maintenance_next') }}: {{ rec.next_service_at | fmt_dt('%d.%m.%Y') }}
                     </span>
+                    {% endif %}
+                    {% if item.recurrence_text %}
+                    <span class="text-purple-500"><i class="fa-solid fa-rotate mr-1"></i>{{ item.recurrence_text }}</span>
                     {% endif %}
                 </div>
             </div>
@@ -185,6 +194,28 @@
                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                 </div>
             </div>
+            <!-- Recurrence -->
+            <div class="bg-gray-50 rounded-xl p-4 space-y-3">
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" name="recurrence_enabled" id="mRecurrenceEnabled" value="1"
+                           class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                    <label for="mRecurrenceEnabled" class="ui-label mb-0">{{ t('maintenance_recurrence_enable') }}</label>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <select name="recurrence_type" id="mRecurrenceType"
+                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                            {% for rt_val, rt_label in recurrence_types %}
+                            <option value="{{ rt_val }}">{{ rt_label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <input type="number" name="recurrence_value" id="mRecurrenceValue" min="1" value="1"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                </div>
+            </div>
             <div class="flex justify-end gap-3 pt-2">
                 <button type="button"
                         onclick="document.getElementById('addMaintenanceModal').classList.add('hidden')"
@@ -261,6 +292,28 @@
                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                 </div>
             </div>
+            <!-- Recurrence -->
+            <div class="bg-gray-50 rounded-xl p-4 space-y-3">
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" name="recurrence_enabled" id="eRecurrenceEnabled" value="1"
+                           class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                    <label for="eRecurrenceEnabled" class="ui-label mb-0">{{ t('maintenance_recurrence_enable') }}</label>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <select name="recurrence_type" id="eRecurrenceType"
+                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                            {% for rt_val, rt_label in recurrence_types %}
+                            <option value="{{ rt_val }}">{{ rt_label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <input type="number" name="recurrence_value" id="eRecurrenceValue" min="1" value="1"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                </div>
+            </div>
             <div class="flex justify-end gap-3 pt-2">
                 <button type="button"
                         onclick="document.getElementById('editMaintenanceModal').classList.add('hidden')"
@@ -289,7 +342,10 @@ const maintenanceRecords = {
         maintenance_type: {{ rec.maintenance_type | tojson }},
         notes: {{ rec.notes | tojson }},
         performed_at: {{ (rec.performed_at.strftime('%Y-%m-%dT%H:%M') if rec.performed_at else '') | tojson }},
-        next_service_at: {{ (rec.next_service_at.strftime('%Y-%m-%d') if rec.next_service_at else '') | tojson }}
+        next_service_at: {{ (rec.next_service_at.strftime('%Y-%m-%d') if rec.next_service_at else '') | tojson }},
+        recurrence_type: {{ rec.recurrence_type | tojson }},
+        recurrence_value: {{ rec.recurrence_value | tojson }},
+        recurrence_enabled: {{ rec.recurrence_enabled | tojson }}
     }{% if not loop.last %},{% endif %}
 {% endfor %}
 };
@@ -326,6 +382,9 @@ function openEditModal(id) {
     document.getElementById('eNotes').value = rec.notes || '';
     document.getElementById('ePerformedAt').value = rec.performed_at || '';
     document.getElementById('eNextServiceAt').value = rec.next_service_at || '';
+    document.getElementById('eRecurrenceType').value = rec.recurrence_type || 'none';
+    document.getElementById('eRecurrenceValue').value = rec.recurrence_value || 1;
+    document.getElementById('eRecurrenceEnabled').checked = rec.recurrence_enabled || false;
 
     eUpdatePrinterNames();
     if (rec.printer_id) {

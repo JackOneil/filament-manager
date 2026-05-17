@@ -1,11 +1,7 @@
-version: '3.8'
-
 services:
   filament_app:
     build: .
     container_name: filament_app
-    ports:
-      - "5050:5000"
     volumes:
       - ./data:/app/data
     restart: unless-stopped
@@ -15,3 +11,18 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       FERNET_KEY: ${FERNET_KEY}
       # BEHIND_PROXY: ${BEHIND_PROXY}
+      TZ: Europe/Prague
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.filament_app.tls=true'
+      - 'traefik.http.routers.filament_app.rule=Host(`print.nbit.cz`)'
+      - 'traefik.http.routers.filament_app.middlewares=whitelistHome@file'
+      - 'traefik.http.services.filament_app.loadbalancer.server.port=5000'
+      - 'traefik.docker.network=traefik_proxy'
+      - 'traefik.http.routers.filament_app.entrypoints=websecure'
+    networks:
+      - traefik_proxy
+networks:
+  traefik_proxy:
+    name: traefik_proxy
+    external: true

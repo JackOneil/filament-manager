@@ -1151,6 +1151,10 @@
                 <i class="fa-solid fa-screwdriver-wrench text-lg w-8 text-center flex-shrink-0"></i>
                 <span class="ml-2 font-semibold opacity-0 group-[.pinned]:opacity-100 transition-opacity">{{ t('maintenance_title') }}</span>
             </a>
+            <a href="{{ url_for('waste_index') }}" class="flex items-center px-4 py-3 text-[var(--ui-text)] hover:bg-[var(--ui-brand-soft)] hover:text-[var(--ui-brand-strong)] transition-colors whitespace-nowrap {% if endpoint == 'waste_index' %}bg-[var(--ui-brand-soft)] text-[var(--ui-brand-strong)] border-r-2 border-[var(--ui-brand-strong)]{% endif %}" title="{{ t('waste_title') }}">
+                <i class="fa-solid fa-triangle-exclamation text-lg w-8 text-center flex-shrink-0"></i>
+                <span class="ml-2 font-semibold opacity-0 group-[.pinned]:opacity-100 transition-opacity">{{ t('waste_title') }}</span>
+            </a>
             {% endif %}
 
             {% if auth_has_section_access('history') or auth_is_admin(current_user) %}

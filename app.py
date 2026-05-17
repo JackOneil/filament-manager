@@ -48,7 +48,7 @@ from utils import get_settings, utc_now
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.73.1'
+APP_VERSION = '1.74.0'
 
 csrf = CSRFProtect()
 
@@ -341,6 +341,12 @@ def _setup_database(app: Flask) -> None:
         # ── Project file versioning ──────────────────────────────────────────
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN parent_file_id INTEGER DEFAULT NULL")
+
+        # ── Printer maintenance recurrence ───────────────────────────────────
+        _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN recurrence_type VARCHAR(20) NOT NULL DEFAULT 'none'")
+        _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN recurrence_value INTEGER NOT NULL DEFAULT 0")
+        _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN recurrence_enabled BOOLEAN NOT NULL DEFAULT 0")
+        _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN last_renewed_at DATETIME DEFAULT NULL")
 
         # ── Seed data (only runs once on fresh database) ─────────────────────
         if not Brand.query.first():

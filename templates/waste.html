@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800">{{ t('waste_title') }}</h1>
+            <p class="text-gray-500 mt-1">{{ t('waste_desc') }}</p>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="document.getElementById('addWasteModal').classList.remove('hidden')"
+                    class="bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2.5 rounded-xl shadow transition flex items-center gap-2">
+                <i class="fa-solid fa-triangle-exclamation"></i> {{ t('waste_add') }}
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats bar -->
+    <div class="flex flex-wrap gap-3 items-center">
+        <span class="ui-badge ui-badge-critical"><i class="fa-solid fa-weight-hanging mr-1"></i> {{ total_waste | int }} g {{ t('waste_total') }}</span>
+    </div>
+
+    <!-- Filters -->
+    <div class="flex flex-wrap gap-3 items-center">
+        <a href="{{ url_for('waste_index') }}"
+           class="ui-badge {% if not filter_reason and not filter_filament and not filter_project %}ui-badge-brand{% else %}ui-badge-neutral{% endif %}">
+            {{ t('all') }}
+        </a>
+        {% for reason in waste_reasons %}
+        <a href="{{ url_for('waste_index', reason=reason, filament=filter_filament, project=filter_project) }}"
+           class="ui-badge {% if filter_reason == reason %}ui-badge-brand{% else %}ui-badge-neutral{% endif %}">
+            {{ t('waste_reason_' ~ reason) }}
+        </a>
+        {% endfor %}
+    </div>
+
+    {% if filaments %}
+    <div class="flex flex-wrap gap-2">
+        <span class="text-xs text-gray-400 font-semibold uppercase self-center mr-1">{{ t('filament') }}:</span>
+        {% for f in filaments[:20] %}
+        <a href="{{ url_for('waste_index', filament=f.id, reason=filter_reason, project=filter_project) }}"
+           class="ui-badge {% if filter_filament == f.id|string %}ui-badge-brand{% else %}ui-badge-neutral{% endif %} text-xs">
+            {{ f.name }}
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Records list -->
+    {% if records %}
+    <div class="space-y-3">
+        {% for rec in records %}
+        <div class="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-4 flex flex-col md:flex-row md:items-center gap-3">
+            <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-red-100 text-red-600">
+                <i class="fa-solid fa-circle-exclamation"></i>
+            </div>
+            <div class="flex-grow min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="font-semibold text-gray-800">{{ rec.filament.name if rec.filament else '?' }}</span>
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                        {{ t('waste_reason_' ~ rec.reason) }}
+                    </span>
+                    <span class="text-sm font-semibold text-red-600">{{ rec.weight_grams | int }} g</span>
+                    {% if rec.project %}
+                    <a href="{{ url_for('project_detail', id=rec.project.id) }}" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 transition">
+                        <i class="fa-solid fa-diagram-project mr-1"></i>{{ rec.project.name }}
+                    </a>
+                    {% endif %}
+                </div>
+                {% if rec.notes %}
+                <p class="text-sm text-gray-600 mt-1 truncate">{{ rec.notes }}</p>
+                {% endif %}
+                <div class="text-xs text-gray-400 mt-1 flex flex-wrap gap-3">
+                    <span><i class="fa-solid fa-calendar-day mr-1"></i>{{ rec.created_at | fmt_dt('%d.%m.%Y %H:%M') }}</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+                <form method="POST" action="{{ url_for('waste_delete', rec_id=rec.id) }}"
+                      onsubmit="return confirm('{{ t('waste_delete_confirm') }}')" class="inline">
+                    <button type="submit" class="text-gray-300 hover:text-red-500 transition" title="{{ t('delete') }}">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if paginated.pages > 1 %}
+    <div class="flex justify-center gap-2 pt-4">
+        {% for p in range(1, paginated.pages + 1) %}
+        <a href="{{ url_for('waste_index', page=p, reason=filter_reason, filament=filter_filament, project=filter_project) }}"
+           class="ui-badge {% if p == paginated.page %}ui-badge-brand{% else %}ui-badge-neutral{% endif %}">{{ p }}</a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="text-center py-20 text-gray-400">
+        <i class="fa-solid fa-circle-check text-5xl mb-4 block"></i>
+        <p class="text-lg">{{ t('waste_empty') }}</p>
+        <p class="text-sm mt-1">{{ t('waste_empty_hint') }}</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Add Waste Modal -->
+<div id="addWasteModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 space-y-5">
+        <div class="flex items-center justify-between">
+            <h2 class="text-xl font-bold text-gray-800">{{ t('waste_add') }}</h2>
+            <button onclick="document.getElementById('addWasteModal').classList.add('hidden')"
+                    class="text-gray-400 hover:text-gray-700 transition text-xl">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+        <form method="POST" action="{{ url_for('waste_add') }}" class="space-y-4">
+            <div>
+                <label class="ui-label">{{ t('filament') }}</label>
+                <select name="filament_id"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none" required>
+                    <option value="">{{ t('waste_select_filament') }}</option>
+                    {% for f in filaments %}
+                    <option value="{{ f.id }}">{{ f.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="ui-label">{{ t('project') }}</label>
+                <select name="project_id"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none">
+                    <option value="">{{ t('waste_select_project') }}</option>
+                    {% for p in projects %}
+                    <option value="{{ p.id }}">{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="ui-label">{{ t('waste_reason_label') }}</label>
+                    <select name="reason"
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none">
+                        {% for reason in waste_reasons %}
+                        <option value="{{ reason }}">{{ t('waste_reason_' ~ reason) }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="ui-label">{{ t('waste_weight') }} (g)</label>
+                    <input type="number" name="weight_grams" step="0.1" min="0" value="0"
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none">
+                </div>
+            </div>
+            <div>
+                <label class="ui-label">{{ t('waste_notes') }}</label>
+                <textarea name="notes" rows="2"
+                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none"
+                          placeholder="{{ t('waste_notes_placeholder') }}"></textarea>
+            </div>
+            <div class="flex justify-end gap-3 pt-2">
+                <button type="button"
+                        onclick="document.getElementById('addWasteModal').classList.add('hidden')"
+                        class="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
+                    {{ t('cancel') }}
+                </button>
+                <button type="submit"
+                        class="px-5 py-2 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 shadow transition">
+                    <i class="fa-solid fa-save mr-1"></i>{{ t('save') }}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

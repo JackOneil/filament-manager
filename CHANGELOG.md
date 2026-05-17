@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.74.0] - 2026-05-14
+
+### Added
+- **Waste/scrap tracking** — New module for recording failed prints with reason (stringing, warping, bed adhesion, clogging, layer shift, spaghetti, broken support, other), weight in grams, linked filament and optional project. Filterable list with stats bar, add modal, and delete confirmation. Includes full backup export/import support.
+- **Recurring maintenance intervals** — Printer maintenance records now support recurring schedules (hours, days, months). When enabled, the next service date is auto-calculated from the performed date + interval. Recurrence info is shown inline in the maintenance list and editable in both add and edit modals.
+- **Maintenance calendar ICS export** — Export all upcoming maintenance items as `.ics` calendar file for importing into Google Calendar, Outlook, etc. Includes printer name, maintenance type, and notes.
+
 ## [1.73.1] - 2026-05-11
 
 ### Added
