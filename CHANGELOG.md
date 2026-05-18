@@ -5,7 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.76.2] - 2026-05-21
+### Changed
+- **Storage page – no-reload drag & drop**: Dragging a filament to a new slot no longer causes a full page reload. After a successful move the grid cells and list rows are updated in-place using DOM node swaps, preserving all event listeners. The assign (+) buttons in empty slots now read shelf/slot info from the parent element so they continue to work correctly after a cell swap. Right-clicking newly-occupied or newly-emptied slots reflects the updated state immediately.
+
+## [1.76.1] - 2026-05-18
+### Changed
+- **Storage page – shelf legend removed**: The row of colored chip badges summarising shelf contents is removed; the visual grid is sufficient for at-a-glance orientation.
+- **Storage page – drag & drop improved**: Dragging a spool now shows a custom ghost element (color swatch + brand · name) instead of the browser's default element snapshot. Drop targets highlight in blue on hover; empty slots are tinted blue during any active drag.
+- **Storage page – slot context menu**: Right-clicking any occupied slot (grid or list view) opens a context menu with "Change filament" (reopens assign modal for that slot) and "Remove from slot" (deletes the placement).
+
+## [1.76.0] - 2026-05-21
+### Added
+- **Context menu: Add spool & Search in shop**: Right-clicking any filament card/row now shows two new actions — "Add 1 piece" (opens the add-spool modal) and "Search in shop" (opens the shop URL in a new tab). The shop URL is resolved from the filament's own shop URL, its brand's shop URL, or the global reorder shop setting, in that priority order. Both entries are shown only when the relevant data is available (admin-only for add spool, shop URL required for search in shop).
+- **Storage page refactor**: Completely overhauled the shelf layout for much better readability:
+  - Grid/List view toggle with `localStorage` persistence — switch between the visual spool grid (88 px fixed-width cells, horizontally scrollable) and a compact table list.
+  - Live search bar — type any filament name, brand, or material to fade out non-matching slots across all shelves instantly.
+  - Shelf legend — each shelf now shows a row of colored chips for the first 12 placed spools so you can identify shelf contents at a glance without scrolling into the grid.
+
+## [1.75.5] - 2026-05-20
+### Fixed
+- **Context menu subtract usage / delete never fired**: The `openFilCtxMenu` function was building button `onclick` attributes using `JSON.stringify(name)` inside a double-quoted HTML attribute, e.g. `onclick="openUseFilamentModal(1,"My Filament",1000)"`. The HTML parser terminated the attribute value at the first inner `"`, so the JS handler was never attached. Fixed by removing all inline `onclick` from the dynamically-built menu HTML and attaching click handlers via `addEventListener` after `menu.innerHTML` is set — avoids the attribute-escaping issue entirely and works for all filament names regardless of content.
+
 ## [1.75.4] - 2026-05-19
+### Fixed
+- **Context menu (right-click) on initial page load**: Static list-view rows rendered on first page load were missing `data-fil-name`, `data-fil-weight`, `data-fil-edit`, `data-fil-detail`, `data-fil-delete`, and `data-fil-admin` data attributes. The context menu opened but showed only the timeline link — subtract usage, edit, and delete actions were absent. Only card view and AJAX-reloaded partials were unaffected.
+
 ### Removed
 - **Kanban column resize feature**: Removed the entire `window.initKanbanResize` function and all related code from the projects page. The feature had persistent issues with saving state and layout overflow across browser sessions. A one-time `localStorage.removeItem` call on page load clears any stale data left in users' browsers.
 

@@ -1,5 +1,17 @@
 {% extends "base.html" %}
 {% block content %}
+<style>
+.storage-slot.drag-over {
+    outline: 2px solid #3b82f6 !important;
+    background-color: #dbeafe !important;
+    border-color: #3b82f6 !important;
+    z-index: 1;
+}
+.storage-dragging .storage-slot:not(.bg-white) {
+    border-color: #93c5fd;
+    background-color: #eff6ff;
+}
+</style>
 <div class="page-shell" x-data="storageBoard(window.storageBoardConfig)">
     <div class="page-hero">
         <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
@@ -43,12 +55,28 @@
     </div>
 
     <div class="space-y-6">
-        <div class="flex justify-end">
-            <button type="button"
-                    class="ui-button-primary"
-                    @click="openShelfModal()">
-                <i class="fa-solid fa-plus"></i> {{ t('storage_add_shelf') }}
-            </button>
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-1 p-1 bg-gray-100 rounded-lg">
+                <button type="button" @click="viewMode = 'grid'" :class="viewMode === 'grid' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'" class="px-3 py-1.5 rounded-md text-sm font-medium transition-all">
+                    <i class="fa-solid fa-grip text-xs mr-1.5"></i>{{ t('storage_view_grid') }}
+                </button>
+                <button type="button" @click="viewMode = 'list'" :class="viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'" class="px-3 py-1.5 rounded-md text-sm font-medium transition-all">
+                    <i class="fa-solid fa-list text-xs mr-1.5"></i>{{ t('storage_view_list') }}
+                </button>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="relative">
+                    <input type="text" x-model="searchQ" placeholder="{{ t('storage_search_slots') }}"
+                           class="rounded-lg border border-gray-300 pl-8 pr-8 py-1.5 text-sm focus:ring-blue-500 outline-none w-48">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none"></i>
+                    <button x-show="searchQ" x-cloak @click="searchQ = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        <i class="fa-solid fa-xmark text-xs"></i>
+                    </button>
+                </div>
+                <button type="button" class="ui-button-primary" @click="openShelfModal()">
+                    <i class="fa-solid fa-plus"></i> {{ t('storage_add_shelf') }}
+                </button>
+            </div>
         </div>
 
         <div class="ui-panel ui-panel-hover relative z-30">
@@ -285,37 +313,63 @@
                 </details>
             </div>
 
-            <div class="mx-auto grid gap-1.5" style="grid-template-columns: repeat({{ row.shelf.columns }}, minmax(0, clamp(3.3rem, calc((100vw - 10rem) / {{ row.shelf.columns }}), 4.2rem))); width: fit-content; max-width: 100%;">
+
+
+            <!-- GRID VIEW -->
+            <div x-show="viewMode === 'grid'" x-cloak class="overflow-x-auto -mx-1 px-1 pb-2">
+            <div class="grid gap-2" style="grid-template-columns: repeat({{ row.shelf.columns }}, 88px); width: fit-content;">
                 {% for slot_index in row.slots %}
                 {% set placement = row.slot_map.get(slot_index) %}
-                <div class="relative aspect-square rounded-lg border p-1.5 {% if placement %}bg-white{% else %}bg-slate-50 border-dashed{% endif %} {% if placement and has_active_filter and placement.matches_filter %}border-red-500 ring-2 ring-red-200 animate-pulse{% elif placement and has_active_filter and not placement.matches_filter %}border-gray-200 opacity-25{% else %}border-gray-300{% endif %}"
+                <div class="storage-slot relative w-[88px] h-[88px] rounded-lg border overflow-hidden
+                     {% if placement %}bg-white border-gray-200
+                     {% if has_active_filter and placement.matches_filter %}!border-red-500 ring-2 ring-red-200 animate-pulse
+                     {% elif has_active_filter and not placement.matches_filter %}opacity-25{% endif %}
+                     {% else %}bg-slate-50 border-dashed border-gray-300{% endif %}"
+                     data-search-text="{{ (placement.filament.name ~ ' ' ~ placement.filament.brand.name ~ ' ' ~ placement.filament.material.name)|lower if placement else '' }}"
+                     data-slot-key="{{ row.shelf.id }}-{{ slot_index }}"
+                     data-slot-shelf="{{ row.shelf.id }}"
+                     data-slot-index="{{ slot_index }}"
+                     data-ctx-shelf="{{ row.shelf.id }}"
+                     data-ctx-shelf-name="{{ row.shelf.name | e }}"
+                     data-ctx-slot="{{ slot_index }}"
+                     @contextmenu.prevent="openSlotCtx($event, $el)"
+                     {% if placement %}
+                     data-ctx-placement="{{ placement.id }}"
+                     data-ctx-name="{{ placement.filament.name | e }}"
+                     data-ctx-delete-url="{{ url_for('storage_delete_placement', placement_id=placement.id) }}"
+                     {% endif %}
                      @dragover.prevent
-                     @drop="movePlacement($event, {{ row.shelf.id }}, {{ slot_index }})">
-                    <div class="absolute top-1 left-1 text-[9px] font-bold text-gray-400">{{ slot_index }}</div>
+                     @dragenter="$el.classList.add('drag-over')"
+                     @dragleave="if(!$el.contains($event.relatedTarget)) $el.classList.remove('drag-over')"
+                     @drop="$el.classList.remove('drag-over'); movePlacement($event, {{ row.shelf.id }}, {{ slot_index }})">
                     {% if placement %}
-                    <div class="group h-full rounded-md border border-gray-200 p-1 cursor-move flex flex-col justify-between"
+                    <div class="h-1.5 w-full" style="background-color: {{ placement.filament.color.hex_value }}"></div>
+                    <div class="p-1 h-[calc(100%-6px)] flex flex-col cursor-move group"
                          draggable="true"
+                         data-fil-name="{{ placement.filament.name | e }}"
+                         data-fil-color="{{ placement.filament.color.hex_value }}"
+                         data-fil-brand="{{ placement.brand_short | e }}"
                          @dragstart="startDrag($event, {{ placement.id }})"
                          title="{{ placement.filament.name }} · {{ placement.filament.brand.name }} · {{ placement.filament.material.name }}">
-                        <div class="flex items-start justify-between gap-1">
-                            <div class="flex items-start gap-1 min-w-0 flex-1 pr-1">
-                                <span class="w-3 h-3 rounded-full border border-gray-200 flex-shrink-0 mt-0.5" style="background-color: {{ placement.filament.color.hex_value }}"></span>
-                                <div class="min-w-0 flex-1 text-left">
-                                    <div class="text-[10px] font-bold text-gray-700 leading-none truncate">{{ placement.brand_short }}</div>
-                                    <div class="text-[9px] text-gray-500 leading-none truncate mt-0.5">{{ placement.filament.name }}</div>
-                                </div>
-                            </div>
-                            <form method="POST" action="{{ url_for('storage_delete_placement', placement_id=placement.id) }}" class="flex-shrink-0">
-                                <button type="submit" class="text-gray-300 hover:text-red-500 text-[10px] leading-none"><i class="fa-solid fa-xmark"></i></button>
+                        <div class="flex items-center justify-between">
+                            <span class="text-[8px] font-bold text-gray-400 leading-none">#{{ slot_index }}</span>
+                            <form method="POST" action="{{ url_for('storage_delete_placement', placement_id=placement.id) }}" class="inline">
+                                <button type="submit" class="text-gray-300 hover:text-red-500 text-[9px] leading-none transition-colors"><i class="fa-solid fa-xmark"></i></button>
                             </form>
                         </div>
-                        <div class="text-left px-0.5 pt-0.5">
-                            <div class="text-[9px] text-gray-400 leading-none">{{ placement.fill_percent }}%</div>
+                        <div class="flex items-start gap-1 mt-0.5 min-w-0 flex-1">
+                            <span class="w-2.5 h-2.5 rounded-full border border-gray-200 flex-shrink-0 mt-0.5" style="background-color: {{ placement.filament.color.hex_value }}"></span>
+                            <div class="min-w-0 flex-1">
+                                <div class="text-[10px] font-bold text-gray-700 leading-none truncate">{{ placement.brand_short }}</div>
+                                <div class="text-[9px] text-gray-500 leading-tight truncate mt-0.5">{{ placement.filament.name }}</div>
+                            </div>
                         </div>
-                        <div class="h-1 rounded-full bg-gray-200 overflow-hidden">
-                            <div class="h-1 rounded-full bg-gradient-to-r from-emerald-500 to-blue-500" style="width: {{ placement.fill_percent }}%"></div>
+                        <div class="mt-auto">
+                            <div class="text-[8px] text-gray-400 leading-none mb-0.5">{{ placement.fill_percent }}%</div>
+                            <div class="h-1 rounded-full bg-gray-200 overflow-hidden">
+                                <div class="h-1 rounded-full bg-gradient-to-r from-emerald-500 to-blue-500" style="width: {{ placement.fill_percent }}%"></div>
+                            </div>
                         </div>
-
                         <div class="hidden group-hover:block pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-30 w-52">
                             <div class="rounded-xl border border-gray-200 bg-white shadow-xl p-3">
                                 <div class="flex items-start gap-3">
@@ -334,14 +388,95 @@
                         </div>
                     </div>
                     {% else %}
-                    <button type="button"
-                            class="w-full h-full rounded-md border border-dashed border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-600 transition flex flex-col items-center justify-center"
-                            @click="openAssignModal({{ row.shelf.id }}, {{ slot_index }}, '{{ row.shelf.name|escape }}')">
-                        <i class="fa-solid fa-plus text-xs"></i>
-                    </button>
+                    <div class="flex items-center justify-center h-full">
+                        <button type="button"
+                                class="w-full h-full flex flex-col items-center justify-center text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+                                onclick="var s=this.closest('.storage-slot');if(window._storageBoard)window._storageBoard.openAssignModal(+s.dataset.slotShelf,+s.dataset.slotIndex,s.dataset.ctxShelfName||'')">
+                            <i class="fa-solid fa-plus text-xs"></i>
+                            <span class="text-[8px] text-gray-400 mt-0.5" data-slot-num>#{{ slot_index }}</span>
+                        </button>
+                    </div>
                     {% endif %}
                 </div>
                 {% endfor %}
+            </div>
+            </div>
+
+            <!-- LIST VIEW -->
+            <div x-show="viewMode === 'list'" x-cloak class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="bg-gray-50 border-b border-gray-200">
+                        <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider w-10">{{ t('storage_slot_label') }}</th>
+                        <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">{{ t('name') }}</th>
+                        <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">{{ t('brand') }}</th>
+                        <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">{{ t('material') }}</th>
+                        <th class="text-center px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">{{ t('remaining') }}</th>
+                        <th class="w-8"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for slot_index in row.slots %}
+                    {% set placement = row.slot_map.get(slot_index) %}
+                    {% if placement %}
+                    <tr class="hover:bg-blue-50/30 transition-colors"
+                        data-slot-key="{{ row.shelf.id }}-{{ slot_index }}"
+                        data-slot-shelf="{{ row.shelf.id }}"
+                        data-slot-index="{{ slot_index }}"
+                        data-ctx-shelf="{{ row.shelf.id }}"
+                        data-ctx-shelf-name="{{ row.shelf.name | e }}"
+                        data-ctx-slot="{{ slot_index }}"
+                        data-search-text="{{ (placement.filament.name ~ ' ' ~ placement.filament.brand.name ~ ' ' ~ placement.filament.material.name)|lower }}"
+                        @contextmenu.prevent="openSlotCtx($event, $el)"
+                        data-ctx-placement="{{ placement.id }}"
+                        data-ctx-name="{{ placement.filament.name | e }}"
+                        data-ctx-delete-url="{{ url_for('storage_delete_placement', placement_id=placement.id) }}">
+                        <td class="px-3 py-2 text-xs font-mono text-gray-400">{{ slot_index }}</td>
+                        <td class="px-3 py-2">
+                            <div class="flex items-center gap-2">
+                                <span class="w-3 h-3 rounded-full flex-shrink-0 border border-gray-200" style="background-color: {{ placement.filament.color.hex_value }}"></span>
+                                <span class="font-medium text-gray-800 text-sm">{{ placement.filament.name }}</span>
+                            </div>
+                        </td>
+                        <td class="px-3 py-2 text-sm text-gray-600 hidden sm:table-cell">{{ placement.filament.brand.name }}</td>
+                        <td class="px-3 py-2 text-xs text-gray-500 hidden md:table-cell">{{ placement.filament.material.name }}</td>
+                        <td class="px-3 py-2">
+                            <div class="flex items-center gap-1.5">
+                                <div class="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                                    <div class="h-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-blue-500" style="width: {{ placement.fill_percent }}%"></div>
+                                </div>
+                                <span class="text-xs text-gray-500 w-8 text-right flex-shrink-0">{{ placement.fill_percent }}%</span>
+                            </div>
+                        </td>
+                        <td class="px-3 py-2 text-center">
+                            <form method="POST" action="{{ url_for('storage_delete_placement', placement_id=placement.id) }}" class="inline">
+                                <button type="submit" class="text-gray-300 hover:text-red-500 transition-colors"><i class="fa-solid fa-xmark text-sm"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr class="opacity-30"
+                        data-slot-key="{{ row.shelf.id }}-{{ slot_index }}"
+                        data-slot-shelf="{{ row.shelf.id }}"
+                        data-slot-index="{{ slot_index }}"
+                        data-ctx-shelf="{{ row.shelf.id }}"
+                        data-ctx-shelf-name="{{ row.shelf.name | e }}"
+                        data-ctx-slot="{{ slot_index }}"
+                        data-search-text=""
+                        @contextmenu.prevent="openSlotCtx($event, $el)">
+                        <td class="px-3 py-1.5 text-xs font-mono text-gray-400">{{ slot_index }}</td>
+                        <td class="px-3 py-1.5 text-xs text-gray-400 italic" colspan="3">{{ t('storage_empty_slot') }}</td>
+                        <td class="px-3 py-1.5" colspan="2">
+                            <button type="button" class="text-gray-300 hover:text-blue-500 transition-colors text-xs"
+                                    onclick="var r=this.closest('tr');if(window._storageBoard)window._storageBoard.openAssignModal(+r.dataset.slotShelf,+r.dataset.slotIndex,r.dataset.ctxShelfName||'')">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
             </div>
         </section>
         {% else %}
@@ -351,6 +486,29 @@
         </div>
         {% endfor %}
     </div>
+
+    <!-- Slot right-click context menu -->
+    <div x-ref="slotCtxMenu" x-show="slotCtxOpen" x-cloak
+         @click.outside="closeSlotCtx()"
+         :style="`position:fixed;left:${slotCtxX}px;top:${slotCtxY}px;z-index:9999`"
+         class="bg-white rounded-xl shadow-xl border border-gray-200 py-1.5 min-w-[190px]">
+        <div class="px-3 py-1.5 border-b border-gray-100">
+            <p class="text-xs font-semibold text-gray-800 truncate max-w-[220px]" x-text="slotCtxName"></p>
+        </div>
+        <button type="button" @click="slotCtxChange()"
+                class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors">
+            <i class="fa-solid fa-arrows-rotate w-4 text-center text-xs text-blue-500"></i>
+            {{ t('storage_ctx_change') }}
+        </button>
+        <button type="button" @click="slotCtxRemove()"
+                class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+            <i class="fa-solid fa-trash-can w-4 text-center text-xs"></i>
+            {{ t('storage_ctx_remove') }}
+        </button>
+    </div>
+    <form id="slotCtxDeleteForm" method="POST" action="" style="display:none">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    </form>
 
     <div x-show="assignModalOpen" x-cloak class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4" @click.self="closeAssignModal()">
         <div class="ui-panel w-full max-w-lg">
@@ -457,6 +615,16 @@ window.storageBoardConfig = {
 function storageBoard(config) {
     return {
         draggedPlacementId: null,
+        draggedSourceEl: null,
+        slotCtxOpen: false,
+        slotCtxX: 0,
+        slotCtxY: 0,
+        slotCtxPlacementId: null,
+        slotCtxName: '',
+        slotCtxShelfId: null,
+        slotCtxShelfName: '',
+        slotCtxSlotIndex: null,
+        slotCtxDeleteUrl: '',
         assignModalOpen: false,
         shelfModalOpen: false,
         assignShelfId: '',
@@ -465,6 +633,8 @@ function storageBoard(config) {
         assignFilament: '',
         assignFilamentQ: '',
         assignFilamentOpen: false,
+        viewMode: localStorage.getItem('storage_view_mode') || 'grid',
+        searchQ: '',
         shelf: config?.shelf || '',
         brand: config?.brand || '',
         material: config?.material || '',
@@ -490,11 +660,22 @@ function storageBoard(config) {
         tagOptions: config?.tagOptions || [],
         presets: [],
         init() {
+            window._storageBoard = this;
             try {
                 this.presets = JSON.parse(localStorage.getItem('filament.storagePresets') || '[]');
             } catch (e) {
                 this.presets = [];
             }
+            this.$watch('viewMode', (mode) => { localStorage.setItem('storage_view_mode', mode); });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') this.slotCtxOpen = false; });
+            this.$watch('searchQ', (q) => {
+                const q_lc = q.toLowerCase();
+                this.$el.querySelectorAll('[data-search-text]').forEach(function(el) {
+                    if (!q_lc) { el.style.opacity = ''; return; }
+                    const text = (el.dataset.searchText || '').toLowerCase();
+                    el.style.opacity = text.includes(q_lc) ? '' : '0.15';
+                });
+            });
             const selectedShelf = this.shelfOptions.find((opt) => this.shelf == opt.id);
             const selectedBrand = this.brandOptions.find((opt) => this.brand == opt.id);
             const selectedMaterial = this.materialOptions.find((opt) => this.material == opt.id);
@@ -620,9 +801,65 @@ function storageBoard(config) {
         closeShelfModal() {
             this.shelfModalOpen = false;
         },
+        openSlotCtx(event, el) {
+            if (!el.dataset.ctxPlacement) return;  // empty slot — no context menu
+            this.slotCtxPlacementId = el.dataset.ctxPlacement;
+            this.slotCtxName = el.dataset.ctxName || '';
+            this.slotCtxShelfId = el.dataset.ctxShelf;
+            this.slotCtxShelfName = el.dataset.ctxShelfName || '';
+            this.slotCtxSlotIndex = el.dataset.ctxSlot;
+            this.slotCtxDeleteUrl = el.dataset.ctxDeleteUrl;
+            this.slotCtxX = event.clientX;
+            this.slotCtxY = event.clientY;
+            this.slotCtxOpen = true;
+            this.$nextTick(() => {
+                const menu = this.$refs.slotCtxMenu;
+                if (!menu) return;
+                const rect = menu.getBoundingClientRect();
+                if (this.slotCtxX + rect.width > window.innerWidth) this.slotCtxX = event.clientX - rect.width;
+                if (this.slotCtxY + rect.height > window.innerHeight) this.slotCtxY = event.clientY - rect.height;
+            });
+        },
+        closeSlotCtx() {
+            this.slotCtxOpen = false;
+        },
+        slotCtxRemove() {
+            this.slotCtxOpen = false;
+            const form = document.getElementById('slotCtxDeleteForm');
+            form.action = this.slotCtxDeleteUrl;
+            form.submit();
+        },
+        slotCtxChange() {
+            this.slotCtxOpen = false;
+            this.openAssignModal(parseInt(this.slotCtxShelfId), parseInt(this.slotCtxSlotIndex), this.slotCtxShelfName);
+        },
         startDrag(event, placementId) {
             this.draggedPlacementId = placementId;
+            // Store outside Alpine's reactive system so the raw DOM reference is preserved
+            window._storageDragSrc = event.currentTarget.closest('.storage-slot');
             event.dataTransfer.setData('text/plain', String(placementId));
+            event.dataTransfer.effectAllowed = 'move';
+            const el = event.currentTarget;
+            const name = el.dataset.filName || '';
+            const brand = el.dataset.filBrand || '';
+            const color = el.dataset.filColor || '#888888';
+            const ghost = document.createElement('div');
+            ghost.style.cssText = 'position:fixed;top:-200px;left:-200px;z-index:9999;background:#fff;border:2px solid #3b82f6;border-radius:10px;padding:7px 12px;display:flex;align-items:center;gap:8px;font-size:13px;box-shadow:0 4px 20px rgba(0,0,0,.2);white-space:nowrap;pointer-events:none;';
+            const dot = document.createElement('span');
+            dot.style.cssText = `width:11px;height:11px;border-radius:50%;background:${color};flex-shrink:0;border:1px solid rgba(0,0,0,.12);`;
+            const label = document.createElement('span');
+            label.style.cssText = 'font-weight:600;color:#1f2937;max-width:200px;overflow:hidden;text-overflow:ellipsis;';
+            label.textContent = brand ? `${brand} · ${name}` : name;
+            ghost.appendChild(dot);
+            ghost.appendChild(label);
+            document.body.appendChild(ghost);
+            event.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, ghost.offsetHeight / 2);
+            setTimeout(() => { if (ghost.parentNode) ghost.parentNode.removeChild(ghost); }, 0);
+            document.body.classList.add('storage-dragging');
+            event.target.addEventListener('dragend', function() {
+                document.body.classList.remove('storage-dragging');
+                document.querySelectorAll('.drag-over').forEach(function(el) { el.classList.remove('drag-over'); });
+            }, { once: true });
         },
         openAssignModal(shelfId, slotIndex, shelfName) {
             this.assignShelfId = shelfId;
@@ -647,8 +884,13 @@ function storageBoard(config) {
             this.assignFilamentOpen = false;
         },
         async movePlacement(event, shelfId, slotIndex) {
+            const dstEl = event.currentTarget;
             const placementId = this.draggedPlacementId || event.dataTransfer.getData('text/plain');
             if (!placementId) return;
+            // Prefer window._storageDragSrc (set outside Alpine reactivity); fall back to a
+            // DOM query so identity comparison works even if the reactive path is used.
+            const srcEl = window._storageDragSrc
+                || document.querySelector(`.storage-slot[data-ctx-placement="${placementId}"]`);
             const form = new FormData();
             form.append('shelf_id', shelfId);
             form.append('slot_index', slotIndex);
@@ -657,7 +899,86 @@ function storageBoard(config) {
                 body: form,
             });
             if (response.ok) {
-                window.location.reload();
+                if (srcEl && dstEl && srcEl !== dstEl) {
+                    this._applyDomMove(srcEl, dstEl);
+                }
+                // same-slot drop or missing ref — server already committed, just leave DOM as-is
+            }
+            window._storageDragSrc = null;
+            this.draggedSourceEl = null;
+            this.draggedPlacementId = null;
+        },
+        _applyDomMove(srcEl, dstEl) {
+            // Capture original placement-specific data before making any changes
+            var srcPlacId   = srcEl.getAttribute('data-ctx-placement') || '';
+            var srcPlacName = srcEl.getAttribute('data-ctx-name') || '';
+            var srcDelUrl   = srcEl.getAttribute('data-ctx-delete-url') || '';
+            var srcSearch   = srcEl.getAttribute('data-search-text') || '';
+            var dstPlacId   = dstEl.getAttribute('data-ctx-placement') || '';
+            var dstPlacName = dstEl.getAttribute('data-ctx-name') || '';
+            var dstDelUrl   = dstEl.getAttribute('data-ctx-delete-url') || '';
+            var dstSearch   = dstEl.getAttribute('data-search-text') || '';
+
+            // Swap all child DOM nodes between the two grid cells
+            // Moving existing nodes preserves all bound event listeners (Alpine @dragstart etc.)
+            var tempFrag = document.createDocumentFragment();
+            while (srcEl.firstChild) tempFrag.appendChild(srcEl.firstChild);
+            while (dstEl.firstChild) srcEl.appendChild(dstEl.firstChild);
+            dstEl.appendChild(tempFrag);
+
+            // Helper: write or clear placement-specific data attrs on an element
+            function setPData(el, placId, placName, delUrl, search) {
+                if (placId) {
+                    el.setAttribute('data-ctx-placement', placId);
+                    el.setAttribute('data-ctx-name', placName);
+                    el.setAttribute('data-ctx-delete-url', delUrl);
+                } else {
+                    el.removeAttribute('data-ctx-placement');
+                    el.removeAttribute('data-ctx-name');
+                    el.removeAttribute('data-ctx-delete-url');
+                }
+                el.setAttribute('data-search-text', search);
+            }
+            // dstEl now holds source's content; srcEl now holds dest's content
+            setPData(dstEl, srcPlacId, srcPlacName, srcDelUrl, srcSearch);
+            setPData(srcEl, dstPlacId, dstPlacName, dstDelUrl, dstSearch);
+
+            // Fix occupied / empty CSS classes on the outer slot divs
+            function setOcc(el, occupied) {
+                if (occupied) {
+                    el.classList.remove('bg-slate-50', 'border-dashed', 'border-gray-300');
+                    el.classList.add('bg-white', 'border-gray-200');
+                } else {
+                    el.classList.remove('bg-white', 'border-gray-200');
+                    el.classList.add('bg-slate-50', 'border-dashed', 'border-gray-300');
+                }
+            }
+            setOcc(dstEl, !!srcPlacId);
+            setOcc(srcEl, !!dstPlacId);
+
+            // Update slot-number label in any empty-slot button that may have moved cells
+            [srcEl, dstEl].forEach(function(el) {
+                var numEl = el.querySelector('[data-slot-num]');
+                if (numEl) numEl.textContent = '#' + (el.dataset.slotIndex || '');
+            });
+
+            // Sync the hidden list-view rows (they stay in sync so switching view works)
+            var srcKey = srcEl.dataset.slotKey;
+            var dstKey = dstEl.dataset.slotKey;
+            var srcRow = srcKey ? document.querySelector('tr[data-slot-key="' + srcKey + '"]') : null;
+            var dstRow = dstKey ? document.querySelector('tr[data-slot-key="' + dstKey + '"]') : null;
+            if (srcRow && dstRow) {
+                // Swap cells from index 1 onward (slot-number td at index 0 stays in position)
+                var srcTds = Array.from(srcRow.querySelectorAll(':scope > td')).slice(1);
+                var dstTds = Array.from(dstRow.querySelectorAll(':scope > td')).slice(1);
+                var frag2 = document.createDocumentFragment();
+                srcTds.forEach(function(td) { frag2.appendChild(td); });
+                dstTds.forEach(function(td) { srcRow.appendChild(td); });
+                dstRow.appendChild(frag2);
+                setPData(dstRow, srcPlacId, srcPlacName, srcDelUrl, srcSearch);
+                setPData(srcRow, dstPlacId, dstPlacName, dstDelUrl, dstSearch);
+                srcPlacId ? dstRow.classList.remove('opacity-30') : dstRow.classList.add('opacity-30');
+                dstPlacId ? srcRow.classList.remove('opacity-30') : srcRow.classList.add('opacity-30');
             }
         },
     };

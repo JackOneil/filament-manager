@@ -380,7 +380,8 @@
              data-fil-edit="{{ url_for('edit', id=fil.id) }}"
              data-fil-detail="{{ url_for('filament_detail', id=fil.id) }}"
              data-fil-delete="{{ url_for('delete', id=fil.id) }}"
-             data-fil-admin="{{ '0' if inventory_read_only else '1' }}">
+             data-fil-admin="{{ '0' if inventory_read_only else '1' }}"
+             data-fil-shop="{{ (fil.shop_url or fil.brand.shop_url or (app_settings.reorder_shop_url if app_settings else '')) | e }}">
             <div class="h-2 w-full absolute top-0 left-0" style="background-color: {{ fil.color.hex_value or '#94a3b8' }};"></div>
             {% set capacity_all = fil.quantity * fil.weight_total %}
             {% if capacity_all > 0 %}
@@ -559,7 +560,15 @@
         {% else %}
             {% set pct = 0 %}
         {% endif %}
-        <div class="inv-list-row bg-white border-b border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors grid grid-cols-12 gap-3 items-center" data-fil-id="{{ fil.id }}">
+        <div class="inv-list-row bg-white border-b border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors grid grid-cols-12 gap-3 items-center"
+             data-fil-id="{{ fil.id }}"
+             data-fil-name="{{ fil.name | e }}"
+             data-fil-weight="{{ fil.weight_remaining }}"
+             data-fil-edit="{{ url_for('edit', id=fil.id) }}"
+             data-fil-detail="{{ url_for('filament_detail', id=fil.id) }}"
+             data-fil-delete="{{ url_for('delete', id=fil.id) }}"
+             data-fil-admin="{{ '0' if inventory_read_only else '1' }}"
+             data-fil-shop="{{ (fil.shop_url or fil.brand.shop_url or (app_settings.reorder_shop_url if app_settings else '')) | e }}">
             <!-- Barva a název (ZVĚTŠENO) -->
         <div class="col-span-1 flex justify-center">
             <input type="checkbox" form="bulkDeleteForm" name="selected_ids" value="{{ fil.id }}" class="filament-select w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
@@ -1290,21 +1299,51 @@ document.addEventListener('DOMContentLoaded', function () {
         var detailUrl = el.dataset.filDetail || '';
         var deleteUrl = el.dataset.filDelete || '';
         var isAdmin = el.dataset.filAdmin === '1';
+        var shopUrl = el.dataset.filShop || '';
         var t = window._filCtxT || {};
         var truncName = name.length > 22 ? name.substring(0, 22) + '\u2026' : name;
         var safeName = truncName.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         var html = '<div class="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 mb-1">' + safeName + '</div>';
         if (isAdmin) {
-            html += '<button type="button" class="w-full text-left px-4 py-2 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center gap-2" onclick="openUseFilamentModal(' + id + ',' + JSON.stringify(name) + ',' + weight + ');closeFilCtxMenu()"><i class="fa-solid fa-minus-circle w-4 text-blue-500"></i> ' + (t.use||'') + '</button>';
+            html += '<button type="button" id="_fctx_use" class="w-full text-left px-4 py-2 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center gap-2"><i class="fa-solid fa-minus-circle w-4 text-blue-500"></i> ' + (t.use||'') + '</button>';
+            html += '<button type="button" id="_fctx_add" class="w-full text-left px-4 py-2 hover:bg-emerald-50 hover:text-emerald-700 transition-colors flex items-center gap-2"><i class="fa-solid fa-plus-circle w-4 text-emerald-500"></i> ' + (t.addSpool||'') + '</button>';
             html += '<a href="' + editUrl + '" class="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors flex items-center gap-2 block"><i class="fa-solid fa-edit w-4 text-gray-500"></i> ' + (t.edit||'') + '</a>';
         }
         html += '<a href="' + detailUrl + '" class="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors flex items-center gap-2 block"><i class="fa-solid fa-wave-square w-4 text-indigo-400"></i> ' + (t.timeline||'') + '</a>';
+        if (shopUrl) {
+            html += '<div class="border-t border-gray-100 my-1"></div>';
+            html += '<button type="button" id="_fctx_shop" class="w-full text-left px-4 py-2 hover:bg-orange-50 hover:text-orange-700 transition-colors flex items-center gap-2"><i class="fa-solid fa-cart-shopping w-4 text-orange-400"></i> ' + (t.shop||'') + '</button>';
+        }
         if (isAdmin) {
             html += '<div class="border-t border-gray-100 my-1"></div>';
-            html += '<button type="button" class="w-full text-left px-4 py-2 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-2" onclick="window._filCtxDelete(' + id + ',' + JSON.stringify(deleteUrl) + ')"><i class="fa-solid fa-trash w-4 text-red-400"></i> ' + (t.del||'') + '</button>';
+            html += '<button type="button" id="_fctx_del" class="w-full text-left px-4 py-2 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-2"><i class="fa-solid fa-trash w-4 text-red-400"></i> ' + (t.del||'') + '</button>';
         }
         var menu = ensureMenu();
         menu.innerHTML = html;
+        // Attach handlers after innerHTML to avoid double-quote attribute escaping issues
+        if (isAdmin) {
+            var useBtn = menu.querySelector('#_fctx_use');
+            if (useBtn) useBtn.addEventListener('click', function() {
+                openUseFilamentModal(id, name, weight);
+                window.closeFilCtxMenu();
+            });
+            var addBtn = menu.querySelector('#_fctx_add');
+            if (addBtn) addBtn.addEventListener('click', function() {
+                window.closeFilCtxMenu();
+                openAddSpoolModal(id, name);
+            });
+            var delBtn = menu.querySelector('#_fctx_del');
+            if (delBtn) delBtn.addEventListener('click', function() {
+                window._filCtxDelete(id, deleteUrl);
+            });
+        }
+        if (shopUrl) {
+            var shopBtn = menu.querySelector('#_fctx_shop');
+            if (shopBtn) shopBtn.addEventListener('click', function() {
+                window.closeFilCtxMenu();
+                window.open(shopUrl, '_blank', 'noopener,noreferrer');
+            });
+        }
         menu.style.display = 'block';
         var x = e.clientX, y = e.clientY;
         var mW = menu.offsetWidth, mH = menu.offsetHeight;
@@ -1341,8 +1380,10 @@ document.addEventListener('DOMContentLoaded', function () {
 })();
 window._filCtxT = {
     use: '{{ t("subtract_usage") }}',
+    addSpool: '{{ t("add_spool") }}',
     edit: '{{ t("edit") }}',
     timeline: '{{ t("spool_life_timeline") }}',
+    shop: '{{ t("stats_search_shop") }}',
     confirmDelete: '{{ t("delete_confirm") }}',
     del: '{{ t("delete") }}'
 };

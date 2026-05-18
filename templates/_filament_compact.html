@@ -12,7 +12,8 @@
          data-fil-edit="{{ url_for('edit', id=fil.id) }}"
          data-fil-detail="{{ url_for('filament_detail', id=fil.id) }}"
          data-fil-delete="{{ url_for('delete', id=fil.id) }}"
-         data-fil-admin="{{ '0' if inventory_read_only else '1' }}">
+         data-fil-admin="{{ '0' if inventory_read_only else '1' }}"
+         data-fil-shop="{{ (fil.shop_url or fil.brand.shop_url or (app_settings.reorder_shop_url if app_settings else '')) | e }}">
         {# Checkbox #}
         <div class="col-span-1 flex justify-center">
             <input type="checkbox" form="bulkDeleteForm" name="selected_ids" value="{{ fil.id }}" class="filament-select w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
