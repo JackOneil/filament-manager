@@ -208,8 +208,13 @@ function createWidgetLayoutManager(config) {
     function loadLayout() {
         try {
             var raw = JSON.parse(localStorage.getItem(config.storageKey) || '{}');
+            var order = Array.isArray(raw.order) ? raw.order : defaultOrder.slice();
+            // Append any newly-added widget IDs missing from a saved (stale) order
+            defaultOrder.forEach(function(id) {
+                if (order.indexOf(id) === -1) order.push(id);
+            });
             return {
-                order:      Array.isArray(raw.order)                             ? raw.order      : defaultOrder.slice(),
+                order:      order,
                 sizes:      raw.sizes      && typeof raw.sizes      === 'object' ? raw.sizes      : {},
                 heights:    raw.heights    && typeof raw.heights    === 'object' ? raw.heights    : {},
                 visibility: raw.visibility && typeof raw.visibility === 'object' ? raw.visibility : {},

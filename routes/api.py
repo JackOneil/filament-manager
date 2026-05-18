@@ -4,7 +4,7 @@ from sqlalchemy.orm import joinedload
 from auth import get_current_user, is_admin
 from database import db
 from models import Filament, Brand, AppSetting, Project, PrusaPrinter, BambuPrinter
-from utils import collect_usage_windows, compute_stock_status, escape_like, get_filament_tags
+from utils import collect_usage_windows, collect_sparkline_data, compute_stock_status, escape_like, get_filament_tags
 
 
 def register(app):
@@ -101,12 +101,15 @@ def register(app):
             )
             fil.tag_list = get_filament_tags(fil)
 
+        sparkline_data = collect_sparkline_data(filaments_paginated.items)
+
         if view_mode == 'card':
             html = render_template(
                 '_filament_cards.html',
                 filaments=filaments_paginated.items,
                 app_settings=setting,
                 inventory_read_only=inventory_read_only,
+                sparkline_data=sparkline_data,
             )
         elif view_mode == 'compact':
             html = render_template(
@@ -114,6 +117,7 @@ def register(app):
                 filaments=filaments_paginated.items,
                 app_settings=setting,
                 inventory_read_only=inventory_read_only,
+                sparkline_data=sparkline_data,
             )
         else:
             html = render_template(
@@ -121,6 +125,7 @@ def register(app):
                 filaments=filaments_paginated.items,
                 app_settings=setting,
                 inventory_read_only=inventory_read_only,
+                sparkline_data=sparkline_data,
             )
 
         return jsonify({

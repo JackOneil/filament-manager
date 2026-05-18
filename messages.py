@@ -1156,6 +1156,29 @@ TRANSLATIONS = {
         'note': 'Poznámka',
         'project': 'Projekt',
         'today': 'Dnes',
+        'material': 'Materiál',
+        'deselect_all': 'Zrušit výběr',
+        # ── Activity heatmap ──────────────────────────────────────────────────
+        'heatmap_title': 'Aktivita (52 týdnů)',
+        'heatmap_less': 'Méně',
+        'heatmap_more': 'Více',
+        'heatmap_events': 'události',
+        # ── Sparkline ─────────────────────────────────────────────────────────
+        'sparkline_tooltip': 'Trend spotřeby za posledních 7 dní',
+        # ── KPI cards ─────────────────────────────────────────────────────────
+        'kpi_choose_metric': 'Vybrat metriku',
+        # ── Community filament database ───────────────────────────────────────
+        'community_db_title': 'Databáze filamentů',
+        'community_db_desc': 'Procházejte komunitu profilů a importujte je přímo do inventáře.',
+        'community_db_import': 'Importovat vybrané',
+        'community_db_imported_n': 'Importováno {count} nových filamentů.',
+        'community_db_filter_all': 'Vše',
+        'community_db_no_results': 'Žádné výsledky.',
+        'community_db_search_placeholder': 'Hledat značku, materiál nebo barvu…',
+        'community_db_selected': 'vybráno',
+        'community_db_browse': 'Databáze filamentů',
+        # ── Kanban resize ─────────────────────────────────────────────────────
+        'kanban_resize_hint': 'Přetáhnout pro změnu šířky sloupce',
     },
     'en': {
         'title': 'Filament Manager',
@@ -2314,5 +2337,28 @@ TRANSLATIONS = {
         'note': 'Note',
         'project': 'Project',
         'today': 'Today',
+        'material': 'Material',
+        'deselect_all': 'Deselect all',
+        # ── Activity heatmap ──────────────────────────────────────────────────
+        'heatmap_title': 'Activity (52 weeks)',
+        'heatmap_less': 'Less',
+        'heatmap_more': 'More',
+        'heatmap_events': 'events',
+        # ── Sparkline ─────────────────────────────────────────────────────────
+        'sparkline_tooltip': '7-day usage trend',
+        # ── KPI cards ─────────────────────────────────────────────────────────
+        'kpi_choose_metric': 'Choose metric',
+        # ── Community filament database ───────────────────────────────────────
+        'community_db_title': 'Filament Database',
+        'community_db_desc': 'Browse community profiles and import them directly into your inventory.',
+        'community_db_import': 'Import selected',
+        'community_db_imported_n': 'Imported {count} new filaments.',
+        'community_db_filter_all': 'All',
+        'community_db_no_results': 'No results found.',
+        'community_db_search_placeholder': 'Search brand, material or colour…',
+        'community_db_selected': 'selected',
+        'community_db_browse': 'Filament Database',
+        # ── Kanban resize ─────────────────────────────────────────────────────
+        'kanban_resize_hint': 'Drag to resize column',
     }
 }

@@ -127,6 +127,8 @@ SECTION_BY_ENDPOINT = {
     'toggle_ui_mode': SECTION_OVERVIEW,
     'onboarding_dismiss': SECTION_SETTINGS,
     'filament_import_csv': SECTION_FILAMENTS,
+    'filament_community_db': SECTION_FILAMENTS,
+    'filament_community_db_import': SECTION_FILAMENTS,
     'filament_export_csv': SECTION_FILAMENTS,
     'maintenance_index': SECTION_PRINTERS,
     'maintenance_add': SECTION_PRINTERS,

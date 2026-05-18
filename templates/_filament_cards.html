@@ -6,28 +6,39 @@
     {% else %}
         {% set pct = 0 %}
     {% endif %}
-    <div class="bg-white rounded-lg shadow-md border border-gray-100 overflow-hidden relative">
-        <div class="h-2 w-full absolute top-0 left-0" style="background-color: {{ fil.color.hex_value }};"></div>
+    <div class="ui-panel !p-0 overflow-hidden relative"
+         data-fil-id="{{ fil.id }}"
+         data-fil-name="{{ fil.name | e }}"
+         data-fil-weight="{{ fil.weight_remaining }}"
+         data-fil-edit="{{ url_for('edit', id=fil.id) }}"
+         data-fil-detail="{{ url_for('filament_detail', id=fil.id) }}"
+         data-fil-delete="{{ url_for('delete', id=fil.id) }}"
+         data-fil-admin="{{ '0' if inventory_read_only else '1' }}">
+        <div class="h-2 w-full absolute top-0 left-0" style="background-color: {{ fil.color.hex_value or '#94a3b8' }};"></div>
         {% if fil.quantity == 0 or pct < 20 %}
-        <div class="absolute top-2 right-2 text-xs font-bold px-2 py-1 rounded shadow-md {% if fil.quantity == 0 %}bg-red-600 text-white{% else %}bg-orange-500 text-white{% endif %}">
+        <div class="absolute top-3 right-3 text-xs font-bold px-2.5 py-1 rounded-full shadow-md {% if fil.quantity == 0 %}bg-red-600 text-white{% else %}bg-orange-500 text-white{% endif %}">
             {% if fil.quantity == 0 %}{{ t('out_of_stock') }}{% else %}{{ t('low_stock') }}{% endif %}
         </div>
         {% endif %}
         {% if fil.reorder_alert_snoozed %}
-        <div class="absolute top-2 left-2 text-gray-400" title="{{ t('reorder_alert_is_snoozed') }}">
+        <div class="absolute top-3 left-3 text-gray-400" title="{{ t('reorder_alert_is_snoozed') }}">
             <i class="fa-solid fa-bell-slash text-sm"></i>
         </div>
         {% endif %}
-        <div class="p-6">
-            <div class="flex justify-between items-start">
-                <div>
-                    <h2 class="text-xl font-bold text-gray-800 truncate" title="{{ fil.name }}">{{ fil.name }}</h2>
-                    <p class="text-sm font-semibold text-gray-500 mt-1 flex items-center gap-1.5 flex-wrap">
-                        {{ fil.brand.name }} &bull; {{ fil.material.name }} &bull;
-                        <span class="inline-block w-3 h-3 rounded-full flex-shrink-0 border border-gray-200 shadow-sm" style="background-color: {{ fil.color.hex_value }};"></span>
-                        {{ fil.color.name }}
-                        <span class="ml-1 text-blue-600">({{ fil.quantity }} {{ t('pieces') }})</span>
-                    </p>
+        <div class="p-6 pt-7">
+            <div class="flex justify-between items-start gap-4">
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-3">
+                        <span class="w-12 h-12 rounded-2xl border border-gray-200 shadow-sm flex-shrink-0" style="background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.7), transparent 38%), linear-gradient(135deg, {{ fil.color.hex_value or '#cbd5e1' }}, color-mix(in srgb, {{ fil.color.hex_value or '#cbd5e1' }} 65%, white));"></span>
+                        <div class="min-w-0">
+                            <h2 class="text-xl font-bold text-gray-800 truncate" title="{{ fil.name }}">{{ fil.name }}</h2>
+                            <p class="text-sm font-semibold text-gray-500 mt-1 flex items-center gap-1.5 flex-wrap">
+                                {{ fil.brand.name }} &bull; {{ fil.material.name }} &bull;
+                                <span class="inline-block w-3 h-3 rounded-full flex-shrink-0 border border-gray-200 shadow-sm" style="background-color: {{ fil.color.hex_value }};"></span>
+                                {{ fil.color.name }}
+                            </p>
+                        </div>
+                    </div>
                     {% if fil.tag_list %}
                     <div class="flex flex-wrap gap-1 mt-2">
                         {% for tag in fil.tag_list[:3] %}
@@ -36,7 +47,7 @@
                     </div>
                     {% endif %}
                 </div>
-                <span class="px-2 py-1 text-xs font-bold rounded shadow-sm
+                <span class="px-2.5 py-1 text-xs font-bold rounded-full shadow-sm flex-shrink-0
                     {% if pct > 50 %}bg-green-100 text-green-800
                     {% elif pct > 20 %}bg-yellow-100 text-yellow-800
                     {% else %}bg-red-100 text-red-800{% endif %}">
@@ -44,15 +55,30 @@
                 </span>
             </div>
             
-            <div class="mt-5">
-                <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden shadow-inner">
-                  <div class="h-3 rounded-full transition-all duration-500
-                    {% if pct > 50 %}bg-green-500{% elif pct > 20 %}bg-yellow-500{% else %}bg-red-500{% endif %}" 
-                    style="width: {{ pct }}%"></div>
+            <div class="grid grid-cols-3 gap-2 mt-4">
+                <div class="ui-card-soft p-2 sm:p-3">
+                    <div class="text-[10px] sm:text-xs uppercase tracking-[0.14em] text-gray-400 font-semibold leading-tight">{{ t('pieces') }}</div>
+                    <div class="text-base sm:text-lg font-bold mt-1 sm:mt-2 text-gray-800">{{ fil.quantity }}</div>
                 </div>
-                <div class="flex justify-between text-sm mt-2 text-gray-600 font-medium">
-                    <span>{{ t('remaining') }}: {{ fil.weight_remaining | int }} g</span>
-                    <span>{{ t('capacity') }}: {{ capacity_all | int }} g</span>
+                <div class="ui-card-soft p-2 sm:p-3">
+                    <div class="text-[10px] sm:text-xs uppercase tracking-[0.14em] text-gray-400 font-semibold leading-tight">{{ t('remaining') }}</div>
+                    <div class="text-base sm:text-lg font-bold mt-1 sm:mt-2 text-gray-800">{{ fil.weight_remaining | int }} g</div>
+                </div>
+                <div class="ui-card-soft p-2 sm:p-3">
+                    <div class="text-[10px] sm:text-xs uppercase tracking-[0.14em] text-gray-400 font-semibold leading-tight">{{ t('capacity') }}</div>
+                    <div class="text-base sm:text-lg font-bold mt-1 sm:mt-2 text-gray-800">{{ capacity_all | int }} g</div>
+                </div>
+            </div>
+
+            <div class="mt-5">
+                <div class="flex justify-between text-sm text-gray-600 font-medium mb-2">
+                    <span>{{ t('inventory_card_stock_state') }}</span>
+                    <span>{{ pct }}%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-3.5 overflow-hidden shadow-inner">
+                    <div class="h-3.5 rounded-full transition-all duration-500
+                        {% if pct > 50 %}bg-green-500{% elif pct > 20 %}bg-yellow-500{% else %}bg-red-500{% endif %}"
+                        style="width: {{ pct }}%"></div>
                 </div>
                 {% if fil.stock_metrics.min_stock > 0 %}
                 <div class="text-xs mt-2 {% if fil.stock_metrics.status == 'critical' %}text-red-600{% elif fil.stock_metrics.status == 'warning' %}text-amber-600{% else %}text-gray-400{% endif %}">
@@ -63,6 +89,23 @@
                 </div>
                 {% endif %}
                 <div class="text-xs text-center text-gray-400 mt-1">{{ t('spool_price').format(price='{:0.2f}'.format(fil.price), weight=fil.weight_total | int, currency=current_currency) }}</div>
+                {% if sparkline_data is defined and sparkline_data[fil.id] is defined %}
+                {% set sl = sparkline_data[fil.id] %}
+                {% set sl_max = sl | max %}
+                {% set sl_max_safe = sl_max if sl_max > 0 else 1 %}
+                <div class="mt-2" title="{{ t('sparkline_tooltip') }}">
+                    <svg viewBox="0 0 70 20" class="w-full h-5" preserveAspectRatio="none">
+                        {% set pts = namespace(points='') %}
+                        {% for i in range(7) %}
+                            {% set x = (i * 70 / 6) | round(2) %}
+                            {% set y = (20 - sl[i] / sl_max_safe * 18) | round(2) %}
+                            {% set pts.points = pts.points ~ x ~ ',' ~ y ~ ' ' %}
+                        {% endfor %}
+                        <polyline points="{{ pts.points }}" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <polyline points="0,20 {{ pts.points }} 70,20" fill="rgba(59,130,246,0.12)" stroke="none"/>
+                    </svg>
+                </div>
+                {% endif %}
             </div>
 
             <div class="mt-6 flex flex-col sm:flex-row justify-between items-center gap-3 border-t pt-4 border-gray-100">

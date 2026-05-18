@@ -2,6 +2,7 @@
 import csv
 import io
 import math
+import os
 import secrets
 import threading
 from collections import Counter
@@ -18,6 +19,8 @@ from models import AppSetting, PrusaPrinter, BambuJobMaterial, BambuPrintJob, Ba
 from utils import (
     build_action_center,
     build_filament_history_name as _display_filament_name,
+    collect_activity_heatmap,
+    collect_sparkline_data,
     compute_stock_status,
     deduct_filament_stock,
     escape_like,
@@ -399,6 +402,8 @@ def _inventory_page_context():
         reverse=True,
     )[:3]
 
+    sparkline_data = collect_sparkline_data(filaments_paginated.items)
+
     return {
         'filaments': filaments_paginated,
         'stats': stats,
@@ -428,6 +433,7 @@ def _inventory_page_context():
             'healthy_pool': healthy_pool,
         },
         'app_settings': setting,
+        'sparkline_data': sparkline_data,
     }
 
 
@@ -695,6 +701,7 @@ def register(app):
             today=utc_now().date(),
             show_onboarding=show_onboarding,
             onboarding_steps=onboarding_steps,
+            activity_heatmap=collect_activity_heatmap(),
         )
 
     @app.route('/filaments')
@@ -1369,3 +1376,98 @@ def register(app):
         response.headers['Content-Type'] = 'text/csv; charset=utf-8-sig'
         response.headers['Content-Disposition'] = 'attachment; filename="filaments_export.csv"'
         return response
+
+    # ── Community filament database ───────────────────────────────────────────
+
+    @app.route('/filaments/community-db')
+    def filament_community_db():
+        _require_inventory_admin()
+        import json
+        db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'data', 'filament_db.json')
+        try:
+            with open(db_path, encoding='utf-8') as f:
+                community = json.load(f)
+            profiles = community.get('profiles', [])
+        except Exception:
+            profiles = []
+
+        brands = sorted({p['brand'] for p in profiles})
+        materials = sorted({p['material'] for p in profiles})
+        return render_template(
+            'filament_db.html',
+            profiles=profiles,
+            brands=brands,
+            materials=materials,
+        )
+
+    @app.route('/filaments/community-db/import', methods=['POST'])
+    def filament_community_db_import():
+        _require_inventory_admin()
+        import json
+        db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'data', 'filament_db.json')
+        try:
+            with open(db_path, encoding='utf-8') as f:
+                community = json.load(f)
+            all_profiles = {
+                f"{p['brand']}|{p['material']}|{p['color']}": p
+                for p in community.get('profiles', [])
+            }
+        except Exception:
+            all_profiles = {}
+
+        selected_keys = request.form.getlist('profile_key')
+        imported = 0
+        for key in selected_keys:
+            p = all_profiles.get(key)
+            if not p:
+                continue
+            # Get or create Brand
+            brand = Brand.query.filter_by(name=p['brand']).first()
+            if not brand:
+                brand = Brand(name=p['brand'])
+                db.session.add(brand)
+                db.session.flush()
+            # Get or create Material
+            material = Material.query.filter_by(name=p['material']).first()
+            if not material:
+                material = Material(name=p['material'])
+                db.session.add(material)
+                db.session.flush()
+            # Get or create Color
+            color = Color.query.filter_by(name=p['color']).first()
+            if not color:
+                color = Color(name=p['color'], hex_value=p.get('hex', '#888888'))
+                db.session.add(color)
+                db.session.flush()
+            # Create Filament if not already present with same brand+material+color
+            existing = Filament.query.filter_by(
+                brand_id=brand.id,
+                material_id=material.id,
+                color_id=color.id,
+            ).first()
+            if existing:
+                continue
+            weight = p.get('weight_total', 1000)
+            fil = Filament(
+                name=f"{p['brand']} {p['material']} {p['color']}",
+                brand_id=brand.id,
+                material_id=material.id,
+                color_id=color.id,
+                weight_total=float(weight),
+                weight_remaining=float(weight),
+                price=0.0,
+                quantity=0,
+                recommended_nozzle_temp=p.get('nozzle_temp'),
+                recommended_bed_temp=p.get('bed_temp'),
+            )
+            db.session.add(fil)
+            imported += 1
+
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            imported = 0
+
+        flash(translate('community_db_imported_n').format(count=imported), 'success')
+        return redirect(url_for('filament_community_db'))

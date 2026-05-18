@@ -101,31 +101,73 @@
                     <h2 class="text-3xl font-bold mt-2 tracking-tight">{{ t('overview_command_center_heading') }}</h2>
                     <p class="text-sm text-gray-500 mt-3">{{ t('overview_command_center_desc') }}</p>
                 </div>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div class="ui-card-soft p-4">
-                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-500">{{ t('total_value') }}</div>
-                        <div class="text-xl sm:text-3xl font-bold mt-2 leading-none">{{ '{:,.0f}'.format(stats.value) }}<span class="text-base sm:text-lg font-semibold text-gray-400 ml-1">{{ current_currency }}</span></div>
-                        <div class="text-sm text-gray-500 mt-2">{{ stats.spools }} {{ t('total_spools')|lower }}</div>
-                        <div class="mt-3 pt-3 border-t border-gray-100 dark:border-slate-700/60">
-                            <div class="text-xs font-semibold uppercase tracking-[0.15em] text-gray-400 mb-1.5">{{ t('total_remaining') }}</div>
-                            <div class="text-lg sm:text-xl font-bold">{{ '{:.1f}'.format(stats.remaining / 1000) }} <span class="text-sm font-normal text-gray-400">kg</span></div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3"
+                     x-data="kpiCards()"
+                     x-init="init()"
+                     @click.away="closeAll()">
+                    {# Pass all available metrics as JSON #}
+                    <script>
+                    function kpiCards() {
+                        const ALL = {
+                            total_value:      { label: {{ t('total_value')|tojson }},      value: {{ '{:,.0f}'.format(stats.value)|tojson }},               sub: {{ (stats.spools|string ~ ' ' ~ t('total_spools')|lower)|tojson }},     color: 'text-emerald-500' },
+                            total_remaining:  { label: {{ t('total_remaining')|tojson }},  value: {{ ('{:.1f}'.format(stats.remaining/1000) ~ ' kg')|tojson }}, sub: '',                                                                    color: 'text-teal-500' },
+                            total_spools:     { label: {{ t('total_spools')|tojson }},     value: {{ stats.spools|tojson }},                                  sub: '',                                                                    color: 'text-sky-500' },
+                            due_today:        { label: {{ t('overview_command_center_due_today')|tojson }}, value: {{ overview_focus.due_today_total|tojson }},sub: {{ t('projects_due_calendar_title')|tojson }},                         color: 'text-amber-500' },
+                            active_projects:  { label: {{ t('overview_command_center_active')|tojson }},   value: {{ overview_focus.active_total|tojson }},   sub: {{ (overview_focus.printing_total|string ~ ' ' ~ t('status_printing')|lower)|tojson }}, color: 'text-sky-600' },
+                            printing_now:     { label: {{ t('status_printing')|tojson }},  value: {{ overview_focus.printing_total|tojson }},                 sub: '',                                                                    color: 'text-violet-500' },
+                            live_printers:    { label: {{ t('overview_live_printers_title')|tojson }}, value: {{ overview_focus.live_total|tojson }},          sub: {{ t('overview_recent_prints_title')|tojson }},                        color: 'text-emerald-600' },
+                            low_stock:        { label: {{ t('low_stock')|tojson }},        value: {{ action_center.low_stock|length|tojson }},                sub: '',                                                                    color: 'text-orange-500' },
+                            overdue:          { label: {{ t('overview_due_dates_title')|tojson }}, value: {{ action_center.overdue_projects|length|tojson }},  sub: '',                                                                    color: 'text-red-500' },
+                        };
+                        const DEFAULT_SLOTS = ['total_value', 'due_today', 'active_projects', 'live_printers'];
+                        const STORAGE_KEY = 'overview_kpi_v1';
+                        return {
+                            slots: [...DEFAULT_SLOTS],
+                            openMenu: null,
+                            metricKeys: Object.keys(ALL),
+                            init() {
+                                try {
+                                    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+                                    if (Array.isArray(saved) && saved.length === 4 && saved.every(k => ALL[k])) this.slots = saved;
+                                } catch(e) {}
+                            },
+                            metric(slotIdx) { return ALL[this.slots[slotIdx]] || ALL['total_value']; },
+                            selectMetric(slotIdx, key) { this.slots[slotIdx] = key; this.openMenu = null; localStorage.setItem(STORAGE_KEY, JSON.stringify(this.slots)); },
+                            closeAll() { this.openMenu = null; },
+                            metricLabel(key) { return (ALL[key] || {}).label || key; },
+                        };
+                    }
+                    </script>
+                    <template x-for="(slotKey, slotIdx) in slots" :key="slotIdx">
+                        <div class="ui-card-soft p-4 relative group/kpi">
+                            {# Gear icon to open the picker #}
+                            <button type="button"
+                                    @click.stop="openMenu = (openMenu === slotIdx ? null : slotIdx)"
+                                    class="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded text-gray-300 hover:text-gray-500 hover:bg-gray-100 transition opacity-0 group-hover/kpi:opacity-100 focus:opacity-100 z-10"
+                                    :title="'{{ t('kpi_choose_metric') }}'">
+                                <i class="fa-solid fa-gear text-xs"></i>
+                            </button>
+                            {# Metric picker dropdown #}
+                            <div x-show="openMenu === slotIdx" x-cloak
+                                 class="absolute right-0 top-8 bg-white border border-gray-200 shadow-xl rounded-lg py-1 min-w-[180px] z-30 text-sm"
+                                 @click.stop>
+                                <div class="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase border-b border-gray-100">{{ t('kpi_choose_metric') }}</div>
+                                <template x-for="key in metricKeys" :key="key">
+                                    <button type="button"
+                                            @click="selectMetric(slotIdx, key)"
+                                            class="w-full text-left px-3 py-1.5 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center gap-2"
+                                            :class="slots[slotIdx] === key ? 'font-bold text-blue-600 bg-blue-50' : 'text-gray-700'">
+                                        <i class="fa-solid fa-check w-4 text-xs" :class="slots[slotIdx] === key ? 'opacity-100' : 'opacity-0'"></i>
+                                        <span x-text="metricLabel(key)"></span>
+                                    </button>
+                                </template>
+                            </div>
+                            {# Metric display #}
+                            <div class="text-xs font-semibold uppercase tracking-[0.18em]" :class="metric(slotIdx).color" x-text="metric(slotIdx).label"></div>
+                            <div class="text-xl sm:text-3xl font-bold mt-2 leading-none" x-text="metric(slotIdx).value"></div>
+                            <div class="text-sm text-gray-500 mt-2" x-text="metric(slotIdx).sub || ''"></div>
                         </div>
-                    </div>
-                    <div class="ui-card-soft p-4">
-                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-500">{{ t('overview_command_center_due_today') }}</div>
-                        <div class="text-3xl font-bold mt-2">{{ overview_focus.due_today_total }}</div>
-                        <div class="text-sm text-gray-500 mt-2">{{ t('projects_due_calendar_title') }}</div>
-                    </div>
-                    <div class="ui-card-soft p-4">
-                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-sky-600">{{ t('overview_command_center_active') }}</div>
-                        <div class="text-3xl font-bold mt-2">{{ overview_focus.active_total }}</div>
-                        <div class="text-sm text-gray-500 mt-2">{{ overview_focus.printing_total }} {{ t('status_printing')|lower }}</div>
-                    </div>
-                    <div class="ui-card-soft p-4">
-                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600">{{ t('overview_live_printers_title') }}</div>
-                        <div class="text-3xl font-bold mt-2">{{ overview_focus.live_total }}</div>
-                        <div class="text-sm text-gray-500 mt-2">{{ t('overview_recent_prints_title') }}</div>
-                    </div>
+                    </template>
                 </div>
             </div>
 
@@ -602,10 +644,69 @@
                 </div>
             </div>
         </section>
+
+        {# ── Activity Heatmap ──────────────────────────────────────────── #}
+        <section class="dashboard-widget md:col-span-2 xl:col-span-4" data-widget-id="activity_heatmap">
+            <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
+                <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('heatmap_title') }}</span>
+                <div class="ml-auto flex items-center gap-1">
+                    <button onclick="moveOverviewWidgetUp('activity_heatmap')" title="{{ t('stats_move_up') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-up text-xs"></i></button>
+                    <button onclick="moveOverviewWidgetDown('activity_heatmap')" title="{{ t('stats_move_down') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-down text-xs"></i></button>
+                </div>
+            </div>
+            <div class="ui-panel h-full">
+                <div class="ui-label">{{ t('overview_activity_label') }}</div>
+                <h2 class="text-xl font-bold mb-4">{{ t('heatmap_title') }}</h2>
+                <div class="overflow-x-auto">
+                    <div id="activity-heatmap-grid" class="inline-flex gap-1" data-heatmap='{{ activity_heatmap | tojson }}'></div>
+                </div>
+                <div class="flex items-center gap-1 mt-3 text-xs text-gray-400">
+                    <span>{{ t('heatmap_less') }}</span>
+                    <span class="w-3 h-3 rounded-sm bg-gray-100 border border-gray-200"></span>
+                    <span class="w-3 h-3 rounded-sm bg-emerald-200"></span>
+                    <span class="w-3 h-3 rounded-sm bg-emerald-400"></span>
+                    <span class="w-3 h-3 rounded-sm bg-emerald-600"></span>
+                    <span class="w-3 h-3 rounded-sm bg-emerald-800"></span>
+                    <span>{{ t('heatmap_more') }}</span>
+                </div>
+            </div>
+        </section>
     </div>
 </div>
 
 <script>
+(function() {
+    const container = document.getElementById('activity-heatmap-grid');
+    if (!container) return;
+    const raw = container.dataset.heatmap;
+    let days;
+    try { days = JSON.parse(raw); } catch(e) { return; }
+    const maxCount = Math.max(1, ...days.map(d => d.count));
+    // Build 52 week columns (7 rows each)
+    for (let week = 0; week < 52; week++) {
+        const col = document.createElement('div');
+        col.className = 'flex flex-col gap-0.5';
+        for (let dow = 0; dow < 7; dow++) {
+            const idx = week * 7 + dow;
+            const day = days[idx];
+            const cell = document.createElement('div');
+            cell.className = 'w-3 h-3 rounded-sm cursor-default';
+            if (!day || day.count === 0) {
+                cell.classList.add('bg-gray-100', 'border', 'border-gray-200');
+            } else {
+                const ratio = day.count / maxCount;
+                if (ratio < 0.25) cell.classList.add('bg-emerald-200');
+                else if (ratio < 0.5) cell.classList.add('bg-emerald-400');
+                else if (ratio < 0.75) cell.classList.add('bg-emerald-600');
+                else cell.classList.add('bg-emerald-800');
+            }
+            if (day) cell.title = day.date + ': ' + (day.count) + ' {{ t("heatmap_events") }}';
+            col.appendChild(cell);
+        }
+        container.appendChild(col);
+    }
+})();
 const overviewLayout = createWidgetLayoutManager({
     containerId: 'overview-layout',
     scopeId: 'overview-page',
@@ -620,7 +721,7 @@ const overviewLayout = createWidgetLayoutManager({
     showBtnTitle: {{ t('dashboard_show_widget')|tojson }},
     limitAllText: {{ t('stats_limit_all')|tojson }},
     mdGridCols: 2,
-    defaultOrder: ['recent_activity', 'live_printers', 'action_center', 'upcoming_deadlines', 'usage_7d', 'top_turnover', 'quick_links'],
+    defaultOrder: ['recent_activity', 'live_printers', 'action_center', 'upcoming_deadlines', 'usage_7d', 'top_turnover', 'quick_links', 'activity_heatmap'],
 });
 
 function toggleOverviewEditMode() { overviewLayout.toggleEditMode(); }

@@ -5,7 +5,14 @@
     {% else %}
         {% set pct = 0 %}
     {% endif %}
-    <div class="bg-white border-b border-gray-100 px-3 py-1.5 hover:bg-blue-50/40 transition-colors grid grid-cols-12 gap-2 items-center text-xs" data-fil-id="{{ fil.id }}">
+    <div class="bg-white border-b border-gray-100 px-3 py-1.5 hover:bg-blue-50/40 transition-colors grid grid-cols-12 gap-2 items-center text-xs"
+         data-fil-id="{{ fil.id }}"
+         data-fil-name="{{ fil.name | e }}"
+         data-fil-weight="{{ fil.weight_remaining }}"
+         data-fil-edit="{{ url_for('edit', id=fil.id) }}"
+         data-fil-detail="{{ url_for('filament_detail', id=fil.id) }}"
+         data-fil-delete="{{ url_for('delete', id=fil.id) }}"
+         data-fil-admin="{{ '0' if inventory_read_only else '1' }}">
         {# Checkbox #}
         <div class="col-span-1 flex justify-center">
             <input type="checkbox" form="bulkDeleteForm" name="selected_ids" value="{{ fil.id }}" class="filament-select w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">

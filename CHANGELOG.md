@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.75.4] - 2026-05-19
+### Removed
+- **Kanban column resize feature**: Removed the entire `window.initKanbanResize` function and all related code from the projects page. The feature had persistent issues with saving state and layout overflow across browser sessions. A one-time `localStorage.removeItem` call on page load clears any stale data left in users' browsers.
+
+## [1.75.3] - 2026-05-18
+### Fixed
+- **Context menu**: Replaced per-element `oncontextmenu` attributes with document-level event delegation — context menu now works reliably in card, list, and compact views, including after AJAX reload
+- **Kanban layout**: Added automatic localStorage cleanup on projects page load to clear stale/broken column width data (`kanban_col_widths_v1` and `v2`) that caused unrecoverable overflow
+- **DnD residue**: Removed all remaining `data-col-key` attributes from inventory list/compact row elements and header buttons — no more accidental column movement
+
+## [1.75.2] - 2026-05-16
+
+### Fixed
+- **Right-click context menu** — Replaced per-card Alpine.js `x-data` context menu with a single pure-JS menu (`openFilCtxMenu`) that works reliably across all three inventory views (card, list, compact) and survives AJAX reloads without needing `Alpine.initTree()`.
+- **Inventory card design inconsistency** — AJAX card partial (`_filament_cards.html`) now matches the server-rendered new card design (gradient color circle swatch, 3-column stats grid, updated progress bar) so the UI looks identical on page load and after switching views.
+- **Drag-and-drop column sorting removed** — Feature was causing more problems than it solved; removed `draggable` attributes, grip icons, and all related JS (`INV_COL_ORDER_KEY`, `getInvColOrder`, `applyInvColOrder`, `setupColDrag`).
+- **Kanban column resizing overflow** — `applyKanbanWidths` no longer includes the calendar widget in the grid template (it now uses `gridColumn: 1/-1` instead); grid width is captured once at `mousedown` to prevent runaway overflow during drag; stored widths are validated against container width on load and cleared if invalid; localStorage key changed to `kanban_col_widths_v2` to force-reset any stale broken values.
+
+## [1.75.1] - 2026-05-15
+
+### Fixed
+- **Activity Heatmap** — Widget not appearing for users with a stale `localStorage` layout (missing IDs from `defaultOrder` now merged automatically on load).
+- **Sparkline mini-charts** — Sparklines were hidden when no filament movements occurred in the last 7 days; they now always render as a flat baseline.
+- **Right-click context menu** — Alpine.js context menu stopped working after any AJAX inventory reload because `Alpine.initTree()` was not called on the replaced DOM tree; fixed.
+- **Drag-and-drop column sorting** — List-view header buttons were missing `id="list-col-header"`, `data-col-key`, and `draggable="true"` attributes when rendered via AJAX, breaking both `applyInvColOrder()` and `setupColDrag()` event delegation.
+- **Kanban column resizing** — Resize IIFE was embedded in `_projects_layout.html` as a `<script>` block that browsers never execute when injected via `innerHTML`; moved to a named `window.initKanbanResize()` in `projects_index.html` and called on both initial load and AJAX reload.
+
+## [1.75.0] - 2026-05-15
+
+### Added
+- **Activity Heatmap** — 52-week GitHub-style activity heatmap on the overview page showing daily movement events with colour-intensity coding.
+- **Sparkline mini-charts** — 7-day consumption trend SVG sparkline inside each filament card (card and compact views).
+- **Right-click context menu** — Alpine.js context menu on filament cards with quick-action links (use, edit, detail, delete).
+- **Drag-and-drop column sorting** — Inventory list view columns are now reorderable via drag-and-drop; order persisted in `localStorage`.
+- **Customisable KPI cards** — Overview dashboard KPI cards are now fully customisable; users can choose from 9 metrics per slot with a gear-icon picker; choices persisted in `localStorage`.
+- **Kanban column resizing** — Projects Kanban columns can be resized with a drag handle; widths persisted in `localStorage`.
+- **Community filament database** — Browse 60+ pre-defined filament profiles from popular brands (Bambu Lab, Prusa, eSUN, Polymaker, etc.) at `/filaments/community-db` and one-click import selected profiles into inventory.
+- **Color-coded history rows** — Movement history table rows are colour-coded by action type: emerald (add), red (remove/print), amber (correction).
+- **Sticky header + first-column freeze** — Movement history table now has a sticky header and frozen first column when scrolling.
+
+### Fixed
+- Added missing i18n keys for all new features to both `cs` and `en` in `messages.py`.
+
 ## [1.74.1] - 2026-05-14
 
 ### Fixed

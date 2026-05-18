@@ -373,8 +373,15 @@
 {% if view_mode == 'card' %}
     {% for fil in filaments.items %}
         <!-- KARTY POHLED -->
-        <div class="ui-panel !p-0 overflow-hidden relative">
-            <div class="h-2.5 w-full absolute top-0 left-0" style="background: linear-gradient(90deg, {{ fil.color.hex_value or '#94a3b8' }}, color-mix(in srgb, {{ fil.color.hex_value or '#94a3b8' }} 60%, white));"></div>
+        <div class="ui-panel !p-0 overflow-hidden relative"
+             data-fil-id="{{ fil.id }}"
+             data-fil-name="{{ fil.name | e }}"
+             data-fil-weight="{{ fil.weight_remaining }}"
+             data-fil-edit="{{ url_for('edit', id=fil.id) }}"
+             data-fil-detail="{{ url_for('filament_detail', id=fil.id) }}"
+             data-fil-delete="{{ url_for('delete', id=fil.id) }}"
+             data-fil-admin="{{ '0' if inventory_read_only else '1' }}">
+            <div class="h-2 w-full absolute top-0 left-0" style="background-color: {{ fil.color.hex_value or '#94a3b8' }};"></div>
             {% set capacity_all = fil.quantity * fil.weight_total %}
             {% if capacity_all > 0 %}
                 {% set pct = (fil.weight_remaining / capacity_all * 100) | round | int %}
@@ -505,33 +512,45 @@
         </button>
     </form>
     <!-- SEZNAM POHLED - HEADER -->
-    <div class="hidden sm:grid grid-cols-12 gap-3 bg-gray-100 border-b border-gray-300 px-4 py-2 sticky top-0 z-10 rounded-t-lg mb-0">
-        <div class="col-span-1"></div>
-        <button type="button" x-on:click="toggleSort('name')" class="col-span-3 font-bold text-gray-700 text-xs uppercase hover:text-blue-600 hover:underline cursor-pointer flex items-center gap-1 group transition bg-transparent border-0 p-0 text-left">
+    <div id="list-col-header" class="hidden sm:flex items-center bg-gray-100 border-b border-gray-300 px-4 py-2 sticky top-0 z-10 rounded-t-lg mb-0 select-none">
+        <div class="w-10 shrink-0"></div>
+        <button type="button"
+                x-on:click="toggleSort('name')"
+                class="flex-1 min-w-[150px] font-bold text-gray-700 text-xs uppercase hover:text-blue-600 hover:underline cursor-pointer flex items-center gap-1 transition bg-transparent border-0 p-0 text-left group">
             {{ t('name') }}
             <i class="fa-solid" :class="sortBy === 'name' ? (sortDir === 'asc' ? 'fa-arrow-up text-blue-600' : 'fa-arrow-down text-blue-600') : 'fa-arrow-up-arrow-down opacity-30'"></i>
         </button>
-        <button type="button" x-on:click="toggleSort('brand')" class="col-span-2 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
+        <button type="button"
+                x-on:click="toggleSort('brand')"
+                class="w-28 shrink-0 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 transition bg-transparent border-0 p-0 group">
             {{ t('brand') }}
             <i class="fa-solid" :class="sortBy === 'brand' ? (sortDir === 'asc' ? 'fa-arrow-up text-blue-600' : 'fa-arrow-down text-blue-600') : 'fa-arrow-up-arrow-down opacity-30'"></i>
         </button>
-        <button type="button" x-on:click="toggleSort('pieces')" class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
+        <button type="button"
+                x-on:click="toggleSort('pieces')"
+                class="w-16 shrink-0 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 transition bg-transparent border-0 p-0 group">
             {{ t('pieces') }}
             <i class="fa-solid" :class="sortBy === 'pieces' ? (sortDir === 'asc' ? 'fa-arrow-up text-blue-600' : 'fa-arrow-down text-blue-600') : 'fa-arrow-up-arrow-down opacity-30'"></i>
         </button>
-        <button type="button" x-on:click="toggleSort('remaining')" class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
+        <button type="button"
+                x-on:click="toggleSort('remaining')"
+                class="w-20 shrink-0 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 transition bg-transparent border-0 p-0 group">
             {{ t('remaining') }}
             <i class="fa-solid" :class="sortBy === 'remaining' ? (sortDir === 'asc' ? 'fa-arrow-up text-blue-600' : 'fa-arrow-down text-blue-600') : 'fa-arrow-up-arrow-down opacity-30'"></i>
         </button>
-        <button type="button" x-on:click="toggleSort('capacity')" class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
+        <button type="button"
+                x-on:click="toggleSort('capacity')"
+                class="w-20 shrink-0 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 transition bg-transparent border-0 p-0 group">
             {{ t('capacity') }}
             <i class="fa-solid" :class="sortBy === 'capacity' ? (sortDir === 'asc' ? 'fa-arrow-up text-blue-600' : 'fa-arrow-down text-blue-600') : 'fa-arrow-up-arrow-down opacity-30'"></i>
         </button>
-        <button type="button" x-on:click="toggleSort('percent')" class="col-span-1 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 group transition bg-transparent border-0 p-0">
+        <button type="button"
+                x-on:click="toggleSort('percent')"
+                class="w-16 shrink-0 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 transition bg-transparent border-0 p-0 group">
             %
             <i class="fa-solid" :class="sortBy === 'percent' ? (sortDir === 'asc' ? 'fa-arrow-up text-blue-600' : 'fa-arrow-down text-blue-600') : 'fa-arrow-up-arrow-down opacity-30'"></i>
         </button>
-        <div class="col-span-2 font-bold text-gray-700 text-xs uppercase text-right pr-1">{{ t('action') }}</div>
+        <div class="w-32 shrink-0 font-bold text-gray-700 text-xs uppercase text-right pr-1">{{ t('action') }}</div>
     </div>
     {% for fil in filaments.items %}
         {% set capacity_all = fil.quantity * fil.weight_total %}
@@ -540,7 +559,7 @@
         {% else %}
             {% set pct = 0 %}
         {% endif %}
-        <div class="bg-white border-b border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors grid grid-cols-12 gap-3 items-center">
+        <div class="inv-list-row bg-white border-b border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors grid grid-cols-12 gap-3 items-center" data-fil-id="{{ fil.id }}">
             <!-- Barva a název (ZVĚTŠENO) -->
         <div class="col-span-1 flex justify-center">
             <input type="checkbox" form="bulkDeleteForm" name="selected_ids" value="{{ fil.id }}" class="filament-select w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
@@ -908,6 +927,7 @@ function inventoryApp() {
                     wrapper.innerHTML = (this.viewMode === 'list' || this.viewMode === 'compact')
                         ? buildListBulkToolbarHtml() + buildListHeaderHtml() + data.html
                         : data.html;
+                    if (window.Alpine) Alpine.initTree(wrapper);
                     initBulkSelectionUI();
                 }
             } catch (e) {
@@ -1011,13 +1031,14 @@ function buildListHeaderHtml() {
     ];
     const btnBase = 'font-bold text-gray-700 text-xs uppercase hover:text-blue-600 hover:underline cursor-pointer flex items-center gap-1 group transition bg-transparent border-0 p-0';
     const btns = fields.map(f => `
-            <button type="button" onclick="window.__inv && window.__inv.toggleSort('${f.key}')"
+            <button type="button"
+                onclick="window.__inv && window.__inv.toggleSort('${f.key}')"
                 class="${f.cls} ${btnBase}">
                 ${listHeaderLabels[f.key]}
                 ${iconHtml(f.key)}
             </button>`).join('');
     return `
-        <div class="hidden sm:grid grid-cols-12 gap-3 bg-gray-100 border-b border-gray-300 px-4 py-2 sticky top-0 z-10 rounded-t-lg mb-0">
+        <div id="list-col-header" class="hidden sm:grid grid-cols-12 gap-3 bg-gray-100 border-b border-gray-300 px-4 py-2 sticky top-0 z-10 rounded-t-lg mb-0">
             <div class="col-span-1"></div>
             ${btns}
             <div class="col-span-2 font-bold text-gray-700 text-xs uppercase text-right pr-1">${listHeaderLabels.action}</div>
@@ -1237,6 +1258,94 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     initBulkSelectionUI();
 });
+
+// =============================================
+// Filament right-click context menu (pure JS)
+// =============================================
+(function() {
+    'use strict';
+    var _menu = null;
+    function getCSRF() {
+        var el = document.querySelector('input[name="csrf_token"]');
+        return el ? el.value : '';
+    }
+    function ensureMenu() {
+        if (!_menu) {
+            _menu = document.createElement('div');
+            _menu.id = 'fil-ctx-menu';
+            _menu.style.cssText = 'position:fixed;z-index:9999;display:none;min-width:170px';
+            _menu.className = 'bg-white border border-gray-200 shadow-xl rounded-lg py-1 text-sm';
+            _menu.addEventListener('click', function(e) { e.stopPropagation(); });
+            document.body.appendChild(_menu);
+        }
+        return _menu;
+    }
+    window.openFilCtxMenu = function(e, el) {
+        e.preventDefault();
+        e.stopPropagation();
+        var id = parseInt(el.dataset.filId, 10);
+        var name = el.dataset.filName || '';
+        var weight = parseFloat(el.dataset.filWeight) || 0;
+        var editUrl = el.dataset.filEdit || '';
+        var detailUrl = el.dataset.filDetail || '';
+        var deleteUrl = el.dataset.filDelete || '';
+        var isAdmin = el.dataset.filAdmin === '1';
+        var t = window._filCtxT || {};
+        var truncName = name.length > 22 ? name.substring(0, 22) + '\u2026' : name;
+        var safeName = truncName.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        var html = '<div class="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 mb-1">' + safeName + '</div>';
+        if (isAdmin) {
+            html += '<button type="button" class="w-full text-left px-4 py-2 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center gap-2" onclick="openUseFilamentModal(' + id + ',' + JSON.stringify(name) + ',' + weight + ');closeFilCtxMenu()"><i class="fa-solid fa-minus-circle w-4 text-blue-500"></i> ' + (t.use||'') + '</button>';
+            html += '<a href="' + editUrl + '" class="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors flex items-center gap-2 block"><i class="fa-solid fa-edit w-4 text-gray-500"></i> ' + (t.edit||'') + '</a>';
+        }
+        html += '<a href="' + detailUrl + '" class="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors flex items-center gap-2 block"><i class="fa-solid fa-wave-square w-4 text-indigo-400"></i> ' + (t.timeline||'') + '</a>';
+        if (isAdmin) {
+            html += '<div class="border-t border-gray-100 my-1"></div>';
+            html += '<button type="button" class="w-full text-left px-4 py-2 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-2" onclick="window._filCtxDelete(' + id + ',' + JSON.stringify(deleteUrl) + ')"><i class="fa-solid fa-trash w-4 text-red-400"></i> ' + (t.del||'') + '</button>';
+        }
+        var menu = ensureMenu();
+        menu.innerHTML = html;
+        menu.style.display = 'block';
+        var x = e.clientX, y = e.clientY;
+        var mW = menu.offsetWidth, mH = menu.offsetHeight;
+        if (x + mW > window.innerWidth - 5) x = window.innerWidth - mW - 5;
+        if (y + mH > window.innerHeight - 5) y = window.innerHeight - mH - 5;
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+    };
+    window.closeFilCtxMenu = function() {
+        if (_menu) _menu.style.display = 'none';
+    };
+    window._filCtxDelete = function(id, url) {
+        var t = window._filCtxT || {};
+        closeFilCtxMenu();
+        if (!confirm(t.confirmDelete || 'Delete?')) return;
+        var f = document.createElement('form');
+        f.method = 'POST'; f.action = url;
+        var ci = document.createElement('input');
+        ci.type = 'hidden'; ci.name = 'csrf_token'; ci.value = getCSRF();
+        f.appendChild(ci);
+        document.body.appendChild(f);
+        f.submit();
+    };
+    document.addEventListener('click', window.closeFilCtxMenu);
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') window.closeFilCtxMenu();
+    });
+    document.addEventListener('contextmenu', function(e) {
+        var el = e.target.closest('[data-fil-id]');
+        if (!el) { window.closeFilCtxMenu(); return; }
+        e.preventDefault();
+        window.openFilCtxMenu(e, el);
+    });
+})();
+window._filCtxT = {
+    use: '{{ t("subtract_usage") }}',
+    edit: '{{ t("edit") }}',
+    timeline: '{{ t("spool_life_timeline") }}',
+    confirmDelete: '{{ t("delete_confirm") }}',
+    del: '{{ t("delete") }}'
+};
 </script>
 </div>
 {% endblock %}

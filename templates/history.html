@@ -80,11 +80,11 @@
             {% endfor %}
         </div>
         {# ── Desktop table (hidden on mobile) ──────────────────────────── #}
-        <div class="hidden md:block overflow-x-auto">
+        <div class="hidden md:block overflow-x-auto overflow-y-auto max-h-[72vh]">
             <table class="min-w-full text-left border-collapse">
-                <thead>
+                <thead class="sticky top-0 z-20">
                     <tr class="border-b border-[var(--ui-border)] bg-[var(--ui-surface-strong)]">
-                        <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-[var(--ui-text-muted)]">{{ t('datetime') }}</th>
+                        <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-[var(--ui-text-muted)] sticky left-0 z-30 bg-[var(--ui-surface-strong)]">{{ t('datetime') }}</th>
                         <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-[var(--ui-text-muted)]">{{ t('movement_filament') }}</th>
                         <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-[var(--ui-text-muted)]">{{ t('movement_action') }}</th>
                         <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-[var(--ui-text-muted)] text-right">{{ t('movement_amount') }}</th>
@@ -94,10 +94,17 @@
                 </thead>
                 <tbody>
                     {% for m in movements.items %}
-                    <tr class="border-b border-[var(--ui-border)] hover:bg-[var(--ui-brand-soft)] transition-colors group">
+                    {% if m.action_type == 'add' %}
+                    {% set row_stripe = 'border-l-4 border-l-emerald-400 bg-emerald-50/40 dark:bg-emerald-900/10' %}
+                    {% elif m.action_type in ('remove', 'bambu_print') %}
+                    {% set row_stripe = 'border-l-4 border-l-red-400 bg-red-50/40 dark:bg-red-900/10' %}
+                    {% else %}
+                    {% set row_stripe = 'border-l-4 border-l-amber-400 bg-amber-50/40 dark:bg-amber-900/10' %}
+                    {% endif %}
+                    <tr class="border-b border-[var(--ui-border)] hover:brightness-95 dark:hover:brightness-110 transition-colors group {{ row_stripe }}">
 
                         {# Date/time #}
-                        <td class="py-3 px-4 text-sm text-[var(--ui-text-muted)] whitespace-nowrap">
+                        <td class="py-3 px-4 text-sm text-[var(--ui-text-muted)] whitespace-nowrap sticky left-0 z-10 bg-inherit">
                             <span class="font-medium text-[var(--ui-text)]">{{ m.created_at | fmt_dt('%d.%m.%Y') }}</span>
                             <span class="ml-1">{{ m.created_at.strftime('%H:%M') }}</span>
                         </td>

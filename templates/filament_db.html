@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}{{ t('community_db_title') }}{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto"
+     x-data="communityDb()"
+     x-init="init()">
+
+    {# ── Page header ───────────────────────────────────────────────────── #}
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+            <div class="ui-label">{{ t('filaments_nav') }}</div>
+            <h1 class="text-2xl font-bold mt-1">{{ t('community_db_title') }}</h1>
+            <p class="text-sm text-gray-500 mt-1">{{ t('community_db_desc') }}</p>
+        </div>
+        <a href="{{ url_for('filament_import_csv') }}" class="ui-badge ui-badge-brand shrink-0">
+            <i class="fa-solid fa-file-csv mr-1"></i> {{ t('import_csv_title') }}
+        </a>
+    </div>
+
+    {# ── Filter bar ────────────────────────────────────────────────────── #}
+    <div class="ui-card-soft p-4 mb-5 flex flex-wrap gap-3 items-center">
+        <div class="flex-1 min-w-[180px]">
+            <input type="text" x-model="search"
+                   class="ui-input w-full text-sm"
+                   :placeholder="'{{ t('community_db_search_placeholder') }}'">
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" @click="filterBrand = ''"
+                    :class="filterBrand === '' ? 'ui-badge ui-badge-brand' : 'ui-badge'"
+                    class="text-xs">{{ t('community_db_filter_all') }}</button>
+            {% for brand in brands %}
+            <button type="button" @click="filterBrand = {{ brand|tojson }}"
+                    :class="filterBrand === {{ brand|tojson }} ? 'ui-badge ui-badge-brand' : 'ui-badge'"
+                    class="text-xs">{{ brand }}</button>
+            {% endfor %}
+        </div>
+        <div>
+            <select x-model="filterMaterial" class="ui-input text-sm pr-8">
+                <option value="">{{ t('community_db_filter_all') }} {{ t('material') }}</option>
+                {% for mat in materials %}
+                <option value="{{ mat }}">{{ mat }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    {# ── Selection summary + import form ──────────────────────────────── #}
+    <form method="post" action="{{ url_for('filament_community_db_import') }}" id="import-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="flex items-center justify-between gap-3 mb-4" x-show="selected.size > 0" x-cloak>
+            <span class="text-sm font-semibold text-gray-700" x-text="selected.size + ' {{ t('community_db_selected') }}'"></span>
+            <div class="flex gap-2">
+                <button type="button" @click="selected.clear(); selected = new Set()" class="ui-badge text-xs">
+                    {{ t('deselect_all') }}
+                </button>
+                <button type="submit" class="ui-badge ui-badge-success text-xs">
+                    <i class="fa-solid fa-file-import mr-1"></i>{{ t('community_db_import') }}
+                </button>
+            </div>
+        </div>
+
+        {# Hidden inputs for selected profiles #}
+        <template x-for="key in [...selected]" :key="key">
+            <input type="hidden" name="profile_key" :value="key">
+        </template>
+
+        {# ── Profile grid ──────────────────────────────────────────────── #}
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {% for p in profiles %}
+            {% set key = p.brand ~ '|' ~ p.material ~ '|' ~ p.color %}
+            <div class="ui-card-soft p-3 cursor-pointer select-none transition-all hover:shadow-md"
+                 :class="selected.has({{ key|tojson }}) ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''"
+                 @click="toggleSelect({{ key|tojson }})"
+                 x-show="matches({{ p.brand|tojson }}, {{ p.material|tojson }}, {{ p.color|tojson }})">
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="w-6 h-6 rounded-full border border-gray-200 shrink-0"
+                         style="background-color: {{ p.hex }}"></div>
+                    <div class="min-w-0">
+                        <div class="text-xs font-bold text-gray-800 dark:text-slate-100 truncate">{{ p.color }}</div>
+                        <div class="text-[10px] text-gray-500 truncate">{{ p.brand }}</div>
+                    </div>
+                    <div class="ml-auto shrink-0">
+                        <i class="fa-solid fa-check w-4 text-blue-600 text-xs"
+                           :class="selected.has({{ key|tojson }}) ? 'opacity-100' : 'opacity-0'"></i>
+                    </div>
+                </div>
+                <div class="text-xs font-semibold text-gray-600 dark:text-slate-300 mb-1">{{ p.material }}</div>
+                {% if p.nozzle_temp or p.bed_temp %}
+                <div class="text-[10px] text-gray-400 flex gap-2">
+                    {% if p.nozzle_temp %}<span><i class="fa-solid fa-temperature-high text-orange-400"></i> {{ p.nozzle_temp }}°C</span>{% endif %}
+                    {% if p.bed_temp %}<span><i class="fa-solid fa-table text-blue-400"></i> {{ p.bed_temp }}°C</span>{% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="col-span-full text-center text-gray-400 py-12">{{ t('community_db_no_results') }}</div>
+            {% endfor %}
+        </div>
+
+        {# Import button at bottom when scrolled #}
+        <div class="flex justify-end mt-6 pt-4 border-t border-gray-100 dark:border-slate-700" x-show="selected.size > 0" x-cloak>
+            <button type="submit" class="ui-btn ui-btn-primary">
+                <i class="fa-solid fa-file-import mr-2"></i>
+                {{ t('community_db_import') }} (<span x-text="selected.size"></span>)
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function communityDb() {
+    return {
+        search: '',
+        filterBrand: '',
+        filterMaterial: '',
+        selected: new Set(),
+        init() {},
+        toggleSelect(key) {
+            const s = new Set(this.selected);
+            if (s.has(key)) { s.delete(key); } else { s.add(key); }
+            this.selected = s;
+        },
+        matches(brand, material, color) {
+            if (this.filterBrand && brand !== this.filterBrand) return false;
+            if (this.filterMaterial && material !== this.filterMaterial) return false;
+            if (this.search) {
+                const q = this.search.toLowerCase();
+                if (!brand.toLowerCase().includes(q) &&
+                    !material.toLowerCase().includes(q) &&
+                    !color.toLowerCase().includes(q)) return false;
+            }
+            return true;
+        },
+    };
+}
+</script>
+{% endblock %}

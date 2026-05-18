@@ -113,7 +113,9 @@ function toggleProjectsEditMode() {
 }
 function moveProjectsWidgetUp(widgetId) { window.projectsLayout.moveUp(widgetId); }
 function moveProjectsWidgetDown(widgetId) { window.projectsLayout.moveDown(widgetId); }
-function resetProjectsLayout() { window.projectsLayout.reset(); }
+function resetProjectsLayout() {
+    window.projectsLayout.reset();
+}
 
 function projectsApp() {
     return {
@@ -281,5 +283,9 @@ function projectsApp() {
         }
     }
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    try { localStorage.removeItem('kanban_col_widths_v1'); localStorage.removeItem('kanban_col_widths_v2'); } catch(e) {}
+});
 </script>
 {% endblock %}

@@ -5,12 +5,19 @@
     {% else %}
         {% set pct = 0 %}
     {% endif %}
-    <div class="bg-white border-b border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors grid grid-cols-12 gap-3 items-center" data-fil-id="{{ fil.id }}">
-        <div class="col-span-1 sm:col-span-1 flex justify-center">
+    <div class="inv-list-row bg-white border-b border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors flex items-center"
+         data-fil-id="{{ fil.id }}"
+         data-fil-name="{{ fil.name | e }}"
+         data-fil-weight="{{ fil.weight_remaining }}"
+         data-fil-edit="{{ url_for('edit', id=fil.id) }}"
+         data-fil-detail="{{ url_for('filament_detail', id=fil.id) }}"
+         data-fil-delete="{{ url_for('delete', id=fil.id) }}"
+         data-fil-admin="{{ '0' if inventory_read_only else '1' }}">
+        <div class="w-10 shrink-0 flex justify-center">
             <input type="checkbox" form="bulkDeleteForm" name="selected_ids" value="{{ fil.id }}" class="filament-select w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
         </div>
-        <!-- Barva a název (ZVĚTŠENO) -->
-        <div class="col-span-5 sm:col-span-3 flex items-start gap-2">
+        <!-- Barva a název -->
+        <div class="flex-1 min-w-[150px] flex items-start gap-2">
             <div class="w-3 h-10 rounded-full flex-shrink-0" style="background-color: {{ fil.color.hex_value }};"></div>
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-1.5">
@@ -35,29 +42,24 @@
                 {% endif %}
             </div>
         </div>
-        
-        <!-- Značka a materiál (skryto na malých obrazovkách) -->
-        <div class="col-span-0 sm:col-span-2 hidden sm:block text-xs text-gray-600 truncate text-center">
+        <!-- Značka a materiál -->
+        <div class="w-28 shrink-0 hidden sm:block text-xs text-gray-600 truncate text-center">
             <div class="font-medium">{{ fil.brand.name }}</div>
         </div>
-        
-        <!-- Počet kusů (skryto na mobilu) -->
-        <div class="hidden sm:block sm:col-span-1 text-center">
+        <!-- Počet kusů -->
+        <div class="w-16 shrink-0 hidden sm:block text-center">
             <div class="font-bold text-gray-800 text-sm">{{ fil.quantity }}</div>
         </div>
-        
-        <!-- Zbývající váha (skryto na mobilu) -->
-        <div class="hidden sm:block sm:col-span-1 text-center">
+        <!-- Zbývající váha -->
+        <div class="w-20 shrink-0 hidden sm:block text-center">
             <div class="font-bold text-gray-800 text-sm">{{ fil.weight_remaining | int }}g</div>
         </div>
-        
-        <!-- Kapacita (skryto na malých obrazovkách) -->
-        <div class="col-span-0 sm:col-span-1 hidden sm:block text-center">
+        <!-- Kapacita -->
+        <div class="w-20 shrink-0 hidden sm:block text-center">
             <div class="font-bold text-gray-800 text-sm">{{ capacity_all | int }}g</div>
         </div>
-        
         <!-- Procenta -->
-        <div class="col-span-3 sm:col-span-1 text-center">
+        <div class="w-16 shrink-0 text-center">
             <span class="px-2 py-1 text-xs font-bold rounded
                 {% if pct > 50 %}bg-green-100 text-green-800
                 {% elif pct > 20 %}bg-yellow-100 text-yellow-800
@@ -65,9 +67,8 @@
                 {{ pct }}%
             </span>
         </div>
-        
         <!-- Akční tlačítka -->
-        <div class="col-span-3 sm:col-span-2 flex gap-1 sm:gap-2 justify-end">
+        <div class="w-32 shrink-0 flex gap-1 justify-end">
             <button type="button" onclick='openUseFilamentModal({{ fil.id }}, {{ fil.name|tojson }}, {{ fil.weight_remaining }})' title="{{ t('subtract_usage') }}" class="text-blue-400 hover:text-blue-600 transition-colors text-sm sm:text-base"><i class="fa-solid fa-droplet"></i></button>
             <button type="button" onclick='openAddSpoolModal({{ fil.id }}, {{ fil.name|tojson }})' title="{{ t('add_spool') }}" class="text-green-500 hover:text-green-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-plus-circle"></i></button>
             <form action="{{ url_for('remove_spool', id=fil.id) }}" method="POST">

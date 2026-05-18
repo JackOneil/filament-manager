@@ -453,6 +453,61 @@ def collect_usage_windows(filaments, now=None):
     return by_id
 
 
+def collect_activity_heatmap(now=None):
+    """Return a list of 364 day-buckets (52 weeks × 7) for the activity heatmap.
+
+    Each entry is a dict with keys ``date`` (ISO string) and ``count``
+    (number of movement events that day).  The list is ordered from the oldest
+    day (index 0 = 364 days ago) to today (index 363).
+    """
+    if now is None:
+        now = utc_now()
+    today = datetime(now.year, now.month, now.day)
+    since = today - timedelta(days=363)
+    rows = MovementHistory.query.filter(
+        MovementHistory.created_at >= since,
+    ).all()
+    by_date: dict[str, int] = {}
+    for row in rows:
+        if row.created_at:
+            d = row.created_at.strftime('%Y-%m-%d')
+            by_date[d] = by_date.get(d, 0) + 1
+    result = []
+    for i in range(364):
+        d = today - timedelta(days=363 - i)
+        iso = d.strftime('%Y-%m-%d')
+        result.append({'date': iso, 'count': by_date.get(iso, 0)})
+    return result
+
+
+def collect_sparkline_data(filaments, now=None):
+    """Return a dict mapping filament_id → list[float] of daily consumption
+    for the last 7 days (index 0 = 7 days ago, index 6 = yesterday/today).
+    Only removal-type movements are counted.
+    """
+    if now is None:
+        now = utc_now()
+    today = datetime(now.year, now.month, now.day)
+    since = today - timedelta(days=6)
+    by_id = {fil.id: [0.0] * 7 for fil in filaments}
+    by_name = {build_filament_history_name(fil): fil.id for fil in filaments}
+    rows = MovementHistory.query.filter(
+        MovementHistory.created_at >= since,
+        MovementHistory.action_type.in_(('remove', 'bambu_print')),
+    ).all()
+    for row in rows:
+        filament_id = row.filament_id
+        if filament_id not in by_id:
+            filament_id = by_name.get(row.filament_name)
+        if filament_id not in by_id:
+            continue
+        if row.created_at:
+            day_index = (row.created_at.date() - since.date()).days
+            if 0 <= day_index <= 6:
+                by_id[filament_id][day_index] += row.weight or 0.0
+    return by_id
+
+
 def parse_sync_status(raw_value):
     if not raw_value:
         return {

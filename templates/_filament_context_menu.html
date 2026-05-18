@@ -1,0 +1,37 @@
+{# ── Right-click context menu (shared partial) ──────────────────────── #}
+{# Expects: fil (Filament object), inventory_read_only (bool)            #}
+<div x-show="ctxOpen" x-cloak
+     :style="`position:fixed;left:${ctxX}px;top:${ctxY}px;z-index:9999`"
+     class="bg-white border border-gray-200 shadow-xl rounded-lg py-1 min-w-[170px] text-sm"
+     @click.stop>
+    <div class="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 mb-1">{{ fil.name | truncate(22, true, '…') }}</div>
+    {% if not inventory_read_only %}
+    <button type="button"
+            class="w-full text-left px-4 py-2 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center gap-2"
+            onclick="openUseFilamentModal({{ fil.id }}, {{ fil.name|tojson }}, {{ fil.weight_remaining }})"
+            @click="ctxOpen=false">
+        <i class="fa-solid fa-minus-circle w-4 text-blue-500"></i> {{ t('subtract_usage') }}
+    </button>
+    <a href="{{ url_for('edit', id=fil.id) }}"
+       class="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors flex items-center gap-2"
+       @click="ctxOpen=false">
+        <i class="fa-solid fa-edit w-4 text-gray-500"></i> {{ t('edit') }}
+    </a>
+    {% endif %}
+    <a href="{{ url_for('filament_detail', id=fil.id) }}"
+       class="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors flex items-center gap-2"
+       @click="ctxOpen=false">
+        <i class="fa-solid fa-wave-square w-4 text-indigo-400"></i> {{ t('spool_life_timeline') }}
+    </a>
+    {% if not inventory_read_only %}
+    <div class="border-t border-gray-100 my-1"></div>
+    <form action="{{ url_for('delete', id=fil.id) }}" method="POST"
+          onsubmit="return confirm('{{ t('delete_confirm') }}');">
+        <button type="submit"
+                class="w-full text-left px-4 py-2 hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-2"
+                @click="ctxOpen=false">
+            <i class="fa-solid fa-trash w-4 text-red-400"></i> {{ t('delete') }}
+        </button>
+    </form>
+    {% endif %}
+</div>
