@@ -212,6 +212,17 @@
                             <i class="fa-solid fa-trash-can"></i> {{ t('delete') }}
                         </button>
                     </form>
+                    {% if status_upper == 'STOPPED' %}
+                    <button type="button"
+                        class="text-xs text-orange-500 hover:text-orange-700 transition-colors px-3 py-1.5 rounded-lg flex items-center gap-1"
+                        data-waste-btn
+                        data-filament-id="{{ job.filament_id or '' }}"
+                        data-project-id="{{ job.project.id if job.project else '' }}"
+                        data-weight="{{ '%.1f'|format(job.weight_grams) if job.weight_grams else '' }}"
+                        data-notes="{{ (job.display_name or job.file_name or '') | e }}">
+                        <i class="fa-solid fa-triangle-exclamation"></i> {{ t('waste_log_from_job') }}
+                    </button>
+                    {% endif %}
                 </div>
             </div>
 
@@ -351,7 +362,96 @@
     {% endif %}
 </div>
 
+{# ── Waste from print modal ── #}
+<div id="wasteModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/40" onclick="document.getElementById('wasteModal').classList.add('hidden')"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-triangle-exclamation text-orange-500 mr-2"></i>{{ t('waste_log_modal_title') }}</h2>
+            <button type="button" onclick="document.getElementById('wasteModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+        </div>
+        <form method="POST" action="{{ url_for('waste_add') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('filament') }}</label>
+                    <select id="wasteFilamentSelect" name="filament_id" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none">
+                        <option value="">{{ t('waste_select_filament') }}</option>
+                        {% for f in waste_filaments %}
+                        <option value="{{ f.id }}">{{ f.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('waste_reason_label') }}</label>
+                    <select id="wasteReasonSelect" name="reason" required
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none">
+                        <option value="stringing">{{ t('waste_reason_stringing') }}</option>
+                        <option value="warping">{{ t('waste_reason_warping') }}</option>
+                        <option value="bed_adhesion">{{ t('waste_reason_bed_adhesion') }}</option>
+                        <option value="clogging">{{ t('waste_reason_clogging') }}</option>
+                        <option value="layer_shift">{{ t('waste_reason_layer_shift') }}</option>
+                        <option value="spaghetti">{{ t('waste_reason_spaghetti') }}</option>
+                        <option value="broken_support">{{ t('waste_reason_broken_support') }}</option>
+                        <option value="other" selected>{{ t('waste_reason_other') }}</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('waste_weight') }} (g)</label>
+                    <input type="number" id="wasteWeightInput" name="weight_grams" step="0.1" min="0"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                        placeholder="0.0">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project') }}</label>
+                    <select id="wasteProjectSelect" name="project_id"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none">
+                        <option value="">{{ t('waste_select_project') }}</option>
+                        {% for p in waste_projects %}
+                        <option value="{{ p.id }}">{{ p.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('waste_notes') }}</label>
+                    <textarea id="wasteNotesInput" name="notes" rows="2"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                        placeholder="{{ t('waste_notes_placeholder') }}"></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button type="button" onclick="document.getElementById('wasteModal').classList.add('hidden')"
+                    class="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+                    {{ t('cancel') }}
+                </button>
+                <button type="submit"
+                    class="px-4 py-2 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition">
+                    {{ t('waste_add') }}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
+// ── Waste from failed print: modal open handler ───────────────────────────────────────────
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-waste-btn]');
+    if (!btn) return;
+    document.getElementById('wasteFilamentSelect').value = btn.dataset.filamentId || '';
+    document.getElementById('wasteReasonSelect').value = 'spaghetti';
+    document.getElementById('wasteWeightInput').value = btn.dataset.weight || '';
+    document.getElementById('wasteProjectSelect').value = btn.dataset.projectId || '';
+    document.getElementById('wasteNotesInput').value = btn.dataset.notes || '';
+    document.getElementById('wasteModal').classList.remove('hidden');
+});
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        var m = document.getElementById('wasteModal');
+        if (m) m.classList.add('hidden');
+    }
+});
 // ── Data: embedded once at page render ───────────────────────────────────────
 const _PF = {{ filaments|tojson }};   // [{id, label, mat}, ...]
 const _PP = {{ projects|tojson }};    // [{id, name}, ...]

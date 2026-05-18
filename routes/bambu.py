@@ -440,6 +440,8 @@ def register(app):
             jobs=jobs,
             filaments=filaments_json,
             projects=projects_json,
+            waste_filaments=filaments_orm,
+            waste_projects=projects_orm,
             printers=printers,
             has_token=has_token,
             setting=setting,

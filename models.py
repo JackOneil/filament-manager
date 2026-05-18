@@ -487,3 +487,13 @@ class WasteRecord(db.Model):
 
     def __repr__(self):
         return f'<WasteRecord {self.id} {self.filament.name if self.filament else "?"} {self.weight_grams}g {self.reason}>'
+
+
+class WasteFile(db.Model):
+    """Photo/image attachments for a WasteRecord (documenting failed prints)."""
+    id = db.Column(db.Integer, primary_key=True)
+    waste_record_id = db.Column(db.Integer, db.ForeignKey('waste_record.id', ondelete='CASCADE'), nullable=False, index=True)
+    filename = db.Column(db.String(255), nullable=False)
+    filepath = db.Column(db.String(255), nullable=False)
+    uploaded_at = db.Column(db.DateTime, default=_utc_now)
+    record = db.relationship('WasteRecord', backref=db.backref('files', lazy=True, cascade='all, delete-orphan'))

@@ -14,7 +14,7 @@ from models import (
     PrintHistory, Project, ProjectFile, ProjectLink, ProjectFilament, ProjectQuote,
     BambuPrinter, BambuPrintJob, BambuJobMaterial, StoragePlacement, StorageShelf,
     PrusaPrinter, PrusaPrintJob, ProjectComment, ProjectTodo, ProjectPrintItem, User, UserInvite, Notification, AuditLog,
-    PrinterMaintenance, WasteRecord,
+    PrinterMaintenance, WasteRecord, WasteFile,
 )
 from utils import encrypt_token, format_tags, utc_now
 
@@ -453,6 +453,12 @@ def register(app):
                 'notes': w.notes,
                 'created_at': w.created_at.isoformat() if w.created_at else None,
                 'recorded_by': _user_ref(w.recorded_by),
+                'files': [{
+                    'filename': wf.filename,
+                    'archive_path': f'waste_files/w{w.id}_{wf.id}_{wf.filename}',
+                    'filepath': wf.filepath,
+                    'uploaded_at': wf.uploaded_at.isoformat() if wf.uploaded_at else None,
+                } for wf in w.files],
             } for w in WasteRecord.query.order_by(WasteRecord.created_at).all()],
         }
 
@@ -469,6 +475,17 @@ def register(app):
             archive.addfile(manifest_info, io.BytesIO(manifest_bytes))
             for project in data.get('projects', []):
                 for file_data in project.get('files', []):
+                    archive_path = file_data.get('archive_path')
+                    source_path = file_data.get('filepath')
+                    if not archive_path or not source_path or not os.path.isfile(source_path):
+                        continue
+                    with open(source_path, 'rb') as handle:
+                        content = handle.read()
+                    file_info = tarfile.TarInfo(archive_path)
+                    file_info.size = len(content)
+                    archive.addfile(file_info, io.BytesIO(content))
+            for w_rec in data.get('waste_records', []):
+                for file_data in w_rec.get('files', []):
                     archive_path = file_data.get('archive_path')
                     source_path = file_data.get('filepath')
                     if not archive_path or not source_path or not os.path.isfile(source_path):
@@ -1046,7 +1063,7 @@ def register(app):
                         if proj:
                             project_id = proj.id
                     recorded_by = _resolve_user_ref(w_data.get('recorded_by'))
-                    db.session.add(WasteRecord(
+                    waste_record = WasteRecord(
                         filament_id=filament.id if filament else None,
                         project_id=project_id,
                         reason=w_data.get('reason', 'other'),
@@ -1054,7 +1071,25 @@ def register(app):
                         notes=w_data.get('notes'),
                         created_at=datetime.fromisoformat(w_data['created_at']) if w_data.get('created_at') else utc_now(),
                         recorded_by_user_id=recorded_by.id if recorded_by else None,
-                    ))
+                    )
+                    db.session.add(waste_record)
+                    db.session.flush()
+                    for wf_data in w_data.get('files', []):
+                        archive_path = wf_data.get('archive_path', '')
+                        wf_content = backup_files.get(archive_path)
+                        if wf_content is None:
+                            continue
+                        original_name = wf_data.get('filename', 'attachment.jpg')
+                        stored_name = f'w{waste_record.id}_{uuid.uuid4().hex[:12]}_{original_name}'
+                        dest_path = os.path.join(upload_folder, stored_name)
+                        with open(dest_path, 'wb') as fh:
+                            fh.write(wf_content)
+                        db.session.add(WasteFile(
+                            waste_record_id=waste_record.id,
+                            filename=original_name,
+                            filepath=dest_path,
+                            uploaded_at=datetime.fromisoformat(wf_data['uploaded_at']) if wf_data.get('uploaded_at') else utc_now(),
+                        ))
 
             app.logger.debug(f"Import finished: {imported_filaments} filaments, projects and Bambu jobs processed.")
         except Exception as e:

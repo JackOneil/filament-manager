@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.77.0] - 2026-05-18
+### Added
+- **Waste page – photo attachments**: Each waste record now supports one or more photo attachments (JPG, PNG, GIF, WEBP) to document the failed print visually (e.g. spaghetti, warping, stringing). Photos are shown as thumbnails inline on the record card. Clicking a thumbnail opens a full-screen lightbox with a download option. A "Add photo" camera-icon link per record triggers a hidden file input with `onchange` auto-submit for a fast one-click upload flow. Attachments are deleted individually via a hover-reveal × button, and are removed from disk when their parent record is deleted. Photos are included in full backup export/import (stored inside the `.tar.gz` archive under `waste_files/`).
+- **New model**: `WasteFile` — photo attachments for `WasteRecord` with cascade delete.
+
+## [1.76.5] - 2026-05-18
+### Added
+- **Waste page – edit records**: Each waste record now has an edit button (pencil icon) that opens an edit modal pre-filled with the existing filament, project, reason, weight, and notes. Changes are saved via the new `POST /waste/<id>/edit` endpoint.
+- **Waste page – interactive filament filter**: The filament badge pills are replaced with a searchable dropdown input (same pattern as the Bambu/Prusa pages). Typing narrows the list instantly; selecting a filament navigates to the filtered view. The active filter is shown as a removable badge.
+- **Waste page – interactive filament & project in modal**: The add/edit modal now uses Alpine.js fulltext search dropdowns for both the filament and project fields, replacing the static `<select>` lists for easier selection when many spools are in inventory.
+
+## [1.76.4] - 2026-05-22
+### Added
+- **Log waste from failed print job**: Failed, cancelled, and stopped jobs on the Bambu Cloud and PrusaLink pages now show a "Log as waste" button. Clicking it opens a pre-filled waste dialog with the job's filament, weight, project, and model name already populated, making it quick to record scrap material directly from the print history.
+
+## [1.76.3] - 2026-05-22
+### Added
+- **Storage page – hover detail card**: Hovering over any occupied slot (grid or list view) now shows a floating detail card after a 320 ms delay. The card displays the filament name, brand, material, color name, a weight/fill progress bar, recommended nozzle and bed temperatures (when set), tags, and additional notes. The card is `pointer-events:none` so it never blocks drag-and-drop or the right-click context menu. After a drag-and-drop move the hover data is swapped in-place, so the card remains accurate without a page reload.
+
 ## [1.76.2] - 2026-05-21
 ### Changed
 - **Storage page – no-reload drag & drop**: Dragging a filament to a new slot no longer causes a full page reload. After a successful move the grid cells and list rows are updated in-place using DOM node swaps, preserving all event listeners. The assign (+) buttons in empty slots now read shelf/slot info from the parent element so they continue to work correctly after a cell swap. Right-clicking newly-occupied or newly-emptied slots reflects the updated state immediately.

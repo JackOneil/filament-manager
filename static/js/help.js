@@ -383,6 +383,56 @@
             ]
         },
         {
+            id: 'waste',
+            icon: 'fa-triangle-exclamation',
+            endpoints: ['waste_index', 'waste_add', 'waste_edit', 'waste_delete', 'waste_upload_file', 'waste_serve_file', 'waste_download_file', 'waste_delete_file'],
+            title: { cs: 'Zmetky a odpady', en: 'Waste & Scrap' },
+            tips: [
+                {
+                    title: { cs: 'Záznam zmetku', en: 'Logging a Waste Record' },
+                    text: {
+                        cs: 'Klikněte na „Zapsat zmetek" a vyplňte filament, důvod selhání (stringing, warping, ucpaná tryska…), hmotnost v gramech a volitelně projekt. Záznamy se zobrazují v chronologickém přehledu s kumulativní statistikou.',
+                        en: 'Click "Log waste record" and fill in the filament, failure reason (stringing, warping, clogging…), weight in grams, and optionally a project. Records are shown in a chronological overview with cumulative stats.'
+                    }
+                },
+                {
+                    title: { cs: 'Úprava záznamu', en: 'Editing a Record' },
+                    text: {
+                        cs: 'Klikněte na ikonu tužky (✏) u záznamu. Otevře se modální okno předvyplněné aktuálními hodnotami. Změny uložte tlačítkem „Uložit".',
+                        en: 'Click the pencil icon (✏) next to a record. A modal pre-filled with the current values opens. Save changes with the "Save" button.'
+                    }
+                },
+                {
+                    title: { cs: 'Fotodokumentace selhání', en: 'Photo Documentation' },
+                    text: {
+                        cs: 'Ke každému záznamu lze přiložit jedno nebo více fotek (JPG, PNG, GIF, WEBP). Klikněte na ikonu fotoaparátu u záznamu a vyberte soubory — nahrají se automaticky. Náhledy jsou viditelné přímo v seznamu. Kliknutím na náhled se otevře celostránkový lightbox s možností stažení.',
+                        en: 'One or more photos (JPG, PNG, GIF, WEBP) can be attached to each record. Click the camera icon on the record and select files — they upload automatically. Thumbnails are visible directly in the list. Click a thumbnail to open a full-screen lightbox with a download option.'
+                    }
+                },
+                {
+                    title: { cs: 'Smazání fotky', en: 'Deleting a Photo' },
+                    text: {
+                        cs: 'Najeďte myší na náhled fotky. Zobrazí se červené tlačítko × v rohu. Kliknutím fotku trvale smažete. Smazáním záznamu zmetku se automaticky smažou i všechny přiložené fotky.',
+                        en: 'Hover over a photo thumbnail. A red × button appears in the corner. Clicking it permanently deletes the photo. Deleting the waste record also automatically removes all its attached photos.'
+                    }
+                },
+                {
+                    title: { cs: 'Filtrování záznamů', en: 'Filtering Records' },
+                    text: {
+                        cs: 'Filtrujte záznamy podle důvodu selhání (barevné štítky nahoře) nebo podle konkrétního filamentu (vyhledávací pole). Filtry lze kombinovat. Aktivní filtr filamentu se zobrazí jako štítek, kliknutím na × ho odeberete.',
+                        en: 'Filter records by failure reason (coloured pills at the top) or by a specific filament (search field). Filters can be combined. An active filament filter is shown as a badge — click × to remove it.'
+                    }
+                },
+                {
+                    title: { cs: 'Záznam zmetku z tiskové úlohy', en: 'Log Waste from a Print Job' },
+                    text: {
+                        cs: 'Na stránkách Bambu Lab a PrusaLink mají selháné, zrušené nebo zastavené úlohy tlačítko „Zaznamenat zmetek". Kliknutím se otevře předvyplněný formulář s filamentem, hmotností a projektem z dané úlohy.',
+                        en: 'On the Bambu Lab and PrusaLink pages, failed, cancelled, or stopped jobs have a "Log as waste" button. Clicking it opens a pre-filled form with the filament, weight, and project from that job.'
+                    }
+                }
+            ]
+        },
+        {
             id: 'general',
             icon: 'fa-circle-info',
             endpoints: [],

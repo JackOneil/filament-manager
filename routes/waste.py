@@ -1,18 +1,41 @@
 """Waste/scrap tracking — record failed prints with reason, weight, filament and project."""
+import os
+import uuid
 from datetime import datetime
 
-from flask import abort, redirect, render_template, request, url_for
+from flask import abort, redirect, render_template, request, send_from_directory, url_for
+from werkzeug.utils import secure_filename
 
 from auth import require_admin
 from database import db
-from models import Filament, Project, WasteRecord, AppSetting
+from models import Filament, Project, WasteFile, WasteRecord, AppSetting
 from utils import utc_now
 
 
 WASTE_REASONS = ['stringing', 'warping', 'bed_adhesion', 'clogging', 'layer_shift', 'spaghetti', 'broken_support', 'other']
+WASTE_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
+
+
+def _get_extension(filename):
+    return filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+
+
+def _is_allowed_waste_image(filename):
+    return _get_extension(filename) in WASTE_IMAGE_EXTENSIONS
+
+
+def _build_waste_storage_name(rec_id, filename):
+    safe_name = secure_filename(filename)
+    unique_id = uuid.uuid4().hex[:12]
+    return f'w{rec_id}_{unique_id}_{safe_name}'
 
 
 def register(app):
+    upload_folder = app.config.get(
+        'PROJECT_UPLOAD_FOLDER',
+        os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'uploads'),
+    )
+    os.makedirs(upload_folder, exist_ok=True)
 
     @app.route('/waste')
     def waste_index():
@@ -39,6 +62,16 @@ def register(app):
         filaments = Filament.query.order_by(Filament.name).all()
         projects = Project.query.order_by(Project.name).all()
 
+        filaments_json = [
+            {
+                'id': f.id,
+                'label': f.name,
+                'mat': f"{f.brand.name} {f.material.name}" if f.brand and f.material else '',
+            }
+            for f in filaments
+        ]
+        projects_json = [{'id': p.id, 'name': p.name} for p in projects]
+
         total_waste = sum(r.weight_grams for r in WasteRecord.query.all())
 
         return render_template(
@@ -47,6 +80,8 @@ def register(app):
             paginated=paginated,
             filaments=filaments,
             projects=projects,
+            filaments_json=filaments_json,
+            projects_json=projects_json,
             waste_reasons=WASTE_REASONS,
             filter_reason=filter_reason,
             filter_filament=filter_filament,
@@ -89,6 +124,39 @@ def register(app):
         db.session.commit()
         return redirect(url_for('waste_index'))
 
+    @app.route('/waste/<int:rec_id>/edit', methods=['POST'])
+    def waste_edit(rec_id):
+        from auth import get_current_user, is_admin
+        user = get_current_user()
+        if not is_admin(user):
+            abort(403)
+        rec = db.get_or_404(WasteRecord, rec_id)
+
+        filament_id = request.form.get('filament_id', type=int)
+        if filament_id:
+            rec.filament_id = filament_id
+
+        project_id = request.form.get('project_id', type=int) or None
+        rec.project_id = project_id
+
+        reason = request.form.get('reason', 'other')
+        if reason not in WASTE_REASONS:
+            reason = 'other'
+        rec.reason = reason
+
+        try:
+            weight_grams = float(request.form.get('weight_grams', 0))
+            if weight_grams < 0:
+                weight_grams = 0.0
+        except (TypeError, ValueError):
+            weight_grams = 0.0
+        rec.weight_grams = weight_grams
+
+        rec.notes = request.form.get('notes', '').strip() or None
+
+        db.session.commit()
+        return redirect(url_for('waste_index'))
+
     @app.route('/waste/<int:rec_id>/delete', methods=['POST'])
     def waste_delete(rec_id):
         from auth import get_current_user, is_admin
@@ -96,6 +164,90 @@ def register(app):
         if not is_admin(user):
             abort(403)
         rec = db.get_or_404(WasteRecord, rec_id)
+        # Delete associated files from disk
+        for f in list(rec.files):
+            try:
+                os.remove(f.filepath)
+            except OSError:
+                pass
         db.session.delete(rec)
         db.session.commit()
         return redirect(url_for('waste_index'))
+
+    @app.route('/waste/<int:rec_id>/upload', methods=['POST'])
+    def waste_upload_file(rec_id):
+        from auth import get_current_user, is_admin
+        user = get_current_user()
+        if not is_admin(user):
+            abort(403)
+        rec = db.get_or_404(WasteRecord, rec_id)
+        files = request.files.getlist('file')
+        for file in files:
+            if not file or file.filename == '':
+                continue
+            if not _is_allowed_waste_image(file.filename):
+                continue
+            original_filename = secure_filename(file.filename)
+            if not original_filename:
+                continue
+            stored_name = _build_waste_storage_name(rec.id, original_filename)
+            filepath = os.path.join(upload_folder, stored_name)
+            file.save(filepath)
+            db.session.add(WasteFile(
+                waste_record_id=rec.id,
+                filename=original_filename,
+                filepath=filepath,
+            ))
+        db.session.commit()
+        page = request.args.get('page', 1)
+        reason = request.args.get('reason', '')
+        filament = request.args.get('filament', '')
+        project = request.args.get('project', '')
+        return redirect(url_for('waste_index', page=page, reason=reason, filament=filament, project=project, _anchor=f'rec-{rec_id}'))
+
+    @app.route('/waste/file/<int:file_id>')
+    def waste_serve_file(file_id):
+        from auth import get_current_user, is_admin
+        user = get_current_user()
+        if not is_admin(user):
+            abort(403)
+        wf = db.get_or_404(WasteFile, file_id)
+        real_path = os.path.realpath(wf.filepath)
+        real_folder = os.path.realpath(upload_folder)
+        if not real_path.startswith(real_folder + os.sep):
+            abort(403)
+        return send_from_directory(os.path.dirname(wf.filepath), os.path.basename(wf.filepath), as_attachment=False)
+
+    @app.route('/waste/file/<int:file_id>/download')
+    def waste_download_file(file_id):
+        from auth import get_current_user, is_admin
+        user = get_current_user()
+        if not is_admin(user):
+            abort(403)
+        wf = db.get_or_404(WasteFile, file_id)
+        real_path = os.path.realpath(wf.filepath)
+        real_folder = os.path.realpath(upload_folder)
+        if not real_path.startswith(real_folder + os.sep):
+            abort(403)
+        return send_from_directory(os.path.dirname(wf.filepath), os.path.basename(wf.filepath), as_attachment=True, download_name=wf.filename)
+
+    @app.route('/waste/file/<int:file_id>/delete', methods=['POST'])
+    def waste_delete_file(file_id):
+        from auth import get_current_user, is_admin
+        user = get_current_user()
+        if not is_admin(user):
+            abort(403)
+        wf = db.get_or_404(WasteFile, file_id)
+        try:
+            os.remove(wf.filepath)
+        except OSError:
+            pass
+        db.session.delete(wf)
+        db.session.commit()
+        page = request.args.get('page', 1)
+        reason = request.args.get('reason', '')
+        filament = request.args.get('filament', '')
+        project = request.args.get('project', '')
+        rec_id = wf.waste_record_id
+        return redirect(url_for('waste_index', page=page, reason=reason, filament=filament, project=project, _anchor=f'rec-{rec_id}'))
+

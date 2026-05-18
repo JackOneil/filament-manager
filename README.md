@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.76.2***
+*Current version: **v1.77.0***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -15,7 +15,7 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 - **Smooth AJAX Skeleton Loading** — Inventory and project list reloads now render animated skeleton placeholders to avoid abrupt content jumps during filtering, sorting, and pagination.
 - **Undo for Destructive Inventory Actions** — After filament deletion, bulk delete, or spool removal, a dedicated toast allows one-click rollback of the last destructive action.
 - **Movement History** — Full audit log of every weight change with reasons, timestamps, and linked projects/jobs.
-- **Waste / Scrap Tracker** — Record failed prints with categorised failure reason (stringing, warping, bed adhesion, clogging, layer shift, spaghetti, broken support), weight, linked filament, and optional project. Filterable list at `/waste` with cumulative waste stats bar.
+- **Waste / Scrap Tracker** — Record failed prints with categorised failure reason (stringing, warping, bed adhesion, clogging, layer shift, spaghetti, broken support), weight, linked filament, and optional project. Edit records in-place via a pre-filled modal. Attach one or more **photos** (JPG/PNG/GIF/WEBP) to each record to document the failure visually — thumbnails are shown inline with a click-to-open lightbox. Interactive filament and project search dropdowns in the add/edit modal. Filterable list at `/waste` with cumulative waste stats bar. Photos are included in full backup export/restore.
 - **Storage Shelf Map** — Visual grid layout of physical shelf positions. Assign spools to named slots, drag-and-drop moves, and stock-level fill indicators.
 
 ### Projects & Client Workflow
@@ -50,7 +50,7 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 - **Interactive Help System** — Floating `?` button on every page opens a slide-out panel with contextual tips for the current section, full-text search across all tips, and a bilingual accordion of all features. Automatically switches language with the app.
 - **Dark Mode** — Full dark theme support with per-user persistence.
 - **Bilingual** — Complete Czech and English translations (700+ keys).
-- **Full Backup / Restore** — Compressed `.tar.gz` export with `manifest.json` plus real uploaded project files stored directly in the archive. Import also supports older `.json.gz` and legacy plain JSON backups.
+- **Full Backup / Restore** — Compressed `.tar.gz` export with `manifest.json` plus real uploaded project files and waste record photos stored directly in the archive. Import also supports older `.json.gz` and legacy plain JSON backups.
 - **Settings Tabs** — Settings page is organized into six tabs: General, Printers, Integrations, Company, Data, and Dictionaries.
 - **Onboarding Checklist** — Guided setup checklist after first installation (currency, energy cost, printer connection, first filament) with auto-dismiss.
 - **Toast Notifications** — Non-blocking pop-up notifications with auto-dismiss via Alpine.js.

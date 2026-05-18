@@ -1,5 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
+
+{# Filament + project data as JSON for Alpine dropdowns #}
+<script>
+const _WF = {{ filaments_json | tojson | safe }};
+const _WP = {{ projects_json | tojson | safe }};
+</script>
+
 <div class="max-w-7xl mx-auto space-y-6">
     <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -8,7 +15,7 @@
             <p class="text-gray-500 mt-1">{{ t('waste_desc') }}</p>
         </div>
         <div class="flex gap-3">
-            <button onclick="document.getElementById('addWasteModal').classList.remove('hidden')"
+            <button onclick="openWasteModal('add', {})"
                     class="bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2.5 rounded-xl shadow transition flex items-center gap-2">
                 <i class="fa-solid fa-triangle-exclamation"></i> {{ t('waste_add') }}
             </button>
@@ -20,7 +27,7 @@
         <span class="ui-badge ui-badge-critical"><i class="fa-solid fa-weight-hanging mr-1"></i> {{ total_waste | int }} g {{ t('waste_total') }}</span>
     </div>
 
-    <!-- Filters -->
+    <!-- Filters: reason pills + interactive filament search -->
     <div class="flex flex-wrap gap-3 items-center">
         <a href="{{ url_for('waste_index') }}"
            class="ui-badge {% if not filter_reason and not filter_filament and not filter_project %}ui-badge-brand{% else %}ui-badge-neutral{% endif %}">
@@ -34,56 +41,147 @@
         {% endfor %}
     </div>
 
-    {% if filaments %}
-    <div class="flex flex-wrap gap-2">
-        <span class="text-xs text-gray-400 font-semibold uppercase self-center mr-1">{{ t('filament') }}:</span>
-        {% for f in filaments[:20] %}
-        <a href="{{ url_for('waste_index', filament=f.id, reason=filter_reason, project=filter_project) }}"
-           class="ui-badge {% if filter_filament == f.id|string %}ui-badge-brand{% else %}ui-badge-neutral{% endif %} text-xs">
-            {{ f.name }}
+    <!-- Interactive filament filter -->
+    <div x-data="wasteFilamentFilter()" class="flex flex-wrap items-center gap-3">
+        <span class="text-xs text-gray-400 font-semibold uppercase self-center">{{ t('filament') }}:</span>
+        <div class="relative w-60" @click.outside="open = false">
+            <input type="text"
+                   x-model="q"
+                   @focus="open = true"
+                   @input="open = true"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-red-400 outline-none bg-white"
+                   placeholder="{{ t('filter_search') }}">
+            <div x-show="open" x-cloak
+                 class="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                <button type="button"
+                        @click="selectFilament('', '')"
+                        class="w-full text-left px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 border-b border-gray-100">
+                    {{ t('waste_filter_all_filaments') }}
+                </button>
+                <template x-for="f in filtered" :key="f.id">
+                    <button type="button"
+                            @click="selectFilament(f.id, f.label)"
+                            class="w-full text-left px-3 py-2 text-sm hover:bg-red-50 transition-colors border-b border-gray-50 last:border-0">
+                        <span class="font-medium text-gray-800" x-text="f.label"></span>
+                        <span class="text-xs text-gray-400 ml-1" x-text="f.mat"></span>
+                    </button>
+                </template>
+            </div>
+        </div>
+        {% if filter_filament %}
+        <a href="{{ url_for('waste_index', reason=filter_reason, project=filter_project) }}"
+           class="ui-badge ui-badge-brand text-xs flex items-center gap-1">
+            <i class="fa-solid fa-times"></i>
+            {{ filaments | selectattr('id', 'equalto', filter_filament | int) | map(attribute='name') | first | default('?') }}
         </a>
-        {% endfor %}
+        {% endif %}
     </div>
-    {% endif %}
 
     <!-- Records list -->
     {% if records %}
-    <div class="space-y-3">
+    <div class="space-y-3" x-data="wasteLightbox()">
         {% for rec in records %}
-        <div class="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-4 flex flex-col md:flex-row md:items-center gap-3">
-            <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-red-100 text-red-600">
-                <i class="fa-solid fa-circle-exclamation"></i>
-            </div>
-            <div class="flex-grow min-w-0">
-                <div class="flex flex-wrap items-center gap-2">
-                    <span class="font-semibold text-gray-800">{{ rec.filament.name if rec.filament else '?' }}</span>
-                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
-                        {{ t('waste_reason_' ~ rec.reason) }}
-                    </span>
-                    <span class="text-sm font-semibold text-red-600">{{ rec.weight_grams | int }} g</span>
-                    {% if rec.project %}
-                    <a href="{{ url_for('project_detail', id=rec.project.id) }}" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 transition">
-                        <i class="fa-solid fa-diagram-project mr-1"></i>{{ rec.project.name }}
-                    </a>
+        {# div opens: 1 #}
+        <div id="rec-{{ rec.id }}" class="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-4">
+            <div class="flex flex-col md:flex-row md:items-start gap-3">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-red-100 text-red-600">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                </div>
+                <div class="flex-grow min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="font-semibold text-gray-800">{{ rec.filament.name if rec.filament else '?' }}</span>
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                            {{ t('waste_reason_' ~ rec.reason) }}
+                        </span>
+                        <span class="text-sm font-semibold text-red-600">{{ rec.weight_grams | round(1) }} g</span>
+                        {% if rec.project %}
+                        <a href="{{ url_for('project_detail', id=rec.project.id) }}" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 transition">
+                            <i class="fa-solid fa-diagram-project mr-1"></i>{{ rec.project.name }}
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% if rec.notes %}
+                    <p class="text-sm text-gray-600 mt-1 truncate">{{ rec.notes }}</p>
                     {% endif %}
+                    <div class="text-xs text-gray-400 mt-1 flex flex-wrap gap-3">
+                        <span><i class="fa-solid fa-calendar-day mr-1"></i>{{ rec.created_at | fmt_dt('%d.%m.%Y %H:%M') }}</span>
+                    </div>
+                    {# Photo attachments #}
+                    {% if rec.files %}
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        {% for wf in rec.files %}
+                        {# div opens: 2 #}
+                        <div class="relative group w-20 h-20 rounded-lg overflow-hidden border border-gray-200 cursor-pointer flex-shrink-0"
+                             @click="open('{{ url_for('waste_serve_file', file_id=wf.id) }}', '{{ wf.filename | e }}', '{{ url_for('waste_download_file', file_id=wf.id) }}')">
+                            <img src="{{ url_for('waste_serve_file', file_id=wf.id) }}" alt="{{ wf.filename }}"
+                                 class="object-cover w-full h-full">
+                            {# div opens: 3 #}
+                            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                <i class="fa-solid fa-magnifying-glass-plus text-white text-lg"></i>
+                            </div>
+                            {# div closes: 3 #}
+                            <form method="POST" action="{{ url_for('waste_delete_file', file_id=wf.id, page=paginated.page, reason=filter_reason, filament=filter_filament, project=filter_project) }}"
+                                  onsubmit="return confirm('{{ t('waste_file_delete_confirm') }}')"
+                                  @click.stop class="absolute top-0.5 right-0.5">
+                                <button type="submit" class="w-5 h-5 rounded-full bg-red-600 text-white text-xs opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                                    <i class="fa-solid fa-times"></i>
+                                </button>
+                            </form>
+                        </div>
+                        {# div closes: 2 #}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {# Upload form #}
+                    <form method="POST"
+                          action="{{ url_for('waste_upload_file', rec_id=rec.id, page=paginated.page, reason=filter_reason, filament=filter_filament, project=filter_project) }}"
+                          enctype="multipart/form-data" class="mt-2">
+                        <input type="file" name="file" accept="image/*" multiple
+                               class="hidden" id="upload-{{ rec.id }}"
+                               onchange="this.form.submit()">
+                        <label for="upload-{{ rec.id }}"
+                               class="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 cursor-pointer transition">
+                            <i class="fa-solid fa-camera"></i> {{ t('waste_upload_photo') }}
+                        </label>
+                    </form>
                 </div>
-                {% if rec.notes %}
-                <p class="text-sm text-gray-600 mt-1 truncate">{{ rec.notes }}</p>
-                {% endif %}
-                <div class="text-xs text-gray-400 mt-1 flex flex-wrap gap-3">
-                    <span><i class="fa-solid fa-calendar-day mr-1"></i>{{ rec.created_at | fmt_dt('%d.%m.%Y %H:%M') }}</span>
-                </div>
-            </div>
-            <div class="flex items-center gap-2 flex-shrink-0">
-                <form method="POST" action="{{ url_for('waste_delete', rec_id=rec.id) }}"
-                      onsubmit="return confirm('{{ t('waste_delete_confirm') }}')" class="inline">
-                    <button type="submit" class="text-gray-300 hover:text-red-500 transition" title="{{ t('delete') }}">
-                        <i class="fa-solid fa-trash-can"></i>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <button type="button"
+                            data-waste-edit="{{ {'id': rec.id, 'filament_id': rec.filament_id, 'filament_name': (rec.filament.name if rec.filament else ''), 'project_id': rec.project_id, 'project_name': (rec.project.name if rec.project else ''), 'reason': rec.reason, 'weight': rec.weight_grams, 'notes': (rec.notes or '')} | tojson | forceescape }}"
+                            class="text-gray-300 hover:text-blue-500 transition" title="{{ t('edit') }}">
+                        <i class="fa-solid fa-pen-to-square"></i>
                     </button>
-                </form>
+                    <form method="POST" action="{{ url_for('waste_delete', rec_id=rec.id) }}"
+                          onsubmit="return confirm('{{ t('waste_delete_confirm') }}')" class="inline">
+                        <button type="submit" class="text-gray-300 hover:text-red-500 transition" title="{{ t('delete') }}">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
+        {# div closes: 1 #}
         {% endfor %}
+
+        {# Lightbox overlay #}
+        <div x-show="isOpen" x-cloak
+             class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+             @click="close()" @keydown.escape.window="close()">
+            <div class="relative max-w-4xl max-h-[90vh] mx-4" @click.stop>
+                <img :src="imgSrc" :alt="imgTitle" class="max-w-full max-h-[80vh] rounded-xl object-contain shadow-2xl">
+                <div class="flex items-center justify-between mt-3 px-1">
+                    <span class="text-white text-sm" x-text="imgTitle"></span>
+                    <div class="flex gap-2">
+                        <a :href="imgDownload" class="ui-badge ui-badge-neutral text-xs" @click.stop>
+                            <i class="fa-solid fa-download mr-1"></i>{{ t('download') }}
+                        </a>
+                        <button @click="close()" class="ui-badge ui-badge-neutral text-xs">
+                            <i class="fa-solid fa-times mr-1"></i>{{ t('close') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Pagination -->
@@ -105,62 +203,98 @@
     {% endif %}
 </div>
 
-<!-- Add Waste Modal -->
-<div id="addWasteModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 space-y-5">
+<!-- Add / Edit Waste Modal -->
+<div id="wasteModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+     x-data="wasteModal()" @keydown.escape.window="close()">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 space-y-5" @click.stop>
         <div class="flex items-center justify-between">
-            <h2 class="text-xl font-bold text-gray-800">{{ t('waste_add') }}</h2>
-            <button onclick="document.getElementById('addWasteModal').classList.add('hidden')"
-                    class="text-gray-400 hover:text-gray-700 transition text-xl">
+            <h2 class="text-xl font-bold text-gray-800" x-text="title"></h2>
+            <button @click="close()" class="text-gray-400 hover:text-gray-700 transition text-xl">
                 <i class="fa-solid fa-times"></i>
             </button>
         </div>
-        <form method="POST" action="{{ url_for('waste_add') }}" class="space-y-4">
+        <form :action="formAction" method="POST" class="space-y-4">
+
+            {# Filament search #}
             <div>
                 <label class="ui-label">{{ t('filament') }}</label>
-                <select name="filament_id"
-                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none" required>
-                    <option value="">{{ t('waste_select_filament') }}</option>
-                    {% for f in filaments %}
-                    <option value="{{ f.id }}">{{ f.name }}</option>
-                    {% endfor %}
-                </select>
+                <div class="relative" @click.outside="filamentOpen = false">
+                    <input type="hidden" name="filament_id" :value="selectedFilamentId">
+                    <input type="text"
+                           x-model="filamentQ"
+                           @focus="filamentOpen = true"
+                           @input="filamentOpen = true"
+                           required
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none"
+                           placeholder="{{ t('waste_select_filament') }}">
+                    <div x-show="filamentOpen" x-cloak
+                         class="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                        <template x-for="f in filteredFilaments" :key="f.id">
+                            <button type="button"
+                                    @click="selectFilament(f.id, f.label)"
+                                    class="w-full text-left px-3 py-2 text-sm hover:bg-red-50 transition-colors border-b border-gray-50 last:border-0">
+                                <span class="font-medium text-gray-800" x-text="f.label"></span>
+                                <span class="text-xs text-gray-400 ml-1" x-text="f.mat"></span>
+                            </button>
+                        </template>
+                        <div x-show="filteredFilaments.length === 0" class="px-3 py-2 text-xs text-gray-400">{{ t('filter_search') }}…</div>
+                    </div>
+                </div>
             </div>
+
+            {# Project search #}
             <div>
                 <label class="ui-label">{{ t('project') }}</label>
-                <select name="project_id"
-                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none">
-                    <option value="">{{ t('waste_select_project') }}</option>
-                    {% for p in projects %}
-                    <option value="{{ p.id }}">{{ p.name }}</option>
-                    {% endfor %}
-                </select>
+                <div class="relative" @click.outside="projectOpen = false">
+                    <input type="hidden" name="project_id" :value="selectedProjectId">
+                    <input type="text"
+                           x-model="projectQ"
+                           @focus="projectOpen = true"
+                           @input="projectOpen = true"
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none"
+                           placeholder="{{ t('waste_select_project') }}">
+                    <div x-show="projectOpen" x-cloak
+                         class="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        <button type="button"
+                                @click="selectProject('', '')"
+                                class="w-full text-left px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 border-b border-gray-100">
+                            {{ t('waste_select_project') }}
+                        </button>
+                        <template x-for="p in filteredProjects" :key="p.id">
+                            <button type="button"
+                                    @click="selectProject(p.id, p.name)"
+                                    class="w-full text-left px-3 py-2 text-sm hover:bg-red-50 transition-colors border-b border-gray-50 last:border-0">
+                                <span class="font-medium text-gray-800" x-text="p.name"></span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
             </div>
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="ui-label">{{ t('waste_reason_label') }}</label>
-                    <select name="reason"
+                    <select name="reason" x-model="reason"
                             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none">
-                        {% for reason in waste_reasons %}
-                        <option value="{{ reason }}">{{ t('waste_reason_' ~ reason) }}</option>
+                        {% for r in waste_reasons %}
+                        <option value="{{ r }}">{{ t('waste_reason_' ~ r) }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div>
                     <label class="ui-label">{{ t('waste_weight') }} (g)</label>
-                    <input type="number" name="weight_grams" step="0.1" min="0" value="0"
+                    <input type="number" name="weight_grams" step="0.1" min="0" x-model="weight"
                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none">
                 </div>
             </div>
             <div>
                 <label class="ui-label">{{ t('waste_notes') }}</label>
-                <textarea name="notes" rows="2"
+                <textarea name="notes" rows="2" x-model="notes"
                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 outline-none"
                           placeholder="{{ t('waste_notes_placeholder') }}"></textarea>
             </div>
             <div class="flex justify-end gap-3 pt-2">
-                <button type="button"
-                        onclick="document.getElementById('addWasteModal').classList.add('hidden')"
+                <button type="button" @click="close()"
                         class="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
                     {{ t('cancel') }}
                 </button>
@@ -172,4 +306,131 @@
         </form>
     </div>
 </div>
+
+<script>
+// ── Lightbox for waste photo attachments ─────────────────────────────────────
+function wasteLightbox() {
+    return {
+        isOpen: false,
+        imgSrc: '',
+        imgTitle: '',
+        imgDownload: '',
+        open(src, title, download) {
+            this.imgSrc = src;
+            this.imgTitle = title;
+            this.imgDownload = download;
+            this.isOpen = true;
+        },
+        close() {
+            this.isOpen = false;
+        },
+    };
+}
+
+// ── Filament filter on list page ─────────────────────────────────────────────
+function wasteFilamentFilter() {
+    const currentId = {{ filter_filament | tojson }};
+    const found = currentId ? _WF.find(f => String(f.id) === String(currentId)) : null;
+    return {
+        q: found ? found.label : '',
+        open: false,
+        get filtered() {
+            const q = this.q.toLowerCase().trim();
+            if (!q) return _WF;
+            return _WF.filter(f => f.label.toLowerCase().includes(q) || f.mat.toLowerCase().includes(q));
+        },
+        selectFilament(id, label) {
+            this.q = label;
+            this.open = false;
+            const url = new URL(window.location.href);
+            if (id) {
+                url.searchParams.set('filament', id);
+            } else {
+                url.searchParams.delete('filament');
+            }
+            url.searchParams.set('page', '1');
+            window.location.href = url.toString();
+        },
+    };
+}
+
+// ── Add / Edit modal ─────────────────────────────────────────────────────────
+function wasteModal() {
+    return {
+        title: '',
+        formAction: '',
+        reason: 'other',
+        weight: 0,
+        notes: '',
+        // Filament search
+        filamentQ: '',
+        filamentOpen: false,
+        selectedFilamentId: '',
+        get filteredFilaments() {
+            const q = this.filamentQ.toLowerCase().trim();
+            if (!q) return _WF;
+            return _WF.filter(f => f.label.toLowerCase().includes(q) || f.mat.toLowerCase().includes(q));
+        },
+        selectFilament(id, label) {
+            this.selectedFilamentId = id;
+            this.filamentQ = label;
+            this.filamentOpen = false;
+        },
+        // Project search
+        projectQ: '',
+        projectOpen: false,
+        selectedProjectId: '',
+        get filteredProjects() {
+            const q = this.projectQ.toLowerCase().trim();
+            if (!q) return _WP;
+            return _WP.filter(p => p.name.toLowerCase().includes(q));
+        },
+        selectProject(id, name) {
+            this.selectedProjectId = id || '';
+            this.projectQ = name || '';
+            this.projectOpen = false;
+        },
+        close() {
+            document.getElementById('wasteModal').classList.add('hidden');
+        },
+    };
+}
+
+function openWasteModal(mode, rec) {
+    const modal = document.getElementById('wasteModal');
+    const comp = Alpine.$data(modal);
+    const addUrl = {{ url_for('waste_add') | tojson }};
+    if (mode === 'add') {
+        comp.title = {{ t('waste_add') | tojson }};
+        comp.formAction = addUrl;
+        comp.selectedFilamentId = '';
+        comp.filamentQ = '';
+        comp.selectedProjectId = '';
+        comp.projectQ = '';
+        comp.reason = 'other';
+        comp.weight = 0;
+        comp.notes = '';
+    } else {
+        comp.title = {{ t('waste_edit_title') | tojson }};
+        comp.formAction = `/waste/${rec.id}/edit`;
+        comp.selectedFilamentId = rec.filament_id || '';
+        comp.filamentQ = rec.filament_name || '';
+        comp.selectedProjectId = rec.project_id || '';
+        comp.projectQ = rec.project_name || '';
+        comp.reason = rec.reason || 'other';
+        comp.weight = rec.weight || 0;
+        comp.notes = rec.notes || '';
+    }
+    modal.classList.remove('hidden');
+}
+
+// ── "Add" button ──────────────────────────────────────────────────────────────
+document.addEventListener('click', function (e) {
+    const editBtn = e.target.closest('[data-waste-edit]');
+    if (editBtn) {
+        const d = JSON.parse(editBtn.dataset.wasteEdit);
+        openWasteModal('edit', d);
+    }
+});
+</script>
 {% endblock %}

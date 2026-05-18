@@ -333,6 +333,8 @@ def register(app):
             printers=printers,
             filaments=filaments_json,
             projects=projects_json,
+            waste_filaments=filaments_orm,
+            waste_projects=projects_orm,
             has_printers=has_printers,
             job_filter=job_filter,
             active_filament=active_filament,
