@@ -1341,7 +1341,8 @@ document.addEventListener('DOMContentLoaded', function () {
             var shopBtn = menu.querySelector('#_fctx_shop');
             if (shopBtn) shopBtn.addEventListener('click', function() {
                 window.closeFilCtxMenu();
-                window.open(shopUrl, '_blank', 'noopener,noreferrer');
+                var resolvedUrl = shopUrl.replace(/\{[^}]+\}/g, encodeURIComponent(name));
+                window.open(resolvedUrl, '_blank', 'noopener,noreferrer');
             });
         }
         menu.style.display = 'block';

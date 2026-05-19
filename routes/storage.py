@@ -122,12 +122,17 @@ def register(app):
                 placement.brand_short = (placement.filament.brand.name[:3].upper() if placement.filament and placement.filament.brand else '---')
                 slot_map[placement.slot_index] = placement
             matched_slots = sum(1 for placement in shelf.placements if getattr(placement, 'matches_filter', True))
+            occupied_slots = len(shelf.placements)
+            total_slots = shelf.slots_count
+            occupancy_percent = round((occupied_slots / total_slots) * 100) if total_slots > 0 else 0
             prepared_shelves.append({
                 'shelf': shelf,
                 'slot_map': slot_map,
                 'slots': list(range(1, shelf.slots_count + 1)),
                 'compact': (shelf.columns or 1) >= 8,
                 'matched_slots': matched_slots,
+                'occupied_slots': occupied_slots,
+                'occupancy_percent': occupancy_percent,
             })
 
         tag_options = sorted({

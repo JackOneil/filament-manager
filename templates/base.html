@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#2563eb">
+    <meta name="theme-color" content="{% if theme == 'dark' %}#0b0f19{% else %}#eef4ff{% endif %}">
     <link rel="manifest" href="{{ url_for('manifest') }}">
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
     <title>{{ t('title') }}</title>
@@ -57,25 +57,25 @@
             --row-soon-border: rgba(252, 211, 77, 0.4);
         }
         html.dark {
-            --ui-bg: #07111f;
-            --ui-bg-accent: rgba(45, 212, 191, 0.08);
-            --ui-surface: rgba(15, 23, 42, 0.78);
-            --ui-surface-strong: rgba(15, 23, 42, 0.94);
-            --ui-surface-soft: rgba(30, 41, 59, 0.82);
-            --ui-border: rgba(148, 163, 184, 0.16);
-            --ui-border-strong: rgba(148, 163, 184, 0.24);
-            --ui-text: #e5eefb;
-            --ui-text-muted: #94a3b8;
-            --ui-brand: #5eead4;
-            --ui-brand-strong: #99f6e4;
-            --ui-brand-soft: rgba(45, 212, 191, 0.12);
-            --ui-brand-ring: rgba(94, 234, 212, 0.18);
+            --ui-bg: #0b0f19;
+            --ui-bg-accent: rgba(20, 184, 166, 0.08);
+            --ui-surface: rgba(17, 24, 39, 0.82);
+            --ui-surface-strong: rgba(17, 24, 39, 0.96);
+            --ui-surface-soft: rgba(31, 41, 55, 0.85);
+            --ui-border: rgba(75, 85, 99, 0.22);
+            --ui-border-strong: rgba(107, 114, 128, 0.32);
+            --ui-text: #f3f4f6;
+            --ui-text-muted: #9ca3af;
+            --ui-brand: #0d9488;
+            --ui-brand-strong: #14b8a6;
+            --ui-brand-soft: rgba(20, 184, 166, 0.12);
+            --ui-brand-ring: rgba(20, 184, 166, 0.22);
             --ui-shadow: 0 20px 50px rgba(2, 8, 23, 0.42);
             --ui-shadow-soft: 0 12px 34px rgba(2, 8, 23, 0.28);
-            --nav-grad-start: rgba(8, 15, 27, 0.88);
-            --nav-grad-end: rgba(15, 118, 110, 0.30);
-            --nav-accent-soft: rgba(94, 234, 212, 0.14);
-            --nav-accent-border: rgba(94, 234, 212, 0.20);
+            --nav-grad-start: rgba(11, 15, 25, 0.88);
+            --nav-grad-end: rgba(20, 184, 166, 0.30);
+            --nav-accent-soft: rgba(20, 184, 166, 0.14);
+            --nav-accent-border: rgba(20, 184, 166, 0.20);
             --nav-accent-text: #ccfbf1;
             --status-critical-bg: rgba(127, 29, 29, 0.35);
             --status-critical-text: #fca5a5;
@@ -1067,8 +1067,24 @@
             --nav-accent-soft: rgba(253, 186, 116, 0.16);
             --nav-accent-border: rgba(253, 186, 116, 0.24);
             --nav-accent-text: #ffedd5;
-        }
         {% endif %}
+        
+        /* Mobile collapsable header and pull to refresh transition rules */
+        @media (max-width: 767px) {
+            header {
+                transition: height 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, border 0.2s ease;
+            }
+            header.collapsed {
+                height: 0 !important;
+                border-bottom-width: 0 !important;
+                overflow: hidden !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+            }
+            #ptr-wrap {
+                transition: height 0.15s ease-out;
+            }
+        }
     </style>
     <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>
@@ -1267,6 +1283,14 @@
                 <a href="{{ url_for('settings') }}" class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
                     <i class="fa-solid fa-cog text-gray-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('settings') }}</span>
                 </a>
+                {% if auth_is_admin(current_user) %}
+                <a href="{{ url_for('maintenance_index') }}" class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
+                    <i class="fa-solid fa-screwdriver-wrench text-amber-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('maintenance_title') }}</span>
+                </a>
+                <a href="{{ url_for('waste_index') }}" class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
+                    <i class="fa-solid fa-triangle-exclamation text-red-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('waste_title') }}</span>
+                </a>
+                {% endif %}
                 {% if auth_has_section_access('users') or auth_is_admin(current_user) %}
                 <a href="{{ url_for('users_index') }}" class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
                     <i class="fa-solid fa-users-gear text-sky-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('users_nav') }}</span>
@@ -1612,6 +1636,13 @@
 
     <!--Scrollablecontent-->
     <main class="flex-1 overflow-x-hidden overflow-y-auto w-full pb-20 md:pb-6 relative pt-4 md:pt-6">
+        <!-- Pull to refresh indicator on mobile -->
+        <div id="ptr-wrap" class="h-0 overflow-hidden w-full flex items-center justify-center bg-[var(--ui-surface)] border-b border-[var(--ui-border)] md:hidden">
+            <div class="flex items-center gap-2 py-3 text-sm text-[var(--ui-text-muted)]">
+                <i id="ptr-icon" class="fa-solid fa-arrow-down transition-transform duration-200"></i>
+                <span id="ptr-text">{{ t('pull_to_refresh_pull') }}</span>
+            </div>
+        </div>
         <div class="w-full px-4 md:px-8 max-w-[1600px] mx-auto">
             <div class="app-surface" style="min-height: calc(100vh - 140px)">
         {% with flashes = get_flashed_messages(with_categories=true) %}
@@ -1732,6 +1763,144 @@
                 applyRememberedBambuFilters();
             }
         })();
+    </script>
+    <!-- Mobile UX Enhancements: Scroll collapsable topbar, Swipe gestures, Pull-to-refresh -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Only execute if we are on a mobile screen width
+            if (window.innerWidth >= 768) return;
+
+            // 1. Collapsing/Expanding Topbar Header on Scroll
+            const mainEl = document.querySelector('main');
+            const headerEl = document.querySelector('header');
+            if (mainEl && headerEl) {
+                let lastScrollTop = 0;
+                mainEl.addEventListener('scroll', () => {
+                    const scrollTop = mainEl.scrollTop;
+                    if (scrollTop > lastScrollTop && scrollTop > 50) {
+                        // Scrolling down -> hide header
+                        headerEl.classList.add('collapsed');
+                    } else {
+                        // Scrolling up -> show header
+                        headerEl.classList.remove('collapsed');
+                    }
+                    lastScrollTop = scrollTop;
+                }, { passive: true });
+            }
+
+            // 2. Horizontal Swipe Gestures for Main Tab Switching
+            let touchstartX = 0;
+            let touchstartY = 0;
+            let touchendX = 0;
+            let touchendY = 0;
+
+            const minSwipeDistance = 100; // in px
+            const maxSwipeVerticalDeviation = 60; // to prevent horizontal swipe triggering on diagonal/vertical scroll
+
+            const currentEndpoint = window.__helpEndpoint;
+            const swipeRoutes = {
+                'index': { next: "{{ url_for('filaments_index') }}", prev: null },
+                'filaments_index': { next: "{{ url_for('projects_index') }}", prev: "{{ url_for('index') }}" },
+                'projects_index': { next: null, prev: "{{ url_for('filaments_index') }}" }
+            };
+
+            if (currentEndpoint && swipeRoutes[currentEndpoint]) {
+                document.addEventListener('touchstart', e => {
+                    // Do not trigger swipe on interactive elements, maps, or drag-and-drop handles
+                    if (e.target.closest('input, textarea, select, button, a, [role="button"], #map, [draggable="true"], .no-swipe')) return;
+                    touchstartX = e.changedTouches[0].screenX;
+                    touchstartY = e.changedTouches[0].screenY;
+                }, { passive: true });
+
+                document.addEventListener('touchend', e => {
+                    if (e.target.closest('input, textarea, select, button, a, [role="button"], #map, [draggable="true"], .no-swipe')) return;
+                    touchendX = e.changedTouches[0].screenX;
+                    touchendY = e.changedTouches[0].screenY;
+                    handleSwipe();
+                }, { passive: true });
+            }
+
+            function handleSwipe() {
+                const diffX = touchendX - touchstartX;
+                const diffY = Math.abs(touchendY - touchstartY);
+
+                if (Math.abs(diffX) > minSwipeDistance && diffY < maxSwipeVerticalDeviation) {
+                    if (diffX < 0) {
+                        // Swiped Left -> Go to Next Tab
+                        const nextUrl = swipeRoutes[currentEndpoint].next;
+                        if (nextUrl) {
+                            window.location.href = nextUrl;
+                        }
+                    } else {
+                        // Swiped Right -> Go to Prev Tab
+                        const prevUrl = swipeRoutes[currentEndpoint].prev;
+                        if (prevUrl) {
+                            window.location.href = prevUrl;
+                        }
+                    }
+                }
+            }
+
+            // 3. Pull-to-Refresh functionality on Main Container
+            const ptrWrap = document.getElementById('ptr-wrap');
+            const ptrIcon = document.getElementById('ptr-icon');
+            const ptrText = document.getElementById('ptr-text');
+            
+            if (mainEl && ptrWrap && ptrIcon && ptrText) {
+                let startY = 0;
+                let active = false;
+
+                mainEl.addEventListener('touchstart', e => {
+                    // Only start tracking if the container is scrolled all the way to the top
+                    if (mainEl.scrollTop === 0) {
+                        startY = e.touches[0].pageY;
+                        active = true;
+                    }
+                }, { passive: true });
+
+                mainEl.addEventListener('touchmove', e => {
+                    if (!active || mainEl.scrollTop > 0) return;
+                    const currentY = e.touches[0].pageY;
+                    const diffY = currentY - startY;
+
+                    if (diffY > 0) {
+                        // We are pulling down at the top of the container
+                        // Prevent native overscroll bouncing/scrolling where possible
+                        if (e.cancelable) e.preventDefault();
+
+                        // Apply resistance
+                        const pullHeight = Math.min(diffY * 0.4, 70);
+                        ptrWrap.style.height = `${pullHeight}px`;
+
+                        if (pullHeight >= 50) {
+                            ptrIcon.style.transform = 'rotate(180deg)';
+                            ptrText.innerText = "{{ t('pull_to_refresh_release') }}";
+                        } else {
+                            ptrIcon.style.transform = 'rotate(0deg)';
+                            ptrText.innerText = "{{ t('pull_to_refresh_pull') }}";
+                        }
+                    }
+                }, { passive: false });
+
+                mainEl.addEventListener('touchend', () => {
+                    if (!active) return;
+                    active = false;
+                    const currentHeight = parseInt(ptrWrap.style.height || '0');
+
+                    if (currentHeight >= 50) {
+                        // Trigger Refresh
+                        ptrWrap.style.height = '50px';
+                        ptrIcon.className = 'fa-solid fa-spinner fa-spin';
+                        ptrIcon.style.transform = 'none';
+                        ptrText.innerText = "{{ t('pull_to_refresh_loading') }}";
+                        window.location.reload();
+                    } else {
+                        // Cancel
+                        ptrWrap.style.height = '0px';
+                    }
+                }, { passive: true });
+            }
+        });
     </script>
     <script>
         function markdownEditor(config) {
@@ -2244,7 +2413,7 @@
         <button
             @click="toggle()"
             title="{{ t('help_btn_title') }}"
-            class="fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full shadow-lg flex items-center justify-center
+            class="fixed bottom-24 md:bottom-6 right-6 z-50 w-12 h-12 rounded-full shadow-lg flex items-center justify-center
                    bg-[var(--ui-brand)] hover:bg-[var(--ui-brand-strong)] text-white
                    transition-all duration-200 hover:scale-110 hover:shadow-xl
                    focus:outline-none focus:ring-2 focus:ring-[var(--ui-brand)] focus:ring-offset-2"

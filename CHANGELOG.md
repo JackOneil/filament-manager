@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.79.5] - 2026-05-19
+### Added
+- **Interactive Shelf Capacity Alerts**: Color-coded shelf title bars (green to orange to red) depending on current space occupancy, and added a visual capacity badge displaying slots occupied out of total.
+- **Enhanced Dark Mode Harmony**: Transitioned the dark theme background to a deep slate (`#0b0f19`) and surface/border elements to matching dark slate tones, accented with vibrant teal and corresponding system transitions.
+
+## [1.79.4] - 2026-05-19
+### Added
+- **Mobile UX gestures**: Implemented horizontal swipe gestures (swipe left/right) on main viewports to switch between Overview, Filaments, and Projects tabs seamlessly.
+- **Scroll-driven collapsible header**: Enabled auto-hiding of the topbar header on mobile when scrolling down to maximize screen estate, automatically restoring it when scrolling up.
+- **Pull-to-refresh implementation**: Added touch-based custom pull-to-refresh on mobile viewports, enabling fast manual reloading of application states with an animated spinner.
+- **Dynamic status bar theme-color**: Aligned the browser/phone status bar `theme-color` meta tag to match the user's selected mode (#07111f for dark mode, #eef4ff for light mode).
+
+## [1.79.3] - 2026-05-19
+### Added
+- **Mobile menu navigation updates**: Restored missing **Maintenance** and **Waste** links in the responsive mobile modal menu (`MobileExtraMenuModal`) for administrators, ensuring complete section accessibility on mobile viewports.
+
+## [1.79.2] - 2026-05-19
+### Fixed
+- **Mobile help button overlap**: Shifted the floating help trigger button's vertical position to `bottom-24` on mobile devices (`md:hidden`), placing it safely 32px above the fixed bottom navigation bar and preventing it from overlapping the "Menu" trigger button. It remains at `bottom-6` on desktop screens.
+
+## [1.79.1] - 2026-05-19
+### Fixed
+- **Context menu search link placeholder replacement**: Fixed right-click context menu "Vyhledat v obchodě" action, which was passing raw template URLs with `{query}` unresolved. It now correctly substitutes any `{...}` placeholder with the encoded filament name, matching the correct behavior of the inline card/row shop buttons.
+
 ## [1.79.0] - 2026-05-19
 ### Changed
 - **SQLite WAL Mode & synchronous tuning**: Enabled Write-Ahead Logging (WAL) and synchronous=NORMAL on SQLite database connections, allowing concurrent reads alongside writes and preventing database-locked errors during concurrent background sync processes.

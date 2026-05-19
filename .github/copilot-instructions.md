@@ -187,9 +187,9 @@ Two daemon threads start in `create_app()`:
 | Token encryption             | Fernet (`FERNET_KEY` env var) for Bambu + Prusa secrets |
 | SSRF protection              | `is_safe_external_url()` in `utils.py`                  |
 | Path traversal               | Upload validation + resolved-path check                 |
-| Security headers             | X-Content-Type-Options, X-Frame-Options, HSTS           |
+| Security headers             | X-Content-Type-Options, X-Frame-Options (SAMEORIGIN), X-XSS-Protection, CSP, HSTS |
 | Open redirect prevention     | `is_safe_redirect_target()` for `?next=` parameter      |
-| SQLite timeout               | `connect_args={'timeout': 30}`                          |
+| SQLite configuration         | WAL mode, synchronous=NORMAL, `connect_args={'timeout': 30}` |
 
 ---
 
