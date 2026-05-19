@@ -12,6 +12,7 @@ from database import db
 from models import (
     AuditLog, BambuPrintJob, Brand, Color, Filament, Material, MovementHistory,
     Project, ProjectFile, ProjectFilament, ProjectQuote, StoragePlacement, StorageShelf, User,
+    PrinterMaintenance, WasteRecord, WasteFile, BambuPrinter,
 )
 
 
@@ -495,6 +496,127 @@ class ImportAtomicityTests(unittest.TestCase):
             self.assertEqual(BambuPrintJob.query.filter_by(external_id='DUPL-1').first().filament_id, restored_filament.id)
             self.assertEqual(StoragePlacement.query.filter_by(slot_index=1).first().filament_id, restored_filament.id)
             self.assertEqual(MovementHistory.query.filter_by(note='duplicate-ref').first().filament_id, restored_filament.id)
+
+    def test_export_and_import_preserve_printer_maintenance_and_waste_records(self):
+        with self.app.app_context():
+            user = User(email='operator@example.com', name='Operator', password_hash='hash', role='user')
+            brand = Brand.query.filter_by(name='Prusament').first()
+            color = Color.query.first()
+            material = Material.query.filter_by(name='PLA').first()
+            project = Project(name='Waste Project')
+            filament = Filament(
+                name='Waste Filament',
+                brand_id=brand.id,
+                material_id=material.id,
+                color_id=color.id,
+                weight_total=1000,
+                weight_remaining=800,
+                price=500,
+                quantity=1,
+            )
+            printer = BambuPrinter(
+                device_id='DEV123',
+                name='X1C Printer',
+                printer_model='X1C',
+                pre_job_time_minutes=5,
+            )
+            db.session.add_all([user, project, filament, printer])
+            db.session.flush()
+
+            maintenance = PrinterMaintenance(
+                printer_type='bambu',
+                printer_id=printer.id,
+                printer_name='X1C Printer',
+                maintenance_type='nozzle_change',
+                notes='Replaced 0.4mm nozzle with hardened steel.',
+                recurrence_value=3,
+                recurrence_type='months',
+                recurrence_enabled=True,
+                last_renewed_at=None,
+            )
+            waste = WasteRecord(
+                filament_id=filament.id,
+                project_id=project.id,
+                reason='warping',
+                weight_grams=35.5,
+                notes='Failed first layer on buildplate.',
+                recorded_by_user_id=user.id,
+            )
+            db.session.add_all([maintenance, waste])
+            db.session.flush()
+
+            # Create a waste attachment file
+            waste_dir = os.path.join(self.temp_dir, 'waste')
+            os.makedirs(waste_dir, exist_ok=True)
+            sample_photo_path = os.path.join(waste_dir, 'failed_print.jpg')
+            with open(sample_photo_path, 'wb') as handle:
+                handle.write(b'jpeg-data')
+            
+            waste_file = WasteFile(
+                waste_record_id=waste.id,
+                filename='failed_print.jpg',
+                filepath=sample_photo_path,
+            )
+            db.session.add(waste_file)
+            db.session.commit()
+
+        # Perform backup export
+        exported, exported_files = unpack_backup_response(self.client.get('/export'))
+        
+        # Verify serialized data
+        self.assertEqual(len(exported.get('printer_maintenance', [])), 1)
+        self.assertEqual(exported['printer_maintenance'][0]['maintenance_type'], 'nozzle_change')
+        self.assertEqual(exported['printer_maintenance'][0]['printer_name'], 'X1C Printer')
+
+        self.assertEqual(len(exported.get('waste_records', [])), 1)
+        self.assertEqual(exported['waste_records'][0]['reason'], 'warping')
+        self.assertEqual(exported['waste_records'][0]['weight_grams'], 35.5)
+        self.assertEqual(exported['waste_records'][0]['recorded_by']['email'], 'operator@example.com')
+
+        self.assertEqual(len(exported['waste_records'][0]['files']), 1)
+        archive_path = exported['waste_records'][0]['files'][0]['archive_path']
+        self.assertIn(archive_path, exported_files)
+        self.assertEqual(exported_files[archive_path], b'jpeg-data')
+
+        # Drop and recreate database schema to simulate restoration on a fresh install
+        with self.app.app_context():
+            db.drop_all()
+            db.create_all()
+            # Clean up the sample photo on disk to verify restoration recovers it
+            if os.path.exists(sample_photo_path):
+                os.remove(sample_photo_path)
+
+        # Perform backup import
+        response = self.client.post(
+            '/import',
+            data={'file': (encode_backup_payload(exported, exported_files), 'backup.tar.gz')},
+            content_type='multipart/form-data',
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+
+        # Verify database entities and disk files were correctly restored
+        with self.app.app_context():
+            restored_maintenance = PrinterMaintenance.query.first()
+            self.assertIsNotNone(restored_maintenance)
+            self.assertEqual(restored_maintenance.maintenance_type, 'nozzle_change')
+            self.assertEqual(restored_maintenance.printer_name, 'X1C Printer')
+            self.assertTrue(restored_maintenance.recurrence_enabled)
+            self.assertEqual(restored_maintenance.recurrence_value, 3)
+
+            restored_waste = WasteRecord.query.first()
+            self.assertIsNotNone(restored_waste)
+            self.assertEqual(restored_waste.reason, 'warping')
+            self.assertEqual(restored_waste.weight_grams, 35.5)
+            self.assertEqual(restored_waste.notes, 'Failed first layer on buildplate.')
+            self.assertEqual(restored_waste.recorded_by.email, 'operator@example.com')
+
+            restored_file = WasteFile.query.first()
+            self.assertIsNotNone(restored_file)
+            self.assertEqual(restored_file.filename, 'failed_print.jpg')
+            self.assertTrue(os.path.exists(restored_file.filepath))
+            with open(restored_file.filepath, 'rb') as handle:
+                self.assertEqual(handle.read(), b'jpeg-data')
 
     def test_import_accepts_legacy_plain_json_backup(self):
         payload = {

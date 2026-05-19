@@ -1056,6 +1056,12 @@ def register(app):
                 # ── 12b. Waste records ─────────────────────────────────
                 for w_data in data.get('waste_records', []):
                     filament = _resolve_filament_ref(w_data.get('filament_ref'), w_data.get('filament_name'))
+                    if not filament:
+                        app.logger.warning(
+                            f"Skipping waste record import: referenced filament '{w_data.get('filament_name')}' "
+                            f"could not be resolved."
+                        )
+                        continue
                     project_id = None
                     project_name = w_data.get('project_name', '').strip()
                     if project_name:

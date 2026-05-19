@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.79.0] - 2026-05-19
+### Changed
+- **SQLite WAL Mode & synchronous tuning**: Enabled Write-Ahead Logging (WAL) and synchronous=NORMAL on SQLite database connections, allowing concurrent reads alongside writes and preventing database-locked errors during concurrent background sync processes.
+- **Atomic Worker Locks**: Refactored `_acquire_worker_lock` to use atomic exclusive file creation (`open(..., 'x')`), eliminating worker startup race conditions under multi-process Gunicorn deployments.
+- **Lightweight Query Aggregations**: Optimized analytics helpers in `utils.py` (`collect_usage_windows`, `collect_activity_heatmap`, and `collect_sparkline_data`) and `routes/stats.py` (`stats` and `_project_usage_rows`) to compute sums and counts directly in SQLite rather than retrieving and parsing all database rows in Python memory.
+- **Security Response Headers**: Strengthened application response security headers globally by implementing explicit `X-Content-Type-Options`, `X-Frame-Options` (SAMEORIGIN), `X-XSS-Protection`, and a structured `Content-Security-Policy`.
+
+## [1.78.0] - 2026-05-19
+### Added
+- **Backup integration tests**: Added complete backup/restore integration tests for `PrinterMaintenance`, `WasteRecord`, and `WasteFile` model data, including file recovery verification.
+
+### Fixed
+- **Audit logging for maintenance & waste**: Mapped endpoints `maintenance_edit`, `maintenance_delete`, `waste_edit`, `waste_delete`, `waste_upload_file`, and `waste_delete_file` in the `_audit_target` dictionary. Privileged updates, deletions, and photo attachments are now correctly audited with before/after state snapshots.
+- **Robust waste record imports**: Gracefully handle missing filament references during waste record backup imports by skipping the record and logging a warning instead of failing the database transaction on constraint check.
+
 ## [1.77.0] - 2026-05-18
 ### Added
 - **Waste page – photo attachments**: Each waste record now supports one or more photo attachments (JPG, PNG, GIF, WEBP) to document the failed print visually (e.g. spaghetti, warping, stringing). Photos are shown as thumbnails inline on the record card. Clicking a thumbnail opens a full-screen lightbox with a download option. A "Add photo" camera-icon link per record triggers a hidden file input with `onchange` auto-submit for a fast one-click upload flow. Attachments are deleted individually via a hover-reveal × button, and are removed from disk when their parent record is deleted. Photos are included in full backup export/import (stored inside the `.tar.gz` archive under `waste_files/`).

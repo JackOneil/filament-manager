@@ -48,7 +48,7 @@ from utils import get_settings, utc_now
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.77.0'
+APP_VERSION = '1.79.0'
 
 csrf = CSRFProtect()
 
@@ -83,6 +83,18 @@ def create_app(test_config=None) -> Flask:
         app.config.update(test_config)
 
     db.init_app(app)
+
+    # Enable WAL mode and synchronous=NORMAL for SQLite connections to improve concurrency
+    with app.app_context():
+        if db.engine.url.drivername == 'sqlite':
+            from sqlalchemy import event
+            @event.listens_for(db.engine, "connect")
+            def set_sqlite_pragma(dbapi_connection, connection_record):
+                cursor = dbapi_connection.cursor()
+                cursor.execute("PRAGMA journal_mode=WAL")
+                cursor.execute("PRAGMA synchronous=NORMAL")
+                cursor.close()
+
     csrf.init_app(app)
     init_auth(app)
     register_all(app)
@@ -190,12 +202,21 @@ def create_app(test_config=None) -> Flask:
 
     @app.after_request
     def add_security_headers(response):
-        response.headers.setdefault('X-Content-Type-Options', 'nosniff')
-        response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
-        response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
-        response.headers.setdefault('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+        response.headers['Content-Security-Policy'] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+            "img-src 'self' data: https:; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "connect-src 'self' ws: wss:;"
+        )
         if request_is_secure(response):
-            response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
         return response
 
     @app.after_request
@@ -401,11 +422,21 @@ def _acquire_worker_lock(app: Flask, worker_name: str) -> bool:
     my_pid = os.getpid()
 
     try:
-        # Atomic check-and-write: read existing PID, verify liveness, replace if stale.
-        if os.path.exists(lock_path):
-            with open(lock_path, 'r') as fh:
-                existing_pid = int(fh.read().strip())
-            if existing_pid != my_pid:
+        # Atomic check-and-write: try to exclusively create the lock file first.
+        try:
+            with open(lock_path, 'x') as fh:
+                fh.write(str(my_pid))
+            return True
+        except FileExistsError:
+            # Lock file already exists, read the owner pid.
+            try:
+                with open(lock_path, 'r') as fh:
+                    existing_pid = int(fh.read().strip())
+            except (ValueError, TypeError, IOError):
+                # Corrupt lock file — take over.
+                existing_pid = None
+
+            if existing_pid is not None and existing_pid != my_pid:
                 # Check whether the owning process is still alive.
                 try:
                     os.kill(existing_pid, 0)  # signal 0 = existence check only
@@ -421,9 +452,10 @@ def _acquire_worker_lock(app: Flask, worker_name: str) -> bool:
                         worker_name, existing_pid, my_pid,
                     )
 
-        with open(lock_path, 'w') as fh:
-            fh.write(str(my_pid))
-        return True
+            # Write our PID to assume ownership
+            with open(lock_path, 'w') as fh:
+                fh.write(str(my_pid))
+            return True
     except Exception as exc:
         app.logger.warning('Could not acquire %s-worker lock: %s', worker_name, exc)
         # Fall back to always starting the worker (original behaviour) so a lock

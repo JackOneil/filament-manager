@@ -437,19 +437,41 @@ def collect_usage_windows(filaments, now=None):
     by_id = {fil.id: {'usage_30': 0.0, 'usage_90': 0.0} for fil in filaments}
     by_name = {build_filament_history_name(fil): fil.id for fil in filaments}
     since_90 = now - timedelta(days=90)
-    rows = MovementHistory.query.filter(
+    since_30 = now - timedelta(days=30)
+
+    # 1. Aggregate by filament_id directly
+    results_id = db.session.query(
+        MovementHistory.filament_id,
+        db.func.sum(db.case((MovementHistory.created_at >= since_30, MovementHistory.weight), else_=0.0)),
+        db.func.sum(MovementHistory.weight)
+    ).filter(
         MovementHistory.created_at >= since_90,
         MovementHistory.action_type.in_(('remove', 'bambu_print')),
-    ).all()
-    for row in rows:
-        filament_id = row.filament_id
-        if filament_id not in by_id:
-            filament_id = by_name.get(row.filament_name)
-        if filament_id not in by_id:
-            continue
-        by_id[filament_id]['usage_90'] += row.weight or 0.0
-        if row.created_at and row.created_at >= now - timedelta(days=30):
-            by_id[filament_id]['usage_30'] += row.weight or 0.0
+        MovementHistory.filament_id.is_not(None)
+    ).group_by(MovementHistory.filament_id).all()
+
+    for fid, u30, u90 in results_id:
+        if fid in by_id:
+            by_id[fid]['usage_30'] += u30 or 0.0
+            by_id[fid]['usage_90'] += u90 or 0.0
+
+    # 2. Aggregate by filament_name for historical/unlinked entries
+    results_name = db.session.query(
+        MovementHistory.filament_name,
+        db.func.sum(db.case((MovementHistory.created_at >= since_30, MovementHistory.weight), else_=0.0)),
+        db.func.sum(MovementHistory.weight)
+    ).filter(
+        MovementHistory.created_at >= since_90,
+        MovementHistory.action_type.in_(('remove', 'bambu_print')),
+        MovementHistory.filament_id.is_(None)
+    ).group_by(MovementHistory.filament_name).all()
+
+    for name, u30, u90 in results_name:
+        fid = by_name.get(name)
+        if fid in by_id:
+            by_id[fid]['usage_30'] += u30 or 0.0
+            by_id[fid]['usage_90'] += u90 or 0.0
+
     return by_id
 
 
@@ -464,14 +486,18 @@ def collect_activity_heatmap(now=None):
         now = utc_now()
     today = datetime(now.year, now.month, now.day)
     since = today - timedelta(days=363)
-    rows = MovementHistory.query.filter(
-        MovementHistory.created_at >= since,
+
+    results = db.session.query(
+        db.func.date(MovementHistory.created_at),
+        db.func.count(MovementHistory.id)
+    ).filter(
+        MovementHistory.created_at >= since
+    ).group_by(
+        db.func.date(MovementHistory.created_at)
     ).all()
-    by_date: dict[str, int] = {}
-    for row in rows:
-        if row.created_at:
-            d = row.created_at.strftime('%Y-%m-%d')
-            by_date[d] = by_date.get(d, 0) + 1
+
+    by_date = {date_str: count for date_str, count in results if date_str}
+
     result = []
     for i in range(364):
         d = today - timedelta(days=363 - i)
@@ -489,22 +515,59 @@ def collect_sparkline_data(filaments, now=None):
         now = utc_now()
     today = datetime(now.year, now.month, now.day)
     since = today - timedelta(days=6)
+    since_date = since.date()
     by_id = {fil.id: [0.0] * 7 for fil in filaments}
     by_name = {build_filament_history_name(fil): fil.id for fil in filaments}
-    rows = MovementHistory.query.filter(
+
+    # Aggregate by ID and Date
+    results_id = db.session.query(
+        MovementHistory.filament_id,
+        db.func.date(MovementHistory.created_at),
+        db.func.sum(MovementHistory.weight)
+    ).filter(
         MovementHistory.created_at >= since,
         MovementHistory.action_type.in_(('remove', 'bambu_print')),
+        MovementHistory.filament_id.is_not(None)
+    ).group_by(
+        MovementHistory.filament_id,
+        db.func.date(MovementHistory.created_at)
     ).all()
-    for row in rows:
-        filament_id = row.filament_id
-        if filament_id not in by_id:
-            filament_id = by_name.get(row.filament_name)
-        if filament_id not in by_id:
-            continue
-        if row.created_at:
-            day_index = (row.created_at.date() - since.date()).days
-            if 0 <= day_index <= 6:
-                by_id[filament_id][day_index] += row.weight or 0.0
+
+    for fid, date_str, weight in results_id:
+        if fid in by_id and date_str:
+            try:
+                dt = datetime.strptime(date_str, '%Y-%m-%d').date()
+                day_index = (dt - since_date).days
+                if 0 <= day_index <= 6:
+                    by_id[fid][day_index] += weight or 0.0
+            except ValueError:
+                pass
+
+    # Aggregate by Name and Date
+    results_name = db.session.query(
+        MovementHistory.filament_name,
+        db.func.date(MovementHistory.created_at),
+        db.func.sum(MovementHistory.weight)
+    ).filter(
+        MovementHistory.created_at >= since,
+        MovementHistory.action_type.in_(('remove', 'bambu_print')),
+        MovementHistory.filament_id.is_(None)
+    ).group_by(
+        MovementHistory.filament_name,
+        db.func.date(MovementHistory.created_at)
+    ).all()
+
+    for name, date_str, weight in results_name:
+        fid = by_name.get(name)
+        if fid in by_id and date_str:
+            try:
+                dt = datetime.strptime(date_str, '%Y-%m-%d').date()
+                day_index = (dt - since_date).days
+                if 0 <= day_index <= 6:
+                    by_id[fid][day_index] += weight or 0.0
+            except ValueError:
+                pass
+
     return by_id
 
 

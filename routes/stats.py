@@ -8,7 +8,10 @@ from flask import render_template, request
 from sqlalchemy.orm import joinedload
 
 from database import db
-from models import AppSetting, BambuPrintJob, Filament, MovementHistory, Project, ProjectFilament, ProjectQuote
+from models import (
+    AppSetting, BambuJobMaterial, BambuPrintJob, Filament,
+    MovementHistory, Project, ProjectFilament, ProjectQuote
+)
 from utils import build_filament_history_name as _display_filament_name, collect_usage_windows, compute_stock_status, utc_now
 
 
@@ -134,7 +137,14 @@ def register(app):
             filament_name_map[_display_filament_name(filament)] = filament
             filament_name_map[filament.name] = filament
 
-        movement_rows = MovementHistory.query.filter(
+        movement_rows = db.session.query(
+            MovementHistory.created_at,
+            MovementHistory.action_type,
+            MovementHistory.weight,
+            MovementHistory.cost,
+            MovementHistory.currency,
+            MovementHistory.filament_name
+        ).filter(
             MovementHistory.created_at >= since_dt
         ).order_by(MovementHistory.created_at.asc()).all()
 
@@ -258,7 +268,20 @@ def register(app):
         setting = AppSetting.query.first()
         kwh_price = setting.kwh_price if setting else 5.0
         printer_power = setting.printer_power if setting else 150
-        for project in Project.query.all():
+        project_ids_with_quotes = list(quote_map.keys())
+        projects_to_calc = []
+        if project_ids_with_quotes:
+            projects_to_calc = (
+                Project.query
+                .options(
+                    joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.materials).joinedload(BambuJobMaterial.filament),
+                    joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.filament)
+                )
+                .filter(Project.id.in_(project_ids_with_quotes))
+                .all()
+            )
+
+        for project in projects_to_calc:
             quote = quote_map.get(project.id)
             if not quote:
                 continue

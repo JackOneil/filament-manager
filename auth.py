@@ -394,7 +394,7 @@ def _audit_target():
         AppSetting, BambuPrintJob, Filament, MovementHistory, PrintHistory,
         Project, ProjectComment, ProjectFile, ProjectFilament, ProjectLink,
         ProjectQuote, PrusaPrinter, PrusaPrintJob, StoragePlacement,
-        StorageShelf,
+        StorageShelf, PrinterMaintenance, WasteRecord, WasteFile,
     )
 
     explicit = {
@@ -443,6 +443,12 @@ def _audit_target():
         'storage_move_placement': (StoragePlacement, 'placement_id'),
         'storage_update_orientation': (StoragePlacement, 'placement_id'),
         'storage_delete_placement': (StoragePlacement, 'placement_id'),
+        'maintenance_edit': (PrinterMaintenance, 'rec_id'),
+        'maintenance_delete': (PrinterMaintenance, 'rec_id'),
+        'waste_edit': (WasteRecord, 'rec_id'),
+        'waste_delete': (WasteRecord, 'rec_id'),
+        'waste_upload_file': (WasteRecord, 'rec_id'),
+        'waste_delete_file': (WasteFile, 'file_id'),
         'notification_mark_read': (Notification, 'id'),
         'notification_delete': (Notification, 'id'),
     }
