@@ -19,7 +19,6 @@ from auth import (
     require_login,
     safe_redirect_target,
     serialize_permissions,
-    unread_notifications_count,
     user_permissions,
     verify_password,
 )
@@ -393,10 +392,12 @@ def register(app):
     @app.context_processor
     def inject_auth_nav():
         user = get_current_user()
+        notifications = recent_notifications(user, limit=8) if user else []
+        unread = sum(1 for n in notifications if not n.is_read) if notifications else 0
         return {
             'current_user_obj': user,
             'current_user_permissions': user_permissions(user) if user else {},
             'is_admin_user': is_admin(user),
-            'nav_notifications': recent_notifications(user, limit=6) if user else [],
-            'nav_notifications_unread': unread_notifications_count(user) if user else 0,
+            'nav_notifications': notifications,
+            'nav_notifications_unread': unread,
         }

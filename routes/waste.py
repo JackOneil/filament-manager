@@ -7,6 +7,7 @@ from flask import abort, redirect, render_template, request, send_from_directory
 from werkzeug.utils import secure_filename
 
 from auth import require_admin
+from sqlalchemy.orm import joinedload
 from database import db
 from models import Filament, Project, WasteFile, WasteRecord, AppSetting
 from utils import utc_now
@@ -59,7 +60,7 @@ def register(app):
 
         paginated = db.paginate(query.statement, page=page, per_page=20, error_out=False)
 
-        filaments = Filament.query.order_by(Filament.name).all()
+        filaments = Filament.query.options(joinedload(Filament.brand), joinedload(Filament.material), joinedload(Filament.color)).order_by(Filament.name).all()
         projects = Project.query.order_by(Project.name).all()
 
         filaments_json = [

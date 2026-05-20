@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.79.7] - 2026-05-20
+### Fixed
+- **Command palette FOUC fix**: Moved the `[x-cloak]` CSS rule from the external `app.css` stylesheet into an inline `<style>` block in `<head>`. Previously, during page navigation, the command palette's hint text ("Pište název stránky…") would briefly flash in the center of the screen before the external CSS finished loading. The inline rule applies immediately during HTML parsing, eliminating the flash of unstyled content.
+
+## [1.79.6] - 2026-05-20
+### Changed
+- **SQLite PRAGMA tuning**: Added `cache_size=-16000` (16 MB), `mmap_size=268435456` (256 MB), and `temp_store=MEMORY` to the SQLite connection event listener for significantly faster database reads on Linux.
+- **New database indexes**: Added missing indexes on `movement_history.action_type`, `movement_history.filament_name`, `bambu_job_material.job_id`, `bambu_print_job.filament_id`, and `prusa_print_job.filament_id` to eliminate full-table scans on stats, inventory, and sync queries.
+- **Reduced per-request DB queries**: Replaced redundant `AppSetting.query.first()` calls in `routes/api.py` and `routes/bambu.py` with cached `get_settings()`; merged two separate notification queries in `inject_auth_nav()` context processor into one.
+- **N+1 query fixes**: Added eager loading (`joinedload`) to Filament queries in `bambu_jobs()`, `prusa_jobs()`, `waste_index()`, `filament_export_csv()`, and `_overview_focus()`; batch pre-loaded Bambu printers, Prusa jobs, and Bambu sync external IDs to eliminate per-item database roundtrips; eagerly loaded `BambuPrintJob.materials` in `_live_printers()`.
+- **Externalized CSS**: Moved 39 KB of inline `<style>` from `base.html` to `static/css/app.css`, enabling browser caching on every page.
+- **Externalized JavaScript**: Moved `appShell()` command palette, CSRF auto-protection, mobile UX gestures, `markdownEditor()`, Bambu filter persistence, and inventory helpers (skeleton builders, bulk selection, context menu) from inline `<script>` blocks to individual `static/js/*.js` files (~56 KB total), allowing browser caching across pages.
+
 ## [1.79.5] - 2026-05-19
 ### Added
 - **Interactive Shelf Capacity Alerts**: Color-coded shelf title bars (green to orange to red) depending on current space occupancy, and added a visual capacity badge displaying slots occupied out of total.

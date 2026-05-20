@@ -392,21 +392,23 @@ This is already applied to `projects_index.html` and overrides any stale localSt
 
 ## 7. Post-Implementation Checklist
 
-After every set of feature additions or structural fixes:
+After every set of feature additions or structural fixes, **always** complete ALL of the following:
 
-1. ✅ Verify Docker builds successfully
-2. ✅ Bump `APP_VERSION` in `app.py` (SemVer: major.minor.patch)
-3. ✅ Update `CHANGELOG.md` under the new version section
-4. ✅ Update `README.md` version tag
-5. ✅ If major functionality added or changed → update `README.md` content (key features, project structure, roadmap) per rule 18
-5. ✅ `docker compose up -d --build` → verify HTTP 200
-6. ✅ If DB schema changed → verify `/export` and `/import` updated (rule 15)
-7. ✅ If user-facing text added → verify `messages.py` updated in both languages (rule 1)
-8. ✅ If routes added/modified → verify `SECTION_BY_ENDPOINT` in `auth.py` (rule 4)
-9. ✅ If inventory rendering changed → verify low-stock indicators (rule 12) and `<div>` closings (rule 9)
-10. ✅ If external URL fetching added → verify SSRF protection (rule 13)
-11. ✅ If file upload added → verify validation and unique naming (rule 14)
-12. ✅ If security-sensitive code added → verify tests exist (rule 19)
-13. ✅ If Stats page modified → verify compliance with rule 16
-14. ✅ If any dashboard page (Overview, Projects, Stats) modified → verify compliance with rule 22
-15. ✅ Keep this instruction file up to date with any new rules or patterns
+1. ✅ Bump `APP_VERSION` in `app.py` (SemVer: major.minor.patch)
+2. ✅ Update `CHANGELOG.md` under the new version section
+3. ✅ Update `README.md` version tag
+4. ✅ If major functionality added or changed → update `README.md` content (key features, project structure, roadmap) per rule 18
+5. ✅ **`docker compose up -d --build` — MANDATORY. Code is never mounted via volumes; a rebuild is REQUIRED for any source change to take effect.**
+6. ✅ Verify HTTP 200 on `/login` and all static assets via curl
+7. ✅ If DB schema changed → verify `/export` and `/import` updated (rule 15)
+8. ✅ If user-facing text added → verify `messages.py` updated in both languages (rule 1)
+9. ✅ If routes added/modified → verify `SECTION_BY_ENDPOINT` in `auth.py` (rule 4)
+10. ✅ If inventory rendering changed → verify low-stock indicators (rule 12) and `<div>` closings (rule 9)
+11. ✅ If external URL fetching added → verify SSRF protection (rule 13)
+12. ✅ If file upload added → verify validation and unique naming (rule 14)
+13. ✅ If security-sensitive code added → verify tests exist (rule 19)
+14. ✅ If Stats page modified → verify compliance with rule 16
+15. ✅ If any dashboard page (Overview, Projects, Stats) modified → verify compliance with rule 22
+16. ✅ Keep this instruction file up to date with any new rules or patterns
+
+**CRITICAL: Step 5 is mandatory after ANY code change. Never skip it.**

@@ -106,22 +106,37 @@ def _live_printers():
     freshness_cutoff = now_dt - timedelta(minutes=15)
 
     # Prusa — real-time local-network printers with progress
-    for printer in PrusaPrinter.query.filter_by(enabled=True).all():
-        job = PrusaPrintJob.query.filter_by(printer_id=printer.id).order_by(PrusaPrintJob.started_at.desc().nullslast()).first()
-        if (
-            job
-            and job.status == 'PRINTING'
-            and job.progress is not None
-            and job.progress > 0
-            and printer.last_success_at
-            and printer.last_success_at >= freshness_cutoff
-            and job.synced_at
-            and job.synced_at >= freshness_cutoff
-        ):
-            prusa_progress_pct = int(job.progress * 100)
-            prusa_eta_at = (job.started_at + timedelta(seconds=job.cost_time)) if (job.started_at and job.cost_time) else None
-            live.append({'printer': printer, 'job': job, 'type': 'prusa',
-                         'progress_pct': prusa_progress_pct, 'eta_at': prusa_eta_at})
+    # Pre-load all enabled printers and their latest jobs in a single query
+    enabled_printers = PrusaPrinter.query.filter_by(enabled=True).all()
+    printer_ids = [p.id for p in enabled_printers]
+    printer_by_id = {p.id: p for p in enabled_printers}
+    if printer_ids:
+        latest_jobs = (
+            PrusaPrintJob.query
+            .filter(PrusaPrintJob.printer_id.in_(printer_ids))
+            .order_by(PrusaPrintJob.started_at.desc().nullslast())
+            .all()
+        )
+        latest_job_by_printer = {}
+        for job in latest_jobs:
+            if job.printer_id not in latest_job_by_printer:
+                latest_job_by_printer[job.printer_id] = job
+        for printer in enabled_printers:
+            job = latest_job_by_printer.get(printer.id)
+            if (
+                job
+                and job.status == 'PRINTING'
+                and job.progress is not None
+                and job.progress > 0
+                and printer.last_success_at
+                and printer.last_success_at >= freshness_cutoff
+                and job.synced_at
+                and job.synced_at >= freshness_cutoff
+            ):
+                prusa_progress_pct = int(job.progress * 100)
+                prusa_eta_at = (job.started_at + timedelta(seconds=job.cost_time)) if (job.started_at and job.cost_time) else None
+                live.append({'printer': printer, 'job': job, 'type': 'prusa',
+                             'progress_pct': prusa_progress_pct, 'eta_at': prusa_eta_at})
 
     # Bambu Cloud — jobs with RUNNING or PAUSED status fetched from Cloud API.
     # NOTE: Bambu Cloud API sometimes reports actively printing jobs as PAUSED
@@ -131,10 +146,12 @@ def _live_printers():
     # Both statuses are therefore treated as "currently printing" for the overview.
     running_bambu = (
         BambuPrintJob.query
+        .options(joinedload(BambuPrintJob.materials))
         .filter(BambuPrintJob.status.in_(['RUNNING', 'PAUSED']))
         .order_by(BambuPrintJob.synced_at.desc())
         .all()
     )
+    bambu_printers_by_device = {p.device_id: p for p in BambuPrinter.query.all()} if running_bambu else {}
     for job in running_bambu:
         fake_printer = SimpleNamespace(
             name=job.printer_name or 'Bambu Lab',
@@ -164,8 +181,8 @@ def _live_printers():
         bambu_progress_pct = None
         bambu_eta_at = None
         if job.started_at and job.cost_time and job.cost_time > 0:
-            # Look up per-printer pre-job calibration offset
-            bambu_printer = BambuPrinter.query.filter_by(device_id=job.device_id).first() if job.device_id else None
+            # Look up per-printer pre-job calibration offset (pre-loaded dict)
+            bambu_printer = bambu_printers_by_device.get(job.device_id) if job.device_id else None
             pre_job_secs = (bambu_printer.pre_job_time_minutes or 0) * 60 if bambu_printer else 0
             total_secs = job.cost_time + pre_job_secs
             elapsed = (now_dt - job.started_at).total_seconds()
@@ -236,7 +253,7 @@ def _overview_focus(action_center, live_printers, now=None):
             if 0 <= days_ago < 7:
                  usage_7d[6 - days_ago] += row.weight
                  
-    all_filaments = Filament.query.all()
+    all_filaments = Filament.query.options(joinedload(Filament.brand), joinedload(Filament.material), joinedload(Filament.color)).all()
     usage_windows = collect_usage_windows(all_filaments, now=now)
     top_turnover_month = []
     for f in all_filaments:
@@ -1329,7 +1346,7 @@ def register(app):
     def filament_export_csv():
         import flask
         _require_inventory_admin()
-        filaments = Filament.query.order_by(Filament.name).all()
+        filaments = Filament.query.options(joinedload(Filament.brand), joinedload(Filament.material), joinedload(Filament.color)).order_by(Filament.name).all()
 
         def _floor2(v):
             """Floor a float to 2 decimal places to avoid floating-point noise."""

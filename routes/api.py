@@ -3,8 +3,8 @@ from flask import request, render_template, jsonify
 from sqlalchemy.orm import joinedload
 from auth import get_current_user, is_admin
 from database import db
-from models import Filament, Brand, AppSetting, Project, PrusaPrinter, BambuPrinter
-from utils import collect_usage_windows, collect_sparkline_data, compute_stock_status, escape_like, get_filament_tags
+from models import Filament, Brand, Project, PrusaPrinter, BambuPrinter
+from utils import collect_usage_windows, collect_sparkline_data, compute_stock_status, escape_like, get_filament_tags, get_settings
 
 
 def register(app):
@@ -85,7 +85,7 @@ def register(app):
 
         page = request.args.get('page', 1, type=int)
 
-        setting = AppSetting.query.first()
+        setting = get_settings()
         default_per_page = setting.items_per_page if setting else 12
         per_page = request.args.get('per_page', default_per_page, type=int)
         if per_page not in [12, 24, 48, 96]:

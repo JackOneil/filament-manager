@@ -14,11 +14,12 @@ from flask import render_template, request, redirect, url_for, jsonify
 
 from database import db
 from models import (
-    AppSetting, BambuPrinter, BambuPrintJob, BambuJobMaterial,
+    BambuPrinter, BambuPrintJob, BambuJobMaterial,
     Filament, PrintHistory, Project, ProjectFilament,
 )
 from sqlalchemy import and_, func, or_, select
-from utils import deduct_filament_stock, decrypt_token, log_movement, utc_now
+from sqlalchemy.orm import joinedload
+from utils import deduct_filament_stock, decrypt_token, get_settings, log_movement, utc_now
 
 _LOG = logging.getLogger(__name__)
 
@@ -256,6 +257,16 @@ def do_sync(token: str, region: str) -> dict:
         p.device_id for p in BambuPrinter.query.with_entities(BambuPrinter.device_id).all()
     )
 
+    # Batch pre-load existing jobs to avoid N+1 per-task queries
+    ext_ids = [str(task.get('id', '')).strip() for task in hits]
+    ext_ids = [eid for eid in ext_ids if eid]
+    existing_by_ext_id = {}
+    if ext_ids:
+        existing_by_ext_id = {
+            job.external_id: job
+            for job in BambuPrintJob.query.filter(BambuPrintJob.external_id.in_(ext_ids)).all()
+        }
+
     for task in hits:
         ext_id = str(task.get('id', '')).strip()
         if not ext_id:
@@ -264,7 +275,7 @@ def do_sync(token: str, region: str) -> dict:
 
         status = _resolve_status(task.get('status', 0))
 
-        existing = BambuPrintJob.query.filter_by(external_id=ext_id).first()
+        existing = existing_by_ext_id.get(ext_id)
         if existing:
             changed = False
             if existing.status != status:
@@ -379,7 +390,7 @@ def register(app):
 
     @app.route('/bambu')
     def bambu_jobs():
-        setting = AppSetting.query.first()
+        setting = get_settings()
         page = request.args.get('page', 1, type=int)
         job_filter = request.args.get('filter', '')
         filament_id = request.args.get('filament_id', type=int)
@@ -418,7 +429,7 @@ def register(app):
         count_unassigned = count_base.filter(_job_unassigned_filter()).count()
         count_not_deducted = count_base.filter(_job_not_deducted_filter()).count()
 
-        filaments_orm = Filament.query.order_by(Filament.name).all()
+        filaments_orm = Filament.query.options(joinedload(Filament.brand), joinedload(Filament.material), joinedload(Filament.color)).order_by(Filament.name).all()
         projects_orm = Project.query.order_by(Project.name).all()
         printers = BambuPrinter.query.order_by(BambuPrinter.name).all()
         has_token = bool(setting and setting.bambu_token)
@@ -456,7 +467,7 @@ def register(app):
 
     @app.route('/bambu/sync', methods=['POST'])
     def bambu_sync():
-        setting = AppSetting.query.first()
+        setting = get_settings()
         if not setting or not setting.bambu_token:
             return jsonify({'ok': False, 'error': 'No Bambu token configured'}), 400
         token = decrypt_token(setting.bambu_token)

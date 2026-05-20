@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 import requests
 from flask import render_template, request, redirect, url_for, jsonify
 
+from sqlalchemy.orm import joinedload
 from database import db
 from models import (
     AppSetting, PrusaPrinter, PrusaPrintJob,
@@ -314,7 +315,7 @@ def register(app):
         ).count()
 
         printers = PrusaPrinter.query.order_by(PrusaPrinter.name).all()
-        filaments_orm = Filament.query.order_by(Filament.name).all()
+        filaments_orm = Filament.query.options(joinedload(Filament.brand), joinedload(Filament.material), joinedload(Filament.color)).order_by(Filament.name).all()
         projects_orm = Project.query.order_by(Project.name).all()
         has_printers = bool(printers)
         filaments_json = [

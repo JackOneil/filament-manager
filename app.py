@@ -48,7 +48,7 @@ from utils import get_settings, utc_now
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.79.5'
+APP_VERSION = '1.79.7'
 
 csrf = CSRFProtect()
 
@@ -93,6 +93,9 @@ def create_app(test_config=None) -> Flask:
                 cursor = dbapi_connection.cursor()
                 cursor.execute("PRAGMA journal_mode=WAL")
                 cursor.execute("PRAGMA synchronous=NORMAL")
+                cursor.execute("PRAGMA cache_size=-16000")
+                cursor.execute("PRAGMA mmap_size=268435456")
+                cursor.execute("PRAGMA temp_store=MEMORY")
                 cursor.close()
 
     csrf.init_app(app)
@@ -310,6 +313,11 @@ def _setup_database(app: Flask) -> None:
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_audit_log_user_id ON audit_log (user_id)')
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_audit_log_endpoint ON audit_log (endpoint)')
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_audit_log_object ON audit_log (object_type, object_id)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_movement_history_action_type ON movement_history (action_type)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_movement_history_filament_name ON movement_history (filament_name)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_bambu_job_material_job_id ON bambu_job_material (job_id)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_bambu_print_job_filament_id ON bambu_print_job (filament_id)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_prusa_print_job_filament_id ON prusa_print_job (filament_id)')
 
         # Bambu Lab Cloud integration
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN bambu_token TEXT DEFAULT NULL")
