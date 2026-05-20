@@ -25,6 +25,7 @@ from utils import (
     deduct_filament_stock,
     escape_like,
     format_tags,
+    generate_sparkline_svg_path,
     get_filament_tags,
     log_movement,
     movement_action_label,
@@ -60,7 +61,7 @@ def _apply_inventory_filters(filaments_query):
     return filaments_query, f_brand, f_material, f_color, f_tag
 
 
-def _decorate_filament(filament, usage_map):
+def _decorate_filament(filament, usage_map, sparkline_data=None):
     metrics = compute_stock_status(
         filament,
         usage_map.get(filament.id, {}).get('usage_30', 0.0),
@@ -68,6 +69,24 @@ def _decorate_filament(filament, usage_map):
     )
     filament.stock_metrics = metrics
     filament.tag_list = get_filament_tags(filament)
+    
+    # Pre-compute capacity and percentage to avoid Jinja2 arithmetic (Rule 3.4)
+    capacity_all = filament.quantity * filament.weight_total
+    filament._capacity_all = capacity_all
+    if capacity_all > 0:
+        filament._pct = round(filament.weight_remaining / capacity_all * 100)
+    else:
+        filament._pct = 0
+    
+    # Pre-compute SVG sparkline path to avoid Jinja2 loops (Rule 3.5)
+    if sparkline_data and filament.id in sparkline_data:
+        polyline_pts, fill_pts = generate_sparkline_svg_path(sparkline_data[filament.id])
+        filament._sparkline_polyline = polyline_pts
+        filament._sparkline_fill = fill_pts
+    else:
+        filament._sparkline_polyline = ''
+        filament._sparkline_fill = ''
+    
     return filament
 
 
@@ -371,7 +390,8 @@ def _inventory_page_context():
 
     filaments_paginated = db.paginate(filaments_query.statement, page=page, per_page=per_page, error_out=False)
     usage_map = collect_usage_windows(filaments_paginated.items)
-    filaments_paginated.items[:] = [_decorate_filament(fil, usage_map) for fil in filaments_paginated.items]
+    sparkline_data = collect_sparkline_data(filaments_paginated.items)
+    filaments_paginated.items[:] = [_decorate_filament(fil, usage_map, sparkline_data) for fil in filaments_paginated.items]
 
     brands = Brand.query.order_by(Brand.name).all()
     materials = Material.query.order_by(Material.name).all()
@@ -737,7 +757,8 @@ def register(app):
 
         filament = _build_filament_query().filter(Filament.id == id).first_or_404()
         usage_map = collect_usage_windows([filament])
-        _decorate_filament(filament, usage_map)
+        sparkline_data = collect_sparkline_data([filament])
+        _decorate_filament(filament, usage_map, sparkline_data)
 
         timeline_page = request.args.get('timeline_page', 1, type=int)
         jobs_page = request.args.get('jobs_page', 1, type=int)

@@ -1,10 +1,7 @@
 {% for fil in filaments %}
-    {% set capacity_all = fil.quantity * fil.weight_total %}
-    {% if capacity_all > 0 %}
-        {% set pct = (fil.weight_remaining / capacity_all * 100) | round | int %}
-    {% else %}
-        {% set pct = 0 %}
-    {% endif %}
+    {# pct and capacity_all are pre-computed in Python (_decorate_filament) #}
+    {% set pct = fil._pct %}
+    {% set capacity_all = fil._capacity_all %}
     <div class="bg-white border-b border-gray-100 px-3 py-1.5 hover:bg-blue-50/40 transition-colors grid grid-cols-12 gap-2 items-center text-xs"
          data-fil-id="{{ fil.id }}"
          data-fil-name="{{ fil.name | e }}"

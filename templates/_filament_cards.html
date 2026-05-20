@@ -1,11 +1,8 @@
 {% for fil in filaments %}
     <!-- KARTY POHLED -->
-    {% set capacity_all = fil.quantity * fil.weight_total %}
-    {% if capacity_all > 0 %}
-        {% set pct = (fil.weight_remaining / capacity_all * 100) | round | int %}
-    {% else %}
-        {% set pct = 0 %}
-    {% endif %}
+    {# pct and capacity_all are pre-computed in Python (_decorate_filament) #}
+    {% set pct = fil._pct %}
+    {% set capacity_all = fil._capacity_all %}
     <div class="ui-panel !p-0 overflow-hidden relative"
          data-fil-id="{{ fil.id }}"
          data-fil-name="{{ fil.name | e }}"
@@ -90,20 +87,11 @@
                 </div>
                 {% endif %}
                 <div class="text-xs text-center text-gray-400 mt-1">{{ t('spool_price').format(price='{:0.2f}'.format(fil.price), weight=fil.weight_total | int, currency=current_currency) }}</div>
-                {% if sparkline_data is defined and sparkline_data[fil.id] is defined %}
-                {% set sl = sparkline_data[fil.id] %}
-                {% set sl_max = sl | max %}
-                {% set sl_max_safe = sl_max if sl_max > 0 else 1 %}
+                {% if fil._sparkline_polyline %}
                 <div class="mt-2" title="{{ t('sparkline_tooltip') }}">
                     <svg viewBox="0 0 70 20" class="w-full h-5" preserveAspectRatio="none">
-                        {% set pts = namespace(points='') %}
-                        {% for i in range(7) %}
-                            {% set x = (i * 70 / 6) | round(2) %}
-                            {% set y = (20 - sl[i] / sl_max_safe * 18) | round(2) %}
-                            {% set pts.points = pts.points ~ x ~ ',' ~ y ~ ' ' %}
-                        {% endfor %}
-                        <polyline points="{{ pts.points }}" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                        <polyline points="0,20 {{ pts.points }} 70,20" fill="rgba(59,130,246,0.12)" stroke="none"/>
+                        <polyline points="{{ fil._sparkline_polyline }}" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <polyline points="{{ fil._sparkline_fill }}" fill="rgba(59,130,246,0.12)" stroke="none"/>
                     </svg>
                 </div>
                 {% endif %}

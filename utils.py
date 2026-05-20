@@ -571,6 +571,31 @@ def collect_sparkline_data(filaments, now=None):
     return by_id
 
 
+def generate_sparkline_svg_path(sparkline_data_for_filament):
+    """Generate SVG polyline points string for sparkline from 7 data points.
+    
+    This moves SVG path construction from Jinja2 templates to Python (Rule 3.5).
+    Input: list of 7 floats [day0, day1, ..., day6]
+    Output: tuple of (polyline_points, fill_points) for SVG
+    """
+    if not sparkline_data_for_filament or len(sparkline_data_for_filament) != 7:
+        return '', ''
+    
+    sl_max = max(sparkline_data_for_filament) if sparkline_data_for_filament else 0
+    sl_max_safe = sl_max if sl_max > 0 else 1
+    
+    points = []
+    for i in range(7):
+        x = round(i * 70 / 6, 2)
+        y = round(20 - sparkline_data_for_filament[i] / sl_max_safe * 18, 2)
+        points.append(f'{x},{y}')
+    
+    polyline_points = ' '.join(points)
+    fill_points = f'0,20 {polyline_points} 70,20'
+    
+    return polyline_points, fill_points
+
+
 def parse_sync_status(raw_value):
     if not raw_value:
         return {

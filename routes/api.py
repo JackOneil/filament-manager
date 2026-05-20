@@ -4,7 +4,7 @@ from sqlalchemy.orm import joinedload
 from auth import get_current_user, is_admin
 from database import db
 from models import Filament, Brand, Project, PrusaPrinter, BambuPrinter
-from utils import collect_usage_windows, collect_sparkline_data, compute_stock_status, escape_like, get_filament_tags, get_settings
+from utils import collect_usage_windows, collect_sparkline_data, compute_stock_status, escape_like, generate_sparkline_svg_path, get_filament_tags, get_settings
 
 
 def register(app):
@@ -93,20 +93,41 @@ def register(app):
 
         filaments_paginated = db.paginate(filaments_query.statement, page=page, per_page=per_page, error_out=False)
         usage_map = collect_usage_windows(filaments_paginated.items)
+        sparkline_data = collect_sparkline_data(filaments_paginated.items)
+        
+        # Decorate filaments with pre-computed values (Rule 3.4, 3.5)
+        decorated_filaments = []
         for fil in filaments_paginated.items:
-            fil.stock_metrics = compute_stock_status(
+            metrics = compute_stock_status(
                 fil,
                 usage_map.get(fil.id, {}).get('usage_30', 0.0),
                 usage_map.get(fil.id, {}).get('usage_90', 0.0),
             )
+            fil.stock_metrics = metrics
             fil.tag_list = get_filament_tags(fil)
-
+            
+            # Pre-compute capacity and percentage
+            capacity_all = fil.quantity * fil.weight_total
+            fil._capacity_all = capacity_all
+            fil._pct = round(fil.weight_remaining / capacity_all * 100) if capacity_all > 0 else 0
+            
+            # Pre-compute SVG sparkline path
+            if fil.id in sparkline_data:
+                polyline_pts, fill_pts = generate_sparkline_svg_path(sparkline_data[fil.id])
+                fil._sparkline_polyline = polyline_pts
+                fil._sparkline_fill = fill_pts
+            else:
+                fil._sparkline_polyline = ''
+                fil._sparkline_fill = ''
+            
+            decorated_filaments.append(fil)
+        
         sparkline_data = collect_sparkline_data(filaments_paginated.items)
 
         if view_mode == 'card':
             html = render_template(
                 '_filament_cards.html',
-                filaments=filaments_paginated.items,
+                filaments=decorated_filaments,
                 app_settings=setting,
                 inventory_read_only=inventory_read_only,
                 sparkline_data=sparkline_data,
@@ -114,7 +135,7 @@ def register(app):
         elif view_mode == 'compact':
             html = render_template(
                 '_filament_compact.html',
-                filaments=filaments_paginated.items,
+                filaments=decorated_filaments,
                 app_settings=setting,
                 inventory_read_only=inventory_read_only,
                 sparkline_data=sparkline_data,
@@ -122,7 +143,7 @@ def register(app):
         else:
             html = render_template(
                 '_filament_list_rows.html',
-                filaments=filaments_paginated.items,
+                filaments=decorated_filaments,
                 app_settings=setting,
                 inventory_read_only=inventory_read_only,
                 sparkline_data=sparkline_data,
