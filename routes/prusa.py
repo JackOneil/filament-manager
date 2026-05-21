@@ -16,7 +16,7 @@ import re
 from datetime import datetime, timezone
 
 import requests
-from flask import render_template, request, redirect, url_for, jsonify
+from flask import render_template, request, redirect, url_for, jsonify, Blueprint
 
 from sqlalchemy.orm import joinedload
 from database import db
@@ -268,12 +268,13 @@ def do_test_connection(printer: PrusaPrinter) -> dict:
 # ─── Route registration ──────────────────────────────────────────────────────
 
 def register(app):
+    bp = Blueprint('prusa', __name__)
 
     app.jinja_env.globals['prusa_format_duration'] = _format_duration
 
     # ── Overview page ────────────────────────────────────────────────────
 
-    @app.route('/prusa')
+    @bp.route('/prusa')
     def prusa_jobs():
         page = request.args.get('page', 1, type=int)
         job_filter = request.args.get('filter', '')
@@ -348,7 +349,7 @@ def register(app):
 
     # ── Per-printer manual sync ──────────────────────────────────────────
 
-    @app.route('/prusa/printer/<int:printer_id>/sync', methods=['POST'])
+    @bp.route('/prusa/printer/<int:printer_id>/sync', methods=['POST'])
     def prusa_printer_sync(printer_id):
         printer = db.session.get(PrusaPrinter, printer_id)
         if not printer:
@@ -358,7 +359,7 @@ def register(app):
 
     # ── Connection test ──────────────────────────────────────────────────
 
-    @app.route('/prusa/printer/<int:printer_id>/test', methods=['POST'])
+    @bp.route('/prusa/printer/<int:printer_id>/test', methods=['POST'])
     def prusa_printer_test(printer_id):
         printer = db.session.get(PrusaPrinter, printer_id)
         if not printer:
@@ -372,7 +373,7 @@ def register(app):
 
     # ── Job mapping (filament + project) ─────────────────────────────────
 
-    @app.route('/prusa/job/<int:job_id>/map', methods=['POST'])
+    @bp.route('/prusa/job/<int:job_id>/map', methods=['POST'])
     def prusa_job_map(job_id):
         is_ajax = request.args.get('ajax') == '1'
         job = db.session.get(PrusaPrintJob, job_id)
@@ -454,13 +455,14 @@ def register(app):
 
     # ── Delete job record ────────────────────────────────────────────────
 
-    @app.route('/prusa/job/<int:job_id>/delete', methods=['POST'])
+    @bp.route('/prusa/job/<int:job_id>/delete', methods=['POST'])
     def prusa_job_delete(job_id):
         job = db.session.get(PrusaPrintJob, job_id)
         if job:
             db.session.delete(job)
             db.session.commit()
         return redirect(url_for('prusa_jobs'))
+    app.register_blueprint(bp)
 
 
 # ─── Project filament sync helper ────────────────────────────────────────────

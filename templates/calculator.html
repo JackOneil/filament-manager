@@ -6,92 +6,227 @@
         <p class="text-gray-500 mt-2">{{ t('calc_desc') }}</p>
     </div>
 
-    <div class="bg-white rounded-xl shadow-md p-6 lg:p-10 border border-gray-100">
+    <div class="bg-white rounded-xl shadow-md p-6 lg:p-10 border border-gray-100"
+         x-data="{
+             step: 1,
+             filamentId: '',
+             filamentSearch: '',
+             filamentSelectedLabel: '',
+             weight: '{{ result.weight if result else '' }}',
+             printTime: '{{ result.print_time if result else '' }}',
+             marginPercent: '{{ result.margin_percent if result else 20 }}',
+             projectId: '{{ result.project_id if result else '' }}',
+             dropdownOpen: false,
+
+             isStep1Valid() {
+                 return this.filamentId !== '';
+             },
+             isStep2Valid() {
+                 return this.weight !== '' && parseFloat(this.weight) > 0 && this.printTime !== '' && parseFloat(this.printTime) >= 0;
+             },
+             isStep3Valid() {
+                 return this.marginPercent !== '' && parseFloat(this.marginPercent) >= 0;
+             },
+
+             init() {
+                 this.$nextTick(() => {
+                     const urlParams = new URLSearchParams(window.location.search);
+                     const preselect = urlParams.get('filament_id');
+                     if (preselect) {
+                         this.selectFilamentById(preselect);
+                     } else if ('{{ result.filament.id if result else '' }}') {
+                         this.selectFilamentById('{{ result.filament.id if result else '' }}');
+                         this.step = 3;
+                     }
+                 });
+             },
+
+             selectFilamentById(id) {
+                 this.filamentId = id;
+                 const opt = document.querySelector(`.filament-option[data-value='${id}']`);
+                 if (opt) {
+                     const name = opt.querySelector('.font-bold').textContent.trim();
+                     const details = opt.querySelector('.text-sm').textContent.trim();
+                     this.filamentSelectedLabel = `${name} | ${details}`;
+                     this.filamentSearch = this.filamentSelectedLabel;
+                 }
+             }
+         }">
+        
+        <!-- Stepper Progress Header -->
+        <div class="flex items-center justify-between mb-8 max-w-lg mx-auto relative px-4">
+            <!-- Background line -->
+            <div class="absolute left-8 right-8 top-5 h-1 bg-gray-200 -z-10 rounded"></div>
+            <!-- Active progress line -->
+            <div class="absolute left-8 top-5 h-1 bg-gradient-to-r from-green-500 to-indigo-500 -z-10 rounded transition-all duration-300"
+                 :style="'width: ' + ((step - 1) * 50) + '%'"></div>
+
+            <!-- Step 1 Circle -->
+            <button type="button" @click="if(step > 1) step = 1" class="flex flex-col items-center gap-1 focus:outline-none">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300"
+                     :class="step === 1 ? 'bg-green-600 text-white shadow-lg ring-4 ring-green-100' : (step > 1 ? 'bg-green-500 text-white' : 'bg-white border-2 border-gray-300 text-gray-400')">
+                    <template x-if="step > 1">
+                        <i class="fa-solid fa-check"></i>
+                    </template>
+                    <template x-if="step === 1">
+                        <span>1</span>
+                    </template>
+                </div>
+                <span class="text-xs font-semibold" :class="step === 1 ? 'text-green-700' : 'text-gray-500'">{{ t('calc_step_material') }}</span>
+            </button>
+
+            <!-- Step 2 Circle -->
+            <button type="button" @click="if(isStep1Valid() && step > 2) step = 2; else if(isStep1Valid() && step < 2) step = 2" class="flex flex-col items-center gap-1 focus:outline-none" :disabled="!isStep1Valid()">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300"
+                     :class="step === 2 ? 'bg-blue-600 text-white shadow-lg ring-4 ring-blue-100' : (step > 2 ? 'bg-blue-500 text-white' : 'bg-white border-2 border-gray-300 text-gray-400')">
+                    <template x-if="step > 2">
+                        <i class="fa-solid fa-check"></i>
+                    </template>
+                    <template x-if="step <= 2">
+                        <span>2</span>
+                    </template>
+                </div>
+                <span class="text-xs font-semibold" :class="step === 2 ? 'text-blue-700' : 'text-gray-500'">{{ t('calc_step_params') }}</span>
+            </button>
+
+            <!-- Step 3 Circle -->
+            <button type="button" @click="if(isStep1Valid() && isStep2Valid()) step = 3" class="flex flex-col items-center gap-1 focus:outline-none" :disabled="!(isStep1Valid() && isStep2Valid())">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300"
+                     :class="step === 3 ? 'bg-indigo-600 text-white shadow-lg ring-4 ring-indigo-100' : 'bg-white border-2 border-gray-300 text-gray-400'">
+                    <span>3</span>
+                </div>
+                <span class="text-xs font-semibold" :class="step === 3 ? 'text-indigo-700' : 'text-gray-500'">{{ t('calc_step_margin') }}</span>
+            </button>
+        </div>
+
         <form method="POST">
-            <div class="mb-5 relative" id="filament-select-container">
-                <label class="block text-gray-700 text-sm font-bold mb-2">{{ t('select_filament') }}</label>
+            <!-- STEP 1: Material Selection -->
+            <div x-show="step === 1" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform translate-x-4" x-transition:enter-end="opacity-100 transform translate-x-0">
+                <div class="mb-5 relative" id="filament-select-container">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">{{ t('select_filament') }}</label>
+                    <input type="hidden" name="filament_id" x-model="filamentId" required>
 
-                <input type="hidden" name="filament_id" id="filament_id_input" required>
-
-                <div class="relative">
-                    <input type="text" id="filament_search" placeholder="{{ t('search_filament') }}" class="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 text-lg pr-10 cursor-pointer" autocomplete="off">
-                    <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-400">
-                        <i class="fa-solid fa-chevron-down"></i>
-                    </div>
-                </div>
-
-                <div id="filament_dropdown" class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto hidden">
-                    {% for f in filaments %}
-                        <div class="filament-option px-4 py-3 hover:bg-green-50 cursor-pointer border-b border-gray-50 last:border-b-0" data-value="{{ f.id }}" data-search="{{ (f.name ~ ' ' ~ f.brand.name ~ ' ' ~ f.material.name)|lower }}">
-                            <div class="font-bold text-gray-800">{{ f.name }}</div>
-                            <div class="text-sm text-gray-500">{{ f.brand.name }} {{ f.material.name }}</div>
-                        </div>
-                    {% endfor %}
-                    <div id="no_results" class="px-4 py-3 text-gray-500 italic hidden">{{ t('no_results') }}</div>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5 items-end">
-                <div>
-                    <label class="block text-gray-700 text-sm font-bold mb-2">{{ t('print_weight') }}</label>
                     <div class="relative">
-                        <input type="number" name="weight" step="0.1" min="0.1" value="{{ result.weight if result else '' }}" placeholder="{{ t('print_weight_placeholder') }}" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500" required>
-                        <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-400 font-bold text-sm">
-                            {{ t('grams') }}
+                        <input type="text" 
+                               x-model="filamentSearch" 
+                               @click="dropdownOpen = true; if(filamentId) filamentSearch = ''"
+                               @input="dropdownOpen = true"
+                               placeholder="{{ t('search_filament') }}" 
+                               class="w-full border border-gray-300 rounded-lg px-4 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 text-lg pr-10 cursor-pointer" 
+                               autocomplete="off">
+                        <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-400">
+                            <i class="fa-solid fa-chevron-down"></i>
                         </div>
                     </div>
-                </div>
 
-                <div>
-                    <label class="block text-gray-700 text-sm font-bold mb-2">{{ t('print_time') }}</label>
-                    <div class="relative">
-                        <input type="number" name="print_time" step="0.1" min="0" value="{{ result.print_time if result else '' }}" placeholder="{{ t('print_time_placeholder') }}" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                        <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-400 font-bold text-sm">
-                            {{ t('hours') }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5 items-end">
-                <div>
-                    <label class="block text-gray-700 text-sm font-bold mb-2">{{ t('quote_margin') }}</label>
-                    <div class="relative">
-                        <input type="number" name="margin_percent" step="0.1" min="0" value="{{ result.margin_percent if result else 20 }}" placeholder="20" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
-                        <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-400 font-bold text-sm">%</div>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-gray-700 text-sm font-bold mb-2">{{ t('quote_project_optional') }}</label>
-                    <select name="project_id" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        <option value="">{{ t('quote_no_project') }}</option>
-                        {% for project in projects %}
-                        <option value="{{ project.id }}">{{ project.name }}</option>
+                    <div x-show="dropdownOpen" 
+                         @click.outside="dropdownOpen = false; if(filamentId) filamentSearch = filamentSelectedLabel; else { filamentId = ''; filamentSearch = ''; }" 
+                         class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                         x-cloak>
+                        {% for f in filaments %}
+                            <div class="filament-option px-4 py-3 hover:bg-green-55 cursor-pointer border-b border-gray-55 last:border-b-0" 
+                                 data-value="{{ f.id }}"
+                                 x-show="!filamentSearch || '{{ (f.name ~ ' ' ~ f.brand.name ~ ' ' ~ f.material.name)|lower }}'.includes(filamentSearch.toLowerCase())"
+                                 :class="filamentId == '{{ f.id }}' ? 'bg-green-100 border-l-4 border-green-500' : ''"
+                                 @click="
+                                     filamentId = '{{ f.id }}';
+                                     filamentSelectedLabel = '{{ f.name }} | {{ f.brand.name }} {{ f.material.name }}';
+                                     filamentSearch = filamentSelectedLabel;
+                                     dropdownOpen = false;
+                                 ">
+                                <div class="font-bold text-gray-800">{{ f.name }}</div>
+                                <div class="text-sm text-gray-500">{{ f.brand.name }} {{ f.material.name }}</div>
+                            </div>
                         {% endfor %}
-                    </select>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end mt-6">
+                    <button type="button" @click="step = 2" :disabled="!isStep1Valid()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow hover:shadow-md transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                        {{ t('calc_step_next') }} <i class="fa-solid fa-arrow-right"></i>
+                    </button>
                 </div>
             </div>
 
-            <div class="mb-8 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center gap-2 text-sm text-yellow-800">
-                <i class="fa-solid fa-bolt text-yellow-500"></i>
-                <span>
-                    <span class="font-semibold">{{ t('kwh_price') }}:</span> {{ setting.kwh_price if setting else 5.0 }}
-                    &nbsp;|&nbsp;
-                    <span class="font-semibold">{{ t('printer_power') }}:</span> {{ setting.printer_power if setting else 150 }} W
-                </span>
-                <a href="{{ url_for('settings') }}#printer-energy" class="sm:ml-auto text-yellow-700 hover:text-yellow-900 underline whitespace-nowrap">
-                    <i class="fa-solid fa-gear"></i> {{ t('settings') }}
-                </a>
+            <!-- STEP 2: Print Parameters -->
+            <div x-show="step === 2" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform translate-x-4" x-transition:enter-end="opacity-100 transform translate-x-0" x-cloak>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5 items-end">
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">{{ t('print_weight') }}</label>
+                        <div class="relative">
+                            <input type="number" name="weight" step="0.1" min="0.1" x-model="weight" placeholder="{{ t('print_weight_placeholder') }}" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500" required>
+                            <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-400 font-bold text-sm">
+                                {{ t('grams') }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">{{ t('print_time') }}</label>
+                        <div class="relative">
+                            <input type="number" name="print_time" step="0.1" min="0" x-model="printTime" placeholder="{{ t('print_time_placeholder') }}" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                            <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-400 font-bold text-sm">
+                                {{ t('hours') }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-between mt-6">
+                    <button type="button" @click="step = 1" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-6 rounded-lg transition-all flex items-center gap-2">
+                        <i class="fa-solid fa-arrow-left"></i> {{ t('calc_step_back') }}
+                    </button>
+                    <button type="button" @click="if (isStep2Valid()) step = 3" :disabled="!isStep2Valid()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow hover:shadow-md transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                        {{ t('calc_step_next') }} <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
             </div>
 
-            <div class="flex flex-col md:flex-row gap-3">
-                <button type="submit" name="action" value="calculate" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg text-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-calculator"></i> {{ t('calc_btn') }}
-                </button>
-                <button type="submit" name="action" value="save_quote" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-6 rounded-lg text-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-file-signature"></i> {{ t('quote_save_btn') }}
-                </button>
+            <!-- STEP 3: Margin & Project saving -->
+            <div x-show="step === 3" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform translate-x-4" x-transition:enter-end="opacity-100 transform translate-x-0" x-cloak>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5 items-end">
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">{{ t('quote_margin') }}</label>
+                        <div class="relative">
+                            <input type="number" name="margin_percent" step="0.1" min="0" x-model="marginPercent" placeholder="20" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                            <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-gray-400 font-bold text-sm">%</div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">{{ t('quote_project_optional') }}</label>
+                        <select name="project_id" x-model="projectId" class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="">{{ t('quote_no_project') }}</option>
+                            {% for project in projects %}
+                            <option value="{{ project.id }}">{{ project.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-8 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center gap-2 text-sm text-yellow-800">
+                    <i class="fa-solid fa-bolt text-yellow-500"></i>
+                    <span>
+                        <span class="font-semibold">{{ t('kwh_price') }}:</span> {{ setting.kwh_price if setting else 5.0 }}
+                        &nbsp;|&nbsp;
+                        <span class="font-semibold">{{ t('printer_power') }}:</span> {{ setting.printer_power if setting else 150 }} W
+                    </span>
+                    <a href="{{ url_for('settings') }}#printer-energy" class="sm:ml-auto text-yellow-700 hover:text-yellow-900 underline whitespace-nowrap">
+                        <i class="fa-solid fa-gear"></i> {{ t('settings') }}
+                    </a>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-3 mt-6">
+                    <button type="button" @click="step = 2" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-4 px-6 rounded-lg transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-arrow-left"></i> {{ t('calc_step_back') }}
+                    </button>
+                    <button type="submit" name="action" value="calculate" :disabled="!isStep3Valid()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-6 rounded-lg text-lg shadow hover:shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="fa-solid fa-calculator"></i> {{ t('calc_btn') }}
+                    </button>
+                    <button type="submit" name="action" value="save_quote" :disabled="!isStep3Valid()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 px-6 rounded-lg text-lg shadow hover:shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="fa-solid fa-file-signature"></i> {{ t('quote_save_btn') }}
+                    </button>
+                </div>
             </div>
         </form>
 
@@ -236,84 +371,5 @@
     </div>
 </div>
 
-<script>
-    document.addEventListener("DOMContentLoaded", function() {
-        const searchInput = document.getElementById('filament_search');
-        const dropdown = document.getElementById('filament_dropdown');
-        const hiddenInput = document.getElementById('filament_id_input');
-        const options = document.querySelectorAll('.filament-option');
-        const noResults = document.getElementById('no_results');
 
-        searchInput.addEventListener('click', function(e) {
-            dropdown.classList.remove('hidden');
-            e.stopPropagation();
-        });
-
-        searchInput.addEventListener('input', function(e) {
-            dropdown.classList.remove('hidden');
-            const searchTerm = e.target.value.toLowerCase().trim();
-            let hasVisible = false;
-
-            options.forEach(option => {
-                option.classList.remove('bg-green-100');
-
-                const searchData = option.getAttribute('data-search');
-                if (searchData.includes(searchTerm)) {
-                    option.classList.remove('hidden');
-                    hasVisible = true;
-                } else {
-                    option.classList.add('hidden');
-                }
-            });
-
-            if (hasVisible) {
-                noResults.classList.add('hidden');
-            } else {
-                noResults.classList.remove('hidden');
-            }
-        });
-
-        options.forEach(option => {
-            option.addEventListener('click', function() {
-                const val = this.getAttribute('data-value');
-                const name = this.querySelector('.font-bold').textContent;
-                const details = this.querySelector('.text-sm').textContent;
-
-                hiddenInput.value = val;
-                searchInput.value = `${name} | ${details}`;
-
-                options.forEach(opt => opt.classList.remove('bg-green-100', 'border-l-4', 'border-green-500'));
-                this.classList.add('bg-green-100', 'border-l-4', 'border-green-500');
-
-                dropdown.classList.add('hidden');
-
-                options.forEach(opt => opt.classList.remove('hidden'));
-                noResults.classList.add('hidden');
-            });
-        });
-
-        document.addEventListener('click', function(e) {
-            if (!document.getElementById('filament-select-container').contains(e.target)) {
-                dropdown.classList.add('hidden');
-                if (!hiddenInput.value) {
-                    searchInput.value = '';
-                }
-            }
-        });
-
-        // Pre-select filament from URL query param (?filament_id=X)
-        const urlParams = new URLSearchParams(window.location.search);
-        const preselect = urlParams.get('filament_id');
-        if (preselect) {
-            const opt = document.querySelector(`.filament-option[data-value="${preselect}"]`);
-            if (opt) {
-                const name = opt.querySelector('.font-bold').textContent;
-                const details = opt.querySelector('.text-sm').textContent;
-                hiddenInput.value = preselect;
-                searchInput.value = `${name} | ${details}`;
-                opt.classList.add('bg-green-100', 'border-l-4', 'border-green-500');
-            }
-        }
-    });
-</script>
 {% endblock %}

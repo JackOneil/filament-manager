@@ -1195,6 +1195,13 @@ TRANSLATIONS = {
         'community_db_browse': 'Databáze filamentů',
         # ── Kanban resize ─────────────────────────────────────────────────────
         'kanban_resize_hint': 'Přetáhnout pro změnu šířky sloupce',
+        # ── Calculator Stepper & Suggestions ──────────────────────────────────
+        'calc_step_material': 'Materiál',
+        'calc_step_params': 'Parametry tisku',
+        'calc_step_margin': 'Marže & Projekt',
+        'calc_step_next': 'Další',
+        'calc_step_back': 'Zpět',
+        'project_suggested_names': 'Doporučené názvy podle tisků',
     },
     'en': {
         'title': 'Filament Manager',
@@ -2392,5 +2399,12 @@ TRANSLATIONS = {
         'community_db_browse': 'Filament Database',
         # ── Kanban resize ─────────────────────────────────────────────────────
         'kanban_resize_hint': 'Drag to resize column',
+        # ── Calculator Stepper & Suggestions ──────────────────────────────────
+        'calc_step_material': 'Material',
+        'calc_step_params': 'Print Parameters',
+        'calc_step_margin': 'Margin & Project',
+        'calc_step_next': 'Next',
+        'calc_step_back': 'Back',
+        'project_suggested_names': 'Suggested Names from Prints',
     }
 }

@@ -291,6 +291,8 @@ def require_admin(view):
 
 def ensure_endpoint_access():
     endpoint = request.endpoint or ''
+    if '.' in endpoint:
+        endpoint = endpoint.split('.')[-1]
     if endpoint in PUBLIC_ENDPOINTS or endpoint.startswith('pwa.'):
         return None
     if request.method == 'OPTIONS':
@@ -333,9 +335,12 @@ def _audit_should_capture(user):
         return False
     if current_app.config.get('TESTING') and not current_app.config.get('AUTH_REQUIRED_IN_TESTS'):
         return False
-    if (request.endpoint or '') in PUBLIC_ENDPOINTS:
+    endpoint = request.endpoint or ''
+    if '.' in endpoint:
+        endpoint = endpoint.split('.')[-1]
+    if endpoint in PUBLIC_ENDPOINTS:
         return False
-    return request.endpoint not in {'audit_logs'}
+    return endpoint not in {'audit_logs'}
 
 
 def _audit_json_dumps(payload):
@@ -388,6 +393,8 @@ def _audit_client_ip():
 
 def _audit_target():
     endpoint = request.endpoint or ''
+    if '.' in endpoint:
+        endpoint = endpoint.split('.')[-1]
     view_args = dict(request.view_args or {})
 
     from models import (
@@ -487,6 +494,9 @@ def _audit_prepare_request():
     if '_audit_sid' not in session:
         session['_audit_sid'] = secrets.token_hex(12)
     target = _audit_target()
+    endpoint = request.endpoint or ''
+    if '.' in endpoint:
+        endpoint = endpoint.split('.')[-1]
     g.audit_context = {
         'user_id': user.id,
         'user_email': user.email,
@@ -495,9 +505,9 @@ def _audit_prepare_request():
         'ip_address': _audit_client_ip(),
         'user_agent': (request.headers.get('User-Agent') or '')[:255] or None,
         'method': request.method,
-        'endpoint': request.endpoint,
+        'endpoint': endpoint,
         'path': request.full_path.rstrip('?'),
-        'action': request.form.get('action') or request.endpoint or request.method.lower(),
+        'action': request.form.get('action') or endpoint or request.method.lower(),
         'object_type': target.get('object_type'),
         'object_id': target.get('object_id'),
         'before': {

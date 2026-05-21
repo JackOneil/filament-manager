@@ -1,6 +1,5 @@
 {% extends "base.html" %}
 {% block content %}
-<script src="{{ url_for('static', filename='js/chart.min.js') }}"></script>
 <style>
 .stats-section { position: relative; }
 .stats-section.drag-over { outline: 2px dashed #3b82f6; outline-offset: 4px; border-radius: 1rem; box-shadow: 0 0 0 4px rgba(59,130,246,0.16); transform: translateY(-2px); }
@@ -741,73 +740,75 @@ function statsDashboard() {
 }
 
 // ── Chart.js ─────────────────────────────────────────────────────────────────
-function baseChartOptions() {
-    return {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { labels: { boxWidth: 12 } } },
-        scales: { y: { beginAtZero: true, ticks: { callback: (v) => `${v} g` } } },
-    };
+function initCharts() {
+    function baseChartOptions() {
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { labels: { boxWidth: 12 } } },
+            scales: { y: { beginAtZero: true, ticks: { callback: (v) => `${v} g` } } },
+        };
+    }
+    new Chart(document.getElementById('executiveChart'), {
+        type: 'bar',
+        data: {
+            labels: statsData.labels,
+            datasets: [
+                {
+                    label: '{{ t("stats_purchase_dataset") }}',
+                    data: statsData.purchaseDaily,
+                    backgroundColor: 'rgba(16,185,129,0.35)',
+                    borderRadius: 8,
+                    order: 2,
+                },
+                {
+                    label: '{{ t("stats_usage_dataset") }}',
+                    data: statsData.usageDaily,
+                    type: 'line',
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37,99,235,0.18)',
+                    fill: true,
+                    tension: 0.3,
+                    order: 1,
+                },
+            ],
+        },
+        options: baseChartOptions(),
+    });
+    new Chart(document.getElementById('usageChart'), {
+        type: 'line',
+        data: {
+            labels: statsData.labels,
+            datasets: [
+                { label: '{{ t("stats_usage_dataset") }}', data: statsData.usageDaily, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.18)', fill: true, tension: 0.3 },
+                ...statsData.materialSeries.map(s => ({ ...s, fill: false, tension: 0.25, borderDash: [5, 4] })),
+            ],
+        },
+        options: baseChartOptions(),
+    });
+    new Chart(document.getElementById('purchaseChart'), {
+        type: 'bar',
+        data: { labels: statsData.labels, datasets: [{ label: '{{ t("stats_purchase_dataset") }}', data: statsData.purchaseDaily, backgroundColor: '#10b981', borderRadius: 8 }] },
+        options: baseChartOptions(),
+    });
+    {% if top_materials %}
+    new Chart(document.getElementById('materialChart'), {
+        type: 'doughnut',
+        data: {
+            labels: {{ top_materials|map(attribute='name')|list|tojson }},
+            datasets: [{ data: {{ top_materials|map(attribute='grams')|list|tojson }}, backgroundColor: ['#2563eb','#10b981','#f59e0b','#ef4444','#8b5cf6'], borderWidth: 0 }],
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
+    });
+    {% endif %}
+    {% if project_rows %}
+    new Chart(document.getElementById('projectChart'), {
+        type: 'bar',
+        data: { labels: statsData.projectLabels, datasets: [{ label: '{{ t("stats_project_dataset") }}', data: statsData.projectData, backgroundColor: '#8b5cf6', borderRadius: 8 }] },
+        options: { ...baseChartOptions(), indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: { callback: (v) => `${v} g` } }, y: { ticks: { callback: (v, i) => statsData.projectLabels[i] || v } } } },
+    });
+    {% endif %}
 }
-new Chart(document.getElementById('executiveChart'), {
-    type: 'bar',
-    data: {
-        labels: statsData.labels,
-        datasets: [
-            {
-                label: '{{ t("stats_purchase_dataset") }}',
-                data: statsData.purchaseDaily,
-                backgroundColor: 'rgba(16,185,129,0.35)',
-                borderRadius: 8,
-                order: 2,
-            },
-            {
-                label: '{{ t("stats_usage_dataset") }}',
-                data: statsData.usageDaily,
-                type: 'line',
-                borderColor: '#2563eb',
-                backgroundColor: 'rgba(37,99,235,0.18)',
-                fill: true,
-                tension: 0.3,
-                order: 1,
-            },
-        ],
-    },
-    options: baseChartOptions(),
-});
-new Chart(document.getElementById('usageChart'), {
-    type: 'line',
-    data: {
-        labels: statsData.labels,
-        datasets: [
-            { label: '{{ t("stats_usage_dataset") }}', data: statsData.usageDaily, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.18)', fill: true, tension: 0.3 },
-            ...statsData.materialSeries.map(s => ({ ...s, fill: false, tension: 0.25, borderDash: [5, 4] })),
-        ],
-    },
-    options: baseChartOptions(),
-});
-new Chart(document.getElementById('purchaseChart'), {
-    type: 'bar',
-    data: { labels: statsData.labels, datasets: [{ label: '{{ t("stats_purchase_dataset") }}', data: statsData.purchaseDaily, backgroundColor: '#10b981', borderRadius: 8 }] },
-    options: baseChartOptions(),
-});
-{% if top_materials %}
-new Chart(document.getElementById('materialChart'), {
-    type: 'doughnut',
-    data: {
-        labels: {{ top_materials|map(attribute='name')|list|tojson }},
-        datasets: [{ data: {{ top_materials|map(attribute='grams')|list|tojson }}, backgroundColor: ['#2563eb','#10b981','#f59e0b','#ef4444','#8b5cf6'], borderWidth: 0 }],
-    },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
-});
-{% endif %}
-{% if project_rows %}
-new Chart(document.getElementById('projectChart'), {
-    type: 'bar',
-    data: { labels: statsData.projectLabels, datasets: [{ label: '{{ t("stats_project_dataset") }}', data: statsData.projectData, backgroundColor: '#8b5cf6', borderRadius: 8 }] },
-    options: { ...baseChartOptions(), indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: { callback: (v) => `${v} g` } }, y: { ticks: { callback: (v, i) => statsData.projectLabels[i] || v } } } },
-});
-{% endif %}
 
 // ── Copy reorder text to clipboard ───────────────────────────────────────────
 function copyReorderText(name, spools, btn) {
@@ -1125,6 +1126,14 @@ document.addEventListener('DOMContentLoaded', () => {
     applyHeights();
     cardManager.applyColors();
     updateRestorePanel();
+
+    window.loadScript("{{ url_for('static', filename='js/chart.min.js') }}")
+        .then(() => {
+            initCharts();
+        })
+        .catch(err => {
+            console.error("Failed to load Chart.js", err);
+        });
 });
 </script>
 {% endblock %}

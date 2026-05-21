@@ -27,7 +27,7 @@
 
 ## 2. Project File Structure
 
-The project uses a **modular Flask app factory pattern — no Blueprints**. Routes are registered directly on the `app` object via `register(app)` functions, so `url_for("index")` works in templates without any prefix.
+The project uses a **modular Flask app factory pattern with Flask Blueprints**. Each module inside the `routes/` directory defines its own Blueprint (e.g. `routes/inventory.py` registers a blueprint for inventory). To maintain backward compatibility with legacy templates and `url_for("endpoint")` usage, a custom `BuildError` fallback handler is registered in `app.py`. If a global endpoint lookup fails, the fallback handler automatically resolves it to the correct blueprint-prefixed endpoint (e.g., `inventory.index`).
 
 ```
 app.py                  # Entry point: create_app(), _setup_database(), _safe_alter(), background workers
@@ -209,9 +209,9 @@ When modifying this project, always follow these rules:
 - When adding/removing/restructuring any table or column, also update the backup schema (see rule 15).
 
 ### Rule 3 — Routes / Modularization
-- **Never use Flask Blueprints.** They require `url_for("blueprint.route")` prefixes and have caused breakage.
-- Add routes inside the appropriate `routes/*.py` `register(app)` function. For new features, create a new file and register it in `routes/__init__.py`.
-- `url_for("index")`, `url_for("add")`, etc. work as-is in templates — no prefix needed.
+- **Use Flask Blueprints for routing.** Each module in `routes/*.py` defines and registers its own Blueprint (e.g., `routes/inventory.py` defines `bp = Blueprint('inventory', __name__)` and registers routes using `@bp.route`).
+- All blueprints are registered in `routes/__init__.py` inside `register_all(app)`.
+- To avoid breaking legacy templates, **the app registers a custom `url_for` build error handler** in `app.py`. When a template calls `url_for("route_name")` without a blueprint prefix (e.g., `url_for("index")` instead of `url_for("inventory.index")`), the handler automatically resolves it to the correct blueprint-prefixed endpoint.
 
 ### Rule 4 — Authentication & Authorization
 - The project has session-based multi-user auth. New endpoints must be mapped in `auth.SECTION_BY_ENDPOINT` to the correct section: `overview`, `filaments`, `projects`, `history`, `storage`, `calculator`, `printers`, `stats`, `settings`, `users`.
@@ -387,6 +387,19 @@ This is already applied to `projects_index.html` and overrides any stale localSt
 - Jinja2 templates use the `t("key")` context processor.
 - Python code (e.g. background tasks, route handlers) must use `translate("key")` from `utils.py`.
 - Do not hardcode localized strings in Python code (e.g. notifications, flash messages where feasible) if it should adapt to the user's selected language.
+
+### Rule 26 — Alpine.js Global Store (appState)
+- Shared frontend states (e.g., active theme, sidebar pinned layout, mobile menu visibility, and command palette open state) must be stored in the global `appState` store defined in `static/js/app-shell.js`.
+- Always reference these properties in HTML templates via `$store.appState` (e.g., `$store.appState.theme` or `$store.appState.mobileOpen`).
+- Avoid replicating local state inside individual components for these shared application-level values.
+
+### Rule 27 — Lazy Loading of Heavy JS Libraries
+- To optimize page load time, heavy third-party JavaScript libraries (specifically `Chart.js` and `Online3DViewer`) must not be loaded statically via `<script>` tags in the page header.
+- Always use the asynchronous helper `window.loadScript(src)` defined in `static/js/app-shell.js`. Load the script dynamically on component mounting or initialization, handling the initialization in the `.then()` promise callback.
+
+### Rule 28 — Bambu Project Naming Suggestions
+- When creating print projects, clean suggestions from unmapped Bambu print jobs can be provided by the backend using the `_clean_title` helper from the Bambu module.
+- Render these suggestions as inline buttons/badges inside the project creation template, enabling one-click pre-filling of the project name input.
 
 ---
 

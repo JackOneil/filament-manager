@@ -10,7 +10,7 @@ import logging
 from datetime import datetime
 
 import requests
-from flask import render_template, request, redirect, url_for, jsonify
+from flask import render_template, request, redirect, url_for, jsonify, Blueprint
 
 from database import db
 from models import (
@@ -384,11 +384,12 @@ def do_sync(token: str, region: str) -> dict:
 # ─── Route registration ──────────────────────────────────────────────────────
 
 def register(app):
+    bp = Blueprint('bambu', __name__)
 
     # Make _format_duration available in all templates from this route module
     app.jinja_env.globals['format_duration'] = _format_duration
 
-    @app.route('/bambu')
+    @bp.route('/bambu')
     def bambu_jobs():
         setting = get_settings()
         page = request.args.get('page', 1, type=int)
@@ -465,7 +466,7 @@ def register(app):
             hide_failed=hide_failed,
         )
 
-    @app.route('/bambu/sync', methods=['POST'])
+    @bp.route('/bambu/sync', methods=['POST'])
     def bambu_sync():
         setting = get_settings()
         if not setting or not setting.bambu_token:
@@ -484,7 +485,7 @@ def register(app):
         db.session.commit()
         return jsonify({'ok': result['error'] is None, **result})
 
-    @app.route('/bambu/job/<int:job_id>/map', methods=['POST'])
+    @bp.route('/bambu/job/<int:job_id>/map', methods=['POST'])
     def bambu_job_map(job_id):
         """Manually map filament + project to a job; optionally deduct stock."""
         is_ajax = request.args.get('ajax') == '1'
@@ -565,7 +566,7 @@ def register(app):
             })
         return redirect(url_for('bambu_jobs'))
 
-    @app.route('/bambu/job/<int:job_id>/deduct-slot', methods=['POST'])
+    @bp.route('/bambu/job/<int:job_id>/deduct-slot', methods=['POST'])
     def bambu_job_deduct_slot(job_id):
         """Map a specific AMS slot to a filament and deduct from stock.
 
@@ -620,10 +621,11 @@ def register(app):
             })
         return redirect(url_for('bambu_jobs'))
 
-    @app.route('/bambu/job/<int:job_id>/delete', methods=['POST'])
+    @bp.route('/bambu/job/<int:job_id>/delete', methods=['POST'])
     def bambu_job_delete(job_id):
         job = db.session.get(BambuPrintJob, job_id)
         if job:
             db.session.delete(job)
             db.session.commit()
         return redirect(url_for('bambu_jobs'))
+    app.register_blueprint(bp)

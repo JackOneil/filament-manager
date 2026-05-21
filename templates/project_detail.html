@@ -1237,7 +1237,6 @@ function projectFilamentPicker() {
 }
 </script>
 
-<script src="{{ url_for('static', filename='js/o3dv.min.js') }}"></script>
 <script>
 let viewerInstance = null;
 
@@ -1253,17 +1252,23 @@ function hexToRgb(hex) {
 }
 
 function open3DViewer(url, colorHex) {
-    setTimeout(() => {
-        const container = document.getElementById('3d-viewer-container');
-        if (!container) return;
-        container.innerHTML = '';
-        const color = hexToRgb(colorHex);
-        viewerInstance = new OV.EmbeddedViewer(container, {
-            backgroundColor: new OV.RGBAColor(15, 23, 42, 255),
-            defaultColor: new OV.RGBColor(color.r, color.g, color.b)
+    window.loadScript("{{ url_for('static', filename='js/o3dv.min.js') }}")
+        .then(() => {
+            setTimeout(() => {
+                const container = document.getElementById('3d-viewer-container');
+                if (!container) return;
+                container.innerHTML = '';
+                const color = hexToRgb(colorHex);
+                viewerInstance = new OV.EmbeddedViewer(container, {
+                    backgroundColor: new OV.RGBAColor(15, 23, 42, 255),
+                    defaultColor: new OV.RGBColor(color.r, color.g, color.b)
+                });
+                viewerInstance.LoadModelFromUrlList([url]);
+            }, 50);
+        })
+        .catch(err => {
+            console.error("Failed to load Online3DViewer library", err);
         });
-        viewerInstance.LoadModelFromUrlList([url]);
-    }, 50);
 }
 
 function close3DViewer() {

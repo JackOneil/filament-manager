@@ -1,7 +1,7 @@
 """Printer maintenance routes — service records, nozzle changes, calibration, fault history."""
 from datetime import datetime, timedelta
 
-from flask import abort, redirect, render_template, request, url_for, Response
+from flask import abort, redirect, render_template, request, url_for, Response, Blueprint
 
 from auth import require_admin
 from database import db
@@ -10,8 +10,9 @@ from utils import translate, utc_now
 
 
 def register(app):
+    bp = Blueprint('maintenance', __name__)
 
-    @app.route('/maintenance')
+    @bp.route('/maintenance')
     def maintenance_index():
         from auth import get_current_user, is_admin
         user = get_current_user()
@@ -72,7 +73,7 @@ def register(app):
             recurrence_types=[('none', translate('maintenance_recurrence_none')), ('hours', translate('maintenance_recurrence_hours')), ('days', translate('maintenance_recurrence_days')), ('months', translate('maintenance_recurrence_months'))],
         )
 
-    @app.route('/maintenance/add', methods=['POST'])
+    @bp.route('/maintenance/add', methods=['POST'])
     def maintenance_add():
         from auth import get_current_user, is_admin
         user = get_current_user()
@@ -129,7 +130,7 @@ def register(app):
         db.session.commit()
         return redirect(url_for('maintenance_index'))
 
-    @app.route('/maintenance/<int:rec_id>/edit', methods=['POST'])
+    @bp.route('/maintenance/<int:rec_id>/edit', methods=['POST'])
     def maintenance_edit(rec_id):
         from auth import get_current_user, is_admin
         user = get_current_user()
@@ -188,7 +189,7 @@ def register(app):
         db.session.commit()
         return redirect(url_for('maintenance_index'))
 
-    @app.route('/maintenance/calendar.ics')
+    @bp.route('/maintenance/calendar.ics')
     def maintenance_ics():
         from auth import get_current_user, is_admin
         user = get_current_user()
@@ -230,7 +231,7 @@ def register(app):
             'Content-Disposition': 'attachment; filename=maintenance_calendar.ics'
         })
 
-    @app.route('/maintenance/<int:rec_id>/delete', methods=['POST'])
+    @bp.route('/maintenance/<int:rec_id>/delete', methods=['POST'])
     def maintenance_delete(rec_id):
         from auth import get_current_user, is_admin
         user = get_current_user()
@@ -240,3 +241,4 @@ def register(app):
         db.session.delete(rec)
         db.session.commit()
         return redirect(url_for('maintenance_index'))
+    app.register_blueprint(bp)

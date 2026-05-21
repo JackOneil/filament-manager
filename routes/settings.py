@@ -7,7 +7,7 @@ import logging
 import os
 import tarfile
 import uuid
-from flask import render_template, request, redirect, url_for, Response
+from flask import render_template, request, redirect, url_for, Response, Blueprint
 from werkzeug.utils import secure_filename
 from database import db
 from models import (
@@ -23,8 +23,9 @@ from utils import build_action_center, decrypt_token, encrypt_token, format_tags
 
 
 def register(app):
+    bp = Blueprint('settings', __name__)
 
-    @app.route('/settings', methods=['GET', 'POST'])
+    @bp.route('/settings', methods=['GET', 'POST'])
     def settings():
         if request.method == 'POST':
             action = request.form.get('action')
@@ -318,7 +319,7 @@ def register(app):
 
 
 
-    @app.route('/toggle-theme', methods=['POST'])
+    @bp.route('/toggle-theme', methods=['POST'])
     def toggle_theme():
         setting = AppSetting.query.first()
         if setting:
@@ -328,10 +329,11 @@ def register(app):
             app.logger.debug(f"Theme changed to: {new_theme}")
         return redirect(request.referrer or url_for('index'))
 
-    @app.route('/onboarding/dismiss', methods=['POST'])
+    @bp.route('/onboarding/dismiss', methods=['POST'])
     def onboarding_dismiss():
         setting = AppSetting.query.first()
         if setting:
             setting.onboarding_dismissed = True
             db.session.commit()
         return redirect(request.referrer or url_for('index'))
+    app.register_blueprint(bp)

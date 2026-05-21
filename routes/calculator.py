@@ -1,5 +1,5 @@
 """Calculator routes: print cost estimation and history."""
-from flask import render_template, request, redirect, url_for, abort
+from flask import render_template, request, redirect, url_for, abort, Blueprint
 from database import db
 from models import Filament, AppSetting, PrintHistory, Project, ProjectQuote
 from utils import get_current_currency
@@ -192,8 +192,9 @@ def _calculate_project_quote(project, margin_percent, setting):
 
 
 def register(app):
+    bp = Blueprint('calculator', __name__)
 
-    @app.route('/calculator', methods=['GET', 'POST'])
+    @bp.route('/calculator', methods=['GET', 'POST'])
     def calculator():
         filaments = Filament.query.all()
         projects = Project.query.order_by(Project.name.asc()).all()
@@ -262,7 +263,7 @@ def register(app):
         )
 
     # ── Project-mode calculator ──────────────────────────────────────────────
-    @app.route('/calculator/project/<int:project_id>', methods=['GET', 'POST'])
+    @bp.route('/calculator/project/<int:project_id>', methods=['GET', 'POST'])
     def calculator_project(project_id):
         """
         Project-mode calculator: all inputs (filaments, weights, print time)
@@ -325,7 +326,7 @@ def register(app):
             margin_percent=margin_percent,
         )
 
-    @app.route('/calculator/history/<int:id>/delete', methods=['POST'])
+    @bp.route('/calculator/history/<int:id>/delete', methods=['POST'])
     def delete_history(id):
         record = db.get_or_404(PrintHistory, id)
         app.logger.debug(f"Deleted print history: {record.filament_name}, cost: {record.total_cost}")
@@ -333,7 +334,7 @@ def register(app):
         db.session.commit()
         return redirect(url_for('calculator'))
 
-    @app.route('/calculator/quote/<int:id>/delete', methods=['POST'])
+    @bp.route('/calculator/quote/<int:id>/delete', methods=['POST'])
     def delete_quote(id):
         quote = db.get_or_404(ProjectQuote, id)
         project_id = quote.project_id
@@ -341,7 +342,7 @@ def register(app):
         db.session.commit()
         return redirect(url_for('project_detail', id=project_id, tab='materials'))
 
-    @app.route('/calculator/quote/<int:id>/export')
+    @bp.route('/calculator/quote/<int:id>/export')
     def export_quote(id):
         quote = db.get_or_404(ProjectQuote, id)
         settings = AppSetting.query.first()
@@ -368,3 +369,4 @@ def register(app):
             settings=settings,
             suggested_invoice_number=suggested_invoice_number,
         )
+    app.register_blueprint(bp)

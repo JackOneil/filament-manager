@@ -348,37 +348,42 @@ function openReorderShop(name, template) {
     window.open(url, '_blank', 'noopener,noreferrer');
 }
 </script>
-<script src="{{ url_for('static', filename='js/chart.min.js') }}"></script>
 <script>
 (function() {
-    var labels = {{ chart_labels | tojson }};
-    var data = {{ chart_data | tojson }};
-    var isDark = document.documentElement.classList.contains('dark');
-    var textColor = isDark ? '#94a3b8' : '#64748b';
-    var barColor = isDark ? 'rgba(94,234,212,0.7)' : 'rgba(13,148,136,0.7)';
-    var ctx = document.getElementById('consumptionMiniChart');
-    if (ctx) {
-        new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: {{ t('detail_chart_grams') | tojson }},
-                    data: data,
-                    backgroundColor: barColor,
-                    borderRadius: 4,
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { ticks: { color: textColor, font: { size: 10 } }, grid: { display: false } },
-                    y: { ticks: { color: textColor, font: { size: 10 } }, grid: { color: isDark ? 'rgba(148,163,184,0.1)' : 'rgba(0,0,0,0.06)' } }
-                }
+    window.loadScript("{{ url_for('static', filename='js/chart.min.js') }}")
+        .then(function() {
+            var labels = {{ chart_labels | tojson }};
+            var data = {{ chart_data | tojson }};
+            var isDark = document.documentElement.classList.contains('dark');
+            var textColor = isDark ? '#94a3b8' : '#64748b';
+            var barColor = isDark ? 'rgba(94,234,212,0.7)' : 'rgba(13,148,136,0.7)';
+            var ctx = document.getElementById('consumptionMiniChart');
+            if (ctx) {
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: {{ t('detail_chart_grams') | tojson }},
+                            data: data,
+                            backgroundColor: barColor,
+                            borderRadius: 4,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { ticks: { color: textColor, font: { size: 10 } }, grid: { display: false } },
+                            y: { ticks: { color: textColor, font: { size: 10 } }, grid: { color: isDark ? 'rgba(148,163,184,0.1)' : 'rgba(0,0,0,0.06)' } }
+                        }
+                    }
+                });
             }
+        })
+        .catch(function(err) {
+            console.error("Failed to load Chart.js", err);
         });
-    }
 })();
 </script>
 {% endblock %}

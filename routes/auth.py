@@ -1,7 +1,7 @@
 from datetime import datetime
 from utils import utc_now
 
-from flask import abort, flash, redirect, render_template, request, url_for
+from flask import abort, flash, redirect, render_template, request, url_for, Blueprint
 from sqlalchemy import or_
 
 from auth import (
@@ -46,7 +46,8 @@ def _permissions_from_form():
 
 
 def register(app):
-    @app.route('/login', methods=['GET', 'POST'])
+    bp = Blueprint('auth', __name__)
+    @bp.route('/login', methods=['GET', 'POST'])
     def login():
         if get_current_user():
             return redirect(url_for('index'))
@@ -61,14 +62,14 @@ def register(app):
             flash('auth_login_failed', 'error')
         return render_template('auth_login.html', user_count=User.query.count())
 
-    @app.route('/logout', methods=['POST'])
+    @bp.route('/logout', methods=['POST'])
     @require_login
     def logout():
         logout_user()
         flash('auth_logout_success', 'success')
         return redirect(url_for('login'))
 
-    @app.route('/register', methods=['GET', 'POST'])
+    @bp.route('/register', methods=['GET', 'POST'])
     def register_account():
         current = get_current_user()
         if current:
@@ -100,7 +101,7 @@ def register(app):
             return redirect(url_for('index'))
         return render_template('auth_register.html', bootstrap_admin=(existing_users == 0))
 
-    @app.route('/activate', methods=['GET', 'POST'])
+    @bp.route('/activate', methods=['GET', 'POST'])
     def activate_invite():
         code = request.values.get('code', '').strip()
         invite = UserInvite.query.filter_by(code=code).first() if code else None
@@ -133,7 +134,7 @@ def register(app):
             return redirect(url_for('index'))
         return render_template('auth_activate.html', invite=invite)
 
-    @app.route('/users', methods=['GET', 'POST'])
+    @bp.route('/users', methods=['GET', 'POST'])
     @require_admin
     def users_index():
         if request.method == 'POST':
@@ -203,7 +204,7 @@ def register(app):
             default_permissions=default_section_permissions(),
         )
 
-    @app.route('/users/<int:user_id>', methods=['GET', 'POST'])
+    @bp.route('/users/<int:user_id>', methods=['GET', 'POST'])
     @require_admin
     def user_detail(user_id):
         user = db.get_or_404(User, user_id)
@@ -232,7 +233,7 @@ def register(app):
             now=utc_now(),
         )
 
-    @app.route('/account', methods=['GET', 'POST'])
+    @bp.route('/account', methods=['GET', 'POST'])
     @require_login
     def account_settings():
         user = get_current_user()
@@ -259,7 +260,7 @@ def register(app):
 
     _VALID_NOTIFICATION_KINDS = {'project_new', 'project_status', 'project_comment', 'info', 'project'}
 
-    @app.route('/notifications')
+    @bp.route('/notifications')
     @require_login
     def notifications_index():
         user = get_current_user()
@@ -290,7 +291,7 @@ def register(app):
             total_count=total_count,
         )
 
-    @app.route('/notifications/<int:id>/read', methods=['POST'])
+    @bp.route('/notifications/<int:id>/read', methods=['POST'])
     @require_login
     def notification_mark_read(id):
         user = get_current_user()
@@ -303,7 +304,7 @@ def register(app):
         kind_filter = request.form.get('kind', '')
         return redirect(url_for('notifications_index', page=next_page, kind=kind_filter or None))
 
-    @app.route('/notifications/read-all', methods=['POST'])
+    @bp.route('/notifications/read-all', methods=['POST'])
     @require_login
     def notification_mark_all_read():
         user = get_current_user()
@@ -316,7 +317,7 @@ def register(app):
         next_page = request.form.get('page', 1, type=int)
         return redirect(url_for('notifications_index', page=next_page, kind=kind_filter or None))
 
-    @app.route('/notifications/<int:id>/delete', methods=['POST'])
+    @bp.route('/notifications/<int:id>/delete', methods=['POST'])
     @require_login
     def notification_delete(id):
         user = get_current_user()
@@ -329,7 +330,7 @@ def register(app):
         kind_filter = request.form.get('kind', '')
         return redirect(url_for('notifications_index', page=next_page, kind=kind_filter or None))
 
-    @app.route('/notifications/delete-read', methods=['POST'])
+    @bp.route('/notifications/delete-read', methods=['POST'])
     @require_login
     def notification_delete_read():
         user = get_current_user()
@@ -341,7 +342,7 @@ def register(app):
         db.session.commit()
         return redirect(url_for('notifications_index', kind=kind_filter or None))
 
-    @app.route('/audit')
+    @bp.route('/audit')
     @require_admin
     def audit_logs():
         page = request.args.get('page', 1, type=int)
@@ -401,3 +402,4 @@ def register(app):
             'nav_notifications': notifications,
             'nav_notifications_unread': unread,
         }
+    app.register_blueprint(bp)

@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.80.1***
+*Current version: **v1.81.0***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -85,8 +85,8 @@ filament/
 ├── auth.py                 # Multi-user auth, RBAC, sessions
 ├── utils.py                # Shared helpers (stock logic, encryption, link preview)
 │
-├── routes/                 # HTTP route modules (no Blueprints)
-│   ├── __init__.py         #   Central registration
+├── routes/                 # Flask Blueprints modular routing structure
+│   ├── __init__.py         #   Central registration and fallback url_for builder
 │   ├── inventory.py        #   Inventory CRUD, CSV import, overview
 │   ├── api.py              #   AJAX filament list / search endpoints
 │   ├── calculator.py       #   Print cost calculator

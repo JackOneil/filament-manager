@@ -1,5 +1,5 @@
 """AJAX API routes for dynamic filtering/sorting without page reload."""
-from flask import request, render_template, jsonify
+from flask import request, render_template, jsonify, Blueprint
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from auth import get_current_user, is_admin
@@ -9,8 +9,9 @@ from utils import collect_usage_windows, collect_sparkline_data, compute_stock_s
 
 
 def register(app):
+    bp = Blueprint('api', __name__)
 
-    @app.route('/api/filaments-list')
+    @bp.route('/api/filaments-list')
     def api_filaments_list():
         user = get_current_user()
         inventory_read_only = bool(user and not is_admin(user))
@@ -156,7 +157,7 @@ def register(app):
             'has_prev': filaments_paginated.has_prev,
         })
 
-    @app.route('/api/search')
+    @bp.route('/api/search')
     def api_search():
         from flask import url_for
         q = request.args.get('q', '').strip()
@@ -229,3 +230,4 @@ def register(app):
                 })
                 
         return jsonify({'results': results})
+    app.register_blueprint(bp)

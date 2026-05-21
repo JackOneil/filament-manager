@@ -3,7 +3,7 @@ import os
 import uuid
 from datetime import datetime
 
-from flask import abort, redirect, render_template, request, send_from_directory, url_for
+from flask import abort, redirect, render_template, request, send_from_directory, url_for, Blueprint
 from werkzeug.utils import secure_filename
 
 from auth import require_admin
@@ -32,13 +32,14 @@ def _build_waste_storage_name(rec_id, filename):
 
 
 def register(app):
+    bp = Blueprint('waste', __name__)
     upload_folder = app.config.get(
         'PROJECT_UPLOAD_FOLDER',
         os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'uploads'),
     )
     os.makedirs(upload_folder, exist_ok=True)
 
-    @app.route('/waste')
+    @bp.route('/waste')
     def waste_index():
         from auth import get_current_user, is_admin
         user = get_current_user()
@@ -90,7 +91,7 @@ def register(app):
             total_waste=total_waste,
         )
 
-    @app.route('/waste/add', methods=['POST'])
+    @bp.route('/waste/add', methods=['POST'])
     def waste_add():
         from auth import get_current_user, is_admin
         user = get_current_user()
@@ -125,7 +126,7 @@ def register(app):
         db.session.commit()
         return redirect(url_for('waste_index'))
 
-    @app.route('/waste/<int:rec_id>/edit', methods=['POST'])
+    @bp.route('/waste/<int:rec_id>/edit', methods=['POST'])
     def waste_edit(rec_id):
         from auth import get_current_user, is_admin
         user = get_current_user()
@@ -158,7 +159,7 @@ def register(app):
         db.session.commit()
         return redirect(url_for('waste_index'))
 
-    @app.route('/waste/<int:rec_id>/delete', methods=['POST'])
+    @bp.route('/waste/<int:rec_id>/delete', methods=['POST'])
     def waste_delete(rec_id):
         from auth import get_current_user, is_admin
         user = get_current_user()
@@ -175,7 +176,7 @@ def register(app):
         db.session.commit()
         return redirect(url_for('waste_index'))
 
-    @app.route('/waste/<int:rec_id>/upload', methods=['POST'])
+    @bp.route('/waste/<int:rec_id>/upload', methods=['POST'])
     def waste_upload_file(rec_id):
         from auth import get_current_user, is_admin
         user = get_current_user()
@@ -206,7 +207,7 @@ def register(app):
         project = request.args.get('project', '')
         return redirect(url_for('waste_index', page=page, reason=reason, filament=filament, project=project, _anchor=f'rec-{rec_id}'))
 
-    @app.route('/waste/file/<int:file_id>')
+    @bp.route('/waste/file/<int:file_id>')
     def waste_serve_file(file_id):
         from auth import get_current_user, is_admin
         user = get_current_user()
@@ -219,7 +220,7 @@ def register(app):
             abort(403)
         return send_from_directory(os.path.dirname(wf.filepath), os.path.basename(wf.filepath), as_attachment=False)
 
-    @app.route('/waste/file/<int:file_id>/download')
+    @bp.route('/waste/file/<int:file_id>/download')
     def waste_download_file(file_id):
         from auth import get_current_user, is_admin
         user = get_current_user()
@@ -232,7 +233,7 @@ def register(app):
             abort(403)
         return send_from_directory(os.path.dirname(wf.filepath), os.path.basename(wf.filepath), as_attachment=True, download_name=wf.filename)
 
-    @app.route('/waste/file/<int:file_id>/delete', methods=['POST'])
+    @bp.route('/waste/file/<int:file_id>/delete', methods=['POST'])
     def waste_delete_file(file_id):
         from auth import get_current_user, is_admin
         user = get_current_user()
@@ -251,4 +252,4 @@ def register(app):
         project = request.args.get('project', '')
         rec_id = wf.waste_record_id
         return redirect(url_for('waste_index', page=page, reason=reason, filament=filament, project=project, _anchor=f'rec-{rec_id}'))
-
+    app.register_blueprint(bp)

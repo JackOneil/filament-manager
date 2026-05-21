@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.81.0] - 2026-05-21
+### Added
+- **Reaktivní Quote Wizard (Vícekrokový formulář)**: Kompletní přepracování kalkulačky tisku (`templates/calculator.html`) do vícekrokového průvodce (stepperu) s využitím Alpine.js. Uživatel je přehledně veden třemi kroky (Volba materiálu, Parametry tisku, Marže a uložení k projektu) s HSL indikátory postupu a podporou server-side kalkulace.
+- **Předvyplnění názvu projektu z Bambu tisků**: Na stránce vytvoření projektu (`templates/project_create.html`) se nyní zobrazují doporučené názvy na základě posledních nepřiřazených tiskových úloh z Bambu Lab Cloud. Kliknutím na doporučení se název automaticky předvyplní do formuláře.
+
+### Changed
+- **Dekompozice app.py na Flask Blueprints**: Rozdělení monolitických rout v `app.py` do samostatných modulů/blueprintů ve složce `routes/` (api, auth, backup, bambu, calculator, history, inventory, maintenance, projects, prusa, pwa, settings, stats, storage, waste). Zpětná kompatibilita globálního generování URL pomocí `url_for` v šablonách je zajištěna vlastním handlerem chyb sestavení (`BuildError`).
+- **Alpine.js Global Store pro sdílený stav**: Zavedení globálního store `appState` v `static/js/app-shell.js` pro sdílení stavů (aktivní motiv/theme, připnutí sidebar, otevření mobilního menu a příkazové palety) napříč komponentami a šablonami bez lokálních stavových duplikátů.
+- **Lazy loading pro náročné JS knihovny**: Implementace dynamického asynchronního zavaděče skriptů `window.loadScript` v `static/js/app-shell.js`. Knihovny `Chart.js` (ve statistikách a detailu filamentu) a `Online3DViewer` (v detailu projektu) se nyní stahují až ve chvíli potřeby, což zrychluje úvodní načítání aplikace.
+
 ## [1.80.1] - 2026-05-21
 ### Fixed
 - **Activity 7-day usage chart**: Fixed the rendering and visibility of the bar chart on the overview page in dark mode. Replaced the generic `bg-blue-100` and `hover:bg-blue-500` classes with a custom `.usage-chart-bar` class, providing a vibrant, visible blue bar with border accents in dark mode while retaining the correct color scheme in light mode.

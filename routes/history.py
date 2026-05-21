@@ -1,5 +1,5 @@
 """Movement history route."""
-from flask import render_template, request, redirect, url_for, make_response
+from flask import render_template, request, redirect, url_for, make_response, Blueprint
 from database import db
 from models import MovementHistory
 from utils import log_movement
@@ -9,8 +9,9 @@ _COOKIE_KEY = 'history_per_page'
 
 
 def register(app):
+    bp = Blueprint('history', __name__)
 
-    @app.route('/history')
+    @bp.route('/history')
     def history():
         page = request.args.get('page', 1, type=int)
 
@@ -43,7 +44,7 @@ def register(app):
             resp.set_cookie(_COOKIE_KEY, str(per_page), max_age=365 * 24 * 3600, samesite='Lax')
         return resp
 
-    @app.route('/history/clear', methods=['POST'])
+    @bp.route('/history/clear', methods=['POST'])
     def clear_history():
         """Delete all movement history records."""
         try:
@@ -54,3 +55,4 @@ def register(app):
             db.session.rollback()
             app.logger.error(f"Error clearing movement history: {e}")
         return redirect(url_for('history'))
+    app.register_blueprint(bp)

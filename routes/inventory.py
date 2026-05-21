@@ -9,7 +9,7 @@ from collections import Counter
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
-from flask import abort, flash, jsonify, render_template, request, redirect, session, url_for
+from flask import abort, flash, jsonify, render_template, request, redirect, session, url_for, Blueprint
 from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload
 
@@ -702,8 +702,9 @@ def _user_dashboard_context(user):
 
 
 def register(app):
+    bp = Blueprint('inventory', __name__)
 
-    @app.route('/')
+    @bp.route('/')
     def index():
         user = get_current_user()
         if user and not is_admin(user):
@@ -741,7 +742,7 @@ def register(app):
             activity_heatmap=collect_activity_heatmap(),
         )
 
-    @app.route('/filaments')
+    @bp.route('/filaments')
     def filaments_index():
         user = get_current_user()
         inventory_read_only = bool(user and not is_admin(user))
@@ -750,7 +751,7 @@ def register(app):
             return render_template('index_user.html', **context)
         return render_template('index.html', inventory_read_only=False, **context)
 
-    @app.route('/filament/<int:id>')
+    @bp.route('/filament/<int:id>')
     def filament_detail(id):
         _require_inventory_admin()
         from utils import collect_usage_windows
@@ -839,7 +840,7 @@ def register(app):
             chart_data=chart_data,
         )
 
-    @app.route('/filament/<int:id>/meta', methods=['POST'])
+    @bp.route('/filament/<int:id>/meta', methods=['POST'])
     def filament_update_meta(id):
         _require_inventory_admin()
         filament = db.get_or_404(Filament, id)
@@ -856,7 +857,7 @@ def register(app):
         db.session.commit()
         return redirect(url_for('filament_detail', id=filament.id))
 
-    @app.route('/filament/<int:id>/toggle-reorder-snooze', methods=['POST'])
+    @bp.route('/filament/<int:id>/toggle-reorder-snooze', methods=['POST'])
     def filament_toggle_reorder_snooze(id):
         _require_inventory_admin()
         filament = db.get_or_404(Filament, id)
@@ -864,7 +865,7 @@ def register(app):
         db.session.commit()
         return redirect(request.referrer or url_for('filament_detail', id=filament.id))
 
-    @app.route('/inventory/bulk', methods=['POST'])
+    @bp.route('/inventory/bulk', methods=['POST'])
     def inventory_bulk():
         _require_inventory_admin()
         # Only the delete action is supported from the UI; validate explicitly
@@ -897,7 +898,7 @@ def register(app):
         )
         return redirect(url_for('filaments_index'))
 
-    @app.route('/add', methods=['GET', 'POST'])
+    @bp.route('/add', methods=['GET', 'POST'])
     def add():
         _require_inventory_admin()
         if request.method == 'POST':
@@ -950,7 +951,7 @@ def register(app):
         materials = Material.query.order_by(Material.name).all()
         return render_template('add.html', brands=brands, colors=colors, materials=materials)
 
-    @app.route('/edit/<int:id>', methods=['GET', 'POST'])
+    @bp.route('/edit/<int:id>', methods=['GET', 'POST'])
     def edit(id):
         _require_inventory_admin()
         filament = db.get_or_404(Filament, id)
@@ -979,7 +980,7 @@ def register(app):
 
         return render_template('edit.html', filament=filament, formatted_tags=format_tags(filament.tag_text))
 
-    @app.route('/use/<int:id>', methods=['POST'])
+    @bp.route('/use/<int:id>', methods=['POST'])
     def use_filament(id):
         _require_inventory_admin()
         try:
@@ -994,7 +995,7 @@ def register(app):
         db.session.commit()
         return redirect(url_for('filaments_index'))
 
-    @app.route('/add_spool/<int:id>', methods=['POST'])
+    @bp.route('/add_spool/<int:id>', methods=['POST'])
     def add_spool(id):
         _require_inventory_admin()
         try:
@@ -1025,7 +1026,7 @@ def register(app):
             })
         return redirect(url_for('filaments_index'))
 
-    @app.route('/remove_spool/<int:id>', methods=['POST'])
+    @bp.route('/remove_spool/<int:id>', methods=['POST'])
     def remove_spool(id):
         _require_inventory_admin()
         filament = db.get_or_404(Filament, id)
@@ -1049,7 +1050,7 @@ def register(app):
             )
         return redirect(url_for('filaments_index'))
 
-    @app.route('/delete/<int:id>', methods=['POST'])
+    @bp.route('/delete/<int:id>', methods=['POST'])
     def delete(id):
         _require_inventory_admin()
         filament = db.get_or_404(Filament, id)
@@ -1069,7 +1070,7 @@ def register(app):
         )
         return redirect(url_for('filaments_index'))
 
-    @app.route('/inventory/undo', methods=['POST'])
+    @bp.route('/inventory/undo', methods=['POST'])
     def inventory_undo():
         _require_inventory_admin()
         pending = session.get(_UNDO_SESSION_KEY) or {}
@@ -1154,7 +1155,7 @@ def register(app):
 
     # ── Operator / Admin mode toggle ──────────────────────────────────────────
 
-    @app.route('/toggle-ui-mode', methods=['POST'])
+    @bp.route('/toggle-ui-mode', methods=['POST'])
     def toggle_ui_mode():
         from flask import session
         from auth import get_current_user, is_admin
@@ -1167,7 +1168,7 @@ def register(app):
 
     # ── CSV filament import ───────────────────────────────────────────────────
 
-    @app.route('/filaments/import-csv', methods=['GET', 'POST'])
+    @bp.route('/filaments/import-csv', methods=['GET', 'POST'])
     def filament_import_csv():
         import csv
         import io
@@ -1363,7 +1364,7 @@ def register(app):
 
     # ── CSV filament export ───────────────────────────────────────────────────
 
-    @app.route('/filaments/export-csv', methods=['GET'])
+    @bp.route('/filaments/export-csv', methods=['GET'])
     def filament_export_csv():
         import flask
         _require_inventory_admin()
@@ -1417,7 +1418,7 @@ def register(app):
 
     # ── Community filament database ───────────────────────────────────────────
 
-    @app.route('/filaments/community-db')
+    @bp.route('/filaments/community-db')
     def filament_community_db():
         _require_inventory_admin()
         import json
@@ -1438,7 +1439,7 @@ def register(app):
             materials=materials,
         )
 
-    @app.route('/filaments/community-db/import', methods=['POST'])
+    @bp.route('/filaments/community-db/import', methods=['POST'])
     def filament_community_db_import():
         _require_inventory_admin()
         import json
@@ -1509,3 +1510,4 @@ def register(app):
 
         flash(translate('community_db_imported_n').format(count=imported), 'success')
         return redirect(url_for('filament_community_db'))
+    app.register_blueprint(bp)

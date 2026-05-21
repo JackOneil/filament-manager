@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import colorsys
 import json
 
-from flask import render_template, request
+from flask import render_template, request, Blueprint
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
@@ -150,8 +150,9 @@ def _project_usage_rows():
 
 
 def register(app):
+    bp = Blueprint('stats', __name__)
 
-    @app.route('/stats')
+    @bp.route('/stats')
     def stats():
         days = request.args.get('days', 30, type=int)
         if days not in (7, 30, 90, 180):
@@ -408,3 +409,4 @@ def register(app):
             color_palette=color_palette,
             app_settings=app_settings,
         )
+    app.register_blueprint(bp)

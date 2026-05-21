@@ -1,5 +1,5 @@
 """Storage shelves visualisation and placement routes."""
-from flask import render_template, request, redirect, url_for, jsonify
+from flask import render_template, request, redirect, url_for, jsonify, Blueprint
 from sqlalchemy.orm import joinedload
 
 from database import db
@@ -56,8 +56,9 @@ def _storage_redirect_for_shelf(shelf):
 
 
 def register(app):
+    bp = Blueprint('storage', __name__)
 
-    @app.route('/storage')
+    @bp.route('/storage')
     def storage():
         shelf_input = request.args.get('shelf', '').strip()
         brand_input = request.args.get('brand', '').strip()
@@ -163,7 +164,7 @@ def register(app):
             has_active_filter=has_active_filter,
         )
 
-    @app.route('/storage/shelf', methods=['POST'])
+    @bp.route('/storage/shelf', methods=['POST'])
     def storage_add_shelf():
         name = request.form.get('name', '').strip()
         columns = max(request.form.get('columns', 4, type=int), 1)
@@ -174,7 +175,7 @@ def register(app):
             db.session.commit()
         return redirect(url_for('storage'))
 
-    @app.route('/storage/shelf/<int:shelf_id>/update', methods=['POST'])
+    @bp.route('/storage/shelf/<int:shelf_id>/update', methods=['POST'])
     def storage_update_shelf(shelf_id):
         shelf = db.session.get(StorageShelf, shelf_id)
         if shelf:
@@ -189,7 +190,7 @@ def register(app):
             db.session.commit()
         return _storage_redirect_for_shelf(shelf)
 
-    @app.route('/storage/shelf/<int:shelf_id>/delete', methods=['POST'])
+    @bp.route('/storage/shelf/<int:shelf_id>/delete', methods=['POST'])
     def storage_delete_shelf(shelf_id):
         shelf = db.session.get(StorageShelf, shelf_id)
         if shelf:
@@ -197,7 +198,7 @@ def register(app):
             db.session.commit()
         return redirect(url_for('storage'))
 
-    @app.route('/storage/slot/assign', methods=['POST'])
+    @bp.route('/storage/slot/assign', methods=['POST'])
     def storage_assign_slot():
         shelf = db.session.get(StorageShelf, request.form.get('shelf_id', type=int))
         filament = _resolve_named_entity(request.form.get('filament', ''), Filament)
@@ -214,7 +215,7 @@ def register(app):
                 db.session.commit()
         return redirect(url_for('storage'))
 
-    @app.route('/storage/placement/<int:placement_id>/move', methods=['POST'])
+    @bp.route('/storage/placement/<int:placement_id>/move', methods=['POST'])
     def storage_move_placement(placement_id):
         placement = db.session.get(StoragePlacement, placement_id)
         if not placement:
@@ -237,7 +238,7 @@ def register(app):
         db.session.commit()
         return jsonify({'ok': True})
 
-    @app.route('/storage/placement/<int:placement_id>/orientation', methods=['POST'])
+    @bp.route('/storage/placement/<int:placement_id>/orientation', methods=['POST'])
     def storage_update_orientation(placement_id):
         placement = db.session.get(StoragePlacement, placement_id)
         if not placement:
@@ -247,7 +248,7 @@ def register(app):
         db.session.commit()
         return _storage_redirect_for_shelf(placement.shelf)
 
-    @app.route('/storage/placement/<int:placement_id>/delete', methods=['POST'])
+    @bp.route('/storage/placement/<int:placement_id>/delete', methods=['POST'])
     def storage_delete_placement(placement_id):
         placement = db.session.get(StoragePlacement, placement_id)
         if placement:
@@ -256,3 +257,4 @@ def register(app):
             db.session.commit()
             return _storage_redirect_for_shelf(shelf)
         return redirect(url_for('storage'))
+    app.register_blueprint(bp)

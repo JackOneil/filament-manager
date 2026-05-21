@@ -1,8 +1,9 @@
-from flask import make_response
+from flask import make_response, Blueprint
 
 def register(app):
+    bp = Blueprint('pwa', __name__)
 
-    @app.route('/manifest.json')
+    @bp.route('/manifest.json')
     def manifest():
         manifest_data = {
             "name": "Filament Manager",
@@ -33,7 +34,7 @@ def register(app):
         response.headers['Content-Type'] = 'application/json'
         return response
 
-    @app.route('/sw.js')
+    @bp.route('/sw.js')
     def service_worker():
         # Minimal Service Worker for installability
         sw_js = """
@@ -55,3 +56,5 @@ self.addEventListener('fetch', event => {
         response = make_response(sw_js)
         response.headers['Content-Type'] = 'application/javascript'
         return response
+
+    app.register_blueprint(bp)

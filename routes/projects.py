@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from types import SimpleNamespace
 
-from flask import abort, current_app, flash, jsonify, redirect, render_template, request, send_from_directory, url_for
+from flask import abort, current_app, flash, jsonify, redirect, render_template, request, send_from_directory, url_for, Blueprint
 from markupsafe import Markup
 from sqlalchemy.orm import joinedload, selectinload
 from werkzeug.utils import secure_filename
@@ -416,13 +416,14 @@ def _schedule_link_preview_refresh(flask_app, link_id, url, max_attempts=3, retr
 
 
 def register(app):
+    bp = Blueprint('projects', __name__)
     upload_folder = app.config.get(
         'PROJECT_UPLOAD_FOLDER',
         os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'uploads'),
     )
     os.makedirs(upload_folder, exist_ok=True)
 
-    @app.route('/projects')
+    @bp.route('/projects')
     def projects_index():
         sort_by = request.args.get('sort_by', 'due_date')
         page = request.args.get('page', 1, type=int)
@@ -587,7 +588,7 @@ def register(app):
 
         return render_template('projects_index.html', **context)
 
-    @app.route('/projects/create', methods=['GET', 'POST'])
+    @bp.route('/projects/create', methods=['GET', 'POST'])
     def project_create():
         user = get_current_user()
         if request.method == 'POST':
@@ -620,13 +621,28 @@ def register(app):
                 _notify_project_created(project)
             db.session.commit()
             return redirect(url_for('project_detail', id=project.id))
+
+        # Query unmapped Bambu print jobs for naming suggestion
+        unmapped_jobs = BambuPrintJob.query.filter_by(project_id=None).order_by(BambuPrintJob.started_at.desc()).limit(15).all()
+        from routes.bambu import _clean_title
+        suggestions = []
+        seen_names = set()
+        for job in unmapped_jobs:
+            if job.model_name:
+                cleaned = _clean_title(job.model_name)
+                if cleaned and cleaned not in seen_names:
+                    seen_names.add(cleaned)
+                    suggestions.append(cleaned)
+
         return render_template(
             'project_create.html',
             is_admin_user=is_admin(user),
             default_client_name=user.name if user and not is_admin(user) else '',
+            suggestions=suggestions,
         )
 
-    @app.route('/projects/<int:id>', methods=['GET'])
+
+    @bp.route('/projects/<int:id>', methods=['GET'])
     def project_detail(id):
         _project_or_404(id)
         project = (
@@ -724,7 +740,7 @@ def register(app):
             can_manage_project=is_admin(),
         )
 
-    @app.route('/projects/<int:id>/edit', methods=['GET', 'POST'])
+    @bp.route('/projects/<int:id>/edit', methods=['GET', 'POST'])
     def project_edit(id):
         user = get_current_user()
         project = _project_or_404(id)
@@ -748,7 +764,7 @@ def register(app):
             return redirect(url_for('project_detail', id=project.id))
         return render_template('project_edit.html', project=project, project_tags=format_tags(project.tag_text), can_manage_project=is_admin())
 
-    @app.route('/projects/<int:id>/delete', methods=['POST'])
+    @bp.route('/projects/<int:id>/delete', methods=['POST'])
     def project_delete(id):
         project = _project_or_404(id)
         _require_project_admin()
@@ -761,7 +777,7 @@ def register(app):
         db.session.commit()
         return redirect(url_for('projects_index'))
 
-    @app.route('/projects/<int:id>/upload', methods=['POST'])
+    @bp.route('/projects/<int:id>/upload', methods=['POST'])
     def project_upload_file(id):
         project = _project_or_404(id)
         if not _project_write_allowed(project):
@@ -815,7 +831,7 @@ def register(app):
             db.session.rollback()
         return _project_detail_redirect(id, 'files')
 
-    @app.route('/projects/<int:id>/download/<int:file_id>')
+    @bp.route('/projects/<int:id>/download/<int:file_id>')
     def project_download_file(id, file_id):
         _project_or_404(id)
         project_file = db.get_or_404(ProjectFile, file_id)
@@ -832,7 +848,7 @@ def register(app):
             download_name=project_file.filename,
         )
 
-    @app.route('/projects/<int:id>/view_file/<int:file_id>/<filename>')
+    @bp.route('/projects/<int:id>/view_file/<int:file_id>/<filename>')
     def project_view_file(id, file_id, filename):
         _project_or_404(id)
         project_file = db.get_or_404(ProjectFile, file_id)
@@ -844,7 +860,7 @@ def register(app):
             return 'Forbidden', 403
         return send_from_directory(os.path.dirname(project_file.filepath), os.path.basename(project_file.filepath), as_attachment=False)
 
-    @app.route('/projects/<int:id>/image/<int:file_id>')
+    @bp.route('/projects/<int:id>/image/<int:file_id>')
     def project_image_file(id, file_id):
         _project_or_404(id)
         project_file = db.get_or_404(ProjectFile, file_id)
@@ -856,7 +872,7 @@ def register(app):
             return 'Forbidden', 403
         return send_from_directory(os.path.dirname(project_file.filepath), os.path.basename(project_file.filepath), as_attachment=False)
 
-    @app.route('/projects/<int:id>/delete_file/<int:file_id>', methods=['POST'])
+    @bp.route('/projects/<int:id>/delete_file/<int:file_id>', methods=['POST'])
     def project_delete_file(id, file_id):
         project = _project_or_404(id)
         if not _project_write_allowed(project):
@@ -871,7 +887,7 @@ def register(app):
             db.session.commit()
         return _project_detail_redirect(id, 'files')
 
-    @app.route('/projects/<int:id>/add_link', methods=['POST'])
+    @bp.route('/projects/<int:id>/add_link', methods=['POST'])
     def project_add_link(id):
         from utils import is_safe_external_url
         from urllib.parse import urlparse as _urlparse
@@ -903,7 +919,7 @@ def register(app):
             _schedule_link_preview_refresh(current_app._get_current_object(), new_link.id, url)
         return _project_detail_redirect(id, 'files')
 
-    @app.route('/projects/<int:id>/delete_link/<int:link_id>', methods=['POST'])
+    @bp.route('/projects/<int:id>/delete_link/<int:link_id>', methods=['POST'])
     def project_delete_link(id, link_id):
         project = _project_or_404(id)
         if not _project_write_allowed(project):
@@ -914,7 +930,7 @@ def register(app):
             db.session.commit()
         return _project_detail_redirect(id, 'files')
 
-    @app.route('/projects/<int:id>/refresh_link/<int:link_id>', methods=['POST'])
+    @bp.route('/projects/<int:id>/refresh_link/<int:link_id>', methods=['POST'])
     def project_refresh_link(id, link_id):
         from utils import fetch_link_metadata, is_safe_external_url
 
@@ -931,7 +947,7 @@ def register(app):
             db.session.commit()
         return _project_detail_redirect(id, 'files')
 
-    @app.route('/projects/<int:id>/add_filament', methods=['POST'])
+    @bp.route('/projects/<int:id>/add_filament', methods=['POST'])
     def project_add_filament(id):
         project = _project_or_404(id)
         _require_project_admin()
@@ -942,7 +958,7 @@ def register(app):
             db.session.commit()
         return _project_detail_redirect(id, 'materials')
 
-    @app.route('/projects/<int:id>/remove_filament/<int:pf_id>', methods=['POST'])
+    @bp.route('/projects/<int:id>/remove_filament/<int:pf_id>', methods=['POST'])
     def project_remove_filament(id, pf_id):
         _project_or_404(id)
         _require_project_admin()
@@ -952,7 +968,7 @@ def register(app):
             db.session.commit()
         return _project_detail_redirect(id, 'materials')
 
-    @app.route('/projects/<int:id>/update_filament/<int:pf_id>', methods=['POST'])
+    @bp.route('/projects/<int:id>/update_filament/<int:pf_id>', methods=['POST'])
     def project_update_filament(id, pf_id):
         _project_or_404(id)
         _require_project_admin()
@@ -964,7 +980,7 @@ def register(app):
                 db.session.commit()
         return _project_detail_redirect(id, 'materials')
 
-    @app.route('/projects/<int:id>/status', methods=['POST'])
+    @bp.route('/projects/<int:id>/status', methods=['POST'])
     def project_status(id):
         project = _project_or_404(id)
         _require_project_admin()
@@ -977,7 +993,7 @@ def register(app):
         db.session.commit()
         return redirect(url_for('project_detail', id=id))
 
-    @app.route('/projects/<int:id>/consume/<int:pf_id>', methods=['POST'])
+    @bp.route('/projects/<int:id>/consume/<int:pf_id>', methods=['POST'])
     def project_consume_filament(id, pf_id):
         from utils import log_movement
 
@@ -1006,7 +1022,7 @@ def register(app):
             db.session.commit()
         return _project_detail_redirect(id, 'materials')
 
-    @app.route('/projects/<int:id>/comments', methods=['POST'])
+    @bp.route('/projects/<int:id>/comments', methods=['POST'])
     def project_add_comment(id):
         project = _project_or_404(id)
         if not _project_write_allowed(project):
@@ -1019,7 +1035,7 @@ def register(app):
             db.session.commit()
         return _project_detail_redirect(id, 'overview')
 
-    @app.route('/projects/<int:id>/comments/<int:comment_id>/edit', methods=['POST'])
+    @bp.route('/projects/<int:id>/comments/<int:comment_id>/edit', methods=['POST'])
     def project_update_comment(id, comment_id):
         _project_or_404(id)
         comment = db.get_or_404(ProjectComment, comment_id)
@@ -1036,7 +1052,7 @@ def register(app):
         db.session.commit()
         return _project_detail_redirect(id, 'overview')
 
-    @app.route('/projects/<int:id>/comments/<int:comment_id>/delete', methods=['POST'])
+    @bp.route('/projects/<int:id>/comments/<int:comment_id>/delete', methods=['POST'])
     def project_delete_comment(id, comment_id):
         project = _project_or_404(id)
         if not _project_write_allowed(project):
@@ -1050,7 +1066,7 @@ def register(app):
         db.session.commit()
         return _project_detail_redirect(id, 'overview')
 
-    @app.route('/projects/<int:id>/comments/<int:comment_id>/toggle-checkbox', methods=['POST'])
+    @bp.route('/projects/<int:id>/comments/<int:comment_id>/toggle-checkbox', methods=['POST'])
     def project_toggle_comment_checkbox(id, comment_id):
         project = _project_or_404(id)
         if not _project_write_allowed(project):
@@ -1069,7 +1085,7 @@ def register(app):
         db.session.commit()
         return jsonify({'html': render_markdown(comment.body)})
 
-    @app.route('/projects/<int:id>/toggle-description-checkbox', methods=['POST'])
+    @bp.route('/projects/<int:id>/toggle-description-checkbox', methods=['POST'])
     def project_toggle_description_checkbox(id):
         project = _project_or_404(id)
         if not _project_write_allowed(project):
@@ -1084,7 +1100,7 @@ def register(app):
         db.session.commit()
         return jsonify({'html': render_markdown(project.description)})
 
-    @app.route('/projects/<int:id>/todos', methods=['POST'])
+    @bp.route('/projects/<int:id>/todos', methods=['POST'])
     def project_add_todo(id):
         project = _project_or_404(id)
         if not _project_write_allowed(project):
@@ -1100,7 +1116,7 @@ def register(app):
             db.session.commit()
         return _project_detail_redirect(id, 'overview')
 
-    @app.route('/projects/<int:id>/todos/<int:todo_id>/toggle', methods=['POST'])
+    @bp.route('/projects/<int:id>/todos/<int:todo_id>/toggle', methods=['POST'])
     def project_toggle_todo(id, todo_id):
         project = _project_or_404(id)
         if not _project_write_allowed(project):
@@ -1113,7 +1129,7 @@ def register(app):
         db.session.commit()
         return _project_detail_redirect(id, 'overview')
 
-    @app.route('/projects/<int:id>/todos/<int:todo_id>/delete', methods=['POST'])
+    @bp.route('/projects/<int:id>/todos/<int:todo_id>/delete', methods=['POST'])
     def project_delete_todo(id, todo_id):
         project = _project_or_404(id)
         if not _project_write_allowed(project):
@@ -1127,7 +1143,7 @@ def register(app):
 
     # ── Print items (pieces tracking) ─────────────────────────────────────────
 
-    @app.route('/projects/<int:id>/printitems/add', methods=['POST'])
+    @bp.route('/projects/<int:id>/printitems/add', methods=['POST'])
     def project_add_print_item(id):
         project = _project_or_404(id)
         if not _project_write_allowed(project):
@@ -1152,7 +1168,7 @@ def register(app):
         db.session.commit()
         return _project_detail_redirect(id, 'overview')
 
-    @app.route('/projects/<int:id>/printitems/<int:item_id>/edit', methods=['POST'])
+    @bp.route('/projects/<int:id>/printitems/<int:item_id>/edit', methods=['POST'])
     def project_edit_print_item(id, item_id):
         project = _project_or_404(id)
         if not _project_write_allowed(project):
@@ -1177,7 +1193,7 @@ def register(app):
         db.session.commit()
         return _project_detail_redirect(id, 'overview')
 
-    @app.route('/projects/<int:id>/printitems/<int:item_id>/delete', methods=['POST'])
+    @bp.route('/projects/<int:id>/printitems/<int:item_id>/delete', methods=['POST'])
     def project_delete_print_item(id, item_id):
         project = _project_or_404(id)
         if not _project_write_allowed(project):
@@ -1189,7 +1205,7 @@ def register(app):
         db.session.commit()
         return _project_detail_redirect(id, 'overview')
 
-    @app.route('/projects/<int:id>/printitems/<int:item_id>/increment', methods=['POST'])
+    @bp.route('/projects/<int:id>/printitems/<int:item_id>/increment', methods=['POST'])
     def project_increment_print_item(id, item_id):
         project = _project_or_404(id)
         if not _project_write_allowed(project):
@@ -1205,7 +1221,7 @@ def register(app):
             return jsonify({'quantity_done': item.quantity_done, 'quantity_total': item.quantity_total, 'pct': pct})
         return _project_detail_redirect(id, 'overview')
 
-    @app.route('/projects/<int:id>/printitems/<int:item_id>/decrement', methods=['POST'])
+    @bp.route('/projects/<int:id>/printitems/<int:item_id>/decrement', methods=['POST'])
     def project_decrement_print_item(id, item_id):
         project = _project_or_404(id)
         if not _project_write_allowed(project):
@@ -1220,3 +1236,4 @@ def register(app):
             pct = int(item.quantity_done / item.quantity_total * 100) if item.quantity_total > 0 else 0
             return jsonify({'quantity_done': item.quantity_done, 'quantity_total': item.quantity_total, 'pct': pct})
         return _project_detail_redirect(id, 'overview')
+    app.register_blueprint(bp)

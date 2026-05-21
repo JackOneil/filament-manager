@@ -6,7 +6,7 @@ import json
 import os
 import tarfile
 import uuid
-from flask import current_app as app, request, redirect, url_for, Response
+from flask import current_app as app, request, redirect, url_for, Response, Blueprint
 
 from database import db
 from models import (
@@ -134,8 +134,9 @@ def _resolve_user_ref(ref):
 
 
 def register(app):
+    bp = Blueprint('backup', __name__)
 
-    @app.route('/export')
+    @bp.route('/export')
     def export_data():
         setting = AppSetting.query.first()
 
@@ -499,7 +500,7 @@ def register(app):
         response.headers['Content-Disposition'] = 'attachment; filename=filament_backup.tar.gz'
         return response
 
-    @app.route('/import', methods=['POST'])
+    @bp.route('/import', methods=['POST'])
     def import_data():
         from datetime import datetime
         file = request.files.get('file')
@@ -1103,3 +1104,4 @@ def register(app):
             app.logger.error(f"Import failed: {str(e)}")
 
         return redirect(url_for('settings'))
+    app.register_blueprint(bp)

@@ -48,7 +48,7 @@ from utils import get_settings, utc_now
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.80.1'
+APP_VERSION = '1.81.0'
 
 csrf = CSRFProtect()
 
@@ -101,6 +101,25 @@ def create_app(test_config=None) -> Flask:
     csrf.init_app(app)
     init_auth(app)
     register_all(app)
+
+    # ── url_for fallback for decomposed Blueprints ─────────────────────────────
+    from flask import url_for
+    from werkzeug.routing import BuildError
+
+    def url_for_fallback(error, endpoint, values):
+        if "." in endpoint:
+            raise error
+        for bp_name in app.blueprints:
+            prefixed = f"{bp_name}.{endpoint}"
+            if prefixed in app.view_functions:
+                try:
+                    return url_for(prefixed, **values)
+                except BuildError:
+                    pass
+        raise error
+
+    app.url_build_error_handlers.append(url_for_fallback)
+
 
     # ── Pretty-print JSON filter ───────────────────────────────────────────────
     import json as _json
