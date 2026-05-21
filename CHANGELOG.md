@@ -7,13 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.81.0] - 2026-05-21
 ### Added
-- **Reaktivní Quote Wizard (Vícekrokový formulář)**: Kompletní přepracování kalkulačky tisku (`templates/calculator.html`) do vícekrokového průvodce (stepperu) s využitím Alpine.js. Uživatel je přehledně veden třemi kroky (Volba materiálu, Parametry tisku, Marže a uložení k projektu) s HSL indikátory postupu a podporou server-side kalkulace.
-- **Předvyplnění názvu projektu z Bambu tisků**: Na stránce vytvoření projektu (`templates/project_create.html`) se nyní zobrazují doporučené názvy na základě posledních nepřiřazených tiskových úloh z Bambu Lab Cloud. Kliknutím na doporučení se název automaticky předvyplní do formuláře.
+- **Reactive Quote Wizard (Multi-step form)**: Complete redesign of the print calculator (`templates/calculator.html`) into a multi-step wizard (stepper) using Alpine.js. Users are guided through three steps (Material selection, Print parameters, Margin and save to project) with HSL progress indicators and server-side calculation support.
+- **Project name pre-fill from Bambu prints**: On the project creation page (`templates/project_create.html`), suggested names are now displayed based on the latest unmapped print jobs from Bambu Lab Cloud. Clicking a suggestion auto-fills the name into the form.
 
 ### Changed
-- **Dekompozice app.py na Flask Blueprints**: Rozdělení monolitických rout v `app.py` do samostatných modulů/blueprintů ve složce `routes/` (api, auth, backup, bambu, calculator, history, inventory, maintenance, projects, prusa, pwa, settings, stats, storage, waste). Zpětná kompatibilita globálního generování URL pomocí `url_for` v šablonách je zajištěna vlastním handlerem chyb sestavení (`BuildError`).
-- **Alpine.js Global Store pro sdílený stav**: Zavedení globálního store `appState` v `static/js/app-shell.js` pro sdílení stavů (aktivní motiv/theme, připnutí sidebar, otevření mobilního menu a příkazové palety) napříč komponentami a šablonami bez lokálních stavových duplikátů.
-- **Lazy loading pro náročné JS knihovny**: Implementace dynamického asynchronního zavaděče skriptů `window.loadScript` v `static/js/app-shell.js`. Knihovny `Chart.js` (ve statistikách a detailu filamentu) a `Online3DViewer` (v detailu projektu) se nyní stahují až ve chvíli potřeby, což zrychluje úvodní načítání aplikace.
+- **Decomposed app.py into Flask Blueprints**: Split monolithic routes in `app.py` into separate modules/blueprints in the `routes/` folder (api, auth, backup, bambu, calculator, history, inventory, maintenance, projects, prusa, pwa, settings, stats, storage, waste). Backward compatibility for global `url_for` generation in templates is ensured by a custom `BuildError` handler.
+- **Alpine.js Global Store for shared state**: Introduced global `appState` store in `static/js/app-shell.js` to share state (active theme, sidebar pinned state, mobile menu and command palette open state) across components and templates without local state duplication.
+- **Lazy loading for heavy JS libraries**: Implemented dynamic async script loader `window.loadScript` in `static/js/app-shell.js`. Libraries `Chart.js` (in stats and filament detail) and `Online3DViewer` (in project detail) are now loaded only when needed, speeding up initial page load.
 
 ## [1.80.1] - 2026-05-21
 ### Fixed
@@ -237,7 +237,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Audit log — full-width expand row** — The "Show before/after" detail now expands into a second table row spanning all columns (`colspan="6"`), using multiple `<tbody x-data>` elements for correct Alpine.js scoping. Each entry has its own independent open/close state.
 - **Audit log — JSON pretty-print** — Added a `pretty_json` Jinja2 template filter in `app.py`. Before/after snapshots are automatically pretty-printed with 2-space indentation; non-JSON values fall back to raw text.
 - **Audit log — unified diff view** — Detail panel now defaults to a GitHub-style unified diff (LCS algorithm, red `-` / green `+` line highlighting). A toggle switches between diff and side-by-side split view. Data is passed via `data-before` / `data-after` HTML attributes to avoid JSON/HTML attribute quoting conflicts.
-- **Overview — removed KPI summary card** — The widget containing “Celkem cívek / Celkem zbývá / Celková hodnota / Akční centrum” miniature was removed from the overview page and from the JS `defaultOrder` array. The full Action Center widget is unchanged.
+- **Overview — removed KPI summary card** — The widget containing "Total spools / Total remaining / Total value / Action Center" miniature was removed from the overview page and from the JS `defaultOrder` array. The full Action Center widget is unchanged.
 
 ## [1.72.2] - 2026-05-03
 
@@ -329,7 +329,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Duplicate project status notifications** — `_notify_project_status()` now uses a `seen` set (same pattern as `_notify_project_comment`) so admin users who are also a project owner receive only one notification when the project status changes, not two.
-- **Live Printers widget — filament grams & progress bar** — The standalone "Aktuálně tisknoucí zařízení" card on the Overview dashboard now shows:
+- **Live Printers widget — filament grams & progress bar** — The standalone "Currently Printing Devices" card on the Overview dashboard now shows:
   - Bambu: per-material gram weights next to each colour swatch; a time-based estimated progress bar and percentage badge computed from `started_at + cost_time`; estimated finish time (ETA).
   - Prusa: filament weight in grams; corrected progress percentage (was rendering 0 % because the stored `0.0–1.0` value was not multiplied by 100).
 
@@ -463,10 +463,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.61.0] - 2026-04-12
 ### Fixed
 - **Security: client filter dropdown scoped to current user** — The list of client names shown in the project search dropdown was previously built from a global query across all projects, leaking other users' client names. The query is now scoped through `_project_scope()` so regular users only see client names from their own projects.
-- **Smart highlights — "Co dochází" widget** now shows the recommended order in pieces (`N ks`) instead of the raw gram deficit (`285 g`), consistent with all other low-stock displays in the app.
+- **Smart highlights — "What is running out" widget** now shows the recommended order in pieces (`N ks`) instead of the raw gram deficit (`285 g`), consistent with all other low-stock displays in the app.
 - **Card view weight-bar tooltip** under the progress bar also updated from `recommended_grams` to `recommended_spools` count for consistency.
-- **Command center KPI mini-card** for "Hoří teď" replaced with a **Stock value card** showing total filament inventory value (with currency), spool count, and remaining weight in kg — the duplicate urgent-items list was already displayed in the large panel below.
-- **Command center large panel** — "Hoří teď" heading and `overview_burning_now_title` i18n key added (CS + EN) to complete the command center redesign.
+- **Command center KPI mini-card** for "Burning now" replaced with a **Stock value card** showing total filament inventory value (with currency), spool count, and remaining weight in kg — the duplicate urgent-items list was already displayed in the large panel below.
+- **Command center large panel** — "Burning now" heading and `overview_burning_now_title` i18n key added (CS + EN) to complete the command center redesign.
 
 ### Tests
 - Updated `test_projects_list_is_paginated_using_app_setting` and `test_project_client_is_rendered_as_filter_link` to match the current Alpine.js AJAX pagination and filter-click behavior (tests previously checked for URL-based `?page=2` links that no longer exist).
@@ -540,7 +540,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Prusa jobs:** Reads `PrusaPrintJob` weight and mapped filament.
   - **Print time:** Calculated from the sum of actual `cost_time` (seconds) across all jobs, not the project estimate.
   - **Fallback:** If no jobs with usable data exist, falls back to planned `ProjectFilament` entries and estimated print time.
-  - **Source badge:** Header shows a teal badge ("Realálná data z tiskových jobů") or amber badge ("Plánovaná data") so the user knows which source is used.
+  - **Source badge:** Header shows a teal badge ("Real data from print jobs") or amber badge ("Planned data") so the user knows which source is used.
   - **Unmapped slots:** Bambu slots not yet assigned to a filament are shown with a warning badge instead of being silently dropped — their cost is 0 but weight is still visible.
   - **Empty state:** Improved with links to both the Materials tab and Jobs tab when neither source provides data.
 
@@ -583,7 +583,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Dark mode – Stats page:** All stats cards (`low_stock`, `top_turnover`, `profitable_projects`, charts, tables, color palette) now correctly adapt to dark mode using CSS custom-property surfaces, borders, and text colors. Day-filter pills, edit-mode button, navigator links, and color-palette tooltips also switch to dark-aware styles.
 - **Dark mode – Project detail:** Status-flow step cards, progress-bar track, TODO item cards, description text, and comment bodies now all render correctly in dark mode.
-- **Project client simplified:** Removed the separate "Vlastník (uživatel)" user-selector and "Vlastník (externí jméno)" manual-input fields from project create, edit, and the projects list/kanban view. Only the "Klient" field is now shown and editable. The owner relationship is retained internally for access-control (non-admin users still see only their own projects) but is no longer surfaced in the UI.
+- **Project client simplified:** Removed the separate "Owner (user)" user-selector and "Owner (external name)" manual-input fields from project create, edit, and the projects list/kanban view. Only the "Client" field is now shown and editable. The owner relationship is retained internally for access-control (non-admin users still see only their own projects) but is no longer surfaced in the UI.
 
 ## [1.55.0] - 2026-04-08
 ### Added
@@ -609,7 +609,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Configurable Dashboard Widgets:** The overview page now supports resizable widgets (1 to 4 columns wide) to let users build a custom dashboard grid.
 - **Dashboard Widget Visibility:** Introduced a widget picker panel in the layout edit mode, allowing users to show or hide individual widget blocks based on their preference.
 - **Statistics card sizing:** The statistics dashboard edit mode now also supports per-card width selection, so individual cards can be expanded to better fit the chosen layout.
-- **New Dashboard Widgets:** Added widgets for "Spotřeba za posledních 7 dní" (7-day activity sparkline), "Nadcházející termíny" (upcoming project deadlines), and "Nejpoužívanější filamenty" (top turnover filaments).
+- **New Dashboard Widgets:** Added widgets for "Consumption last 7 days" (7-day activity sparkline), "Upcoming deadlines" (upcoming project deadlines), and "Most used filaments" (top turnover filaments).
 - **Configurable navigation palette:** Settings now include a new interface palette selector for the main menu and top app shell, with multiple color moods for the navigation area.
 
 ### Changed
@@ -621,7 +621,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Overview upgraded into a command center:** The admin homepage now surfaces urgent items, projects due today, and the active project queue in a stronger operations-first layout above the existing widgets.
 - **Project detail turned into a richer workspace:** Project pages now open with a progress-first workspace header, visible status timeline, clearer delivery signals, and a sticky right-side next-action panel.
 - **Inventory visuals strengthened:** The filament inventory now highlights stock risks, turnover, and color mix before the filter area, and the card view uses stronger color swatches, compact stock metrics, and clearer quick actions.
-- **Command center urgency card clarified:** The `Hoří teď` block now shows a concrete shortlist of urgent stock, project, or printer issues instead of only a summary number.
+- **Command center urgency card clarified:** The `Burning now` block now shows a concrete shortlist of urgent stock, project, or printer issues instead of only a summary number.
 
 ### Fixed
 - **Filaments page runtime error:** Restored the missing `Counter` import used by the new inventory highlight aggregation so `/filaments` no longer fails with HTTP 500.
@@ -709,7 +709,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.46.1] - 2026-04-03
 ### Fixed
-- **Stats – duplicitní KPI odstranněno:** 4. karta v sekci `section_kpi` zobrazovala stejné „Upozornění na doobjednání“ jako fixní Denní řídcí přehled v horní části stránky. Karta je nyní nahrazena metrikou **Sledované filamenty** (celkový počet sledovaných filamentů + počet aktivních projektů), která nebyla nikde jinde zobrazena.
+- **Stats – duplicate KPI removed**: Card 4 in the `section_kpi` section was displaying the same "Reorder recommendations" as the fixed Daily Command Center panel at the top of the page. The card is now replaced with a **Tracked filaments** metric (total tracked filaments + count of active projects), which was not displayed anywhere else.
 
 ## [1.46.0] - 2026-04-03
 ### Fixed
@@ -731,7 +731,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Project detail cleanup:** The duplicate activity block was removed from the overview tab, leaving activity history only in the dedicated `Activity & jobs` workspace tab.
 - **Dashboard edit button fix:** The active `Done editing` button now keeps readable light-theme hover styling on overview, projects, and statistics pages.
 - **Statistics navigation simplified:** The confusing `Sections` tab switcher was replaced with a stable quick-jump navigator, and all deeper statistics sections remain visible on the same page instead of hiding surrounding content.
-- **Projects due strip refined:** The `Termíny` widget now stays in a single compact row and shows only the nearest unfinished deadlines.
+- **Projects due strip refined:** The `Deadlines` widget now stays in a single compact row and shows only the nearest unfinished deadlines.
 - **Live printer reliability tightened:** The overview now shows only printers with fresh sync data and real progress information, so stale `Heating / preparing` states no longer linger there.
 
 ## [1.45.2] - 2026-04-02
@@ -820,7 +820,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.40.0] - 2026-03-29
 ### Fixed
-- **Stats record-limit bug**: The row-limit selector had no effect on the *Co dochází*, *Co se nejvíc točí*, and *Nejziskovější projekty* cards because `element.hidden` was overridden by Tailwind's `display: flex` class. Fixed by using `element.style.display` (inline style) instead.
+- **Stats record-limit bug**: The row-limit selector had no effect on the *What is running out*, *Most used filaments*, and *Most profitable projects* cards because `element.hidden` was overridden by Tailwind's `display: flex` class. Fixed by using `element.style.display` (inline style) instead.
 
 ### Added
 - **Up/Down buttons in edit mode**: Each section-edit-bar now shows ▲ / ▼ arrow buttons alongside the drag handle so sections can be reordered by clicking without drag-and-drop.
@@ -1237,7 +1237,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added sorting feature on the overview page: users can now sort filaments by Name (A-Z), Brand (A-Z), Pieces (most), Remaining weight (most), Total capacity (most), and Percentage (most).
 - Sort preference is preserved across pagination and filters.
 ### Fixed
-- Fixed calculator result box visibility in dark theme: "Výsledek Vašeho Výpočtu" heading and result boxes now have appropriate dark mode background colors.
+- Fixed calculator result box visibility in dark theme: "Your Calculation Result" heading and result boxes now have appropriate dark mode background colors.
 
 ## [1.13.0] - 2026-03-03
 ### Fixed
