@@ -337,6 +337,8 @@ def _inventory_page_context():
     from utils import collect_usage_windows
 
     filaments_query, f_brand, f_material, f_color, f_tag = _apply_inventory_filters(_build_filament_query())
+    # Capture filtered query before sorting — used for Smart Highlights across ALL pages
+    highlights_query = filaments_query
     sort_by = request.args.get('sort_by', 'name')
     sort_direction = request.args.get('sort_direction', 'asc')
 
@@ -389,6 +391,22 @@ def _inventory_page_context():
     stats = _inventory_stats(f_brand, f_material, f_color, f_tag)
 
     filaments_paginated = db.paginate(filaments_query, page=page, per_page=per_page, error_out=False)
+
+    # Load ALL filaments matching the current filter (no pagination) so Smart Highlights
+    # (top turnover, counts, alerts) reflect the entire inventory, not just the current page.
+    all_highlights_filaments = db.session.execute(highlights_query).scalars().all()
+    highlights_usage_map = collect_usage_windows(all_highlights_filaments)
+    for fil in all_highlights_filaments:
+        fil.stock_metrics = compute_stock_status(
+            fil,
+            highlights_usage_map.get(fil.id, {}).get('usage_30', 0.0),
+            highlights_usage_map.get(fil.id, {}).get('usage_90', 0.0),
+        )
+        fil.tag_list = get_filament_tags(fil)
+        capacity_all = fil.quantity * fil.weight_total
+        fil._capacity_all = capacity_all
+        fil._pct = round(fil.weight_remaining / capacity_all * 100) if capacity_all > 0 else 0
+
     usage_map = collect_usage_windows(filaments_paginated.items)
     sparkline_data = collect_sparkline_data(filaments_paginated.items)
     filaments_paginated.items[:] = [_decorate_filament(fil, usage_map, sparkline_data) for fil in filaments_paginated.items]
@@ -403,7 +421,7 @@ def _inventory_page_context():
     }, key=str.lower)
 
     stock_alert_pool = [
-        fil for fil in filaments_paginated.items
+        fil for fil in all_highlights_filaments
         if fil.stock_metrics['status'] in ('critical', 'warning') and not fil.reorder_alert_snoozed
     ]
     stock_alert_pool.sort(
@@ -414,13 +432,12 @@ def _inventory_page_context():
         ),
     )
 
-    visible_filaments = list(filaments_paginated.items)
-    critical_count = sum(1 for fil in visible_filaments if fil.stock_metrics['status'] == 'critical')
-    warning_count = sum(1 for fil in visible_filaments if fil.stock_metrics['status'] == 'warning')
-    stable_count = sum(1 for fil in visible_filaments if fil.stock_metrics['status'] == 'stable')
+    critical_count = sum(1 for fil in all_highlights_filaments if fil.stock_metrics['status'] == 'critical')
+    warning_count = sum(1 for fil in all_highlights_filaments if fil.stock_metrics['status'] == 'warning')
+    stable_count = sum(1 for fil in all_highlights_filaments if fil.stock_metrics['status'] == 'stable')
 
     color_counts = Counter()
-    for fil in visible_filaments:
+    for fil in all_highlights_filaments:
         color_name = fil.color.name if fil.color else '-'
         color_hex = fil.color.hex_value if fil.color and fil.color.hex_value else '#cbd5e1'
         color_counts[(color_name, color_hex)] += max(int(fil.quantity or 0), 1)
@@ -429,17 +446,15 @@ def _inventory_page_context():
         for (name, hex_value), count in color_counts.most_common(6)
     ]
     top_turnover = sorted(
-        [fil for fil in visible_filaments if fil.stock_metrics['usage_30'] > 0],
-        key=lambda fil: (fil.stock_metrics['usage_30'], fil.weight_remaining),
+        [fil for fil in all_highlights_filaments if fil.stock_metrics['usage_30'] > 0],
+        key=lambda fil: fil.stock_metrics['usage_30'],
         reverse=True,
     )[:3]
     healthy_pool = sorted(
-        [fil for fil in visible_filaments if fil.stock_metrics['status'] == 'stable'],
+        [fil for fil in all_highlights_filaments if fil.stock_metrics['status'] == 'stable'],
         key=lambda fil: ((fil.weight_remaining or 0), (fil.quantity or 0)),
         reverse=True,
     )[:3]
-
-    sparkline_data = collect_sparkline_data(filaments_paginated.items)
 
     return {
         'filaments': filaments_paginated,
@@ -464,7 +479,7 @@ def _inventory_page_context():
             'critical_count': critical_count,
             'warning_count': warning_count,
             'stable_count': stable_count,
-            'tagged_count': sum(1 for fil in visible_filaments if fil.tag_list),
+            'tagged_count': sum(1 for fil in all_highlights_filaments if fil.tag_list),
             'color_mix': color_mix,
             'top_turnover': top_turnover,
             'healthy_pool': healthy_pool,
