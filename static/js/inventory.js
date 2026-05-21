@@ -81,7 +81,7 @@ function updateBulkDeleteState() {
     const countLabel = document.getElementById('selectedFilamentsCount');
     const deleteButton = document.getElementById('bulkDeleteButton');
     const selectAll = document.getElementById('selectAllFilaments');
-    if (countLabel) countLabel.textContent = `{{ t("selected_filaments_count_prefix") }} ${checked.length}`;
+    if (countLabel) countLabel.textContent = `${(window._filCtxT && window._filCtxT.selectedPrefix) || 'Selected:'} ${checked.length}`;
     if (deleteButton) deleteButton.disabled = checked.length === 0;
     if (selectAll) {
         selectAll.checked = checkboxes.length > 0 && checked.length === checkboxes.length;
@@ -155,7 +155,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     await window.__inv.fetchContent(window.__inv.currentPage || 1);
                 }
             } catch (e) {
-                alert('{{ t("add_spool_error") }}');
+                alert((window._filCtxT && window._filCtxT.addSpoolError) || 'Error adding spool.');
             } finally {
                 if (submitButton) submitButton.disabled = false;
             }

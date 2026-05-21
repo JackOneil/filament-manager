@@ -516,40 +516,40 @@
     <div id="list-col-header" class="hidden sm:flex items-center bg-gray-100 border-b border-gray-300 px-4 py-2 sticky top-0 z-10 rounded-t-lg mb-0 select-none">
         <div class="w-10 shrink-0"></div>
         <button type="button"
-                x-on:click="toggleSort('name')"
+                onclick="window.__inv && window.__inv.toggleSort('name')"
                 class="flex-1 min-w-[150px] font-bold text-gray-700 text-xs uppercase hover:text-blue-600 hover:underline cursor-pointer flex items-center gap-1 transition bg-transparent border-0 p-0 text-left group">
             {{ t('name') }}
-            <i class="fa-solid" :class="sortBy === 'name' ? (sortDir === 'asc' ? 'fa-arrow-up text-blue-600' : 'fa-arrow-down text-blue-600') : 'fa-arrow-up-arrow-down opacity-30'"></i>
+            <i class="fa-solid {% if sort_by == 'name' %}{% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600{% else %}fa-arrow-up-arrow-down opacity-30{% endif %}"></i>
         </button>
         <button type="button"
-                x-on:click="toggleSort('brand')"
+                onclick="window.__inv && window.__inv.toggleSort('brand')"
                 class="w-28 shrink-0 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 transition bg-transparent border-0 p-0 group">
             {{ t('brand') }}
-            <i class="fa-solid" :class="sortBy === 'brand' ? (sortDir === 'asc' ? 'fa-arrow-up text-blue-600' : 'fa-arrow-down text-blue-600') : 'fa-arrow-up-arrow-down opacity-30'"></i>
+            <i class="fa-solid {% if sort_by == 'brand' %}{% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600{% else %}fa-arrow-up-arrow-down opacity-30{% endif %}"></i>
         </button>
         <button type="button"
-                x-on:click="toggleSort('pieces')"
+                onclick="window.__inv && window.__inv.toggleSort('pieces')"
                 class="w-16 shrink-0 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 transition bg-transparent border-0 p-0 group">
             {{ t('pieces') }}
-            <i class="fa-solid" :class="sortBy === 'pieces' ? (sortDir === 'asc' ? 'fa-arrow-up text-blue-600' : 'fa-arrow-down text-blue-600') : 'fa-arrow-up-arrow-down opacity-30'"></i>
+            <i class="fa-solid {% if sort_by == 'pieces' %}{% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600{% else %}fa-arrow-up-arrow-down opacity-30{% endif %}"></i>
         </button>
         <button type="button"
-                x-on:click="toggleSort('remaining')"
+                onclick="window.__inv && window.__inv.toggleSort('remaining')"
                 class="w-20 shrink-0 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 transition bg-transparent border-0 p-0 group">
             {{ t('remaining') }}
-            <i class="fa-solid" :class="sortBy === 'remaining' ? (sortDir === 'asc' ? 'fa-arrow-up text-blue-600' : 'fa-arrow-down text-blue-600') : 'fa-arrow-up-arrow-down opacity-30'"></i>
+            <i class="fa-solid {% if sort_by == 'remaining' %}{% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600{% else %}fa-arrow-up-arrow-down opacity-30{% endif %}"></i>
         </button>
         <button type="button"
-                x-on:click="toggleSort('capacity')"
+                onclick="window.__inv && window.__inv.toggleSort('capacity')"
                 class="w-20 shrink-0 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 transition bg-transparent border-0 p-0 group">
             {{ t('capacity') }}
-            <i class="fa-solid" :class="sortBy === 'capacity' ? (sortDir === 'asc' ? 'fa-arrow-up text-blue-600' : 'fa-arrow-down text-blue-600') : 'fa-arrow-up-arrow-down opacity-30'"></i>
+            <i class="fa-solid {% if sort_by == 'capacity' %}{% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600{% else %}fa-arrow-up-arrow-down opacity-30{% endif %}"></i>
         </button>
         <button type="button"
-                x-on:click="toggleSort('percent')"
+                onclick="window.__inv && window.__inv.toggleSort('percent')"
                 class="w-16 shrink-0 font-bold text-gray-700 text-xs uppercase text-center hover:text-blue-600 hover:underline cursor-pointer flex items-center justify-center gap-1 transition bg-transparent border-0 p-0 group">
             %
-            <i class="fa-solid" :class="sortBy === 'percent' ? (sortDir === 'asc' ? 'fa-arrow-up text-blue-600' : 'fa-arrow-down text-blue-600') : 'fa-arrow-up-arrow-down opacity-30'"></i>
+            <i class="fa-solid {% if sort_by == 'percent' %}{% if sort_direction == 'asc' %}fa-arrow-up{% else %}fa-arrow-down{% endif %} text-blue-600{% else %}fa-arrow-up-arrow-down opacity-30{% endif %}"></i>
         </button>
         <div class="w-32 shrink-0 font-bold text-gray-700 text-xs uppercase text-right pr-1">{{ t('action') }}</div>
     </div>
@@ -1118,7 +1118,9 @@ window._filCtxT = {
     timeline: '{{ t("spool_life_timeline") }}',
     shop: '{{ t("stats_search_shop") }}',
     confirmDelete: '{{ t("delete_confirm") }}',
-    del: '{{ t("delete") }}'
+    del: '{{ t("delete") }}',
+    selectedPrefix: '{{ t("selected_filaments_count_prefix") }}',
+    addSpoolError: '{{ t("add_spool_error") }}'
 };
 </script>
 </div>
