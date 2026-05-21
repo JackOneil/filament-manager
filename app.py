@@ -48,7 +48,7 @@ from utils import get_settings, utc_now
 from routes import register_all
 from messages import TRANSLATIONS
 
-APP_VERSION = '1.79.7'
+APP_VERSION = '1.80.1'
 
 csrf = CSRFProtect()
 
@@ -318,6 +318,14 @@ def _setup_database(app: Flask) -> None:
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_bambu_job_material_job_id ON bambu_job_material (job_id)')
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_bambu_print_job_filament_id ON bambu_print_job (filament_id)')
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_prusa_print_job_filament_id ON prusa_print_job (filament_id)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_filament_brand_color_material ON filament (brand_id, color_id, material_id)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_movement_history_fil_action_created ON movement_history (filament_id, action_type, created_at)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_project_quote_project_filament ON project_quote (project_id, filament_id)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_project_file_project_parent ON project_file (project_id, parent_file_id)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_storage_placement_shelf_filament ON storage_placement (shelf_id, filament_id)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_bambu_job_material_filament_id ON bambu_job_material (filament_id)')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_waste_record_filament_project ON waste_record (filament_id, project_id)')
+
 
         # Bambu Lab Cloud integration
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN bambu_token TEXT DEFAULT NULL")

@@ -5,6 +5,7 @@ import colorsys
 import json
 
 from flask import render_template, request
+from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
 from database import db
@@ -65,41 +66,74 @@ def _reorder_status_label_key(status):
 def _project_usage_rows():
     rows = defaultdict(lambda: {'grams': 0.0, 'jobs': 0, 'source': set()})
 
-    bambu_jobs = BambuPrintJob.query.options(
-        joinedload(BambuPrintJob.project),
-        joinedload(BambuPrintJob.materials),
-    ).filter(BambuPrintJob.project_id.is_not(None)).all()
+    # Subquery: get all job IDs that have materials
+    has_materials_sub = select(BambuJobMaterial.job_id).distinct()
 
-    for job in bambu_jobs:
-        if not job.project:
-            continue
-        grams = 0.0
-        if len(job.materials) > 1:
-            grams = sum((mat.weight_grams or 0.0) for mat in job.materials if mat.deducted)
-        elif job.deducted:
-            grams = job.weight_grams or 0.0
-        elif job.materials:
-            grams = sum((mat.weight_grams or 0.0) for mat in job.materials if mat.deducted)
+    # Query 1: Bambu jobs with materials
+    bambu_with_materials = db.session.query(
+        Project.id.label('project_id'),
+        Project.name.label('project_name'),
+        db.func.count(db.func.distinct(BambuPrintJob.id)).label('job_count'),
+        db.func.sum(BambuJobMaterial.weight_grams).label('total_weight')
+    ).join(
+        BambuPrintJob, Project.id == BambuPrintJob.project_id
+    ).join(
+        BambuJobMaterial, BambuPrintJob.id == BambuJobMaterial.job_id
+    ).filter(
+        BambuJobMaterial.deducted.is_(True),
+        BambuJobMaterial.weight_grams > 0
+    ).group_by(
+        Project.id, Project.name
+    ).all()
 
-        if grams <= 0:
-            continue
+    # Query 2: Bambu jobs without materials
+    bambu_no_materials = db.session.query(
+        Project.id.label('project_id'),
+        Project.name.label('project_name'),
+        db.func.count(BambuPrintJob.id).label('job_count'),
+        db.func.sum(BambuPrintJob.weight_grams).label('total_weight')
+    ).join(
+        Project, Project.id == BambuPrintJob.project_id
+    ).filter(
+        BambuPrintJob.deducted.is_(True),
+        BambuPrintJob.weight_grams > 0,
+        ~BambuPrintJob.id.in_(has_materials_sub)
+    ).group_by(
+        Project.id, Project.name
+    ).all()
 
-        row = rows[job.project.id]
-        row['project_name'] = job.project.name
-        row['grams'] += grams
-        row['jobs'] += 1
+    # Query 3: Manual links
+    manual_sums = db.session.query(
+        Project.id.label('project_id'),
+        Project.name.label('project_name'),
+        db.func.sum(ProjectFilament.estimated_weight).label('total_weight')
+    ).join(
+        Project, Project.id == ProjectFilament.project_id
+    ).filter(
+        ProjectFilament.is_used.is_(True),
+        ProjectFilament.estimated_weight > 0
+    ).group_by(
+        Project.id, Project.name
+    ).all()
+
+    for project_id, project_name, job_count, total_weight in bambu_with_materials:
+        row = rows[project_id]
+        row['project_name'] = project_name
+        row['grams'] += total_weight
+        row['jobs'] += job_count
         row['source'].add('bambu')
 
-    manual_links = ProjectFilament.query.options(
-        joinedload(ProjectFilament.project)
-    ).filter(ProjectFilament.is_used.is_(True)).all()
+    for project_id, project_name, job_count, total_weight in bambu_no_materials:
+        row = rows[project_id]
+        row['project_name'] = project_name
+        row['grams'] += total_weight
+        row['jobs'] += job_count
+        row['source'].add('bambu')
 
-    for link in manual_links:
-        if not link.project or link.estimated_weight <= 0:
-            continue
-        row = rows[link.project.id]
-        row['project_name'] = link.project.name
-        row['grams'] += link.estimated_weight
+    for project_id, project_name, total_weight in manual_sums:
+        row = rows[project_id]
+        row['project_name'] = project_name
+        row['grams'] += total_weight
         row['source'].add('manual')
 
     result = []
@@ -112,6 +146,7 @@ def _project_usage_rows():
             'source': ', '.join(sorted(data['source'])),
         })
     return sorted(result, key=lambda item: item['grams'], reverse=True)
+
 
 
 def register(app):

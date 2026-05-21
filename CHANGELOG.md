@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.80.1] - 2026-05-21
+### Fixed
+- **Activity 7-day usage chart**: Fixed the rendering and visibility of the bar chart on the overview page in dark mode. Replaced the generic `bg-blue-100` and `hover:bg-blue-500` classes with a custom `.usage-chart-bar` class, providing a vibrant, visible blue bar with border accents in dark mode while retaining the correct color scheme in light mode.
+
+## [1.80.0] - 2026-05-21
+### Added
+- **Glassmorphism Action Center**: Redesigned the Action Center cards on the overview dashboard using glassmorphism styling (backdrop blur, subtle border, floating hover translation, shadows, inner glow, and category left-borders).
+- **Sleek Dark Mode Color Consistency**: Added global overrides under `html.dark` to render light-mode utility classes (slate, neutral, zinc, gray, green, red, amber, blue backgrounds/borders/texts) consistently using a unified HSL/RGB palette.
+
+### Changed
+- **SQLite Database Indexing**: Added 7 new indexes (`ix_filament_brand_color_material`, `ix_movement_history_fil_action_created`, `ix_project_quote_project_filament`, etc.) on app startup to optimize common filter, sort, and history queries.
+- **SQL Aggregation**: Refactored `_project_usage_rows` in statistics dashboard to aggregate weights and counts direct in SQLite, eliminating in-memory Python loops.
+- **N+1 Query Elimination in Pagination**: Refactored API and inventory pagination queries to use modern `select()` construct directly, preserving relationship loaders and eliminating unnecessary queries.
+- **Duplicate Queries**: Removed duplicate `collect_sparkline_data` execution.
+
 ## [1.79.7] - 2026-05-20
 ### Fixed
 - **Command palette FOUC fix**: Moved the `[x-cloak]` CSS rule from the external `app.css` stylesheet into an inline `<style>` block in `<head>`. Previously, during page navigation, the command palette's hint text ("Pište název stránky…") would briefly flash in the center of the screen before the external CSS finished loading. The inline rule applies immediately during HTML parsing, eliminating the flash of unstyled content.

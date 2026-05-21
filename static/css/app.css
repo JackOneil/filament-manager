@@ -820,25 +820,190 @@
         .dashboard-widget .ui-kpi { min-width: 0; }
         /* Stats cards need relative positioning for the resize handle */
         .stats-card { position: relative; }
-        html.dark body {
-            background-color: #111827;
-            color: #f3f4f6;
+        /* ── Glassmorphism Action Center Cards ─────────────────────────── */
+        .action-center-card {
+            background: rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(12px) saturate(110%);
+            -webkit-backdrop-filter: blur(12px) saturate(110%);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 1.15rem;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.04);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            position: relative;
+            overflow: hidden;
         }
-        html.dark .bg-white { background-color: #1f2937; }
-        html.dark .bg-gray-100 { background-color: #111827; }
-        html.dark .bg-gray-50 { background-color: #1f2937; }
-        html.dark .bg-gray-800 { background-color: #111827; }
-        html.dark .border-gray-100 { border-color: #374151; }
-        html.dark .border-gray-200 { border-color: #374151; }
-        html.dark .text-gray-800 { color: #f3f4f6; }
-        html.dark .text-gray-700 { color: #e5e7eb; }
-        html.dark .text-gray-600 { color: #d1d5db; }
-        html.dark .text-gray-500 { color: #9ca3af; }
-        html.dark .text-gray-400 { color: #9ca3af; }
-        html.dark .bg-blue-600 { background-color: #1e40af; }
-        html.dark .hover\:bg-blue-700:hover { background-color: #1e3a8a; }
-        
-        /* Dark mode input styling */
+
+        html.dark .action-center-card {
+            background: rgba(17, 24, 39, 0.45);
+            backdrop-filter: blur(12px) saturate(130%);
+            -webkit-backdrop-filter: blur(12px) saturate(130%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .action-center-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            border-radius: 4px 0 0 4px;
+            transition: width 0.2s ease;
+        }
+
+        .action-center-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.08);
+            border-color: rgba(255, 255, 255, 0.6);
+        }
+
+        html.dark .action-center-card:hover {
+            box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.45);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Category Left Border Accents */
+        .action-center-card.card-warning::before {
+            background: linear-gradient(to bottom, #f59e0b, #d97706);
+        }
+        .action-center-card.card-danger::before {
+            background: linear-gradient(to bottom, #ef4444, #dc2626);
+        }
+        .action-center-card.card-brand::before {
+            background: linear-gradient(to bottom, #0d9488, #0f766e);
+        }
+        .action-center-card.card-info::before {
+            background: linear-gradient(to bottom, #3b82f6, #2563eb);
+        }
+
+        /* Accent Glows on Hover */
+        .action-center-card.card-warning:hover {
+            box-shadow: 0 12px 40px 0 rgba(245, 158, 11, 0.15);
+        }
+        .action-center-card.card-danger:hover {
+            box-shadow: 0 12px 40px 0 rgba(239, 68, 68, 0.15);
+        }
+        .action-center-card.card-brand:hover {
+            box-shadow: 0 12px 40px 0 rgba(13, 148, 136, 0.15);
+        }
+        .action-center-card.card-info:hover {
+            box-shadow: 0 12px 40px 0 rgba(59, 130, 246, 0.15);
+        }
+
+        html.dark .action-center-card.card-warning:hover {
+            box-shadow: 0 12px 40px 0 rgba(245, 158, 11, 0.22);
+        }
+        html.dark .action-center-card.card-danger:hover {
+            box-shadow: 0 12px 40px 0 rgba(239, 68, 68, 0.22);
+        }
+        html.dark .action-center-card.card-brand:hover {
+            box-shadow: 0 12px 40px 0 rgba(13, 148, 136, 0.22);
+        }
+        html.dark .action-center-card.card-info:hover {
+            box-shadow: 0 12px 40px 0 rgba(59, 130, 246, 0.22);
+        }
+
+        /* ── Usage Chart Bar Styling ───────────────────────────────────── */
+        .usage-chart-bar {
+            background-color: #dbeafe !important; /* Tailwind bg-blue-100 fallback */
+            transition: background-color 150ms ease;
+        }
+        .usage-chart-bar:hover {
+            background-color: #3b82f6 !important; /* Tailwind bg-blue-500 fallback */
+        }
+        html.dark .usage-chart-bar {
+            background-color: rgba(59, 130, 246, 0.4) !important; /* Visible blue in dark mode */
+            border: 1px solid rgba(96, 165, 250, 0.45);
+        }
+        html.dark .usage-chart-bar:hover {
+            background-color: rgba(59, 130, 246, 0.75) !important;
+        }
+
+        /* ── Modern Sleek Dark Mode (Consistency overrides in HSL) ── */
+        html.dark body {
+            background-color: var(--ui-bg);
+            color: var(--ui-text);
+        }
+
+        /* Standard Tailwind Gray/Slate/Zinc/Neutral Background Overrides */
+        html.dark .bg-white { background-color: var(--ui-surface) !important; }
+        html.dark .bg-gray-50, html.dark .bg-slate-50, html.dark .bg-zinc-50, html.dark .bg-neutral-50 { background-color: hsla(222, 47%, 11%, 0.4) !important; }
+        html.dark .bg-gray-100, html.dark .bg-slate-100, html.dark .bg-zinc-100, html.dark .bg-neutral-100 { background-color: hsla(222, 47%, 8%, 0.8) !important; }
+        html.dark .bg-gray-200, html.dark .bg-slate-200, html.dark .bg-zinc-200, html.dark .bg-neutral-200 { background-color: hsla(222, 47%, 15%, 0.5) !important; }
+        html.dark .bg-gray-300, html.dark .bg-slate-300, html.dark .bg-zinc-300, html.dark .bg-neutral-300 { background-color: hsla(222, 47%, 20%, 0.5) !important; }
+        html.dark .bg-gray-800, html.dark .bg-slate-800, html.dark .bg-zinc-800, html.dark .bg-neutral-800 { background-color: hsla(222, 47%, 12%, 0.95) !important; }
+        html.dark .bg-gray-900, html.dark .bg-slate-900, html.dark .bg-zinc-900, html.dark .bg-neutral-900 { background-color: hsla(222, 47%, 7%, 0.95) !important; }
+        html.dark .bg-white\/70 { background-color: rgba(17, 24, 39, 0.45) !important; }
+
+        /* Standard Tailwind Border Overrides */
+        html.dark .border-gray-100, html.dark .border-slate-100, html.dark .border-zinc-100, html.dark .border-neutral-100 { border-color: hsla(217, 19%, 27%, 0.35) !important; }
+        html.dark .border-gray-200, html.dark .border-slate-200, html.dark .border-zinc-200, html.dark .border-neutral-200 { border-color: hsla(217, 19%, 27%, 0.5) !important; }
+        html.dark .border-gray-300, html.dark .border-slate-300, html.dark .border-zinc-300, html.dark .border-neutral-300 { border-color: hsla(217, 19%, 27%, 0.75) !important; }
+        html.dark .border-b.border-gray-200, html.dark .border-b.border-gray-300, html.dark .border-b.border-slate-200 { border-color: hsla(217, 19%, 27%, 0.5) !important; }
+        html.dark .border-gray-100 { border-color: hsla(217, 19%, 27%, 0.35); }
+        html.dark .border-gray-200 { border-color: hsla(217, 19%, 27%, 0.5); }
+
+        /* Standard Tailwind Text Color Overrides */
+        html.dark .text-gray-900, html.dark .text-slate-900, html.dark .text-zinc-900, html.dark .text-neutral-900 { color: hsl(210, 40%, 98%) !important; }
+        html.dark .text-gray-800, html.dark .text-slate-800, html.dark .text-zinc-800, html.dark .text-neutral-800 { color: hsl(210, 40%, 93%) !important; }
+        html.dark .text-gray-700, html.dark .text-slate-700, html.dark .text-zinc-700, html.dark .text-neutral-700 { color: hsl(212, 25%, 85%) !important; }
+        html.dark .text-gray-600, html.dark .text-slate-600, html.dark .text-zinc-600, html.dark .text-neutral-600 { color: hsl(215, 20%, 75%) !important; }
+        html.dark .text-gray-500, html.dark .text-slate-500, html.dark .text-zinc-500, html.dark .text-neutral-500 { color: hsl(215, 16%, 65%) !important; }
+        html.dark .text-gray-400, html.dark .text-slate-400, html.dark .text-zinc-400, html.dark .text-neutral-400 { color: hsl(215, 16%, 55%) !important; }
+        html.dark .text-gray-300, html.dark .text-slate-300, html.dark .text-zinc-300, html.dark .text-neutral-300 { color: hsl(215, 16%, 45%) !important; }
+
+        /* Red Alerts / Overdue Items */
+        html.dark .bg-red-50 { background-color: hsla(0, 72%, 15%, 0.3) !important; }
+        html.dark .bg-red-100 { background-color: hsla(0, 72%, 20%, 0.4) !important; }
+        html.dark .border-red-100 { border-color: hsla(0, 72%, 35%, 0.3) !important; }
+        html.dark .border-red-200 { border-color: hsla(0, 72%, 35%, 0.4) !important; }
+        html.dark .text-red-500 { color: hsl(0, 100%, 75%) !important; }
+        html.dark .text-red-600 { color: hsl(0, 100%, 75%) !important; }
+        html.dark .text-red-700 { color: hsl(0, 100%, 80%) !important; }
+        html.dark .text-red-800 { color: hsl(0, 100%, 85%) !important; }
+        html.dark .bg-red-50\/95 { background-color: rgba(127, 29, 29, 0.95) !important; }
+
+        /* Green Success / Tags */
+        html.dark .bg-green-50, html.dark .bg-emerald-50 { background-color: hsla(150, 60%, 12%, 0.3) !important; }
+        html.dark .bg-green-100, html.dark .bg-emerald-100 { background-color: hsla(150, 60%, 15%, 0.4) !important; }
+        html.dark .border-green-100, html.dark .border-emerald-100 { border-color: hsla(150, 60%, 25%, 0.3) !important; }
+        html.dark .border-green-200, html.dark .border-emerald-200 { border-color: hsla(150, 60%, 25%, 0.4) !important; }
+        html.dark .text-green-500, html.dark .text-emerald-500 { color: hsl(150, 80%, 70%) !important; }
+        html.dark .text-green-600, html.dark .text-emerald-600 { color: hsl(150, 80%, 70%) !important; }
+        html.dark .text-green-700, html.dark .text-emerald-700 { color: hsl(150, 80%, 75%) !important; }
+        html.dark .text-green-800, html.dark .text-emerald-800 { color: hsl(150, 80%, 85%) !important; }
+        html.dark .bg-green-50\/95 { background-color: rgba(6, 78, 59, 0.95) !important; }
+
+        /* Amber / Yellow / Orange Warnings */
+        html.dark .bg-amber-50, html.dark .bg-yellow-50 { background-color: hsla(38, 80%, 10%, 0.3) !important; }
+        html.dark .bg-amber-100, html.dark .bg-yellow-100, html.dark .bg-orange-100 { background-color: hsla(38, 80%, 15%, 0.4) !important; }
+        html.dark .border-amber-100, html.dark .border-yellow-100 { border-color: hsla(38, 80%, 30%, 0.3) !important; }
+        html.dark .border-amber-200, html.dark .border-yellow-200 { border-color: hsla(38, 80%, 30%, 0.4) !important; }
+        html.dark .text-amber-500, html.dark .text-yellow-500, html.dark .text-orange-500 { color: hsl(38, 90%, 70%) !important; }
+        html.dark .text-amber-600, html.dark .text-yellow-600, html.dark .text-orange-600 { color: hsl(38, 90%, 70%) !important; }
+        html.dark .text-amber-700, html.dark .text-yellow-700, html.dark .text-orange-700 { color: hsl(38, 90%, 75%) !important; }
+        html.dark .text-amber-800, html.dark .text-yellow-800, html.dark .text-orange-800 { color: hsl(38, 90%, 85%) !important; }
+
+        /* Blue / Info Accent Overrides */
+        html.dark .bg-blue-50 { background-color: hsla(217, 72%, 15%, 0.2) !important; }
+        html.dark .bg-blue-100 { background-color: hsla(217, 72%, 20%, 0.35) !important; }
+        html.dark .bg-blue-600 { background-color: #2563eb !important; }
+        html.dark .border-blue-100 { border-color: hsla(217, 72%, 35%, 0.28) !important; }
+        html.dark .border-blue-200 { border-color: hsla(217, 72%, 35%, 0.35) !important; }
+        html.dark .text-blue-500 { color: hsl(217, 90%, 75%) !important; }
+        html.dark .text-blue-600 { color: hsl(217, 90%, 75%) !important; }
+        html.dark .text-blue-700 { color: #93c5fd !important; }
+        html.dark .text-blue-800 { color: hsl(217, 90%, 85%) !important; }
+        html.dark .hover\:bg-blue-700:hover { background-color: #1d4ed8 !important; }
+
+        /* Additional color-specific items */
+        html.dark .text-emerald-700, html.dark .text-emerald-600 { color: #34d399; }
+        html.dark .bg-emerald-100 { background-color: rgba(6, 78, 59, 0.3); }
+        html.dark .bg-teal-100 { background-color: rgba(19, 78, 74, 0.3); }
+        html.dark .text-teal-700, html.dark .text-teal-600 { color: #2dd4bf; }
+
+        /* Input / Select Fields */
         html.dark input[type="text"],
         html.dark input[type="number"],
         html.dark input[type="email"],
@@ -848,11 +1013,11 @@
         html.dark input[type="date"],
         html.dark textarea,
         html.dark select {
-            background-color: #1f2937;
+            background-color: hsla(222, 47%, 12%, 0.95);
             color: #f3f4f6;
-            border-color: #374151;
+            border-color: hsla(217, 19%, 27%, 0.6);
         }
-        
+
         html.dark input[type="text"]:focus,
         html.dark input[type="number"]:focus,
         html.dark input[type="email"]:focus,
@@ -862,158 +1027,82 @@
         html.dark input[type="date"]:focus,
         html.dark textarea:focus,
         html.dark select:focus {
-            background-color: #1f2937;
+            background-color: hsla(222, 47%, 12%, 0.95);
             color: #f3f4f6;
-            border-color: #4b5563;
+            border-color: var(--ui-brand);
         }
-        
-        html.dark input::placeholder {
-            color: #9ca3af;
+
+        html.dark input::placeholder { color: #9ca3af; }
+        html.dark option { background-color: #1f2937; color: #f3f4f6; }
+        html.dark input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1) brightness(1.2);
         }
-        
-        html.dark option {
-            background-color: #1f2937;
-            color: #f3f4f6;
+
+        /* Hover Classes */
+        html.dark .hover\:bg-gray-50:hover,
+        html.dark .hover\:bg-gray-100:hover,
+        html.dark .hover\:bg-slate-50:hover,
+        html.dark .hover\:bg-slate-100:hover {
+            background-color: hsla(222, 47%, 15%, 0.6) !important;
         }
-        
-        /* Dark mode for Tailwind hover classes used in calculator */
-        html.dark .hover\:bg-gray-50:hover { background-color: #374151; }
-        html.dark .hover\:bg-gray-100:hover { background-color: #374151; }
-        html.dark .hover\:bg-green-50:hover { background-color: #374151; }
-        html.dark .hover\:bg-red-50:hover { background-color: #7f1d1d; }
-        html.dark .hover\:bg-red-100:hover { background-color: #7f1d1d; }
-        html.dark .hover\:bg-blue-50:hover { background-color: #1e3a8a; }
-        html.dark .hover\:bg-blue-100:hover { background-color: #1e3a8a; }
-        
-        /* Dark mode for calculator fulltext search */
+        html.dark .hover\:bg-green-50:hover { background-color: hsla(150, 60%, 15%, 0.3) !important; }
+        html.dark .hover\:bg-red-50:hover { background-color: hsla(0, 72%, 15%, 0.3) !important; }
+        html.dark .hover\:bg-red-100:hover { background-color: hsla(0, 72%, 20%, 0.4) !important; }
+        html.dark .hover\:bg-blue-50:hover { background-color: hsla(217, 72%, 15%, 0.3) !important; }
+        html.dark .hover\:bg-blue-100:hover { background-color: hsla(217, 72%, 20%, 0.4) !important; }
+        html.dark a.hover\:text-blue-600:hover { color: #60a5fa !important; }
+        html.dark .group:hover .group-hover\:text-blue-700 { color: #3b82f6 !important; }
+        html.dark .hover\:bg-blue-50:hover { background-color: rgba(30, 58, 138, 0.3) !important; }
+
+        /* Calculator / Dropdowns / Search */
         html.dark #filament_search {
-            background-color: #1f2937;
+            background-color: hsla(222, 47%, 12%, 0.95);
             color: #f3f4f6;
-            border-color: #374151;
+            border-color: hsla(217, 19%, 27%, 0.6);
         }
         html.dark #filament_search:focus {
-            background-color: #1f2937;
-            color: #f3f4f6;
-            border-color: #4b5563;
+            background-color: hsla(222, 47%, 12%, 0.95);
+            border-color: var(--ui-brand);
         }
         html.dark #filament_dropdown {
-            background-color: #1f2937;
-            border-color: #374151;
+            background-color: hsla(222, 47%, 12%, 0.98);
+            border-color: hsla(217, 19%, 27%, 0.8);
         }
         html.dark .filament-option {
-            border-color: #374151;
+            border-color: hsla(217, 19%, 27%, 0.5);
             color: #f3f4f6;
         }
         html.dark .filament-option .text-gray-800 { color: #f3f4f6; }
         html.dark .filament-option .text-gray-500 { color: #9ca3af; }
-        
-        /* Dark mode for pagination */
-        html.dark nav.flex.items-center.gap-1.bg-white {
-            background-color: #1f2937;
-            border-color: #374151;
-        }
-        html.dark .text-gray-700 { color: #e5e7eb; }
-        
-        /* Dark mode for overview list view */
-        html.dark .hover\:bg-gray-50:hover { background-color: #1f2937; }
-        html.dark .bg-gray-50 { background-color: #1f2937; }
-        html.dark .bg-gray-200 { background-color: #374151; }
-        html.dark .bg-gray-300:hover { background-color: #4b5563; }
-        html.dark .border-b.border-gray-200 { border-color: #374151; }
-        
-        /* Dark mode for list view header */
-        html.dark .bg-gray-100 { background-color: #1f2937; }
-        html.dark .border-b.border-gray-300 { border-color: #374151; }
-        
-        /* Dark mode for view toggle buttons */
-        html.dark .bg-gray-200 { background-color: #374151; }
-        html.dark .text-gray-600 { color: #d1d5db; }
-        html.dark .text-gray-600:hover { color: #e5e7eb; }
-        
-        /* Dark mode for text colors in forms */
-        html.dark .text-gray-800 { color: #f3f4f6; }
-        
-        /* Dark mode for list view header sorting links */
-        html.dark .bg-gray-100 { background-color: #1f2937; }
-        html.dark .text-gray-700 { color: #e5e7eb; }
-        html.dark a.hover\:text-blue-600:hover { color: #60a5fa; }
-        html.dark .group:hover .group-hover\:text-blue-700 { color: #3b82f6; }
-        
-        /* Dark mode for sort buttons */
-        html.dark .bg-gray-200 { background-color: #374151; }
-        html.dark .hover\:bg-gray-300:hover { background-color: #4b5563; }
-        html.dark .bg-blue-600 { background-color: #2563eb; }
-        html.dark .hover\:bg-blue-700:hover { background-color: #1d4ed8; }
-        
-        /* Dark mode for calculator result */
+
+        /* Calculator results gradient & border */
         html.dark .bg-gradient-to-b.from-green-50.to-white {
-            background: linear-gradient(to bottom, #064e3b, #1f2937) !important;
+            background: linear-gradient(to bottom, hsla(150, 60%, 12%, 0.8), hsla(222, 47%, 12%, 0.95)) !important;
         }
-        html.dark .border-green-200 { border-color: #047857; }
-        html.dark .outline-green-50 { outline-color: #047857; }
-        html.dark .text-green-600 { color: #10b981; }
-        html.dark .text-green-700 { color: #059669; }
-        html.dark .bg-gradient-to-b.from-blue-50 { background: linear-gradient(to bottom, #0c4a6e, #1f2937) !important; }
+        html.dark .bg-gradient-to-b.from-blue-50 {
+            background: linear-gradient(to bottom, hsla(217, 72%, 15%, 0.8), hsla(222, 47%, 12%, 0.95)) !important;
+        }
+        html.dark .outline-green-50 { outline-color: hsla(150, 60%, 25%, 0.4); }
 
-        /* Dark mode: flash / toast messages */
-        html.dark .bg-red-50\/95 { background-color: rgba(127, 29, 29, 0.95) !important; }
-        html.dark .bg-green-50\/95 { background-color: rgba(6, 78, 59, 0.95) !important; }
-        html.dark .border-red-200 { border-color: #991b1b; }
-        html.dark .text-red-800 { color: #fca5a5; }
-        html.dark .text-green-800 { color: #6ee7b7; }
-        html.dark .text-red-500 { color: #f87171; }
-        html.dark .text-green-500 { color: #34d399; }
+        /* Pagination bar */
+        html.dark nav.flex.items-center.gap-1.bg-white {
+            background-color: hsla(222, 47%, 12%, 0.95);
+            border-color: hsla(217, 19%, 27%, 0.6);
+        }
 
-        /* Dark mode: stats section-edit-bar and card-edit-bar */
+        /* Edit Bars (Stats layout / widgets) */
         html.dark .section-edit-bar,
         html.dark .card-edit-bar {
             background-color: rgba(30, 58, 138, 0.35) !important;
             border-color: rgba(96, 165, 250, 0.25) !important;
         }
-        html.dark .bg-blue-50 { background-color: rgba(30, 58, 138, 0.2); }
-        html.dark .border-blue-200 { border-color: rgba(96, 165, 250, 0.3); }
-        html.dark .text-blue-700 { color: #93c5fd; }
-        html.dark .hover\:bg-blue-50:hover { background-color: rgba(30, 58, 138, 0.3) !important; }
-        html.dark .bg-white\/70 { background-color: rgba(17, 24, 39, 0.72) !important; }
-        html.dark .border-amber-100 { border-color: rgba(251, 191, 36, 0.28) !important; }
-        html.dark .border-red-100 { border-color: rgba(248, 113, 113, 0.28) !important; }
-        html.dark .border-blue-100 { border-color: rgba(96, 165, 250, 0.28) !important; }
-        html.dark .hover\:border-amber-300:hover { border-color: rgba(251, 191, 36, 0.5) !important; }
-        html.dark .hover\:border-red-300:hover { border-color: rgba(248, 113, 113, 0.5) !important; }
-        html.dark .hover\:border-blue-300:hover { border-color: rgba(96, 165, 250, 0.5) !important; }
-        html.dark input[type="date"]::-webkit-calendar-picker-indicator {
-            filter: invert(1) brightness(1.2);
-        }
 
-        /* Dark mode: info / hint banners (yellow, amber) */
-        html.dark .bg-yellow-50 { background-color: rgba(120, 53, 15, 0.2); }
-        html.dark .border-yellow-200 { border-color: rgba(251, 191, 36, 0.3); }
-        html.dark .text-yellow-800 { color: #fde68a; }
-        html.dark .text-amber-600 { color: #fbbf24; }
-        html.dark .bg-amber-50 { background-color: rgba(120, 53, 15, 0.2); }
-
-        /* Dark mode: status bg chips */
-        html.dark .bg-green-100 { background-color: rgba(6, 78, 59, 0.3); }
-        html.dark .text-green-800 { color: #6ee7b7; }
-        html.dark .bg-red-100 { background-color: rgba(127, 29, 29, 0.3); }
-        html.dark .text-red-800 { color: #fca5a5; }
-        html.dark .bg-yellow-100 { background-color: rgba(120, 53, 15, 0.3); }
-        html.dark .text-yellow-800 { color: #fde68a; }
-        html.dark .bg-emerald-100 { background-color: rgba(6, 78, 59, 0.3); }
-        html.dark .text-emerald-700 { color: #34d399; }
-        html.dark .text-emerald-600 { color: #34d399; }
-        html.dark .bg-orange-100 { background-color: rgba(154, 52, 18, 0.3); }
-        html.dark .text-orange-700 { color: #fdba74; }
-        html.dark .text-orange-600 { color: #fdba74; }
-        html.dark .bg-teal-100 { background-color: rgba(19, 78, 74, 0.3); }
-        html.dark .text-teal-700 { color: #2dd4bf; }
-        html.dark .text-teal-600 { color: #2dd4bf; }
-
-        /* Dark mode: modals (backdrop + content) */
+        /* Modals & Menus */
         html.dark #useFilamentModal,
         html.dark .modal-content,
         html.dark [id*="Modal"] .bg-white {
-            background-color: #1f2937 !important;
+            background-color: hsla(222, 47%, 12%, 0.98) !important;
+            border: 1px solid hsla(217, 19%, 27%, 0.8);
         }
         html.dark .bg-black\/50 { background-color: rgba(0,0,0,0.7); }
         html.dark .nav-menu-panel {

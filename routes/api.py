@@ -1,5 +1,6 @@
 """AJAX API routes for dynamic filtering/sorting without page reload."""
 from flask import request, render_template, jsonify
+from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from auth import get_current_user, is_admin
 from database import db
@@ -13,7 +14,7 @@ def register(app):
     def api_filaments_list():
         user = get_current_user()
         inventory_read_only = bool(user and not is_admin(user))
-        filaments_query = Filament.query.options(
+        filaments_query = select(Filament).options(
             joinedload(Filament.brand),
             joinedload(Filament.material),
             joinedload(Filament.color)
@@ -32,18 +33,18 @@ def register(app):
             sort_direction = 'asc'
 
         if f_brand:
-            filaments_query = filaments_query.filter(Filament.brand_id == f_brand)
+            filaments_query = filaments_query.where(Filament.brand_id == f_brand)
         if f_material:
-            filaments_query = filaments_query.filter(Filament.material_id == f_material)
+            filaments_query = filaments_query.where(Filament.material_id == f_material)
         if f_color:
-            filaments_query = filaments_query.filter(Filament.color_id == f_color)
+            filaments_query = filaments_query.where(Filament.color_id == f_color)
         if f_tag:
-            filaments_query = filaments_query.filter(Filament.tag_text.ilike(f'%{escape_like(f_tag)}%'))
+            filaments_query = filaments_query.where(Filament.tag_text.ilike(f'%{escape_like(f_tag)}%'))
 
         # Quick server-side filters (computed from DB columns, no post-load filtering needed)
         if quick_filter == 'low_stock':
             # quantity == 0 OR remaining/capacity < 20 %
-            filaments_query = filaments_query.filter(
+            filaments_query = filaments_query.where(
                 db.or_(
                     Filament.quantity == 0,
                     db.and_(
@@ -54,7 +55,7 @@ def register(app):
             )
         elif quick_filter == 'reorder':
             # has a min_stock threshold AND remaining is below it
-            filaments_query = filaments_query.filter(
+            filaments_query = filaments_query.where(
                 Filament.min_stock_grams > 0,
                 Filament.weight_remaining < Filament.min_stock_grams,
                 Filament.reorder_alert_snoozed == False,  # noqa: E712
@@ -91,7 +92,7 @@ def register(app):
         if per_page not in [12, 24, 48, 96]:
             per_page = default_per_page
 
-        filaments_paginated = db.paginate(filaments_query.statement, page=page, per_page=per_page, error_out=False)
+        filaments_paginated = db.paginate(filaments_query, page=page, per_page=per_page, error_out=False)
         usage_map = collect_usage_windows(filaments_paginated.items)
         sparkline_data = collect_sparkline_data(filaments_paginated.items)
         
@@ -121,8 +122,6 @@ def register(app):
                 fil._sparkline_fill = ''
             
             decorated_filaments.append(fil)
-        
-        sparkline_data = collect_sparkline_data(filaments_paginated.items)
 
         if view_mode == 'card':
             html = render_template(

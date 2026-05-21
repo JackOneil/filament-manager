@@ -429,7 +429,7 @@
                     </div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                    <div class="ui-card-soft p-4">
+                    <div class="action-center-card card-warning p-4">
                         <div class="flex items-center justify-between mb-3">
                             <span class="ui-badge ui-badge-warning"><i class="fa-solid fa-triangle-exclamation"></i> {{ t('overview_low_stock_title') }}</span>
                             <span class="text-sm text-gray-500">{{ action_center.counts.low_stock }}</span>
@@ -450,7 +450,7 @@
                             {% endfor %}
                         </div>
                     </div>
-                    <div class="ui-card-soft p-4">
+                    <div class="action-center-card card-danger p-4">
                         <div class="flex items-center justify-between mb-3">
                             <span class="ui-badge ui-badge-critical"><i class="fa-solid fa-calendar-xmark"></i> {{ t('overview_due_dates_title') }}</span>
                             <span class="text-sm text-gray-500">{{ action_center.counts.overdue_projects }}</span>
@@ -466,7 +466,7 @@
                             {% endfor %}
                         </div>
                     </div>
-                    <div class="ui-card-soft p-4">
+                    <div class="action-center-card card-brand p-4">
                         <div class="flex items-center justify-between mb-3">
                             <span class="ui-badge ui-badge-brand"><i class="fa-solid fa-link-slash"></i> {{ t('overview_mapping_title') }}</span>
                             <span class="text-sm text-gray-500">{{ action_center.counts.unmapped_jobs }}</span>
@@ -493,7 +493,7 @@
                             {% endif %}
                         </div>
                     </div>
-                    <div class="ui-card-soft p-4">
+                    <div class="action-center-card card-info p-4">
                         <div class="flex items-center justify-between mb-3">
                             <span class="ui-badge"><i class="fa-solid fa-clock-rotate-left"></i> {{ t('overview_recent_prints_title') }}</span>
                             <a href="{{ url_for('bambu_jobs') }}" class="text-xs text-blue-600 hover:underline">{{ t('overview_see_all') }}</a>
@@ -607,7 +607,7 @@
                 <div class="flex-1 flex items-end gap-2 h-32 pt-4">
                     {% set max_val = (overview_focus.usage_7d | max) or 1 %}
                     {% for val in overview_focus.usage_7d %}
-                    <div class="flex-1 bg-blue-100 hover:bg-blue-500 rounded-t-md relative group transition-colors" style="height: {{ [(val / max_val * 100), 5] | max }}%;">
+                    <div class="flex-1 usage-chart-bar rounded-t-md relative group transition-colors" style="height: {{ [(val / max_val * 100), 5] | max }}%;">
                         <div class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-10">{{ val|round|int }} g</div>
                     </div>
                     {% endfor %}
