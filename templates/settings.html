@@ -522,6 +522,11 @@
                                 <i class="fa-solid fa-hourglass-start"></i> {{ p.pre_job_time_minutes }} {{ t('bambu_pre_job_time_unit') }}
                             </span>
                             {% endif %}
+                            {% if p.power_draw_watts %}
+                            <span class="text-xs text-amber-600 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <i class="fa-solid fa-bolt"></i> {{ p.power_draw_watts }} W
+                            </span>
+                            {% endif %}
                             {% if p.device_id %}
                             <span class="text-xs text-gray-400 font-mono">{{ p.device_id }}</span>
                             {% endif %}
@@ -558,6 +563,17 @@
                                     value="{{ p.pre_job_time_minutes or 0 }}"
                                     class="w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                                 <span class="text-xs text-gray-400">{{ t('bambu_pre_job_time_unit') }}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="text-xs text-gray-500 whitespace-nowrap flex items-center gap-1.5">
+                                    <i class="fa-solid fa-bolt text-gray-400"></i>
+                                    {{ t('printer_power_draw_label') }}:
+                                </label>
+                                <input type="number" name="power_draw_watts" min="0" max="2000"
+                                    value="{{ p.power_draw_watts or '' }}"
+                                    class="w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder="e.g. 150">
+                                <span class="text-xs text-gray-400">W</span>
                             </div>
                             <div>
                                 <label class="text-xs text-gray-500 whitespace-nowrap flex items-center gap-1.5">
@@ -618,6 +634,13 @@
                             class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
                             placeholder="{{ t('prusa_notes_placeholder') }}">
                     </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('printer_power_draw_label') }}</label>
+                        <input type="number" name="power_draw_watts" min="0" max="2000"
+                            class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                            placeholder="e.g. 150">
+                        <p class="text-xs text-gray-400 mt-1">{{ t('printer_power_draw_desc') }}</p>
+                    </div>
                     <div class="flex gap-3">
                         <button type="submit"
                             class="bg-orange-500 hover:bg-orange-600 transition-colors text-white font-semibold py-2 px-5 rounded-lg text-sm shadow">
@@ -648,6 +671,11 @@
                                 <span class="font-semibold text-gray-800">{{ pp.name }}</span>
                                 {% if pp.printer_model %}
                                 <span class="ml-2 text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{{ pp.printer_model }}</span>
+                                {% endif %}
+                                {% if pp.power_draw_watts %}
+                                <span class="ml-2 text-xs text-amber-600 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                                    <i class="fa-solid fa-bolt"></i> {{ pp.power_draw_watts }} W
+                                </span>
                                 {% endif %}
                                 <span class="block text-xs text-gray-400 font-mono mt-0.5">{{ pp.host }}</span>
                                 {% if not pp.enabled %}
@@ -711,6 +739,12 @@
                                     <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('prusa_printer_notes') }}</label>
                                     <input type="text" name="notes" value="{{ pp.notes or '' }}"
                                         class="w-full border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none">
+                                </div>
+                                <div>
+                                    <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('printer_power_draw_label') }}</label>
+                                    <input type="number" name="power_draw_watts" value="{{ pp.power_draw_watts or '' }}" min="0" max="2000"
+                                        class="w-full border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
+                                        placeholder="e.g. 150">
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">

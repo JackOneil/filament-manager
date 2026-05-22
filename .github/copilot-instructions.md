@@ -30,8 +30,9 @@
 The project uses a **modular Flask app factory pattern with Flask Blueprints**. Each module inside the `routes/` directory defines its own Blueprint (e.g. `routes/inventory.py` registers a blueprint for inventory). To maintain backward compatibility with legacy templates and `url_for("endpoint")` usage, a custom `BuildError` fallback handler is registered in `app.py`. If a global endpoint lookup fails, the fallback handler automatically resolves it to the correct blueprint-prefixed endpoint (e.g., `inventory.index`).
 
 ```
-app.py                  # Entry point: create_app(), _setup_database(), _safe_alter(), background workers
+app.py                  # Entry point: create_app(), background workers
 database.py             # Shared db = SQLAlchemy() instance
+migrations.py           # Database migrations: run_migrations(), _safe_alter() schema updates and seeds
 models.py               # All ORM models (~24 tables): Brand, Color, Material, Filament,
                         #   MovementHistory, AppSetting, PrintHistory, Project, ProjectFile,
                         #   ProjectLink, ProjectFilament, ProjectQuote, ProjectComment, ProjectTodo,
@@ -67,12 +68,14 @@ templates/
   index_user.html       # Filament inventory — user (read-only, paginated)
   stats.html            # Statistics dashboard — Chart.js, 6 draggable sections (see rule 16)
   storage.html          # Visual shelf grid map
-  project_detail.html   # Tabbed workspace (overview, materials, files, jobs)
+  project_detail.html   # Tabbed workspace hosting project detail partial templates
   projects_index.html   # Kanban board + table
   bambu.html            # Bambu Cloud job list with filter pills
   prusa.html            # PrusaLink job list with filter pills
   settings.html         # Full settings + dictionaries + integrations
-  ...                   # Auth pages, forms, partials (_filament_cards.html, _filament_list_rows.html)
+  ...                   # Auth pages, forms, partials (_filament_cards.html, _filament_list_rows.html,
+                        #   _project_overview.html, _project_materials.html, _project_files.html,
+                        #   _project_jobs.html, _project_activity.html)
 tests/
   test_auth.py          # Auth flows, sessions, RBAC
   test_bambu.py         # Bambu sync, deduction, idempotency
@@ -145,8 +148,8 @@ Two daemon threads start in `create_app()`:
 
 ### 3.4 DB Schema Migration Strategy
 
-- **No Alembic.** Migrations are handled via `_safe_alter()` in `app.py`.
-- Every new column requires a `_safe_alter(app, 'ALTER TABLE ...')` line in `_setup_database()`.
+- **No Alembic.** Migrations are handled via `_safe_alter()` in `migrations.py`.
+- Every new column requires a `_safe_alter(app, 'ALTER TABLE ...')` line in `run_migrations()` inside `migrations.py`.
 - `duplicate column name` exceptions are silently ignored → safe on reruns.
 - `db.create_all()` creates new tables; `_safe_alter()` adds columns to existing ones.
 
@@ -202,7 +205,7 @@ When modifying this project, always follow these rules:
 - Add new key/value pairs to **both** `cs` and `en` dictionaries in `messages.py`.
 
 ### Rule 2 — Database Schema
-- Models live in `models.py`. When adding a new column, also add a `_safe_alter()` call in `app.py`:
+- Models live in `models.py`. When adding a new column, also add a `_safe_alter()` call in `migrations.py`'s `run_migrations()`:
   ```python
   _safe_alter(app, "ALTER TABLE tablename ADD COLUMN column_name TYPE DEFAULT value")
   ```
@@ -287,8 +290,8 @@ The `/export` and `/import` functions in `routes/settings.py` must cover the **e
 | App settings         | `AppSetting` (language, currency, theme, energy, sync config, etc.)    |
 | Calculator records   | `PrintHistory`                                                         |
 | Projects             | `Project`, `ProjectFile` (with file content), `ProjectLink`, `ProjectFilament`, `ProjectQuote`, `ProjectComment` |
-| Bambu integration    | `BambuPrinter`, `BambuPrintJob`, `BambuJobMaterial`                    |
-| Prusa integration    | `PrusaPrinter` (API keys excluded), `PrusaPrintJob`                    |
+| Bambu integration    | `BambuPrinter` (+ `power_draw_watts`), `BambuPrintJob`, `BambuJobMaterial` |
+| Prusa integration    | `PrusaPrinter` (API keys excluded, + `power_draw_watts`), `PrusaPrintJob` |
 | Storage              | `StorageShelf`, `StoragePlacement`                                     |
 | Users & auth         | `User`, `UserInvite`, `Notification`, `AuditLog`                       |
 

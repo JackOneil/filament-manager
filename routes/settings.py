@@ -179,8 +179,16 @@ def register(app):
                             printer.pre_job_time_minutes = max(0, int(request.form.get('pre_job_time_minutes', 0)))
                         except (ValueError, TypeError):
                             pass
+                        power_raw = request.form.get('power_draw_watts', '').strip()
+                        if power_raw:
+                            try:
+                                printer.power_draw_watts = max(0, int(power_raw))
+                            except (ValueError, TypeError):
+                                pass
+                        else:
+                            printer.power_draw_watts = None
                         printer.notes = request.form.get('notes', '').strip() or None
-                        app.logger.debug(f"Edited Bambu printer {printer.device_id}: name={printer.name}, pre_job={printer.pre_job_time_minutes}min, notes={printer.notes}")
+                        app.logger.debug(f"Edited Bambu printer {printer.device_id}: name={printer.name}, pre_job={printer.pre_job_time_minutes}min, power={printer.power_draw_watts}W, notes={printer.notes}")
 
                 elif action == 'delete_bambu_printer':
                     printer = db.session.get(BambuPrinter, request.form.get('id', type=int))
@@ -203,12 +211,20 @@ def register(app):
                     host = _validate_host(host_raw)
                     alias = request.form.get('name', '').strip()
                     api_key_raw = request.form.get('api_key', '').strip()
+                    power_raw = request.form.get('power_draw_watts', '').strip()
+                    power_val = None
+                    if power_raw:
+                        try:
+                            power_val = max(0, int(power_raw))
+                        except (ValueError, TypeError):
+                            pass
                     if host and alias and api_key_raw:
                         db.session.add(PrusaPrinter(
                             name=alias,
                             host=host,
                             api_key=encrypt_token(api_key_raw),
                             notes=request.form.get('notes', '').strip() or None,
+                            power_draw_watts=power_val,
                         ))
                         app.logger.debug(f'Added PrusaLink printer: {alias} @ {host}')
 
@@ -225,6 +241,14 @@ def register(app):
                             printer.host = new_host
                         if new_key:
                             printer.api_key = encrypt_token(new_key)
+                        power_raw = request.form.get('power_draw_watts', '').strip()
+                        if power_raw:
+                            try:
+                                printer.power_draw_watts = max(0, int(power_raw))
+                            except (ValueError, TypeError):
+                                pass
+                        else:
+                            printer.power_draw_watts = None
                         printer.notes = request.form.get('notes', '').strip() or None
                         printer.enabled = request.form.get('enabled') == 'on'
                         app.logger.debug(f'Edited PrusaLink printer id={printer.id}')

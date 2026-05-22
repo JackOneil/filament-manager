@@ -352,6 +352,7 @@ def register(app):
                 'printer_model': bp.printer_model,
                 'notes': bp.notes,
                 'pre_job_time_minutes': bp.pre_job_time_minutes or 0,
+                'power_draw_watts': bp.power_draw_watts,
             } for bp in BambuPrinter.query.all()],
 
             'bambu_jobs': [{
@@ -409,6 +410,7 @@ def register(app):
                 'last_sync_at': pp.last_sync_at.isoformat() if pp.last_sync_at else None,
                 'last_success_at': pp.last_success_at.isoformat() if pp.last_success_at else None,
                 'last_sync_status': pp.last_sync_status,
+                'power_draw_watts': pp.power_draw_watts,
             } for pp in PrusaPrinter.query.all()],
 
             'prusa_jobs': [{
@@ -823,6 +825,7 @@ def register(app):
                             printer_model=bp.get('printer_model'),
                             notes=bp.get('notes'),
                             pre_job_time_minutes=bp.get('pre_job_time_minutes', 0),
+                            power_draw_watts=bp.get('power_draw_watts'),
                         ))
 
                 # ── 7. Bambu jobs ─────────────────────────────────────
@@ -939,6 +942,7 @@ def register(app):
                             printer_model=pp.get('printer_model'),
                             notes=pp.get('notes'),
                             enabled=pp.get('enabled', True),
+                            power_draw_watts=pp.get('power_draw_watts'),
                         )
                         if pp.get('last_sync_at'):
                             restored_printer.last_sync_at = datetime.fromisoformat(pp['last_sync_at'])

@@ -361,7 +361,9 @@ class BambuPrinter(db.Model):
     printer_model = db.Column(db.String(50), nullable=True)
     notes = db.Column(db.Text, nullable=True)
     pre_job_time_minutes = db.Column(db.Integer, default=0)  # calibration/warmup time before print
+    power_draw_watts = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, default=_utc_now)
+
 
 
 class BambuPrintJob(db.Model):
@@ -418,7 +420,9 @@ class PrusaPrinter(db.Model):
     last_sync_at = db.Column(db.DateTime, nullable=True)
     last_success_at = db.Column(db.DateTime, nullable=True)
     last_sync_status = db.Column(db.String(255), nullable=True)
+    power_draw_watts = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, default=_utc_now)
+
 
 
 class PrusaPrintJob(db.Model):

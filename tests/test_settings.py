@@ -12,7 +12,7 @@ from database import db
 from models import (
     AuditLog, BambuPrintJob, Brand, Color, Filament, Material, MovementHistory,
     Project, ProjectFile, ProjectFilament, ProjectQuote, StoragePlacement, StorageShelf, User,
-    PrinterMaintenance, WasteRecord, WasteFile, BambuPrinter,
+    PrinterMaintenance, WasteRecord, WasteFile, BambuPrinter, PrusaPrinter,
 )
 
 
@@ -750,6 +750,117 @@ class SettingsTagManagementTests(unittest.TestCase):
             project_b = Project.query.filter_by(name='Project B').first()
             self.assertEqual(project_a.tag_text, 'client')
             self.assertEqual(project_b.tag_text, 'internal')
+
+
+class SettingsPrinterPowerTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp(prefix='filament-settings-printer-')
+        db_path = os.path.join(self.temp_dir, 'test.db')
+        self.app = create_app({
+            'TESTING': True,
+            'SQLALCHEMY_DATABASE_URI': f'sqlite:///{db_path}',
+            'PROJECT_UPLOAD_FOLDER': os.path.join(self.temp_dir, 'uploads'),
+            'WTF_CSRF_ENABLED': False,
+        })
+        self.client = self.app.test_client()
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_edit_bambu_printer_power_draw(self):
+        with self.app.app_context():
+            printer = BambuPrinter(
+                device_id='BAMBU1',
+                name='Bambu Original',
+                printer_model='X1C',
+                pre_job_time_minutes=5,
+                power_draw_watts=350,
+            )
+            db.session.add(printer)
+            db.session.commit()
+            printer_id = printer.id
+
+        # Update with valid power draw
+        response = self.client.post('/settings', data={
+            'action': 'edit_bambu_printer',
+            'id': printer_id,
+            'name': 'Bambu Updated',
+            'pre_job_time_minutes': 10,
+            'power_draw_watts': '450',
+            'notes': 'Some notes',
+        }, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+
+        with self.app.app_context():
+            p = db.session.get(BambuPrinter, printer_id)
+            self.assertEqual(p.power_draw_watts, 450)
+
+        # Clear power draw (empty input)
+        response = self.client.post('/settings', data={
+            'action': 'edit_bambu_printer',
+            'id': printer_id,
+            'name': 'Bambu Updated',
+            'pre_job_time_minutes': 10,
+            'power_draw_watts': '',
+            'notes': 'Some notes',
+        }, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+
+        with self.app.app_context():
+            p = db.session.get(BambuPrinter, printer_id)
+            self.assertIsNone(p.power_draw_watts)
+
+    def test_add_and_edit_prusa_printer_power_draw(self):
+        # 1. Add Prusa Printer with power draw
+        response = self.client.post('/settings', data={
+            'action': 'add_prusa_printer',
+            'host': '192.168.1.50',
+            'name': 'Prusa i3 MK3',
+            'api_key': 'testkey123',
+            'power_draw_watts': '200',
+            'notes': 'Nozzle 0.4',
+        }, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+
+        with self.app.app_context():
+            p = PrusaPrinter.query.filter_by(name='Prusa i3 MK3').first()
+            self.assertIsNotNone(p)
+            self.assertEqual(p.power_draw_watts, 200)
+            printer_id = p.id
+
+        # 2. Edit Prusa Printer power draw
+        response = self.client.post('/settings', data={
+            'action': 'edit_prusa_printer',
+            'id': printer_id,
+            'name': 'Prusa Updated',
+            'host': '192.168.1.50',
+            'api_key': '', # keep current key
+            'power_draw_watts': '150',
+            'notes': 'New notes',
+            'enabled': 'on',
+        }, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+
+        with self.app.app_context():
+            p = db.session.get(PrusaPrinter, printer_id)
+            self.assertEqual(p.power_draw_watts, 150)
+
+        # 3. Clear power draw
+        response = self.client.post('/settings', data={
+            'action': 'edit_prusa_printer',
+            'id': printer_id,
+            'name': 'Prusa Updated',
+            'host': '192.168.1.50',
+            'api_key': '',
+            'power_draw_watts': '',
+            'notes': 'New notes',
+            'enabled': 'on',
+        }, follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+
+        with self.app.app_context():
+            p = db.session.get(PrusaPrinter, printer_id)
+            self.assertIsNone(p.power_draw_watts)
 
 
 if __name__ == '__main__':

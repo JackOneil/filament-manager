@@ -640,10 +640,17 @@ def parse_sync_status(raw_value):
     }
 
 
-def build_project_metrics(project, setting=None):
+def build_project_metrics(project, setting=None, bambu_powers=None, prusa_powers=None):
     setting = setting or get_settings()
     kwh_price = setting.kwh_price if setting else 5.0
     printer_power = setting.printer_power if setting else 150
+
+    if bambu_powers is None:
+        from models import BambuPrinter
+        bambu_powers = {p.device_id: p.power_draw_watts for p in BambuPrinter.query.all() if p.device_id}
+    if prusa_powers is None:
+        from models import PrusaPrinter
+        prusa_powers = {p.id: p.power_draw_watts for p in PrusaPrinter.query.all()}
 
     estimated_material_cost = 0.0
     estimated_weight = 0.0
@@ -660,9 +667,17 @@ def build_project_metrics(project, setting=None):
     actual_material_cost = 0.0
     actual_weight = 0.0
     actual_seconds = 0
+    energy_cost = 0.0
 
     for job in getattr(project, 'bambu_jobs', []) or []:
-        actual_seconds += int(job.cost_time or 0)
+        job_seconds = int(job.cost_time or 0)
+        actual_seconds += job_seconds
+
+        job_power = printer_power
+        if job.device_id and job.device_id in bambu_powers and bambu_powers[job.device_id] is not None:
+            job_power = bambu_powers[job.device_id]
+        energy_cost += (job_seconds / 3600.0) * (job_power / 1000.0) * kwh_price
+
         if job.materials:
             slot_total = 0.0
             for slot in job.materials:
@@ -681,13 +696,19 @@ def build_project_metrics(project, setting=None):
             actual_weight += float(job.weight_grams or 0.0)
 
     for job in getattr(project, 'prusa_jobs', []) or []:
-        actual_seconds += int(job.cost_time or 0)
+        job_seconds = int(job.cost_time or 0)
+        actual_seconds += job_seconds
+
+        job_power = printer_power
+        if job.printer_id and job.printer_id in prusa_powers and prusa_powers[job.printer_id] is not None:
+            job_power = prusa_powers[job.printer_id]
+        energy_cost += (job_seconds / 3600.0) * (job_power / 1000.0) * kwh_price
+
         if job.weight_grams:
             actual_weight += float(job.weight_grams or 0.0)
         if job.filament and job.filament.weight_total > 0 and job.weight_grams:
             actual_material_cost += (job.filament.price / job.filament.weight_total) * job.weight_grams
 
-    energy_cost = (actual_seconds / 3600.0) * (printer_power / 1000.0) * kwh_price
     actual_total_cost = actual_material_cost + energy_cost
     latest_quote = None
     if getattr(project, 'quotes', None):

@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.81.0***
+*Current version: **v1.82.0***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -78,8 +78,9 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 
 ```
 filament/
-├── app.py                  # App factory, DB migrations, background workers
+├── app.py                  # App factory, background workers
 ├── database.py             # Shared SQLAlchemy instance
+├── migrations.py           # Database migrations and seed data
 ├── models.py               # All ORM models (~24 tables)
 ├── messages.py             # i18n dictionaries (cs + en)
 ├── auth.py                 # Multi-user auth, RBAC, sessions
@@ -219,6 +220,7 @@ Tests cover: authentication flows, Bambu sync idempotency, stock deduction logic
 - Sequential invoice numbering with fully self-hosted export templates
 - Bambu Lab Cloud integration (auto-sync, per-AMS deduction, pre-job time offset)
 - PrusaLink integration (local network, auto-poll)
+- Multi-printer energy cost tracking (per-printer wattage and power draw configuration)
 - Printer maintenance log module
 - Statistics dashboard with drag-and-drop layout
 - Storage shelf visualization
@@ -237,7 +239,6 @@ Tests cover: authentication flows, Bambu sync idempotency, stock deduction logic
 
 ### 🔮 Potential Future Work
 - OctoPrint integration
-- Multi-printer energy cost tracking
 - Filament spool RFID/NFC pairing
 - Public project sharing / client portal
 - REST API for third-party integrations

@@ -304,6 +304,10 @@ def register(app):
         setting = AppSetting.query.first()
         kwh_price = setting.kwh_price if setting else 5.0
         printer_power = setting.printer_power if setting else 150
+
+        from models import BambuPrinter
+        bambu_powers = {p.device_id: p.power_draw_watts for p in BambuPrinter.query.all() if p.device_id}
+
         project_ids_with_quotes = list(quote_map.keys())
         projects_to_calc = []
         if project_ids_with_quotes:
@@ -329,7 +333,11 @@ def register(app):
                             actual_cost += (slot.filament.price / slot.filament.weight_total) * slot.weight_grams
                 elif job.filament and job.weight_grams and job.filament.weight_total > 0:
                     actual_cost += (job.filament.price / job.filament.weight_total) * job.weight_grams
-                actual_cost += ((job.cost_time or 0) / 3600.0) * (printer_power / 1000.0) * kwh_price
+
+                job_power = printer_power
+                if job.device_id and job.device_id in bambu_powers and bambu_powers[job.device_id] is not None:
+                    job_power = bambu_powers[job.device_id]
+                actual_cost += ((job.cost_time or 0) / 3600.0) * (job_power / 1000.0) * kwh_price
             profit = round(quote.final_price - actual_cost, 2)
             profitable_projects.append({
                 'project_id': project.id,

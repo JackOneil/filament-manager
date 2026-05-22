@@ -446,7 +446,7 @@ TRANSLATIONS = {
         'bambu_go_to_jobs': 'Zobrazit tiskové úlohy',
         'bambu_printers_title': 'Zjištěné tiskárny',
         'bambu_no_printers': 'Žádné tiskárny nebyly dosud detekovány.',
-        'bambu_printer_rename': 'Přejmenovat',
+        'bambu_printer_rename': 'Upravit',
         'bambu_printer_name_label': 'Jméno tiskárny',
         'bambu_pre_job_time_label': 'Předtisková příprava',
         'bambu_pre_job_time_unit': 'min',
@@ -1202,6 +1202,8 @@ TRANSLATIONS = {
         'calc_step_next': 'Další',
         'calc_step_back': 'Zpět',
         'project_suggested_names': 'Doporučené názvy podle tisků',
+        'printer_power_draw_label': 'Spotřeba tiskárny (W)',
+        'printer_power_draw_desc': 'Vlastní spotřeba této tiskárny ve Wattech. Pokud není vyplněno, použije se globální nastavení spotřeby.',
     },
     'en': {
         'title': 'Filament Manager',
@@ -1650,7 +1652,7 @@ TRANSLATIONS = {
         'bambu_go_to_jobs': 'View print jobs',
         'bambu_printers_title': 'Detected Printers',
         'bambu_no_printers': 'No printers detected yet.',
-        'bambu_printer_rename': 'Rename',
+        'bambu_printer_rename': 'Edit',
         'bambu_printer_name_label': 'Printer name',
         'bambu_pre_job_time_label': 'Pre-job preparation',
         'bambu_pre_job_time_unit': 'min',
@@ -2406,5 +2408,7 @@ TRANSLATIONS = {
         'calc_step_next': 'Next',
         'calc_step_back': 'Back',
         'project_suggested_names': 'Suggested Names from Prints',
+        'printer_power_draw_label': 'Printer Power Draw (W)',
+        'printer_power_draw_desc': 'Specific power consumption of this printer in Watts. If left empty, the global default will be used.',
     }
 }

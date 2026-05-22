@@ -16,6 +16,7 @@ from models import (
     AppSetting,
     BambuJobMaterial,
     BambuPrintJob,
+    BambuPrinter,
     Filament,
     Project,
     ProjectComment,
@@ -65,10 +66,20 @@ def _job_timestamp(job):
     return job.started_at or job.finished_at or getattr(job, 'synced_at', None) or datetime.min
 
 
-def _job_cost_parts(job, setting):
+def _job_cost_parts(job, setting, bambu_powers=None, prusa_powers=None):
     kwh_price = setting.kwh_price if setting else 5.0
     printer_power = setting.printer_power if setting else 150
-    energy_cost = ((job.cost_time or 0) / 3600.0) * (printer_power / 1000.0) * kwh_price
+
+    job_power = printer_power
+    if isinstance(job, BambuPrintJob):
+        if bambu_powers and job.device_id and job.device_id in bambu_powers and bambu_powers[job.device_id] is not None:
+            job_power = bambu_powers[job.device_id]
+    else:
+        # PrusaPrintJob uses printer_id
+        if prusa_powers and job.printer_id and job.printer_id in prusa_powers and prusa_powers[job.printer_id] is not None:
+            job_power = prusa_powers[job.printer_id]
+
+    energy_cost = ((job.cost_time or 0) / 3600.0) * (job_power / 1000.0) * kwh_price
     material_cost = 0.0
     weight_grams = float(job.weight_grams or 0.0)
 
@@ -90,12 +101,12 @@ def _job_cost_parts(job, setting):
     return round(weight_grams, 1), round(material_cost, 2), round(energy_cost, 2)
 
 
-def _build_project_job_feed(project, setting, show_bambu_jobs, show_prusa_jobs):
+def _build_project_job_feed(project, setting, show_bambu_jobs, show_prusa_jobs, bambu_powers=None, prusa_powers=None):
     items = []
 
     if show_bambu_jobs:
         for job in getattr(project, 'bambu_jobs', []) or []:
-            weight_grams, material_cost, energy_cost = _job_cost_parts(job, setting)
+            weight_grams, material_cost, energy_cost = _job_cost_parts(job, setting, bambu_powers, prusa_powers)
             items.append({
                 'source': 'bambu',
                 'title': job.model_name or job.external_id or f'Job #{job.id}',
@@ -120,7 +131,7 @@ def _build_project_job_feed(project, setting, show_bambu_jobs, show_prusa_jobs):
 
     if show_prusa_jobs:
         for job in getattr(project, 'prusa_jobs', []) or []:
-            weight_grams, material_cost, energy_cost = _job_cost_parts(job, setting)
+            weight_grams, material_cost, energy_cost = _job_cost_parts(job, setting, bambu_powers, prusa_powers)
             items.append({
                 'source': 'prusa',
                 'title': job.display_name or job.file_name or f'Job #{job.id}',
@@ -533,7 +544,9 @@ def register(app):
                 .filter(Project.id.in_(visible_ids))
                 .all()
             )
-            project_metrics = {project.id: build_project_metrics(project, setting) for project in visible_projects}
+            bambu_powers = {p.device_id: p.power_draw_watts for p in BambuPrinter.query.all() if p.device_id}
+            prusa_powers = {p.id: p.power_draw_watts for p in PrusaPrinter.query.all()}
+            project_metrics = {project.id: build_project_metrics(project, setting, bambu_powers=bambu_powers, prusa_powers=prusa_powers) for project in visible_projects}
         else:
             project_metrics = {}
 
@@ -678,12 +691,15 @@ def register(app):
         if active_tab not in {'overview', 'materials', 'files', 'jobs', 'activity'}:
             active_tab = 'overview'
 
-        project_metrics = build_project_metrics(project, setting)
+        bambu_powers = {p.device_id: p.power_draw_watts for p in BambuPrinter.query.all() if p.device_id}
+        prusa_powers = {p.id: p.power_draw_watts for p in PrusaPrinter.query.all()}
+
+        project_metrics = build_project_metrics(project, setting, bambu_powers=bambu_powers, prusa_powers=prusa_powers)
         images, model_files, other_files = _get_project_files_by_category(project)
         next_actions = _build_project_next_actions(project, project_metrics, show_bambu_jobs, show_prusa_jobs)
         activity_events = _build_project_activity_events(project)
 
-        job_feed = _build_project_job_feed(project, setting, show_bambu_jobs, show_prusa_jobs)
+        job_feed = _build_project_job_feed(project, setting, show_bambu_jobs, show_prusa_jobs, bambu_powers=bambu_powers, prusa_powers=prusa_powers)
         jobs_page = request.args.get('jobs_page', 1, type=int)
         job_feed_page, jobs_pagination = _paginate_jobs(job_feed, jobs_page)
 

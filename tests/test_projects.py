@@ -7,7 +7,10 @@ import unittest
 from app import create_app
 from auth import hash_password
 from database import db
-from models import Project, ProjectComment, ProjectFile, ProjectTodo, User
+from models import (
+    Project, ProjectComment, ProjectFile, ProjectTodo, User,
+    BambuPrinter, BambuPrintJob, PrusaPrinter, PrusaPrintJob,
+)
 
 
 class ProjectUploadTests(unittest.TestCase):
@@ -325,3 +328,72 @@ class ProjectCollaborationTests(unittest.TestCase):
         self.assertIn('Visible Studio', html)
         # Other user's client is NOT exposed in the dropdown options
         self.assertNotIn('Secret Corp', html)
+
+
+class ProjectPowerMetricsTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp(prefix='filament-project-metrics-')
+        db_path = os.path.join(self.temp_dir, 'test.db')
+        self.app = create_app({
+            'TESTING': True,
+            'SQLALCHEMY_DATABASE_URI': f'sqlite:///{db_path}',
+            'PROJECT_UPLOAD_FOLDER': os.path.join(self.temp_dir, 'uploads'),
+            'WTF_CSRF_ENABLED': False,
+        })
+        self.client = self.app.test_client()
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_project_metrics_energy_cost_with_printer_power(self):
+        from utils import build_project_metrics, get_settings
+        with self.app.app_context():
+            bambu_printer = BambuPrinter(
+                device_id='DEV400',
+                name='Bambu 400W',
+                printer_model='X1C',
+                pre_job_time_minutes=5,
+                power_draw_watts=400,
+            )
+            prusa_printer = PrusaPrinter(
+                name='Prusa 250W',
+                host='192.168.1.100',
+                api_key='somekey',
+                power_draw_watts=250,
+            )
+            project = Project(name='Metrics Project')
+            db.session.add_all([bambu_printer, prusa_printer, project])
+            db.session.flush()
+
+            bambu_job = BambuPrintJob(
+                external_id='JOB-B1',
+                model_name='Bambu Print',
+                device_id='DEV400',
+                cost_time=3600,
+                project_id=project.id,
+                started_at=None,
+                finished_at=None,
+                synced_at=None,
+            )
+            prusa_job = PrusaPrintJob(
+                display_name='Prusa Print',
+                printer_id=prusa_printer.id,
+                cost_time=3600,
+                project_id=project.id,
+                started_at=None,
+                finished_at=None,
+                synced_at=None,
+            )
+            db.session.add_all([bambu_job, prusa_job])
+            db.session.commit()
+
+            settings = get_settings()
+            metrics = build_project_metrics(project, settings)
+            self.assertAlmostEqual(metrics['energy_cost'], 3.25)
+
+            bambu_job.device_id = 'UNKNOWN_DEV'
+            db.session.commit()
+
+            metrics2 = build_project_metrics(project, settings)
+            self.assertAlmostEqual(metrics2['energy_cost'], 2.00)
+

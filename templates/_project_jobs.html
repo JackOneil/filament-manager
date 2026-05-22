@@ -1,0 +1,86 @@
+<div x-show="workspaceTab === 'jobs'" x-cloak class="space-y-4">
+    {% if show_bambu_jobs or show_prusa_jobs %}
+    <div class="ui-panel">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
+            <div>
+                <div class="ui-label">{{ t('project_printer_jobs_title') }}</div>
+                <h2 class="text-2xl font-bold mt-1">{{ t('project_printer_jobs_heading') }}</h2>
+                <p class="text-sm text-gray-500 mt-2">{{ t('project_printer_jobs_desc') }}</p>
+            </div>
+        </div>
+        <div class="space-y-3">
+            {% for item in job_feed %}
+            <div class="ui-card-soft p-4">
+                <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+                    <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="ui-badge {% if item.source == 'bambu' %}ui-badge-brand{% else %}ui-badge{% endif %}">
+                                {% if item.source == 'bambu' %}{{ t('project_job_source_bambu') }}{% else %}{{ t('project_job_source_prusa') }}{% endif %}
+                            </span>
+                            {% if item.deducted %}
+                            <span class="ui-badge ui-badge-success"><i class="fa-solid fa-check-double"></i> {{ t('bambu_deducted') }}</span>
+                            {% endif %}
+                            {% if item.unmapped %}
+                            <span class="ui-badge ui-badge-warning"><i class="fa-solid fa-link-slash"></i> {{ t('project_job_unmapped') }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="font-semibold text-gray-800 mt-3 truncate">{{ item.title }}</div>
+                        <div class="text-sm text-gray-500 mt-1">
+                            {% if item.printer_name %}{{ item.printer_name }} · {% endif %}
+                            {{ item.status or '-' }}
+                            {% if item.timestamp and item.timestamp.year > 1900 %} · {{ item.timestamp | fmt_dt('%d.%m.%Y %H:%M') }}{% endif %}
+                        </div>
+                        <div class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-gray-500">
+                            {% if item.filament_name %}
+                            <span><i class="fa-solid fa-fill-drip mr-1 text-gray-400"></i>{{ item.filament_name }}</span>
+                            {% endif %}
+                            {% if item.material_slots > 1 %}
+                            <span><i class="fa-solid fa-layer-group mr-1 text-gray-400"></i>{{ item.material_slots }} {{ t('project_job_material_slots') }}</span>
+                            {% endif %}
+                            {% if item.weight_grams %}
+                            <span><i class="fa-solid fa-weight-hanging mr-1 text-gray-400"></i>{{ item.weight_grams }} g</span>
+                            {% endif %}
+                            {% if item.cost_time %}
+                            <span><i class="fa-solid fa-clock mr-1 text-gray-400"></i>{% set job_h = (item.cost_time // 3600) | int %}{% set job_m = ((item.cost_time % 3600) // 60) | int %}{% if job_h %}{{ job_h }}h {% endif %}{{ job_m }}min</span>
+                            {% endif %}
+                            {% if item.total_cost > 0 %}
+                            <span class="font-semibold text-indigo-600"><i class="fa-solid fa-coins mr-1"></i>{{ item.total_cost }} {{ current_currency }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="flex gap-2 items-start">
+                        <a href="{{ item.detail_url }}" class="ui-badge ui-badge-brand"><i class="fa-solid fa-arrow-up-right-from-square"></i> {{ t('project_job_open_source') }}</a>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-400">{{ t('project_no_printer_jobs') }}</p>
+            {% endfor %}
+        </div>
+
+        {% if jobs_pagination.pages > 1 %}
+        <div class="flex justify-center mt-6">
+            <nav class="flex items-center gap-1 bg-white rounded-lg shadow-sm border border-gray-200 px-2 py-1">
+                <a href="{{ url_for('project_detail', id=project.id, tab='jobs', jobs_page=jobs_pagination.prev_num) if jobs_pagination.has_prev else '#' }}"
+                   class="px-3 py-1 rounded {{ 'text-blue-600 hover:bg-blue-50' if jobs_pagination.has_prev else 'text-gray-300 cursor-not-allowed' }}">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </a>
+
+                {% for p in range(1, jobs_pagination.pages + 1) %}
+                    {% if p == jobs_pagination.page %}
+                    <span class="px-3 py-1 rounded bg-blue-600 text-white font-bold">{{ p }}</span>
+                    {% else %}
+                    <a href="{{ url_for('project_detail', id=project.id, tab='jobs', jobs_page=p) }}" class="px-3 py-1 rounded text-gray-700 hover:bg-gray-100 transition-colors">{{ p }}</a>
+                    {% endif %}
+                {% endfor %}
+
+                <a href="{{ url_for('project_detail', id=project.id, tab='jobs', jobs_page=jobs_pagination.next_num) if jobs_pagination.has_next else '#' }}"
+                   class="px-3 py-1 rounded {{ 'text-blue-600 hover:bg-blue-50' if jobs_pagination.has_next else 'text-gray-300 cursor-not-allowed' }}">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </a>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>

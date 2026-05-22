@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.82.0] - 2026-05-22
+### Added
+- **Printer Power Draw Configuration**: Added option to configure individual printer power draw (`power_draw_watts`) for Bambu Lab and Prusa printers in Settings. This value is used for more accurate energy cost calculations of print jobs.
+- **Translations for Printer Power Draw**: Added Czech and English translation strings for the printer power draw configuration settings.
+
+### Changed
+- **Bambu Printer Edit and Wattage Settings**: Renamed the Bambu printer "Rename" (Přejmenovat) button in Settings to "Edit" (Upravit) and added the specific `power_draw_watts` configuration input to the Bambu printer edit form.
+- **Architecture Documentation Updates**: Updated `.github/copilot-instructions.md` and `README.md` to document the extraction of `migrations.py`, the new template partial files, and the presence of `power_draw_watts` in the database schema and backup routines.
+- **Decoupled Database Migrations**: Extracted database migration and schema setup logic out of `app.py` into a separate `migrations.py` module, streamlining the application startup script.
+- **Energy Cost Calculation Optimization**: Implemented preloading of printer power draw configurations in project and statistics routes, eliminating N+1 queries when calculating energy costs for print jobs.
+- **Modularized Project Detail Template**: Split the monolithic `project_detail.html` template into reusable partial templates (`_project_overview.html`, `_project_materials.html`, `_project_files.html`, `_project_jobs.html`, and `_project_activity.html`) to improve frontend maintainability.
+
 ## [1.81.0] - 2026-05-21
 ### Added
 - **Reactive Quote Wizard (Multi-step form)**: Complete redesign of the print calculator (`templates/calculator.html`) into a multi-step wizard (stepper) using Alpine.js. Users are guided through three steps (Material selection, Print parameters, Margin and save to project) with HSL progress indicators and server-side calculation support.
