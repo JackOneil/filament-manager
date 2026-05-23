@@ -201,6 +201,9 @@ class AppSetting(db.Model):
     # Onboarding
     onboarding_dismissed = db.Column(db.Boolean, default=False)
 
+    # Audit logging toggle
+    audit_logging_enabled = db.Column(db.Boolean, default=True)
+
 
 class PrintHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)

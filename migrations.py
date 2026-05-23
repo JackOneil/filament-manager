@@ -131,6 +131,9 @@ def run_migrations(app: Flask) -> None:
         # ── Onboarding checklist ─────────────────────────────────────────────
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN onboarding_dismissed BOOLEAN NOT NULL DEFAULT 0")
 
+        # ── Audit logging toggle ─────────────────────────────────────────────
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN audit_logging_enabled BOOLEAN NOT NULL DEFAULT 1")
+
         # ── Project file versioning ──────────────────────────────────────────
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN parent_file_id INTEGER DEFAULT NULL")

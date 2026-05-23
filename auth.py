@@ -340,7 +340,14 @@ def _audit_should_capture(user):
         endpoint = endpoint.split('.')[-1]
     if endpoint in PUBLIC_ENDPOINTS:
         return False
-    return endpoint not in {'audit_logs'}
+    if endpoint in {'audit_logs'}:
+        return False
+    # Respect the audit_logging_enabled app setting
+    from utils import get_settings
+    setting = get_settings()
+    if setting and not getattr(setting, 'audit_logging_enabled', True):
+        return False
+    return True
 
 
 def _audit_json_dumps(payload):

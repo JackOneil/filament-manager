@@ -86,6 +86,11 @@ def register(app):
                     else:
                         app.logger.setLevel(logging.INFO)
 
+                elif action == 'audit_logging':
+                    setting = AppSetting.query.first()
+                    setting.audit_logging_enabled = request.form.get('audit_logging_enabled') == 'on'
+                    app.logger.debug(f"Audit logging {'enabled' if setting.audit_logging_enabled else 'disabled'}.")
+
                 elif action == 'edit_brand':
                     brand = db.session.get(Brand, request.form.get('id', 0, type=int))
                     if brand:

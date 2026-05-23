@@ -191,6 +191,17 @@
                     </label>
                 </form>
             </div>
+
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <form method="POST" class="flex items-center justify-between max-w-xs">
+                    <input type="hidden" name="action" value="audit_logging">
+                    <label class="font-semibold text-gray-600 text-sm flex items-center gap-2" title="{{ t('audit_logging_desc') }}"><i class="fa-solid fa-shield-halved text-rose-400 w-4 text-center"></i> {{ t('audit_logging') }}</label>
+                    <label class="relative inline-flex items-center cursor-pointer ml-4">
+                        <input type="checkbox" name="audit_logging_enabled" onchange="this.form.submit()" class="sr-only peer" {% if app_settings.audit_logging_enabled %}checked{% endif %}>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-500"></div>
+                    </label>
+                </form>
+            </div>
     </div>
     </div> <!-- end tab: general -->
 

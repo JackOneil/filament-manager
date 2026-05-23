@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.84.0] - 2026-05-23
+### Added
+- **Audit Logging Toggle**: Added `audit_logging_enabled` setting to enable/disable audit logging. When disabled, the Audit Log menu item is hidden from both desktop sidebar and mobile menu, and no audit log entries are written to the database. Toggle available in Settings → General tab.
+
 ## [1.83.0] - 2026-05-23
 ### Changed
 - **Database-backed Undo System**: Refactored the undo system from in-memory cache + session tokens to a persistent database-backed `FilamentUndoLog` table. Undo snapshots now survive application restarts and provide a better audit trail. All undo functions (`create_undo_snapshot`, `consume_undo_log`, `restore_filament_from_snapshot`) centralized in `utils.py`.

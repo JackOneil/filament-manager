@@ -49,7 +49,7 @@ from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
 
-APP_VERSION = '1.83.0'
+APP_VERSION = '1.84.0'
 
 csrf = CSRFProtect()
 
@@ -178,6 +178,7 @@ def create_app(test_config=None) -> Flask:
         # Navigation visibility flags ─────────────────────────────────────────
         printer_access = has_section_access('printers', user=current_user) or is_admin(current_user)
         nav_bambu_enabled = bool(setting and setting.bambu_token and printer_access)
+        nav_audit_enabled = bool(setting and getattr(setting, 'audit_logging_enabled', True) and is_admin(current_user))
         try:
             from flask import g
             if 'nav_prusa_enabled' not in g:
@@ -212,6 +213,7 @@ def create_app(test_config=None) -> Flask:
             app_version=APP_VERSION,
             nav_bambu_enabled=nav_bambu_enabled,
             nav_prusa_enabled=nav_prusa_enabled,
+            nav_audit_enabled=nav_audit_enabled,
             current_user=current_user,
             auth_has_section_access=has_section_access,
             auth_is_admin=is_admin,
