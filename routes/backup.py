@@ -14,7 +14,7 @@ from models import (
     PrintHistory, Project, ProjectFile, ProjectLink, ProjectFilament, ProjectQuote,
     BambuPrinter, BambuPrintJob, BambuJobMaterial, StoragePlacement, StorageShelf,
     PrusaPrinter, PrusaPrintJob, ProjectComment, ProjectTodo, ProjectPrintItem, User, UserInvite, Notification, AuditLog,
-    PrinterMaintenance, WasteRecord, WasteFile,
+    PrinterMaintenance, WasteRecord, WasteFile, FilamentUndoLog,
 )
 from utils import encrypt_token, format_tags, utc_now
 
@@ -463,6 +463,19 @@ def register(app):
                     'uploaded_at': wf.uploaded_at.isoformat() if wf.uploaded_at else None,
                 } for wf in w.files],
             } for w in WasteRecord.query.order_by(WasteRecord.created_at).all()],
+
+            # ── Undo log ─────────────────────────────────────────────
+            'undo_logs': [{
+                'created_at': ul.created_at.isoformat() if ul.created_at else None,
+                'user_email': ul.user.email if ul.user else None,
+                'action_type': ul.action_type,
+                'filament_name': ul.filament.name if ul.filament else None,
+                'filament_ref': _filament_ref(ul.filament),
+                'snapshot_data': ul.snapshot_data,
+                'expires_at': ul.expires_at.isoformat() if ul.expires_at else None,
+                'is_consumed': ul.is_consumed,
+                'consumed_at': ul.consumed_at.isoformat() if ul.consumed_at else None,
+            } for ul in FilamentUndoLog.query.order_by(FilamentUndoLog.created_at).all()],
         }
 
         app.logger.debug(
@@ -1101,6 +1114,21 @@ def register(app):
                             filepath=dest_path,
                             uploaded_at=datetime.fromisoformat(wf_data['uploaded_at']) if wf_data.get('uploaded_at') else utc_now(),
                         ))
+
+            # ── Undo log import ─────────────────────────────────────────────────
+            for ul_data in manifest.get('undo_logs', []):
+                user_id = _user_id_by_email.get(ul_data.get('user_email'))
+                filament = _resolve_filament_ref(ul_data.get('filament_ref'), ul_data.get('filament_name'))
+                db.session.add(FilamentUndoLog(
+                    created_at=datetime.fromisoformat(ul_data['created_at']) if ul_data.get('created_at') else utc_now(),
+                    user_id=user_id,
+                    action_type=ul_data.get('action_type', ''),
+                    filament_id=filament.id if filament else None,
+                    snapshot_data=ul_data.get('snapshot_data', ''),
+                    expires_at=datetime.fromisoformat(ul_data['expires_at']) if ul_data.get('expires_at') else utc_now(),
+                    is_consumed=ul_data.get('is_consumed', True),
+                    consumed_at=datetime.fromisoformat(ul_data['consumed_at']) if ul_data.get('consumed_at') else None,
+                ))
 
             app.logger.debug(f"Import finished: {imported_filaments} filaments, projects and Bambu jobs processed.")
         except Exception as e:

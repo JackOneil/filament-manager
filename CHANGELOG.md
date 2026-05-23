@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.83.0] - 2026-05-23
+### Changed
+- **Database-backed Undo System**: Refactored the undo system from in-memory cache + session tokens to a persistent database-backed `FilamentUndoLog` table. Undo snapshots now survive application restarts and provide a better audit trail. All undo functions (`create_undo_snapshot`, `consume_undo_log`, `restore_filament_from_snapshot`) centralized in `utils.py`.
+- **Removed in-memory undo cache**: Eliminated `_UNDO_CACHE`, `_UNDO_CACHE_LOCK`, `_purge_undo_cache()`, `_queue_inventory_undo()`, and `_pop_cached_undo_payload()` from `routes/inventory.py`.
+
+### Added
+- **FilamentUndoLog model**: New ORM model with fields `created_at`, `user_id`, `action_type`, `filament_id`, `snapshot_data` (JSON), `expires_at`, `is_consumed`, `consumed_at`. Automatically created by `db.create_all()`.
+- **Undo log export/import**: Full backup now includes `undo_logs` array preserving undo history across export/import cycles.
+- **DB cleanup helper**: `purge_expired_undo_logs()` function for periodic cleanup of expired undo entries.
+
 ## [1.82.0] - 2026-05-22
 ### Added
 - **Printer Power Draw Configuration**: Added option to configure individual printer power draw (`power_draw_watts`) for Bambu Lab and Prusa printers in Settings. This value is used for more accurate energy cost calculations of print jobs.

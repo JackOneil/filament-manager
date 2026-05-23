@@ -33,12 +33,14 @@ The project uses a **modular Flask app factory pattern with Flask Blueprints**. 
 app.py                  # Entry point: create_app(), background workers
 database.py             # Shared db = SQLAlchemy() instance
 migrations.py           # Database migrations: run_migrations(), _safe_alter() schema updates and seeds
-models.py               # All ORM models (~24 tables): Brand, Color, Material, Filament,
+models.py               # All ORM models (~25 tables): Brand, Color, Material, Filament,
                         #   MovementHistory, AppSetting, PrintHistory, Project, ProjectFile,
                         #   ProjectLink, ProjectFilament, ProjectQuote, ProjectComment, ProjectTodo,
                         #   StorageShelf, StoragePlacement, BambuPrinter, BambuPrintJob,
                         #   BambuJobMaterial, PrusaPrinter, PrusaPrintJob, User, UserInvite,
-                        #   Notification, AuditLog
+                        #   Notification, AuditLog, PrinterMaintenance, WasteRecord, WasteFile,
+                        #   FilamentUndoLog, PrinterMaintenance, WasteRecord, WasteFile,
+                        #   FilamentUndoLog
 auth.py                 # Multi-user auth, RBAC, session management, invite system
 messages.py             # i18n translations (cs + en), ~700 keys per language
 utils.py                # Shared helpers: get_settings(), utc_now(), translate(), log_movement(),
@@ -56,7 +58,8 @@ routes/
   prusa.py              # /prusa, /prusa/printer/<id>/*, /prusa/job/<id>/*, PrusaLink local API
   stats.py              # /stats — statistics dashboard (charts, forecast, stock health, color palette)
   storage.py            # /storage, /storage/shelf/*, /storage/slot/* — physical shelf management
-  settings.py           # /settings, /export, /import, /toggle-theme — app config + full backup
+  settings.py           # /settings — app config + dictionaries + integrations
+  backup.py             # /export, /import — full database backup and restore
   auth.py               # /login, /logout, /register, /activate, /account, /users/*,
                         #   /audit — auth, users, notifications, audit log routes
   pwa.py                # /manifest.json, /sw.js — Progressive Web App support
@@ -294,6 +297,7 @@ The `/export` and `/import` functions in `routes/settings.py` must cover the **e
 | Prusa integration    | `PrusaPrinter` (API keys excluded, + `power_draw_watts`), `PrusaPrintJob` |
 | Storage              | `StorageShelf`, `StoragePlacement`                                     |
 | Users & auth         | `User`, `UserInvite`, `Notification`, `AuditLog`                       |
+| Undo system          | `FilamentUndoLog`                                                      |
 
 - **Referential integrity**: resolve FKs by name/serial before inserting dependent rows. Commit in order: enumerations → filaments → history → projects → integrations → users.
 - **Idempotency**: "skip if already exists" by natural key.
@@ -404,6 +408,17 @@ This is already applied to `projects_index.html` and overrides any stale localSt
 - When creating print projects, clean suggestions from unmapped Bambu print jobs can be provided by the backend using the `_clean_title` helper from the Bambu module.
 - Render these suggestions as inline buttons/badges inside the project creation template, enabling one-click pre-filling of the project name input.
 
+### Rule 29 — Architecture Documentation Updates
+- **After implementing new features, refactoring, or structural changes, always update architecture documentation:**
+  - `.github/copilot-instructions.md` — update file structure, data flow diagrams, key dependencies, or rules if they changed
+  - `README.md` — update key features, project structure, roadmap
+  - `.kilo/agent/filament-agent.md` — ensure Project Context section reflects current state
+- **When refactoring:**
+  - Document extracted/merged/removed functions in the changelog
+  - Note consolidated duplicates or new patterns (base classes, interfaces)
+  - Update relevant sections in this file
+- **Keep all architecture docs in sync with the codebase.** Outdated docs cause confusion and technical debt.
+
 ---
 
 ## 7. Post-Implementation Checklist
@@ -426,5 +441,15 @@ After every set of feature additions or structural fixes, **always** complete AL
 14. ✅ If Stats page modified → verify compliance with rule 16
 15. ✅ If any dashboard page (Overview, Projects, Stats) modified → verify compliance with rule 22
 16. ✅ Keep this instruction file up to date with any new rules or patterns
+17. ✅ **ARCHITECTURE UPDATE** — After implementing new features, refactoring, or structural changes, update all architecture-related documents:
+    - `.github/copilot-instructions.md` — update file structure, data flow diagrams, key dependencies, rules if changed
+    - `README.md` — update key features, project structure, roadmap
+    - `.kilo/agent/filament-agent.md` — ensure Project Context section reflects current state
+18. ✅ **REFACTORING LOG** — If refactoring was performed, document what was changed:
+    - Functions extracted/merged/removed
+    - Duplicates consolidated
+    - Patterns changed (e.g., new base classes, interfaces)
+    - Update any relevant sections in this file
 
-**CRITICAL: Step 5 is mandatory after ANY code change. Never skip it.**
+**CRITICAL: Step 5 (Docker build) is mandatory after ANY code change. Never skip it.**
+**CRITICAL: Step 17 (Architecture update) is mandatory after any feature/refactoring. Keep docs in sync.**

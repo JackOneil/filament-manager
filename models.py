@@ -501,3 +501,26 @@ class WasteFile(db.Model):
     filepath = db.Column(db.String(255), nullable=False)
     uploaded_at = db.Column(db.DateTime, default=_utc_now)
     record = db.relationship('WasteRecord', backref=db.backref('files', lazy=True, cascade='all, delete-orphan'))
+
+
+class FilamentUndoLog(db.Model):
+    """Database-backed undo log for filament operations.
+
+    Persists undo snapshots in the database instead of in-memory cache,
+    providing durability across restarts and better audit trail.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=_utc_now, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False, index=True)
+    action_type = db.Column(db.String(50), nullable=False)  # delete_filament, bulk_delete, remove_spool
+    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='CASCADE'), nullable=True, index=True)
+    snapshot_data = db.Column(db.Text, nullable=False)  # JSON of filament state and relations
+    expires_at = db.Column(db.DateTime, nullable=False, index=True)
+    is_consumed = db.Column(db.Boolean, nullable=False, default=False)
+    consumed_at = db.Column(db.DateTime, nullable=True)
+
+    user = db.relationship('User', backref=db.backref('filament_undo_logs', lazy=True))
+    filament = db.relationship('Filament', backref=db.backref('undo_logs', lazy=True))
+
+    def __repr__(self):
+        return f'<FilamentUndoLog {self.id} action={self.action_type!r} user={self.user_id} consumed={self.is_consumed}>'

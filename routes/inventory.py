@@ -15,13 +15,16 @@ from sqlalchemy.orm import joinedload
 
 from database import db
 from auth import get_current_user, is_admin
-from models import AppSetting, PrusaPrinter, BambuJobMaterial, BambuPrintJob, BambuPrinter, PrusaPrintJob, Brand, Color, Filament, Material, MovementHistory, Notification, Project, ProjectComment, ProjectFilament, ProjectQuote
+from models import AppSetting, PrusaPrinter, BambuJobMaterial, BambuPrintJob, BambuPrinter, PrusaPrintJob, Brand, Color, Filament, Material, MovementHistory, Notification, Project, ProjectComment, ProjectFilament, ProjectQuote, FilamentUndoLog
 from utils import (
     build_action_center,
     build_filament_history_name as _display_filament_name,
     collect_activity_heatmap,
     collect_sparkline_data,
     compute_stock_status,
+    consume_undo_log,
+    create_bulk_undo_snapshot,
+    create_undo_snapshot,
     deduct_filament_stock,
     escape_like,
     format_tags,
@@ -30,6 +33,8 @@ from utils import (
     log_movement,
     movement_action_label,
     parse_tags,
+    restore_filament_from_snapshot,
+    restore_bulk_from_snapshot,
     translate,
     utc_now,
 )
@@ -508,70 +513,7 @@ def _require_inventory_admin():
         abort(403)
 
 
-_UNDO_CACHE_LOCK = threading.Lock()
-_UNDO_CACHE = {}
-_UNDO_TTL_SECONDS = 15 * 60
 _UNDO_SESSION_KEY = 'inventory_pending_undo'
-
-
-def _purge_undo_cache(now_ts=None):
-    ts = now_ts if now_ts is not None else utc_now().timestamp()
-    stale_tokens = [
-        token for token, entry in _UNDO_CACHE.items()
-        if float(entry.get('expires_at', 0.0)) <= ts
-    ]
-    for token in stale_tokens:
-        _UNDO_CACHE.pop(token, None)
-
-
-def _clear_pending_undo_session(remove_cache=True):
-    pending = session.pop(_UNDO_SESSION_KEY, None)
-    if not remove_cache or not pending:
-        return
-    token = pending.get('token')
-    if not token:
-        return
-    with _UNDO_CACHE_LOCK:
-        _UNDO_CACHE.pop(token, None)
-
-
-def _queue_inventory_undo(payload, title_key, detail_text=''):
-    user = get_current_user()
-    if not user:
-        return
-
-    _clear_pending_undo_session(remove_cache=True)
-
-    token = secrets.token_urlsafe(16)
-    expires_at = utc_now() + timedelta(seconds=_UNDO_TTL_SECONDS)
-
-    with _UNDO_CACHE_LOCK:
-        _purge_undo_cache()
-        _UNDO_CACHE[token] = {
-            'user_id': user.id,
-            'payload': payload,
-            'expires_at': expires_at.timestamp(),
-        }
-
-    session[_UNDO_SESSION_KEY] = {
-        'token': token,
-        'title_key': title_key,
-        'detail': detail_text,
-        'expires_at': expires_at.isoformat(timespec='seconds'),
-    }
-
-
-def _pop_cached_undo_payload(token, user_id):
-    if not token:
-        return None
-    with _UNDO_CACHE_LOCK:
-        _purge_undo_cache()
-        entry = _UNDO_CACHE.pop(token, None)
-    if not entry:
-        return None
-    if entry.get('user_id') != user_id:
-        return None
-    return entry.get('payload')
 
 
 def _serialize_filament_snapshot(filament):
@@ -903,14 +845,17 @@ def register(app):
             db.session.delete(filament)
 
         db.session.commit()
-        _queue_inventory_undo(
-            {
-                'type': 'bulk_delete',
-                'entries': undo_entries,
-            },
-            'undo_toast_bulk_delete_title',
-            detail_text=translate('undo_toast_bulk_delete_detail').format(count=len(undo_entries)),
-        )
+        
+        # Create DB-backed undo snapshot
+        user = get_current_user()
+        if user:
+            undo_log = create_bulk_undo_snapshot(user.id, undo_entries)
+            session[_UNDO_SESSION_KEY] = {
+                'undo_log_id': undo_log.id,
+                'title_key': 'undo_toast_bulk_delete_title',
+                'detail': translate('undo_toast_bulk_delete_detail').format(count=len(undo_entries)),
+                'expires_at': undo_log.expires_at.isoformat(timespec='seconds'),
+            }
         return redirect(url_for('filaments_index'))
 
     @bp.route('/add', methods=['GET', 'POST'])
@@ -1053,16 +998,22 @@ def register(app):
             removed_weight = float(actual_amount or 0.0)
         db.session.commit()
         if removed_weight > 0:
-            _queue_inventory_undo(
-                {
-                    'type': 'remove_spool',
-                    'filament_id': filament.id,
-                    'restore_quantity': 1,
-                    'restore_weight': removed_weight,
-                },
-                'undo_toast_remove_spool_title',
-                detail_text=filament.name,
-            )
+            # Create DB-backed undo snapshot
+            user = get_current_user()
+            if user:
+                undo_log = create_undo_snapshot(
+                    user_id=user.id,
+                    action_type='remove_spool',
+                    filament=filament,
+                    restore_quantity=1,
+                    restore_weight=removed_weight,
+                )
+                session[_UNDO_SESSION_KEY] = {
+                    'undo_log_id': undo_log.id,
+                    'title_key': 'undo_toast_remove_spool_title',
+                    'detail': filament.name,
+                    'expires_at': undo_log.expires_at.isoformat(timespec='seconds'),
+                }
         return redirect(url_for('filaments_index'))
 
     @bp.route('/delete/<int:id>', methods=['POST'])
@@ -1075,43 +1026,58 @@ def register(app):
         ProjectQuote.query.filter_by(filament_id=filament.id).update({'filament_id': None})
         db.session.delete(filament)
         db.session.commit()
-        _queue_inventory_undo(
-            {
-                'type': 'delete_filament',
-                'entry': undo_entry,
-            },
-            'undo_toast_delete_title',
-            detail_text=undo_entry['filament']['name'],
-        )
+        
+        # Create DB-backed undo snapshot
+        user = get_current_user()
+        if user:
+            undo_log = create_undo_snapshot(
+                user_id=user.id,
+                action_type='delete_filament',
+                filament=filament,
+                project_filaments=[
+                    type('obj', (object,), pf)() for pf in undo_entry.get('project_filaments', [])
+                ] if undo_entry.get('project_filaments') else None,
+                project_quote_ids=undo_entry.get('project_quote_ids', []),
+            )
+            session[_UNDO_SESSION_KEY] = {
+                'undo_log_id': undo_log.id,
+                'title_key': 'undo_toast_delete_title',
+                'detail': undo_entry['filament']['name'],
+                'expires_at': undo_log.expires_at.isoformat(timespec='seconds'),
+            }
         return redirect(url_for('filaments_index'))
 
     @bp.route('/inventory/undo', methods=['POST'])
     def inventory_undo():
         _require_inventory_admin()
         pending = session.get(_UNDO_SESSION_KEY) or {}
-        token = (request.form.get('token', '') or '').strip()
+        undo_log_id = request.form.get('undo_log_id', type=int)
         user = get_current_user()
         user_id = user.id if user else None
 
-        if not token or token != pending.get('token'):
+        if not undo_log_id or undo_log_id != pending.get('undo_log_id'):
             flash('undo_toast_not_available', 'error')
-            _clear_pending_undo_session(remove_cache=False)
+            session.pop(_UNDO_SESSION_KEY, None)
             return redirect(request.referrer or url_for('filaments_index'))
 
-        payload = _pop_cached_undo_payload(token, user_id)
-        _clear_pending_undo_session(remove_cache=False)
-        if not payload:
+        # Consume the undo log and get snapshot data
+        snapshot_data = consume_undo_log(undo_log_id, user_id)
+        session.pop(_UNDO_SESSION_KEY, None)
+        
+        if not snapshot_data:
             flash('undo_toast_not_available', 'error')
             return redirect(request.referrer or url_for('filaments_index'))
 
         try:
-            payload_type = payload.get('type')
-            if payload_type == 'remove_spool':
-                filament = db.session.get(Filament, payload.get('filament_id'))
+            action_type = snapshot_data.get('action_type') or snapshot_data.get('type')
+            
+            if action_type == 'remove_spool':
+                filament_id = snapshot_data.get('filament_id')
+                filament = db.session.get(Filament, filament_id)
                 if filament is None:
                     raise ValueError('filament_not_found')
-                restore_quantity = int(payload.get('restore_quantity', 1) or 1)
-                restore_weight = float(payload.get('restore_weight', 0.0) or 0.0)
+                restore_quantity = int(snapshot_data.get('restore_quantity', 1) or 1)
+                restore_weight = float(snapshot_data.get('restore_weight', 0.0) or 0.0)
                 filament.quantity = int(filament.quantity or 0) + max(restore_quantity, 0)
                 filament.weight_remaining = float(filament.weight_remaining or 0.0) + max(restore_weight, 0.0)
                 log_movement(
@@ -1120,18 +1086,11 @@ def register(app):
                     max(restore_weight, 0.0),
                     note=translate('movement_note_undo_remove_spool'),
                 )
+                db.session.commit()
 
-            elif payload_type == 'delete_filament':
-                entry = payload.get('entry') or {}
-                snapshot = entry.get('filament')
-                if not snapshot:
-                    raise ValueError('missing_snapshot')
-                filament = _restore_filament_snapshot(snapshot)
-                _restore_project_relations(
-                    filament.id,
-                    entry.get('project_filaments') or [],
-                    entry.get('project_quote_ids') or [],
-                )
+            elif action_type == 'delete_filament':
+                # Use the DB-backed restore function
+                filament = restore_filament_from_snapshot(snapshot_data)
                 log_movement(
                     filament,
                     'add',
@@ -1139,18 +1098,10 @@ def register(app):
                     note=translate('movement_note_undo_delete'),
                 )
 
-            elif payload_type == 'bulk_delete':
-                entries = payload.get('entries') or []
+            elif action_type == 'bulk_delete':
+                entries = snapshot_data.get('entries', [])
                 for entry in entries:
-                    snapshot = entry.get('filament')
-                    if not snapshot:
-                        continue
-                    filament = _restore_filament_snapshot(snapshot)
-                    _restore_project_relations(
-                        filament.id,
-                        entry.get('project_filaments') or [],
-                        entry.get('project_quote_ids') or [],
-                    )
+                    filament = restore_filament_from_snapshot(entry)
                     log_movement(
                         filament,
                         'add',

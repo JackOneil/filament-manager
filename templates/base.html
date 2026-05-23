@@ -505,7 +505,7 @@
                                 {% endif %}
                                 <div class="mt-2">
                                     <form method="POST" action="{{ url_for('inventory_undo') }}" class="inline">
-                                        <input type="hidden" name="token" value="{{ pending_inventory_undo.token }}">
+                                        <input type="hidden" name="undo_log_id" value="{{ pending_inventory_undo.undo_log_id }}">
                                         <button type="submit" class="inline-flex items-center gap-1 rounded-full border border-amber-400/60 bg-white/80 dark:bg-amber-800/40 px-3 py-1 text-xs font-semibold hover:bg-white dark:hover:bg-amber-800/70 transition">
                                             <i class="fa-solid fa-rotate-left"></i>
                                             <span>{{ t('undo_toast_button') }}</span>

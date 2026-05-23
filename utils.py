@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 from database import db
 from models import (
     AppSetting, BambuJobMaterial, BambuPrintJob, MovementHistory,
-    Project, PrusaPrintJob, PrusaPrinter,
+    Project, PrusaPrintJob, PrusaPrinter, FilamentUndoLog, ProjectFilament,
 )
 
 # ---------------------------------------------------------------------------
@@ -935,6 +935,286 @@ def deduct_filament_stock(filament, requested_weight):
             filament.quantity = expected_quantity
 
     return actual_amount
+
+
+# ---------------------------------------------------------------------------
+# Database-backed Undo System
+# ---------------------------------------------------------------------------
+_UNDO_TTL_MINUTES = 15  # Undo tokens expire after 15 minutes
+
+
+def create_undo_snapshot(user_id, action_type, filament, project_filaments=None, project_quote_ids=None, restore_quantity=None, restore_weight=None):
+    """Create a database-backed undo snapshot for a filament operation.
+
+    Args:
+        user_id: ID of the user performing the action
+        action_type: One of 'delete_filament', 'bulk_delete', 'remove_spool'
+        filament: Filament object to snapshot
+        project_filaments: List of ProjectFilament objects for relation restoration
+        project_quote_ids: List of ProjectQuote IDs for relation restoration
+        restore_quantity: For remove_spool, quantity to restore (default: 1)
+        restore_weight: For remove_spool, weight to restore
+
+    Returns:
+        FilamentUndoLog object
+    """
+    from utils import utc_now
+
+    snapshot_data = {
+        'filament': {
+            'id': filament.id,
+            'name': filament.name,
+            'brand_id': filament.brand_id,
+            'color_id': filament.color_id,
+            'material_id': filament.material_id,
+            'weight_total': filament.weight_total,
+            'weight_remaining': filament.weight_remaining,
+            'price': filament.price,
+            'quantity': filament.quantity,
+            'min_stock_grams': filament.min_stock_grams,
+            'max_stock_grams': filament.max_stock_grams,
+            'tag_text': filament.tag_text,
+            'quality_stringing': filament.quality_stringing,
+            'quality_adhesion': filament.quality_adhesion,
+            'quality_drying': filament.quality_drying,
+            'quality_profile': filament.quality_profile,
+            'quality_notes': filament.quality_notes,
+            'recommended_nozzle_temp': filament.recommended_nozzle_temp,
+            'recommended_bed_temp': filament.recommended_bed_temp,
+            'reorder_alert_snoozed': filament.reorder_alert_snoozed,
+            'shop_url': filament.shop_url,
+        },
+        'project_filaments': [
+            {
+                'project_id': pf.project_id,
+                'estimated_weight': pf.estimated_weight,
+                'is_used': pf.is_used,
+            }
+            for pf in (project_filaments or [])
+        ],
+        'project_quote_ids': list(project_quote_ids or []),
+        'restore_quantity': restore_quantity,
+        'restore_weight': restore_weight,
+    }
+
+    undo_log = FilamentUndoLog(
+        user_id=user_id,
+        action_type=action_type,
+        filament_id=filament.id,
+        snapshot_data=json.dumps(snapshot_data),
+        expires_at=utc_now() + timedelta(minutes=_UNDO_TTL_MINUTES),
+        is_consumed=False,
+    )
+    db.session.add(undo_log)
+    db.session.commit()
+    return undo_log
+
+
+def create_bulk_undo_snapshot(user_id, entries):
+    """Create a database-backed undo snapshot for bulk delete operation.
+
+    Args:
+        user_id: ID of the user performing the action
+        entries: List of dicts with 'filament', 'project_filaments', 'project_quote_ids'
+
+    Returns:
+        FilamentUndoLog object
+    """
+    from utils import utc_now
+
+    snapshot_data = {
+        'type': 'bulk_delete',
+        'entries': []
+    }
+
+    for entry in entries:
+        filament = entry['filament']
+        snapshot_data['entries'].append({
+            'filament': {
+                'id': filament.id,
+                'name': filament.name,
+                'brand_id': filament.brand_id,
+                'color_id': filament.color_id,
+                'material_id': filament.material_id,
+                'weight_total': filament.weight_total,
+                'weight_remaining': filament.weight_remaining,
+                'price': filament.price,
+                'quantity': filament.quantity,
+                'min_stock_grams': filament.min_stock_grams,
+                'max_stock_grams': filament.max_stock_grams,
+                'tag_text': filament.tag_text,
+                'quality_stringing': filament.quality_stringing,
+                'quality_adhesion': filament.quality_adhesion,
+                'quality_drying': filament.quality_drying,
+                'quality_profile': filament.quality_profile,
+                'quality_notes': filament.quality_notes,
+                'recommended_nozzle_temp': filament.recommended_nozzle_temp,
+                'recommended_bed_temp': filament.recommended_bed_temp,
+                'reorder_alert_snoozed': filament.reorder_alert_snoozed,
+                'shop_url': filament.shop_url,
+            },
+            'project_filaments': [
+                {
+                    'project_id': pf.project_id,
+                    'estimated_weight': pf.estimated_weight,
+                    'is_used': pf.is_used,
+                }
+                for pf in entry.get('project_filaments', [])
+            ],
+            'project_quote_ids': list(entry.get('project_quote_ids', [])),
+        })
+
+    undo_log = FilamentUndoLog(
+        user_id=user_id,
+        action_type='bulk_delete',
+        filament_id=None,  # Multiple filaments
+        snapshot_data=json.dumps(snapshot_data),
+        expires_at=utc_now() + timedelta(minutes=_UNDO_TTL_MINUTES),
+        is_consumed=False,
+    )
+    db.session.add(undo_log)
+    db.session.commit()
+    return undo_log
+
+
+def get_pending_undo(user_id):
+    """Get pending undo log for a user (not expired, not consumed).
+
+    Args:
+        user_id: ID of the user
+
+    Returns:
+        FilamentUndoLog object or None
+    """
+    from utils import utc_now
+
+    undo_log = FilamentUndoLog.query.filter(
+        FilamentUndoLog.user_id == user_id,
+        FilamentUndoLog.is_consumed == False,
+        FilamentUndoLog.expires_at > utc_now(),
+    ).order_by(FilamentUndoLog.created_at.desc()).first()
+
+    return undo_log
+
+
+def consume_undo_log(undo_log_id, user_id):
+    """Consume an undo log entry (mark as consumed and return snapshot data).
+
+    Args:
+        undo_log_id: ID of the undo log entry
+        user_id: ID of the user (for ownership validation)
+
+    Returns:
+        dict snapshot_data or None if invalid/expired
+    """
+    from utils import utc_now
+
+    undo_log = FilamentUndoLog.query.filter_by(id=undo_log_id, user_id=user_id).first()
+    if not undo_log:
+        return None
+
+    if undo_log.is_consumed:
+        return None
+
+    if undo_log.expires_at < utc_now():
+        return None
+
+    undo_log.is_consumed = True
+    undo_log.consumed_at = utc_now()
+    db.session.commit()
+
+    return json.loads(undo_log.snapshot_data)
+
+
+def purge_expired_undo_logs():
+    """Delete expired undo log entries (cleanup)."""
+    from utils import utc_now
+
+    expired = FilamentUndoLog.query.filter(
+        FilamentUndoLog.expires_at < utc_now()
+    ).delete()
+    db.session.commit()
+    return expired
+
+
+def restore_filament_from_snapshot(snapshot_data):
+    """Restore a filament from snapshot data.
+
+    Args:
+        snapshot_data: dict with 'filament', 'project_filaments', 'project_quote_ids'
+
+    Returns:
+        Restored Filament object
+    """
+    filament_data = snapshot_data['filament']
+
+    # Check if filament still exists (might have been recreated)
+    filament = Filament.query.get(filament_data['id'])
+
+    if filament:
+        # Update existing filament
+        filament.name = filament_data['name']
+        filament.brand_id = filament_data['brand_id']
+        filament.color_id = filament_data['color_id']
+        filament.material_id = filament_data['material_id']
+        filament.weight_total = filament_data['weight_total']
+        filament.weight_remaining = filament_data['weight_remaining']
+        filament.price = filament_data['price']
+        filament.quantity = filament_data['quantity']
+        filament.min_stock_grams = filament_data['min_stock_grams']
+        filament.max_stock_grams = filament_data['max_stock_grams']
+        filament.tag_text = filament_data['tag_text']
+        filament.quality_stringing = filament_data['quality_stringing']
+        filament.quality_adhesion = filament_data['quality_adhesion']
+        filament.quality_drying = filament_data['quality_drying']
+        filament.quality_profile = filament_data['quality_profile']
+        filament.quality_notes = filament_data['quality_notes']
+        filament.recommended_nozzle_temp = filament_data['recommended_nozzle_temp']
+        filament.recommended_bed_temp = filament_data['recommended_bed_temp']
+        filament.reorder_alert_snoozed = filament_data['reorder_alert_snoozed']
+        filament.shop_url = filament_data['shop_url']
+    else:
+        # Recreate deleted filament
+        filament = Filament(**filament_data)
+        db.session.add(filament)
+        db.session.flush()  # Get the new ID
+
+    # Restore project filament relations
+    for pf_data in snapshot_data.get('project_filaments', []):
+        existing = ProjectFilament.query.filter_by(
+            project_id=pf_data['project_id'],
+            filament_id=filament.id
+        ).first()
+        if not existing:
+            project_filament = ProjectFilament(
+                project_id=pf_data['project_id'],
+                filament_id=filament.id,
+                estimated_weight=pf_data['estimated_weight'],
+                is_used=pf_data['is_used'],
+            )
+            db.session.add(project_filament)
+
+    # Restore ProjectQuote relations
+    for qid in snapshot_data.get('project_quote_ids', []):
+        ProjectQuote.query.filter_by(id=qid).update({'filament_id': filament.id}, synchronize_session=False)
+
+    return filament
+
+
+def restore_bulk_from_snapshot(snapshot_data):
+    """Restore multiple filaments from bulk delete snapshot.
+
+    Args:
+        snapshot_data: dict with 'entries' list
+
+    Returns:
+        List of restored Filament objects
+    """
+    restored = []
+    for entry in snapshot_data.get('entries', []):
+        filament = restore_filament_from_snapshot(entry)
+        restored.append(filament)
+    return restored
 
 
 def _is_public_ip(address):
