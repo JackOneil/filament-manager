@@ -34,7 +34,7 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 - **Admin Audit Log** — Successful administrator actions are recorded with user, IP/session, endpoint, target object, and before/after snapshots.
 
 ### Printer Integrations
-- **Bambu Lab Cloud** — Sync print jobs from Bambu Cloud API. Assign filaments and projects, deduct stock per-AMS-slot, background auto-sync with configurable pre-job time offset.
+- **Bambu Lab Cloud** — Sync print jobs from Bambu Cloud API. Assign filaments and projects, deduct stock per-AMS-slot, background auto-sync with configurable pre-job time offset. Intelligent project name suggestions from job titles with one-click project creation directly from the Bambu jobs page.
 - **PrusaLink** — Poll local Prusa printers via REST API (no cloud required). Automatic job capture, progress tracking, and filament mapping.
 - **Printer Maintenance Log** — Dedicated `/maintenance` module for logging nozzle changes, calibrations, services, and faults per printer, with overdue and due-soon badge indicators. Supports recurring schedules (hours/days/months) with auto-calculated next service dates and `.ics` calendar export for Google Calendar / Outlook.
 - **Live Printer Dashboard** — Overview page shows active print jobs with real-time progress bars, ETA, material swatches, and brand badges.
@@ -205,7 +205,7 @@ pip install -r requirements.txt
 python -m pytest tests/ -v
 ```
 
-Tests cover: authentication flows, Bambu sync idempotency, stock deduction logic, backup/restore integrity, SSRF protection, calculator, and statistics routes.
+Tests cover: authentication flows, Bambu sync idempotency, stock deduction logic, backup/restore integrity, SSRF protection, calculator, statistics routes, waste record CRUD, printer maintenance CRUD and ICS export, `_clean_title` helper, and thumbnail MIME-type caching (S3 binary/octet-stream fallback).
 
 ---
 

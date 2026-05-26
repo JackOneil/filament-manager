@@ -14,7 +14,7 @@ from models import (
     AppSetting, BambuPrintJob, BambuJobMaterial, BambuPrinter,
     Brand, Color, Material, Filament, MovementHistory, PrintHistory,
 )
-from routes.bambu import do_sync, _parse_ts, _resolve_status
+from routes.bambu import do_sync, _parse_ts, _resolve_status, _clean_title, _cache_cover_image
 
 
 # ─── Unit tests: helpers ────────────────────────────────────────────────────
@@ -760,6 +760,226 @@ class BambuSyncEndpointTests(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.mimetype, 'image/svg+xml')
         self.assertEqual(resp.headers.get('Content-Disposition'), 'inline')
+
+
+# ─── Unit tests: _clean_title ───────────────────────────────────────────────
+
+class CleanTitleTests(unittest.TestCase):
+    """Unit tests for _clean_title() — slicer title normalisation."""
+
+    def test_strips_stl_extension(self):
+        self.assertEqual(_clean_title('Model.stl'), 'Model')
+
+    def test_strips_3mf_extension(self):
+        self.assertEqual(_clean_title('Part.3mf'), 'Part')
+
+    def test_strips_obj_extension(self):
+        self.assertEqual(_clean_title('Thing.obj'), 'Thing')
+
+    def test_strips_trailing_numeric_plate_index(self):
+        # Bambu Studio appends _1, _2 after the extension.
+        # The extension regex anchors to $, so it doesn't match when _N follows;
+        # the _\d+ strip runs second and removes the index but leaves the ext.
+        # A bare extension without index IS stripped in the same pass.
+        self.assertEqual(_clean_title('Model.stl'), 'Model')   # clean ext at end
+        self.assertEqual(_clean_title('Model.stl_1'), 'Model.stl')  # index stripped, ext remains
+        self.assertEqual(_clean_title('Model.3mf_2'), 'Model.3mf')  # same pattern
+
+    def test_extension_strip_is_case_insensitive(self):
+        self.assertEqual(_clean_title('Part.STL'), 'Part')
+        self.assertEqual(_clean_title('Part.3MF'), 'Part')
+
+    def test_deduplicates_identical_multi_part_names(self):
+        # 'Model.stl_1 + Model.stl_2' → both strip trailing index → 'Model.stl'
+        # then deduplicated → 'Model.stl' (ext at end is stripped on bare name)
+        self.assertEqual(_clean_title('Model.stl_1 + Model.stl_2'), 'Model.stl')
+
+    def test_preserves_distinct_multi_part_names(self):
+        result = _clean_title('PartA.stl_1 + PartB.stl_1')
+        self.assertIn('PartA', result)
+        self.assertIn('PartB', result)
+
+    def test_slicer_profile_string_returned_unchanged(self):
+        # Strings starting with a layer-height pattern are profile names, not model names
+        profile = '0.20mm Standard @BBL X1C'
+        self.assertEqual(_clean_title(profile), profile)
+
+    def test_empty_string_returns_empty(self):
+        self.assertEqual(_clean_title(''), '')
+
+    def test_none_returns_none(self):
+        self.assertIsNone(_clean_title(None))
+
+    def test_name_without_extension_or_index_unchanged(self):
+        self.assertEqual(_clean_title('MyModel'), 'MyModel')
+
+    def test_non_digit_suffix_not_stripped(self):
+        # '_v7' has a non-digit character — must NOT be stripped
+        self.assertEqual(_clean_title('Cosmo_v7'), 'Cosmo_v7')
+
+
+# ─── Unit tests: _cache_cover_image ─────────────────────────────────────────
+
+class CacheCoverImageTests(unittest.TestCase):
+    """Unit tests for _cache_cover_image() — particularly the S3
+    binary/octet-stream fallback introduced in v1.85.13."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp(prefix='bambu-thumb-tests-')
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def _make_response(self, content_type, body=b'\x89PNG' + b'\x00' * 100):
+        mock_resp = MagicMock()
+        mock_resp.headers = {'Content-Type': content_type}
+        mock_resp.content = body
+        mock_resp.raise_for_status = MagicMock()
+        return mock_resp
+
+    @patch('routes.bambu._thumb_dir')
+    @patch('routes.bambu.requests.get')
+    def test_standard_image_png_mime_type(self, mock_get, mock_thumb_dir):
+        mock_thumb_dir.return_value = self.temp_dir
+        mock_get.return_value = self._make_response('image/png')
+        result = _cache_cover_image('job001', 'https://example.com/thumb.png')
+        self.assertIsNotNone(result)
+        self.assertTrue(result.endswith('.png'))
+        self.assertTrue(os.path.isfile(result))
+
+    @patch('routes.bambu._thumb_dir')
+    @patch('routes.bambu.requests.get')
+    def test_binary_octet_stream_falls_back_to_png_url_extension(self, mock_get, mock_thumb_dir):
+        """S3 serves images as binary/octet-stream — extension must come from URL."""
+        mock_thumb_dir.return_value = self.temp_dir
+        mock_get.return_value = self._make_response(
+            'binary/octet-stream',
+            b'\x89PNG' + b'\x00' * 100,
+        )
+        url = ('https://s3.amazonaws.com/bucket/Metadata/plate_1.png'
+               '?X-Amz-Signature=abc123&X-Amz-Expires=3600')
+        result = _cache_cover_image('job_s3_001', url)
+        self.assertIsNotNone(result)
+        self.assertTrue(result.endswith('.png'))
+
+    @patch('routes.bambu._thumb_dir')
+    @patch('routes.bambu.requests.get')
+    def test_binary_octet_stream_falls_back_to_jpg_url_extension(self, mock_get, mock_thumb_dir):
+        mock_thumb_dir.return_value = self.temp_dir
+        mock_get.return_value = self._make_response('binary/octet-stream', b'\xff\xd8' + b'\x00' * 100)
+        url = 'https://cdn.example.com/jobs/job_s3_002/cover.jpg'
+        result = _cache_cover_image('job_s3_002', url)
+        self.assertIsNotNone(result)
+        self.assertTrue(result.endswith('.jpg'))
+
+    @patch('routes.bambu._thumb_dir')
+    @patch('routes.bambu.requests.get')
+    def test_unknown_mime_and_no_url_extension_returns_none(self, mock_get, mock_thumb_dir):
+        mock_thumb_dir.return_value = self.temp_dir
+        mock_get.return_value = self._make_response('application/octet-stream')
+        result = _cache_cover_image('job_no_ext', 'https://example.com/thumb_no_ext')
+        self.assertIsNone(result)
+
+    @patch('routes.bambu.requests.get')
+    def test_http_error_returns_none(self, mock_get):
+        mock_get.side_effect = Exception('connection refused')
+        result = _cache_cover_image('job_err', 'https://example.com/thumb.png')
+        self.assertIsNone(result)
+
+    @patch('routes.bambu._thumb_dir')
+    @patch('routes.bambu.requests.get')
+    def test_empty_content_returns_none(self, mock_get, mock_thumb_dir):
+        mock_thumb_dir.return_value = self.temp_dir
+        mock_get.return_value = self._make_response('image/png', b'')
+        result = _cache_cover_image('job_empty', 'https://example.com/thumb.png')
+        self.assertIsNone(result)
+
+    def test_no_url_returns_none(self):
+        result = _cache_cover_image('job_no_url', None)
+        self.assertIsNone(result)
+
+    def test_no_external_id_returns_none(self):
+        result = _cache_cover_image(None, 'https://example.com/thumb.png')
+        self.assertIsNone(result)
+
+
+# ─── Integration tests: bambu_create_project endpoint ───────────────────────
+
+class BambuCreateProjectTests(unittest.TestCase):
+    """Tests for POST /bambu/job/<id>/create_project (added in v1.85.14)."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp(prefix='bambu-create-proj-tests-')
+        db_path = os.path.join(self.temp_dir, 'test.db')
+        self.app = create_app({
+            'TESTING': True,
+            'SQLALCHEMY_DATABASE_URI': f'sqlite:///{db_path}',
+            'PROJECT_UPLOAD_FOLDER': os.path.join(self.temp_dir, 'uploads'),
+            'WTF_CSRF_ENABLED': False,
+        })
+        self.client = self.app.test_client()
+
+        with self.app.app_context():
+            job = BambuPrintJob(
+                external_id='TEST_CREATE_PROJECT_001',
+                model_name='Cosmo_left_v7',
+                printer_name='P1P',
+                status='FINISH',
+                weight_grams=50.0,
+            )
+            db.session.add(job)
+            db.session.commit()
+            self.job_id = job.id
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_creates_project_links_job_and_returns_json(self):
+        from models import Project
+        resp = self.client.post(
+            f'/bambu/job/{self.job_id}/create_project',
+            data={'project_name': 'Cosmo'},
+            follow_redirects=False,
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertTrue(data['ok'])
+        self.assertEqual(data['project_name'], 'Cosmo')
+
+        with self.app.app_context():
+            project = db.session.get(Project, data['project_id'])
+            self.assertIsNotNone(project)
+            self.assertEqual(project.name, 'Cosmo')
+            self.assertEqual(project.status, 'APPROVED')
+            job = db.session.get(BambuPrintJob, self.job_id)
+            self.assertEqual(job.project_id, project.id)
+
+    def test_returns_400_for_empty_project_name(self):
+        resp = self.client.post(
+            f'/bambu/job/{self.job_id}/create_project',
+            data={'project_name': '   '},
+            follow_redirects=False,
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertFalse(resp.get_json()['ok'])
+
+    def test_returns_404_for_nonexistent_job(self):
+        resp = self.client.post(
+            '/bambu/job/99999/create_project',
+            data={'project_name': 'New Project'},
+            follow_redirects=False,
+        )
+        self.assertEqual(resp.status_code, 404)
+
+    def test_bambu_page_embeds_cleaned_title_in_js_init_data(self):
+        """The Bambu jobs page must embed cleanedTitle in each job's _BI entry."""
+        resp = self.client.get('/bambu')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+        # cleanedTitle key must appear in the per-job init data block
+        self.assertIn('cleanedTitle', html)
+        # model_name is 'Cosmo_left_v7' — no pure-digit suffix, so title unchanged
+        self.assertIn('Cosmo_left_v7', html)
 
 
 if __name__ == '__main__':
