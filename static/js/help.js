@@ -262,7 +262,7 @@
         {
             id: 'bambu',
             icon: 'fa-plug-circle-bolt',
-            endpoints: ['bambu_index', 'bambu_sync', 'bambu_job_detail', 'bambu_job_delete'],
+            endpoints: ['bambu_index', 'bambu_sync', 'bambu_job_detail', 'bambu_job_delete', 'bambu_create_project'],
             title: { cs: 'Bambu Lab', en: 'Bambu Lab' },
             tips: [
                 {
@@ -284,6 +284,13 @@
                     text: {
                         cs: 'Filtrujte tiskové úlohy podle tiskárny, stavu (dokončeno, selháno, probíhá) nebo časového rozsahu pomocí rychlých filtrů (pills) v horní části stránky.',
                         en: 'Filter print jobs by printer, status (completed, failed, in progress), or time range using the quick filter pills at the top of the page.'
+                    }
+                },
+                {
+                    title: { cs: 'Vytvoření projektu z tiskové úlohy', en: 'Create Project from Print Job' },
+                    text: {
+                        cs: 'Klikněte na „Přiřadit projekt" u libovolné tiskové úlohy. Systém nabídne existující projekty na základě shody s názvem úlohy (fuzzy matching). Pokud žádný nevyhovuje, zobrazí se tlačítko „Vytvořit nový projekt" s předvyplněným názvem — jedním kliknutím projekt okamžitě vznikne a přiřadí se k úloze.',
+                        en: 'Click "Assign project" on any print job. The system suggests existing projects based on fuzzy-matching the job title. If none match, a "Create new project" button appears with a pre-filled name — one click creates and assigns the project immediately.'
                     }
                 }
             ]

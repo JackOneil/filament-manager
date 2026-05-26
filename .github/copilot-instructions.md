@@ -408,6 +408,14 @@ This is already applied to `projects_index.html` and overrides any stale localSt
 - When creating print projects, clean suggestions from unmapped Bambu print jobs can be provided by the backend using the `_clean_title` helper from the Bambu module.
 - Render these suggestions as inline buttons/badges inside the project creation template, enabling one-click pre-filling of the project name input.
 
+### Rule 30 — Interactive Help System (`static/js/help.js`)
+- The interactive help panel is powered by `static/js/help.js` which contains the `HELP_SECTIONS` array.
+- **Every section** has an `endpoints` array that maps Flask endpoint names to the help section. Whenever a new endpoint is added to a page that already has a help section, add the endpoint name to that array.
+- **When adding a new feature** that changes how a page works (new button, workflow, or screen), add a contextual tip (object with `title` and `text`, both `cs` and `en`) to the relevant section in `HELP_SECTIONS`.
+- **When adding a new page** (new route/blueprint with its own template), add a brand new section object to `HELP_SECTIONS` covering the main workflows of that page.
+- Tip text must be in both Czech (`cs`) and English (`en`).
+- Never hardcode only one language — both keys are always required.
+
 ### Rule 29 — Architecture Documentation Updates
 - **After implementing new features, refactoring, or structural changes, always update architecture documentation:**
   - `.github/copilot-instructions.md` — update file structure, data flow diagrams, key dependencies, or rules if they changed
@@ -450,6 +458,10 @@ After every set of feature additions or structural fixes, **always** complete AL
     - Duplicates consolidated
     - Patterns changed (e.g., new base classes, interfaces)
     - Update any relevant sections in this file
+19. ✅ **HELP SYSTEM** — If a new page, feature, or workflow was added or changed → update `static/js/help.js` (Rule 30):
+    - Add new endpoint names to the relevant section's `endpoints[]` array
+    - Add a new tip describing the feature in both `cs` and `en`
+    - If entirely new page → add a new section to `HELP_SECTIONS`
 
 **CRITICAL: Step 5 (Docker build) is mandatory after ANY code change. Never skip it.**
 **CRITICAL: Step 17 (Architecture update) is mandatory after any feature/refactoring. Keep docs in sync.**

@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.85.16] - 2026-05-26
+### Changed
+- **Help system — Bambu project creation tip**: Added a contextual tip to the Bambu Lab help section describing the one-click project creation from print jobs (fuzzy-match suggestions + inline "Create new project" button). Endpoint `bambu_create_project` added to the Bambu section's `endpoints[]` array so the tip shows on that page.
+- **Rule 30 added**: New project rule mandating that `static/js/help.js` (`HELP_SECTIONS`) must be updated whenever a new page, feature, endpoint, or workflow is added — with tips in both Czech and English.
+
+## [1.85.15] - 2026-05-26
+### Fixed
+- **Backup import — undo log crash**: The undo-log import block referenced `manifest` (undefined, should be `data`) and `_user_id_by_email` (a dict that was never built), causing a `NameError` crash on any import that contained undo-log entries. Additionally, the block was placed outside the `with db.session.begin():` transaction, so undo-log rows were never committed. All three issues are fixed: variable names corrected, user resolved via `_resolve_user_ref`, and the block moved inside the transaction.
+
 ## [1.85.14] - 2026-05-26
 ### Added
 - **Bambu project suggestions**: When opening the mapping panel for a Bambu print job, suggested projects are shown as clickable badges based on fuzzy-matching the cleaned job title against existing project names (e.g. job `Cosmo_left.f3d_v7` suggests project `Cosmo`). If no project matches, a "Create new project" inline button appears with the cleaned title pre-filled, allowing quick project creation and immediate job assignment — all without leaving the Bambu jobs page.
