@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.85.14] - 2026-05-26
+### Added
+- **Bambu project suggestions**: When opening the mapping panel for a Bambu print job, suggested projects are shown as clickable badges based on fuzzy-matching the cleaned job title against existing project names (e.g. job `Cosmo_left.f3d_v7` suggests project `Cosmo`). If no project matches, a "Create new project" inline button appears with the cleaned title pre-filled, allowing quick project creation and immediate job assignment — all without leaving the Bambu jobs page.
+
 ## [1.85.13] - 2026-05-26
 ### Fixed
 - **Bambu thumbnail `binary/octet-stream` fix**: AWS S3 serves Bambu job thumbnails with `Content-Type: binary/octet-stream` instead of `image/png`. The `_cache_cover_image` helper now falls back to the file extension in the URL path when the MIME type is unrecognised, allowing thumbnails to be downloaded and cached correctly.

@@ -752,6 +752,7 @@ def register(app):
         slot_meta_by_material = {}
         for job in jobs.items:
             job_meta, slot_meta = _extract_job_meta(job)
+            job_meta['cleaned_title'] = _clean_title(job.model_name or '') if job.model_name else ''
             bambu_payload_meta[job.id] = job_meta
             slot_meta_by_material.update(slot_meta)
 
@@ -992,4 +993,28 @@ def register(app):
             db.session.delete(job)
             db.session.commit()
         return redirect(url_for('bambu_jobs'))
+
+    @bp.route('/bambu/job/<int:job_id>/create_project', methods=['POST'])
+    def bambu_create_project(job_id):
+        """Create a new project from a Bambu job title and link it to the job."""
+        from models import Project
+        from auth import get_current_user
+        user = get_current_user()
+        job = db.session.get(BambuPrintJob, job_id)
+        if not job:
+            return jsonify({'ok': False, 'error': 'not found'}), 404
+        project_name = request.form.get('project_name', '').strip()
+        if not project_name:
+            return jsonify({'ok': False, 'error': 'Name required'}), 400
+        project = Project(
+            name=project_name,
+            created_by_user_id=user.id if user else None,
+            status='APPROVED',
+        )
+        db.session.add(project)
+        db.session.flush()
+        job.project_id = project.id
+        db.session.commit()
+        return jsonify({'ok': True, 'project_id': project.id, 'project_name': project.name})
+
     app.register_blueprint(bp)

@@ -281,6 +281,48 @@
                     {# ── Project fulltext search dropdown ── #}
                     <div class="relative" @click.outside="projectOpen = false">
                         <label class="text-xs font-semibold text-gray-600 mb-1 block">{{ t('bambu_map_project') }}</label>
+                        {# ── Suggested projects ── #}
+                        <template x-if="!selectedProjectId && suggestedProjects.length > 0">
+                            <div class="mb-1">
+                                <p class="text-xs text-gray-400 mb-1"><i class="fa-solid fa-lightbulb text-amber-400 mr-1"></i>{{ t('bambu_suggested_projects') }}:</p>
+                                <div class="flex flex-wrap gap-1">
+                                    <template x-for="p in suggestedProjects" :key="p.id">
+                                        <button type="button" @click="selectProject(p.id, p.name)"
+                                            class="text-xs bg-amber-50 border border-amber-300 text-amber-800 hover:bg-amber-100 px-2 py-0.5 rounded-full transition-colors font-medium">
+                                            <i class="fa-solid fa-folder-open mr-1 text-amber-500"></i><span x-text="p.name"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                        {# ── Create new project (when no suggestions) ── #}
+                        <template x-if="!selectedProjectId && suggestedProjects.length === 0 && cleanedTitle">
+                            <div class="mb-1">
+                                <template x-if="!createProjectOpen">
+                                    <button type="button" @click="openCreateProject()"
+                                        class="text-xs bg-emerald-50 border border-emerald-300 text-emerald-700 hover:bg-emerald-100 px-2 py-0.5 rounded-full transition-colors font-medium">
+                                        <i class="fa-solid fa-plus mr-1"></i>{{ t('bambu_create_project') }}
+                                    </button>
+                                </template>
+                                <template x-if="createProjectOpen">
+                                    <div class="flex gap-1 items-center">
+                                        <input type="text" x-model="createProjectName"
+                                            class="flex-1 border border-emerald-300 rounded px-2 py-1 text-xs focus:ring-2 focus:ring-emerald-400 outline-none"
+                                            @keydown.enter.prevent="createProject({{ job.id }})"
+                                            @keydown.escape="createProjectOpen = false"
+                                            placeholder="{{ t('bambu_new_project_name') }}">
+                                        <button type="button" @click="createProject({{ job.id }})"
+                                            class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded transition-colors">
+                                            <i class="fa-solid fa-check"></i>
+                                        </button>
+                                        <button type="button" @click="createProjectOpen = false"
+                                            class="text-xs text-gray-500 hover:text-gray-700 px-1 py-1 rounded transition-colors">
+                                            <i class="fa-solid fa-xmark"></i>
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
                         <input type="hidden" name="project_id" :value="selectedProjectId">
                         <input type="text"
                             x-model="projectQ"
@@ -357,6 +399,48 @@
                     {# ── Project fulltext search dropdown ── #}
                     <div class="relative" @click.outside="projectOpen = false">
                         <label class="text-xs font-semibold text-gray-600 mb-1 block">{{ t('bambu_map_project') }}</label>
+                        {# ── Suggested projects ── #}
+                        <template x-if="!selectedProjectId && suggestedProjects.length > 0">
+                            <div class="mb-1">
+                                <p class="text-xs text-gray-400 mb-1"><i class="fa-solid fa-lightbulb text-amber-400 mr-1"></i>{{ t('bambu_suggested_projects') }}:</p>
+                                <div class="flex flex-wrap gap-1">
+                                    <template x-for="p in suggestedProjects" :key="p.id">
+                                        <button type="button" @click="selectProject(p.id, p.name)"
+                                            class="text-xs bg-amber-50 border border-amber-300 text-amber-800 hover:bg-amber-100 px-2 py-0.5 rounded-full transition-colors font-medium">
+                                            <i class="fa-solid fa-folder-open mr-1 text-amber-500"></i><span x-text="p.name"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                        {# ── Create new project (when no suggestions) ── #}
+                        <template x-if="!selectedProjectId && suggestedProjects.length === 0 && cleanedTitle">
+                            <div class="mb-1">
+                                <template x-if="!createProjectOpen">
+                                    <button type="button" @click="openCreateProject()"
+                                        class="text-xs bg-emerald-50 border border-emerald-300 text-emerald-700 hover:bg-emerald-100 px-2 py-0.5 rounded-full transition-colors font-medium">
+                                        <i class="fa-solid fa-plus mr-1"></i>{{ t('bambu_create_project') }}
+                                    </button>
+                                </template>
+                                <template x-if="createProjectOpen">
+                                    <div class="flex gap-1 items-center">
+                                        <input type="text" x-model="createProjectName"
+                                            class="flex-1 border border-emerald-300 rounded px-2 py-1 text-xs focus:ring-2 focus:ring-emerald-400 outline-none"
+                                            @keydown.enter.prevent="createProject({{ job.id }})"
+                                            @keydown.escape="createProjectOpen = false"
+                                            placeholder="{{ t('bambu_new_project_name') }}">
+                                        <button type="button" @click="createProject({{ job.id }})"
+                                            class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded transition-colors">
+                                            <i class="fa-solid fa-check"></i>
+                                        </button>
+                                        <button type="button" @click="createProjectOpen = false"
+                                            class="text-xs text-gray-500 hover:text-gray-700 px-1 py-1 rounded transition-colors">
+                                            <i class="fa-solid fa-xmark"></i>
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
                         <input type="hidden" name="project_id" :value="selectedProjectId">
                         <input type="text"
                             x-model="projectQ"
@@ -748,9 +832,25 @@ const _BI = {
     pLabel: {{ job.project.name|tojson if job.project else 'null' }},
         prefMaterial: {{ (js_slot_meta.material_type if js_slot_meta else (js_single_slot.material_name if js_single_slot else ''))|tojson }},
         prefColor: {{ (js_slot_meta.color_hex if js_slot_meta and js_slot_meta.color_hex else (js_single_slot.color_hex if js_single_slot else ''))|tojson }},
+        cleanedTitle: {{ (bambu_payload_meta.get(job.id, {}).get('cleaned_title') or '')|tojson }},
   },
 {% endfor %}{% endif %}
 };
+
+// ── Project suggestions: match cleaned job title against project names ────────
+function _suggestedProjects(cleanedTitle) {
+    if (!cleanedTitle) return [];
+    const titleWords = cleanedTitle.toLowerCase()
+        .replace(/[_\-\.]+/g, ' ').split(/\s+/).filter(w => w.length > 2);
+    if (!titleWords.length) return [];
+    return _BP.filter(p => {
+        const projWords = p.name.toLowerCase()
+            .replace(/[_\-\.]+/g, ' ').split(/\s+/).filter(w => w.length > 2);
+        return projWords.some(pw =>
+            titleWords.some(tw => tw === pw || tw.startsWith(pw) || pw.startsWith(tw))
+        );
+    });
+}
 
 // ── Alpine component for per-job mapping panel ───────────────────────────────
 function bambuMap(jobId) {
@@ -800,15 +900,43 @@ function bambuMap(jobId) {
         projectQ: init.pLabel || '',
         projectOpen: false,
         selectedProjectId: init.pId || '',
+        cleanedTitle: init.cleanedTitle || '',
+        createProjectOpen: false,
+        createProjectName: init.cleanedTitle || '',
         get filteredProjects() {
             const q = this.projectQ.toLowerCase().trim();
             if (!q) return _BP;
             return _BP.filter(p => p.name.toLowerCase().includes(q));
         },
+        get suggestedProjects() {
+            if (this.selectedProjectId) return [];
+            return _suggestedProjects(this.cleanedTitle);
+        },
         selectProject(id, name) {
             this.selectedProjectId = id;
             this.projectQ = name;
             this.projectOpen = false;
+            this.createProjectOpen = false;
+        },
+        openCreateProject() {
+            this.createProjectName = this.cleanedTitle || '';
+            this.createProjectOpen = true;
+        },
+        async createProject(jobId) {
+            if (!this.createProjectName.trim()) return;
+            const csrfToken = document.querySelector('meta[name="csrf-token"]');
+            const fd = new FormData();
+            fd.append('project_name', this.createProjectName.trim());
+            if (csrfToken) fd.append('csrf_token', csrfToken.getAttribute('content'));
+            try {
+                const r = await fetch(`/bambu/job/${jobId}/create_project`, { method: 'POST', body: fd });
+                const data = await r.json();
+                if (!data.ok) return;
+                this.selectedProjectId = data.project_id;
+                this.projectQ = data.project_name;
+                this.createProjectOpen = false;
+                _BP.push({ id: data.project_id, name: data.project_name });
+            } catch (_) {}
         },
         async saveJob(event) {
             const form = event.target;

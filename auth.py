@@ -107,6 +107,7 @@ SECTION_BY_ENDPOINT = {
     'bambu_job_map': SECTION_PRINTERS,
     'bambu_job_deduct_slot': SECTION_PRINTERS,
     'bambu_job_delete': SECTION_PRINTERS,
+    'bambu_create_project': SECTION_PRINTERS,
     'prusa_jobs': SECTION_PRINTERS,
     'prusa_printer_sync': SECTION_PRINTERS,
     'prusa_printer_test': SECTION_PRINTERS,
