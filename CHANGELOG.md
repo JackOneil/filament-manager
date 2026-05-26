@@ -5,6 +5,78 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.85.13] - 2026-05-26
+### Fixed
+- **Bambu thumbnail `binary/octet-stream` fix**: AWS S3 serves Bambu job thumbnails with `Content-Type: binary/octet-stream` instead of `image/png`. The `_cache_cover_image` helper now falls back to the file extension in the URL path when the MIME type is unrecognised, allowing thumbnails to be downloaded and cached correctly.
+
+## [1.85.12] - 2026-05-26
+### Fixed
+- **Bambu thumbnail authenticated re-fetch**: When a job thumbnail is not in the local cache and the stored signed cover URL has expired, the thumbnail endpoint now re-queries the Bambu Cloud API using the configured sync token (Bearer auth) to obtain a fresh cover URL, downloads it, caches it locally, and updates the stored payload. Falls back to the SVG placeholder only if no token is configured or the API returns no usable URL.
+
+## [1.85.11] - 2026-05-26
+### Fixed
+- **Bambu thumbnail fallback reliability**: The thumbnail endpoint now returns a local inline SVG placeholder when a cached image is unavailable and recaching fails, instead of surfacing a 404. This keeps the UI stable even when the remote Bambu cover URL has expired.
+
+## [1.85.10] - 2026-05-26
+### Fixed
+- **Bambu thumbnail visibility**: Restored thumbnail/detail rendering for jobs that still have a cloud cover URL in payload metadata, while keeping the actual thumbnail endpoint local-only. This prevents the UI from disappearing entirely when local cache entries are missing.
+
+## [1.85.9] - 2026-05-26
+### Fixed
+- **Bambu thumbnail expiration fallback**: Removed redirect fallback from `/bambu/job/<id>/thumbnail` to Bambu signed `cover` URLs when local recache fails. The endpoint now serves only locally cached thumbnails and returns `404` otherwise, preventing browser navigation to expired `AccessDenied` links.
+- **Bambu thumbnail UI visibility**: Job cards now render thumbnail blocks only when a local cached thumbnail exists, so the UI no longer implies a working image based solely on an external cloud URL.
+
+## [1.85.8] - 2026-05-26
+### Changed
+- **Webfont fetch priority for Bambu page render stability**: Added explicit preload hints for self-hosted Plus Jakarta Sans WOFF2 files in the base layout with high fetch priority so typography assets are requested earlier and are less likely to be delayed by image traffic (including Bambu thumbnails).
+
+## [1.85.7] - 2026-05-26
+### Fixed
+- **Bambu thumbnail open behavior**: Opening a Bambu job thumbnail now serves the image explicitly as inline content (`Content-Disposition: inline`) with an image MIME type, so browsers open the preview in a new tab/window instead of downloading it as a file.
+
+## [1.85.6] - 2026-05-26
+### Changed
+- **Bambu thumbnail lazy loading**: Job thumbnail images on the Bambu print history page now use native lazy loading (`loading="lazy"`, `decoding="async"`, `fetchpriority="low"`) to reduce initial page load blocking when many jobs are listed.
+
+## [1.85.5] - 2026-05-26
+### Added
+- **Bambu thumbnail refetch action**: New button on the Bambu jobs page triggers `/bambu/refetch-thumbnails` to retry caching thumbnails for jobs that are missing a local thumbnail file.
+
+### Changed
+- **Bambu refetch result feedback**: The UI now shows a summary with fetched/failed/already-cached/missing-cover counters after thumbnail refetch.
+
+## [1.85.4] - 2026-05-26
+### Changed
+- **Bambu material family matching**: Single-material and per-slot multimaterial filament suggestions now use material-family wildcard matching (e.g. `PETG` also matches `PETG V0`) instead of strict exact-name equality.
+- **Fallback picker for full catalog**: Bambu mapping dropdowns now show an explicit `Other filament…` action that switches from suggested candidates to the full interactive filament list when the suggested subset is not enough.
+
+## [1.85.3] - 2026-05-26
+### Changed
+- **Thumbnail refresh in normal sync**: Existing Bambu jobs now refresh their stored Cloud payload during `/bambu/sync`, and the local thumbnail cache is only fetched when the image is not already cached. This lets the app refetch missing thumbnails without any DB-only backfill.
+
+## [1.85.2] - 2026-05-26
+### Added
+- **Local Bambu thumbnail proxy/cache**: Added `/bambu/job/<id>/thumbnail` endpoint and local cover-image cache (`data/bambu_thumbs`) so job thumbnails remain accessible even after temporary Cloud signed URLs expire.
+
+### Changed
+- **Single-color job smart mapping**: The filament dropdown for single-material jobs now uses the same material+color ranking logic as multimaterial slot mapping.
+- **Thumbnail rendering source**: Bambu job detail now loads thumbnail image links from the local proxy endpoint instead of directly using expiring Cloud URLs.
+
+## [1.85.1] - 2026-05-26
+### Changed
+- **Bambu job detail cleanup**: Removed verbose cover URL text from job detail; thumbnail is now shown as a clickable image only.
+- **Bambu metadata relevance**: Removed AMS mapping detail blocks (`amsMapping`, `amsMapping2`) from the UI because they did not provide actionable value.
+- **Single-material visibility fix**: Material slot detail enrichment (material type and color code) now appears for single-material jobs as well, not only multimaterial jobs.
+
+## [1.85.0] - 2026-05-26
+### Added
+- **Bambu job detail metadata panel**: Expanded Bambu job detail with Cloud payload metadata including model thumbnail (`cover` URL), nozzle list (`nozzleInfos`), and both AMS mapping arrays (`amsMapping`, `amsMapping2`).
+- **AMS slot detail enrichment**: Multi-material slot rows now display material type and explicit color code values in addition to weight and AMS position.
+
+### Changed
+- **Smarter filament assignment suggestions for AMS slots**: Slot assignment dropdown now ranks candidates by matching material type and similar color, making mapping faster and reducing manual search.
+- **Bambu payload parsing resilience**: Added fallback parsing for real Cloud keys (`ams`, `slotId`, `targetColor`/`sourceColor`, `filamentType`) when storing job materials, improving future sync accuracy for AMS slot labels and material/color metadata.
+
 ## [1.84.0] - 2026-05-23
 ### Added
 - **Audit Logging Toggle**: Added `audit_logging_enabled` setting to enable/disable audit logging. When disabled, the Audit Log menu item is hidden from both desktop sidebar and mobile menu, and no audit log entries are written to the database. Toggle available in Settings → General tab.

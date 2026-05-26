@@ -8,6 +8,8 @@
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
     <title>{{ t('title') }}</title>
     <style>[x-cloak]{display:none!important}</style>
+    <link rel="preload" href="{{ url_for('static', filename='fonts/files/plus-jakarta-sans-latin-wght-normal.woff2') }}" as="font" type="font/woff2" crossorigin fetchpriority="high">
+    <link rel="preload" href="{{ url_for('static', filename='fonts/files/plus-jakarta-sans-latin-ext-wght-normal.woff2') }}" as="font" type="font/woff2" crossorigin fetchpriority="high">
     <link rel="stylesheet" href="{{ url_for('static', filename='fonts/plus-jakarta-sans.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fontawesome.min.css') }}">

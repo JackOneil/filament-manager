@@ -103,6 +103,7 @@ SECTION_BY_ENDPOINT = {
     'project_decrement_print_item': SECTION_PROJECTS,
     'bambu_jobs': SECTION_PRINTERS,
     'bambu_sync': SECTION_PRINTERS,
+    'bambu_refetch_thumbnails': SECTION_PRINTERS,
     'bambu_job_map': SECTION_PRINTERS,
     'bambu_job_deduct_slot': SECTION_PRINTERS,
     'bambu_job_delete': SECTION_PRINTERS,
@@ -489,7 +490,7 @@ def _audit_target():
         return {'object_type': 'StorageShelf', 'object_id': None, 'object': None}
     if endpoint == 'storage_assign_slot':
         return {'object_type': 'StoragePlacement', 'object_id': None, 'object': None}
-    if endpoint in {'bambu_sync', 'prusa_jobs'}:
+    if endpoint in {'bambu_sync', 'bambu_refetch_thumbnails', 'prusa_jobs'}:
         return {'object_type': endpoint, 'object_id': None, 'object': None}
     return {'object_type': endpoint or None, 'object_id': None, 'object': None}
 

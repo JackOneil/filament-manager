@@ -7,10 +7,12 @@ No Flask Blueprints — all routes are registered directly on the app object.
 import json
 import re
 import logging
+import os
+import mimetypes
 from datetime import datetime
 
 import requests
-from flask import render_template, request, redirect, url_for, jsonify, Blueprint
+from flask import current_app, render_template, request, redirect, url_for, jsonify, Blueprint, send_file, abort
 
 from database import db
 from models import (
@@ -109,6 +111,244 @@ def _format_duration(seconds) -> str:
     if h:
         return f'{h}h {m}min'
     return f'{m}min'
+
+
+def _thumb_dir() -> str:
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    return os.path.join(base_dir, 'data', 'bambu_thumbs')
+
+
+def _safe_thumb_id(external_id: str) -> str:
+    return re.sub(r'[^a-zA-Z0-9_-]', '_', str(external_id or '').strip())
+
+
+def _cover_url_from_payload(payload: dict) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+    return payload.get('cover') or payload.get('snapShot') or None
+
+
+def _find_cached_thumb_path(external_id: str) -> str | None:
+    safe_id = _safe_thumb_id(external_id)
+    if not safe_id:
+        return None
+    for ext in ('jpg', 'jpeg', 'png', 'webp', 'gif'):
+        path = os.path.join(_thumb_dir(), f'{safe_id}.{ext}')
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def _cache_cover_image(external_id: str, cover_url: str | None) -> str | None:
+    if not external_id or not cover_url:
+        return None
+
+    try:
+        resp = requests.get(cover_url, timeout=15)
+        resp.raise_for_status()
+    except Exception:
+        return None
+
+    ctype = (resp.headers.get('Content-Type') or '').split(';', 1)[0].strip().lower()
+    ext_map = {
+        'image/jpeg': 'jpg',
+        'image/jpg': 'jpg',
+        'image/png': 'png',
+        'image/webp': 'webp',
+        'image/gif': 'gif',
+    }
+    ext = ext_map.get(ctype)
+    if not ext:
+        # S3 and some CDNs serve images as binary/octet-stream — fall back to
+        # the file extension in the URL path (strip query string first).
+        url_path = cover_url.split('?', 1)[0].lower()
+        url_ext = url_path.rsplit('.', 1)[-1] if '.' in url_path else ''
+        ext = ext_map.get(f'image/{url_ext}') or (url_ext if url_ext in ('jpg', 'jpeg', 'png', 'webp', 'gif') else None)
+    if not ext:
+        return None
+    if ext == 'jpeg':
+        ext = 'jpg'
+
+    content = resp.content or b''
+    if not content or len(content) > 8 * 1024 * 1024:
+        return None
+
+    os.makedirs(_thumb_dir(), exist_ok=True)
+    safe_id = _safe_thumb_id(external_id)
+    if not safe_id:
+        return None
+
+    for old_ext in ('jpg', 'jpeg', 'png', 'webp', 'gif'):
+        old_path = os.path.join(_thumb_dir(), f'{safe_id}.{old_ext}')
+        if os.path.exists(old_path):
+            try:
+                os.remove(old_path)
+            except OSError:
+                pass
+
+    target = os.path.join(_thumb_dir(), f'{safe_id}.{ext}')
+    try:
+        with open(target, 'wb') as fh:
+            fh.write(content)
+    except OSError:
+        return None
+
+    return target
+
+
+def _fetch_fresh_cover_url_from_api(external_id: str, token: str, region: str) -> str | None:
+    """Ask Bambu Cloud API for a fresh signed cover URL for a specific task.
+
+    Tries the single-task endpoint first; falls back to scanning the list.
+    Returns the cover URL string or None.
+    """
+    base = _api_base(region)
+    # Single-task endpoint (may not exist on all regions — tolerate 404)
+    try:
+        resp = requests.get(
+            f'{base}/v1/user-service/my/tasks/{external_id}',
+            headers={'Authorization': f'Bearer {token}'},
+            timeout=15,
+        )
+        if resp.ok:
+            cover = _cover_url_from_payload(resp.json())
+            if cover:
+                return cover
+    except Exception:
+        pass
+
+    # Fallback: scan the first page of tasks
+    try:
+        resp = requests.get(
+            f'{base}/v1/user-service/my/tasks',
+            params={'limit': 100, 'offset': 0},
+            headers={'Authorization': f'Bearer {token}'},
+            timeout=15,
+        )
+        if resp.ok:
+            hits = resp.json().get('hits') or resp.json().get('tasks') or []
+            for task in hits:
+                if str(task.get('id', '')).strip() == str(external_id):
+                    cover = _cover_url_from_payload(task)
+                    if cover:
+                        return cover
+    except Exception:
+        pass
+
+    return None
+
+
+def _send_inline_thumbnail(path: str):
+    mimetype, _ = mimetypes.guess_type(path)
+    response = send_file(path, mimetype=mimetype or 'image/jpeg', as_attachment=False)
+    # Force browser inline rendering when opening the thumbnail endpoint.
+    response.headers['Content-Disposition'] = 'inline'
+    return response
+
+
+def _thumbnail_placeholder_response():
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Thumbnail unavailable">'
+        '<rect width="256" height="256" rx="20" fill="#F3F4F6"/>'
+        '<rect x="44" y="44" width="168" height="168" rx="16" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="8" stroke-dasharray="14 10"/>'
+        '<circle cx="128" cy="112" r="26" fill="#E5E7EB"/>'
+        '<path d="M82 176l30-34 24 22 18-18 20 30H82z" fill="#E5E7EB"/>'
+        '<path d="M96 76h64" stroke="#D1D5DB" stroke-width="10" stroke-linecap="round"/>'
+        '</svg>'
+    )
+    response = current_app.response_class(svg, mimetype='image/svg+xml')
+    response.headers['Content-Disposition'] = 'inline'
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
+def _normalize_color_hex(value):
+    """Normalize color hex values from Cloud payloads to #RRGGBB when possible."""
+    if not value:
+        return None
+    s = str(value).strip().lstrip('#')
+    if len(s) == 8:
+        s = s[:6]
+    if len(s) != 6:
+        return None
+    if not re.fullmatch(r'[0-9a-fA-F]{6}', s):
+        return None
+    return f'#{s.upper()}'
+
+
+def _extract_job_meta(job: BambuPrintJob) -> tuple[dict, dict]:
+    """Build UI-friendly metadata from raw_payload and per-slot fallbacks.
+
+    Returns:
+      (job_meta, slot_meta_by_material_id)
+    """
+    payload = {}
+    if job.raw_payload:
+        try:
+            payload = json.loads(job.raw_payload)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            payload = {}
+
+    raw_slots = (
+        payload.get('amsDetailMapping')
+        or payload.get('amsDetailMappings')
+        or payload.get('amsDetail')
+        or []
+    )
+    if not isinstance(raw_slots, list):
+        raw_slots = []
+
+    nozzle_infos = payload.get('nozzleInfos') or []
+    if not isinstance(nozzle_infos, list):
+        nozzle_infos = []
+
+    cover_url = _cover_url_from_payload(payload)
+    cached_thumb = _find_cached_thumb_path(job.external_id)
+
+    job_meta = {
+        'cover_url': cover_url,
+        'has_thumbnail': bool(cover_url or cached_thumb),
+        'nozzle_infos': nozzle_infos,
+        'ams_mapping': payload.get('amsMapping') if isinstance(payload.get('amsMapping'), list) else [],
+        'ams_mapping2': payload.get('amsMapping2') if isinstance(payload.get('amsMapping2'), list) else [],
+    }
+
+    slot_meta = {}
+    for idx, mat in enumerate(list(job.materials or [])):
+        raw = raw_slots[idx] if idx < len(raw_slots) and isinstance(raw_slots[idx], dict) else {}
+        raw_color = (
+            raw.get('targetColor')
+            or raw.get('sourceColor')
+            or raw.get('colorHex')
+            or raw.get('color')
+        )
+        color_hex = _normalize_color_hex(mat.color_hex) or _normalize_color_hex(raw_color)
+        color_code = color_hex or (str(raw_color) if raw_color else None)
+        material_type = (
+            mat.material_name
+            or raw.get('materialName')
+            or raw.get('material')
+            or raw.get('filamentType')
+            or raw.get('targetFilamentType')
+            or '?'
+        )
+
+        ams_val = mat.ams_id if mat.ams_id is not None else raw.get('amsId')
+        if ams_val is None:
+            ams_val = raw.get('ams')
+        tray_val = mat.tray_id if mat.tray_id is not None else raw.get('trayId')
+        if tray_val is None:
+            tray_val = raw.get('slotId')
+
+        slot_meta[mat.id] = {
+            'material_type': material_type,
+            'color_hex': color_hex,
+            'color_code': color_code,
+            'ams': ams_val,
+            'tray': tray_val,
+        }
+
+    return job_meta, slot_meta
 
 
 def _clean_title(title: str) -> str:
@@ -273,11 +513,19 @@ def do_sync(token: str, region: str) -> dict:
             skipped += 1
             continue
 
+        cover_url = _cover_url_from_payload(task)
+        if cover_url and not _find_cached_thumb_path(ext_id):
+            _cache_cover_image(ext_id, cover_url)
+
+        task_payload = json.dumps(task, ensure_ascii=False)
         status = _resolve_status(task.get('status', 0))
 
         existing = existing_by_ext_id.get(ext_id)
         if existing:
             changed = False
+            if existing.raw_payload != task_payload:
+                existing.raw_payload = task_payload
+                changed = True
             if existing.status != status:
                 existing.status = status
                 changed = True
@@ -344,7 +592,7 @@ def do_sync(token: str, region: str) -> dict:
             finished_at=_parse_ts(task.get('endTime')),
             weight_grams=total_weight if total_weight > 0 else None,
             cost_time=int(cost_time) if cost_time else None,
-            raw_payload=json.dumps(task, ensure_ascii=False),
+                raw_payload=task_payload,
         )
         db.session.add(job)
         db.session.flush()  # populate job.id
@@ -353,10 +601,20 @@ def do_sync(token: str, region: str) -> dict:
             slot_w = float(m.get('weight') or 0)
             db.session.add(BambuJobMaterial(
                 job_id=job.id,
-                ams_id=m.get('amsId'),
-                tray_id=m.get('trayId'),
-                color_hex=m.get('color') or m.get('colorHex'),
-                material_name=m.get('materialName') or m.get('material'),
+                ams_id=m.get('amsId') if m.get('amsId') is not None else m.get('ams'),
+                tray_id=m.get('trayId') if m.get('trayId') is not None else m.get('slotId'),
+                color_hex=(
+                    m.get('color')
+                    or m.get('colorHex')
+                    or m.get('targetColor')
+                    or m.get('sourceColor')
+                ),
+                material_name=(
+                    m.get('materialName')
+                    or m.get('material')
+                    or m.get('filamentType')
+                    or m.get('targetFilamentType')
+                ),
                 weight_grams=slot_w if slot_w > 0 else None,
             ))
 
@@ -379,6 +637,46 @@ def do_sync(token: str, region: str) -> dict:
         return {'added': 0, 'updated': 0, 'skipped': skipped, 'error': str(exc)}
 
     return {'added': added, 'updated': updated, 'skipped': skipped, 'error': None}
+
+
+def _refetch_missing_thumbnails() -> dict:
+    """Try to cache thumbnails for jobs that do not have a local thumbnail yet."""
+    stats = {
+        'total_jobs': 0,
+        'already_cached': 0,
+        'missing_candidates': 0,
+        'missing_cover': 0,
+        'fetched': 0,
+        'failed': 0,
+    }
+
+    jobs = BambuPrintJob.query.with_entities(BambuPrintJob.external_id, BambuPrintJob.raw_payload).all()
+    for external_id, raw_payload in jobs:
+        stats['total_jobs'] += 1
+
+        if _find_cached_thumb_path(external_id):
+            stats['already_cached'] += 1
+            continue
+
+        payload = {}
+        if raw_payload:
+            try:
+                payload = json.loads(raw_payload)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                payload = {}
+
+        cover_url = _cover_url_from_payload(payload)
+        if not cover_url:
+            stats['missing_cover'] += 1
+            continue
+
+        stats['missing_candidates'] += 1
+        if _cache_cover_image(external_id, cover_url):
+            stats['fetched'] += 1
+        else:
+            stats['failed'] += 1
+
+    return stats
 
 
 # ─── Route registration ──────────────────────────────────────────────────────
@@ -440,6 +738,8 @@ def register(app):
                 'id': f.id,
                 'label': f.name,
                 'mat': f"{f.brand.name} {f.material.name}" if f.brand and f.material else '',
+                'material_name': f.material.name if f.material else '',
+                'color_hex': f.color.hex_value if f.color else '',
             }
             for f in filaments_orm
         ]
@@ -447,6 +747,14 @@ def register(app):
             {'id': p.id, 'name': p.name}
             for p in projects_orm
         ]
+
+        bambu_payload_meta = {}
+        slot_meta_by_material = {}
+        for job in jobs.items:
+            job_meta, slot_meta = _extract_job_meta(job)
+            bambu_payload_meta[job.id] = job_meta
+            slot_meta_by_material.update(slot_meta)
+
         return render_template(
             'bambu.html',
             jobs=jobs,
@@ -464,6 +772,8 @@ def register(app):
             count_unassigned=count_unassigned,
             count_not_deducted=count_not_deducted,
             hide_failed=hide_failed,
+            bambu_payload_meta=bambu_payload_meta,
+            slot_meta_by_material=slot_meta_by_material,
         )
 
     @bp.route('/bambu/sync', methods=['POST'])
@@ -484,6 +794,60 @@ def register(app):
             })
         db.session.commit()
         return jsonify({'ok': result['error'] is None, **result})
+
+    @bp.route('/bambu/refetch-thumbnails', methods=['POST'])
+    def bambu_refetch_thumbnails():
+        stats = _refetch_missing_thumbnails()
+        return jsonify({'ok': True, **stats})
+
+    @bp.route('/bambu/job/<int:job_id>/thumbnail')
+    def bambu_job_thumbnail(job_id):
+        job = db.session.get(BambuPrintJob, job_id)
+        if not job:
+            abort(404)
+
+        cached = _find_cached_thumb_path(job.external_id)
+        if cached:
+            return _send_inline_thumbnail(cached)
+
+        payload = {}
+        if job.raw_payload:
+            try:
+                payload = json.loads(job.raw_payload)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                payload = {}
+
+        cover_url = _cover_url_from_payload(payload)
+        if not cover_url:
+            abort(404)
+
+        recached = _cache_cover_image(job.external_id, cover_url)
+        if recached:
+            return _send_inline_thumbnail(recached)
+
+        # Stored cover URL has expired — try to get a fresh one from Bambu API
+        setting = get_settings()
+        if setting and setting.bambu_token:
+            try:
+                api_token = decrypt_token(setting.bambu_token)
+                region = setting.bambu_region or 'global'
+                fresh_url = _fetch_fresh_cover_url_from_api(job.external_id, api_token, region)
+                if fresh_url and fresh_url != cover_url:
+                    recached = _cache_cover_image(job.external_id, fresh_url)
+                    if recached:
+                        # Persist the fresh URL back into the job payload so
+                        # future loads skip the API roundtrip.
+                        try:
+                            payload['cover'] = fresh_url
+                            job.raw_payload = json.dumps(payload, ensure_ascii=False)
+                            db.session.commit()
+                        except Exception:
+                            db.session.rollback()
+                        return _send_inline_thumbnail(recached)
+            except Exception:
+                pass
+
+        return _thumbnail_placeholder_response()
 
     @bp.route('/bambu/job/<int:job_id>/map', methods=['POST'])
     def bambu_job_map(job_id):

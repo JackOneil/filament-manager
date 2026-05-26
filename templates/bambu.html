@@ -16,6 +16,11 @@
                     <i class="fa-solid fa-rotate" id="sync-icon"></i>
                     <span id="sync-label">{{ t('bambu_sync') }}</span>
                 </button>
+                <button id="thumb-refetch-btn" onclick="doThumbRefetch()"
+                    class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 transition-colors text-white font-semibold px-5 py-2 rounded-lg shadow text-sm">
+                    <i class="fa-solid fa-image" id="thumb-refetch-icon"></i>
+                    <span id="thumb-refetch-label">{{ t('bambu_refetch_thumbnails') }}</span>
+                </button>
                 {% endif %}
                 <a href="{{ url_for('settings') }}#bambu-cloud"
                    class="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 transition-colors text-gray-700 font-semibold px-4 py-2 rounded-lg text-sm">
@@ -132,6 +137,7 @@
         {% set is_mm = job.materials|length > 1 %}
         {% set single_slot = job.materials[0] if job.materials|length == 1 else none %}
         {% set display_filament = job.filament if job.filament else (single_slot.filament if single_slot and single_slot.filament else none) %}
+        {% set job_meta = bambu_payload_meta.get(job.id) if bambu_payload_meta else none %}
         {% if is_mm %}
             {# If slot materials exist, assignment/deduction state is driven by slots #}
             {% set ns_mm = namespace(unassigned=false, all_deducted=true) %}
@@ -338,6 +344,13 @@
                                     <span class="text-xs text-gray-400 ml-1" x-text="f.mat"></span>
                                 </button>
                             </template>
+                            <button type="button"
+                                x-show="canShowAllFilamentsButton"
+                                x-cloak
+                                @click="showAllChoices()"
+                                class="w-full text-left px-3 py-2 text-xs text-blue-600 hover:bg-blue-50 border-t border-blue-100 font-semibold">
+                                {{ t('bambu_other_filament') }}
+                            </button>
                         </div>
                     </div>
 
@@ -395,29 +408,39 @@
                 </form>
 
                 {# ── Per-slot AMS material breakdown ── #}
-                {% if is_mm %}
+                {% if job.materials %}
                 <div class="mt-4 pt-3 border-t border-gray-200">
                     <p class="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">
                         <i class="fa-solid fa-layer-group mr-1"></i> {{ t('bambu_materials') }}
                     </p>
                     <div class="space-y-2">
                         {% for mat in job.materials %}
+                        {% set slot_meta = slot_meta_by_material.get(mat.id) if slot_meta_by_material else none %}
                         {# Pass initial state to Alpine so it can manage the slot reactively #}
                         {% set init_fid = mat.filament_id if mat.filament_id is not none else 'null' %}
                         {% set init_flabel = mat.filament.name|tojson|forceescape if mat.filament else 'null' %}
+                        {% set slot_material = (slot_meta.material_type if slot_meta else (mat.material_name or ''))|tojson|forceescape %}
+                        {% set slot_color = (slot_meta.color_hex if slot_meta and slot_meta.color_hex else (mat.color_hex or ''))|tojson|forceescape %}
                         <div class="flex flex-col sm:flex-row sm:items-center gap-2 bg-white rounded-lg border border-gray-100 px-3 py-2"
-                             x-data='bambuSlotMap({{ job.id }}, {{ mat.id }}, {{ init_fid }}, {{ init_flabel }}, {{ "true" if mat.deducted else "false" }})'>
+                             x-data='bambuSlotMap({{ job.id }}, {{ mat.id }}, {{ init_fid }}, {{ init_flabel }}, {{ "true" if mat.deducted else "false" }}, {{ slot_material }}, {{ slot_color }})'>
                             <div class="flex items-center gap-2 min-w-[180px]">
-                                {% if mat.color_hex %}
+                                {% if slot_meta and slot_meta.color_hex %}
                                 <span class="w-4 h-4 rounded-full border border-gray-200 flex-shrink-0"
-                                    style="background-color: {{ mat.color_hex }};"></span>
+                                    style="background-color: {{ slot_meta.color_hex }};"></span>
                                 {% endif %}
-                                <span class="text-xs font-semibold text-gray-700">{{ mat.material_name or '?' }}</span>
+                                <span class="text-xs font-semibold text-gray-700">{{ slot_meta.material_type if slot_meta else (mat.material_name or '?') }}</span>
                                 <span class="text-xs text-gray-400">
-                                    AMS {{ mat.ams_id if mat.ams_id is not none else '?' }}/{{ mat.tray_id if mat.tray_id is not none else '?' }}
+                                    AMS {{ slot_meta.ams if slot_meta and slot_meta.ams is not none else (mat.ams_id if mat.ams_id is not none else '?') }}/{{ slot_meta.tray if slot_meta and slot_meta.tray is not none else (mat.tray_id if mat.tray_id is not none else '?') }}
                                 </span>
                                 {% if mat.weight_grams %}
                                 <span class="text-xs text-gray-500">{{ '%.1f'|format(mat.weight_grams) }} g</span>
+                                {% endif %}
+                            </div>
+
+                            <div class="flex items-center gap-2 text-xs text-gray-500">
+                                <span>{{ t('material') }}: {{ slot_meta.material_type if slot_meta else (mat.material_name or '?') }}</span>
+                                {% if slot_meta and slot_meta.color_code %}
+                                <span>{{ t('bambu_color_code') }}: {{ slot_meta.color_code }}</span>
                                 {% endif %}
                             </div>
 
@@ -429,8 +452,8 @@
                                 <i x-show="deducted" class="fa-solid fa-check text-emerald-500"></i>
                             </span>
 
-                            {# Assign + deduct action — hidden when already deducted #}
-                            <div x-show="!deducted" x-cloak class="flex items-center gap-2 ml-auto flex-wrap">
+                            {# Assign + deduct action — only relevant for multimaterial slots #}
+                            <div {% if not is_mm %}class="hidden"{% else %}x-show="!deducted" x-cloak class="flex items-center gap-2 ml-auto flex-wrap"{% endif %}>
                                 <div class="relative" @click.outside="slotOpen = false">
                                     <input type="text"
                                         x-model="slotQ"
@@ -448,6 +471,13 @@
                                                 <span class="text-gray-400 ml-1" x-text="f.mat"></span>
                                             </button>
                                         </template>
+                                        <button type="button"
+                                            x-show="canShowAllSlotFilamentsButton"
+                                            x-cloak
+                                            @click="showAllSlotChoices()"
+                                            class="w-full text-left px-2 py-1.5 text-xs text-blue-600 hover:bg-blue-50 border-t border-blue-100 font-semibold">
+                                            {{ t('bambu_other_filament') }}
+                                        </button>
                                     </div>
                                 </div>
                                 <button type="button" @click="assignSlot()"
@@ -461,6 +491,37 @@
                         </div>
                         {% endfor %}
                     </div>
+                </div>
+                {% endif %}
+
+                {% if job_meta and (job_meta.cover_url or job_meta.nozzle_infos) %}
+                <div class="mt-4 pt-3 border-t border-gray-200 space-y-3">
+                    <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                        <i class="fa-solid fa-circle-info mr-1"></i> {{ t('detail') }}
+                    </p>
+
+                    {% if job_meta.has_thumbnail %}
+                    <div class="bg-white rounded-lg border border-gray-100 p-2 w-fit">
+                        <a href="{{ url_for('bambu_job_thumbnail', job_id=job.id) }}" target="_blank" rel="noopener noreferrer" class="block shrink-0">
+                            <img src="{{ url_for('bambu_job_thumbnail', job_id=job.id) }}" alt="thumbnail" loading="lazy" decoding="async" fetchpriority="low" class="w-20 h-20 rounded-md object-cover border border-gray-200">
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    {% if job_meta.nozzle_infos %}
+                    <div class="bg-white rounded-lg border border-gray-100 px-3 py-2">
+                        <p class="text-xs font-semibold text-gray-700 mb-2">{{ t('bambu_nozzle_infos') }}</p>
+                        <div class="flex flex-wrap gap-2">
+                            {% for nozzle in job_meta.nozzle_infos %}
+                            <span class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">
+                                #{{ nozzle.id if nozzle.id is not none else '?' }}
+                                {% if nozzle.diameter is not none %}· {{ nozzle.diameter }} mm{% endif %}
+                                {% if nozzle.flowSize %}· {{ nozzle.flowSize }}{% endif %}
+                            </span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
                 {% endif %}
             </div>
@@ -589,17 +650,104 @@ document.addEventListener('keydown', function(e) {
     }
 });
 // ── Data: embedded once at page render, safe inside <script> (no HTML attr quotes) ──
-const _BF = {{ filaments|tojson }};   // [{id, label, mat}, ...]
+const _BF = {{ filaments|tojson }};   // [{id, label, mat, material_name, color_hex}, ...]
 const _BP = {{ projects|tojson }};    // [{id, name}, ...]
 const _BAMBU_FILTER = {{ job_filter|tojson }};
+
+function _normHex(hex) {
+    if (!hex) return null;
+    let s = String(hex).trim().replace('#', '');
+    if (s.length === 8) s = s.slice(0, 6);
+    if (!/^[0-9a-fA-F]{6}$/.test(s)) return null;
+    return `#${s.toUpperCase()}`;
+}
+
+function _hexDistance(a, b) {
+    const aa = _normHex(a);
+    const bb = _normHex(b);
+    if (!aa || !bb) return null;
+    const ar = parseInt(aa.slice(1, 3), 16);
+    const ag = parseInt(aa.slice(3, 5), 16);
+    const ab = parseInt(aa.slice(5, 7), 16);
+    const br = parseInt(bb.slice(1, 3), 16);
+    const bg = parseInt(bb.slice(3, 5), 16);
+    const bbv = parseInt(bb.slice(5, 7), 16);
+    const dr = ar - br;
+    const dg = ag - bg;
+    const db = ab - bbv;
+    return Math.sqrt((dr * dr) + (dg * dg) + (db * db));
+}
+
+function _normMaterialName(value) {
+    if (!value) return '';
+    return String(value)
+        .toLowerCase()
+        .replace(/[_\-/]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function _materialFamilyToken(value) {
+    const norm = _normMaterialName(value);
+    if (!norm) return '';
+    const parts = norm.split(' ');
+    return parts[0] || '';
+}
+
+function _materialFamilyMatch(preferred, candidate) {
+    const a = _normMaterialName(preferred);
+    const b = _normMaterialName(candidate);
+    if (!a || !b) return false;
+    if (a === b) return true;
+    if (a.startsWith(`${b} `) || b.startsWith(`${a} `)) return true;
+    return _materialFamilyToken(a) === _materialFamilyToken(b);
+}
+
+function _rankFilaments(base, preferredMaterial, preferredColorHex) {
+    return base.slice().sort((a, b) => {
+        const aMat = (a.material_name || '').toLowerCase();
+        const bMat = (b.material_name || '').toLowerCase();
+        const da = _hexDistance(a.color_hex, preferredColorHex);
+        const db = _hexDistance(b.color_hex, preferredColorHex);
+
+        let sa = 0;
+        let sb = 0;
+        if (_materialFamilyMatch(preferredMaterial, aMat)) sa += 100;
+        if (_materialFamilyMatch(preferredMaterial, bMat)) sb += 100;
+        if (da !== null) sa += Math.max(0, 50 - (da / 4));
+        if (db !== null) sb += Math.max(0, 50 - (db / 4));
+        return sb - sa;
+    });
+}
+
+function _suggestedFilaments(ranked, preferredMaterial, preferredColorHex) {
+    const strong = ranked.filter(f => {
+        const matOk = !preferredMaterial || _materialFamilyMatch(preferredMaterial, f.material_name || '');
+        const d = _hexDistance(f.color_hex, preferredColorHex);
+        const colorOk = d === null ? true : d <= 90;
+        return matOk && colorOk;
+    });
+    if (strong.length > 0) return strong;
+
+    const sameFamily = ranked.filter(
+        f => preferredMaterial && _materialFamilyMatch(preferredMaterial, f.material_name || '')
+    );
+    if (sameFamily.length > 0) return sameFamily;
+
+    return ranked;
+}
 // Per-job initialisation data keyed by job.id
 const _BI = {
 {% if jobs.items %}{% for job in jobs.items %}
+    {% set js_single_slot = job.materials[0] if job.materials|length == 1 else none %}
+    {% set js_slot_meta = slot_meta_by_material.get(js_single_slot.id) if js_single_slot and slot_meta_by_material else none %}
   {{ job.id }}: {
     fId: {{ job.filament_id if job.filament_id is not none else 'null' }},
     fLabel: {{ job.filament.name|tojson if job.filament else 'null' }},
     pId: {{ job.project_id if job.project_id is not none else 'null' }},
     pLabel: {{ job.project.name|tojson if job.project else 'null' }},
+        prefMaterial: {{ (js_slot_meta.material_type if js_slot_meta else (js_single_slot.material_name if js_single_slot else ''))|tojson }},
+        prefColor: {{ (js_slot_meta.color_hex if js_slot_meta and js_slot_meta.color_hex else (js_single_slot.color_hex if js_single_slot else ''))|tojson }},
   },
 {% endfor %}{% endif %}
 };
@@ -612,13 +760,36 @@ function bambuMap(jobId) {
         // Filament search
         filamentQ: init.fLabel || '',
         filamentOpen: false,
+        showAllFilaments: false,
         selectedFilamentId: init.fId || '',
+        preferredMaterial: (init.prefMaterial || '').toLowerCase(),
+        preferredColorHex: _normHex(init.prefColor),
         get filteredFilaments() {
             const q = this.filamentQ.toLowerCase().trim();
-            if (!q) return _BF;
-            return _BF.filter(f =>
-                f.label.toLowerCase().includes(q) || f.mat.toLowerCase().includes(q)
-            );
+            let base = _BF;
+            if (q) {
+                base = _BF.filter(f =>
+                    f.label.toLowerCase().includes(q)
+                    || f.mat.toLowerCase().includes(q)
+                    || (f.material_name || '').toLowerCase().includes(q)
+                    || (f.color_hex || '').toLowerCase().includes(q)
+                );
+            }
+
+            const ranked = _rankFilaments(base, this.preferredMaterial, this.preferredColorHex);
+            if (q || this.showAllFilaments) return ranked;
+            return _suggestedFilaments(ranked, this.preferredMaterial, this.preferredColorHex);
+        },
+        get canShowAllFilamentsButton() {
+            const q = this.filamentQ.toLowerCase().trim();
+            if (q || this.showAllFilaments) return false;
+            const ranked = _rankFilaments(_BF, this.preferredMaterial, this.preferredColorHex);
+            const suggested = _suggestedFilaments(ranked, this.preferredMaterial, this.preferredColorHex);
+            return suggested.length < ranked.length;
+        },
+        showAllChoices() {
+            this.showAllFilaments = true;
+            this.filamentOpen = true;
         },
         selectFilament(id, label) {
             this.selectedFilamentId = id;
@@ -676,20 +847,43 @@ function bambuMap(jobId) {
 }
 
 // ── Alpine component for per-AMS-slot filament search + AJAX assignment ──────
-function bambuSlotMap(jobId, slotId, initFilamentId, initFilamentLabel, initDeducted) {
+function bambuSlotMap(jobId, slotId, initFilamentId, initFilamentLabel, initDeducted, slotMaterial, slotColorHex) {
     return {
         slotQ: initFilamentLabel || '',
         slotOpen: false,
+        showAllSlotFilaments: false,
         slotFilamentId: initFilamentId || '',
         assignedLabel: initFilamentLabel || '',
         deducted: initDeducted,
+        slotMaterial: (slotMaterial || '').toLowerCase(),
+        slotColorHex: _normHex(slotColorHex),
         saving: false,
         get filteredSlotFilaments() {
             const q = this.slotQ.toLowerCase().trim();
-            if (!q) return _BF;
-            return _BF.filter(f =>
-                f.label.toLowerCase().includes(q) || f.mat.toLowerCase().includes(q)
-            );
+            let base = _BF;
+            if (q) {
+                base = _BF.filter(f =>
+                    f.label.toLowerCase().includes(q)
+                    || f.mat.toLowerCase().includes(q)
+                    || (f.material_name || '').toLowerCase().includes(q)
+                    || (f.color_hex || '').toLowerCase().includes(q)
+                );
+            }
+
+            const ranked = _rankFilaments(base, this.slotMaterial, this.slotColorHex);
+            if (q || this.showAllSlotFilaments) return ranked;
+            return _suggestedFilaments(ranked, this.slotMaterial, this.slotColorHex);
+        },
+        get canShowAllSlotFilamentsButton() {
+            const q = this.slotQ.toLowerCase().trim();
+            if (q || this.showAllSlotFilaments) return false;
+            const ranked = _rankFilaments(_BF, this.slotMaterial, this.slotColorHex);
+            const suggested = _suggestedFilaments(ranked, this.slotMaterial, this.slotColorHex);
+            return suggested.length < ranked.length;
+        },
+        showAllSlotChoices() {
+            this.showAllSlotFilaments = true;
+            this.slotOpen = true;
         },
         selectSlot(id, label) {
             this.slotFilamentId = id;
@@ -758,6 +952,49 @@ async function doSync() {
         btn.disabled = false;
         icon.className = 'fa-solid fa-rotate';
         lbl.textContent = '{{ t("bambu_sync") }}';
+    }
+}
+
+// ── Thumbnail refetch for jobs missing local cache ──────────────────────────
+async function doThumbRefetch() {
+    const btn  = document.getElementById('thumb-refetch-btn');
+    const icon = document.getElementById('thumb-refetch-icon');
+    const lbl  = document.getElementById('thumb-refetch-label');
+    const res  = document.getElementById('sync-result');
+
+    btn.disabled = true;
+    icon.className = 'fa-solid fa-spinner fa-spin';
+    lbl.textContent = '{{ t("bambu_refetching_thumbnails") }}';
+    res.classList.add('hidden');
+
+    try {
+        const r = await fetch('{{ url_for("bambu_refetch_thumbnails") }}', { method: 'POST' });
+        const data = await r.json();
+
+        res.classList.remove('hidden');
+        if (data.ok) {
+            res.className = 'rounded-lg px-4 py-3 text-sm font-medium bg-green-50 text-green-700 border border-green-200';
+            res.textContent =
+                '{{ t("bambu_refetch_done") }}: '
+                + data.fetched + ' {{ t("bambu_thumb_fetched") }}, '
+                + data.failed + ' {{ t("bambu_thumb_failed") }}, '
+                + data.already_cached + ' {{ t("bambu_thumb_already_cached") }}, '
+                + data.missing_cover + ' {{ t("bambu_thumb_missing_cover") }}';
+            if (data.fetched > 0) {
+                setTimeout(() => location.reload(), 1200);
+            }
+        } else {
+            res.className = 'rounded-lg px-4 py-3 text-sm font-medium bg-red-50 text-red-600 border border-red-200';
+            res.textContent = '{{ t("bambu_sync_error") }}: ' + (data.error || '?');
+        }
+    } catch (e) {
+        res.classList.remove('hidden');
+        res.className = 'rounded-lg px-4 py-3 text-sm font-medium bg-red-50 text-red-600 border border-red-200';
+        res.textContent = '{{ t("bambu_sync_error") }}: ' + e.message;
+    } finally {
+        btn.disabled = false;
+        icon.className = 'fa-solid fa-image';
+        lbl.textContent = '{{ t("bambu_refetch_thumbnails") }}';
     }
 }
 

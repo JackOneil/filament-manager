@@ -28,8 +28,9 @@ env.bak/
 venv.bak/
 
 # Database
-data/*.db
+data/*.db*
 data/*.sqlite3
+data/bambu_thumbs
 
 # Uploads
 data/uploads/*

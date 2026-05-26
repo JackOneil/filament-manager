@@ -86,9 +86,9 @@ class ResolveStatusTests(unittest.TestCase):
 
 # ─── Integration tests: do_sync ─────────────────────────────────────────────
 
-def _make_task(task_id, status=2, weight=50.0, ams=None):
+def _make_task(task_id, status=2, weight=50.0, ams=None, cover=None):
     """Build a minimal Bambu task dict matching real Bambu Cloud API field names."""
-    return {
+    task = {
         'id': task_id,
         'title': f'Model_{task_id}',
         'designTitle': '',
@@ -103,6 +103,9 @@ def _make_task(task_id, status=2, weight=50.0, ams=None):
         'endTime': '2024-03-10T12:00:00',
         'amsDetailMappings': ams or [],
     }
+    if cover:
+        task['cover'] = cover
+    return task
 
 
 def _api_response(tasks):
@@ -170,6 +173,32 @@ class DoSyncTests(unittest.TestCase):
         job = BambuPrintJob.query.filter_by(external_id='3001').first()
         self.assertEqual(job.status, 'FINISH')
         self.assertEqual(BambuPrintJob.query.count(), 1)
+
+    @patch('routes.bambu._cache_cover_image', return_value='/tmp/thumb.png')
+    @patch('routes.bambu._find_cached_thumb_path', return_value=None)
+    @patch('routes.bambu.requests.get')
+    def test_refreshes_existing_job_payload_and_missing_thumbnail(self, mock_get, mock_find_thumb, mock_cache):
+        task = _make_task(3101, cover='https://example.com/new-cover.png')
+        mock_get.return_value = _api_response([task])
+
+        existing = BambuPrintJob(
+            external_id='3101',
+            status='RUNNING',
+            raw_payload=json.dumps({'id': 3101, 'cover': 'https://example.com/old-cover.png'}),
+        )
+        db.session.add(existing)
+        db.session.commit()
+
+        result = do_sync('token', 'global')
+
+        self.assertEqual(result['updated'], 1)
+        self.assertEqual(result['added'], 0)
+        self.assertEqual(mock_cache.call_count, 1)
+        mock_cache.assert_called_with('3101', 'https://example.com/new-cover.png')
+
+        job = BambuPrintJob.query.filter_by(external_id='3101').first()
+        self.assertIsNotNone(job)
+        self.assertIn('new-cover.png', job.raw_payload)
 
     @patch('routes.bambu.requests.get')
     def test_stores_per_slot_materials(self, mock_get):
@@ -533,7 +562,8 @@ class BambuDeductionRouteTests(unittest.TestCase):
         response = self.client.get('/bambu?filter=unassigned')
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'SingleSlotJob', response.data)
-        self.assertNotIn('Materiálové sloty'.encode('utf-8'), response.data)
+        self.assertIn('Materiálové sloty'.encode('utf-8'), response.data)
+        self.assertIn('Jiný filament'.encode('utf-8'), response.data)
 
         self.client.post(
             f'/bambu/job/{job_id}/map',
@@ -548,7 +578,7 @@ class BambuDeductionRouteTests(unittest.TestCase):
         response = self.client.get('/bambu')
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'SingleSlotJob', response.data)
-        self.assertNotIn('Materiálové sloty'.encode('utf-8'), response.data)
+        self.assertIn('Materiálové sloty'.encode('utf-8'), response.data)
 
     def test_job_map_ajax_returns_updated_unassigned_state(self):
         with self.app.app_context():
@@ -670,6 +700,66 @@ class BambuSyncEndpointTests(unittest.TestCase):
         data = resp.get_json()
         self.assertTrue(data['ok'])
         self.assertEqual(data['added'], 1)
+
+    @patch('routes.bambu._refetch_missing_thumbnails')
+    def test_refetch_thumbnails_returns_stats(self, mock_refetch):
+        mock_refetch.return_value = {
+            'total_jobs': 12,
+            'already_cached': 3,
+            'missing_candidates': 9,
+            'missing_cover': 2,
+            'fetched': 5,
+            'failed': 4,
+        }
+
+        resp = self.client.post('/bambu/refetch-thumbnails')
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertTrue(data['ok'])
+        self.assertEqual(data['fetched'], 5)
+        self.assertEqual(data['failed'], 4)
+
+    @patch('routes.bambu._find_cached_thumb_path')
+    def test_thumbnail_endpoint_serves_inline_image(self, mock_find_cached):
+        thumb_path = os.path.join(self.temp_dir, 'thumb.png')
+        with open(thumb_path, 'wb') as fh:
+            fh.write(
+                b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01'
+                b'\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\x0dIDATx\x9cc\xf8\xff\xff?\x00\x05\xfe\x02\xfeA\r\n\x9f\x00\x00\x00\x00IEND\xaeB`\x82'
+            )
+
+        with self.app.app_context():
+            job = BambuPrintJob(external_id='thumb-job-1', status='FINISH', raw_payload='{}')
+            db.session.add(job)
+            db.session.commit()
+            job_id = job.id
+
+        mock_find_cached.return_value = thumb_path
+        resp = self.client.get(f'/bambu/job/{job_id}/thumbnail')
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.mimetype, 'image/png')
+        self.assertEqual(resp.headers.get('Content-Disposition'), 'inline')
+
+    @patch('routes.bambu._cache_cover_image', return_value=None)
+    @patch('routes.bambu._find_cached_thumb_path', return_value=None)
+    def test_thumbnail_endpoint_never_redirects_to_remote_cover_url(self, _mock_find_cached, _mock_cache):
+        payload = {'cover': 'https://bambu.example/signed-expired-url'}
+        with self.app.app_context():
+            job = BambuPrintJob(
+                external_id='thumb-job-2',
+                status='FINISH',
+                raw_payload=json.dumps(payload),
+            )
+            db.session.add(job)
+            db.session.commit()
+            job_id = job.id
+
+        resp = self.client.get(f'/bambu/job/{job_id}/thumbnail', follow_redirects=False)
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.mimetype, 'image/svg+xml')
+        self.assertEqual(resp.headers.get('Content-Disposition'), 'inline')
 
 
 if __name__ == '__main__':
