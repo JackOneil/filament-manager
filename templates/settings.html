@@ -219,40 +219,41 @@
             </div>
             <ul class="mb-6 text-sm flex-grow overflow-y-auto filter drop-shadow-sm space-y-2 pr-2" style="max-height: 500px;">
                 {% for b in brands %}
-                <li class="py-2 px-3 bg-gray-50 border border-gray-100 rounded flex justify-between group relative">
-                    <form method="POST" class="flex flex-col gap-1 w-full pr-6">
+                <li class="py-2 px-3 bg-gray-50 border border-gray-100 rounded flex items-start gap-2 group">
+                    <form method="POST" class="flex-1 min-w-0">
                         <input type="hidden" name="action" value="edit_brand">
                         <input type="hidden" name="id" value="{{ b.id }}">
                         <div class="flex items-center gap-2">
                             <input type="text" name="name" value="{{ b.name }}" class="bg-transparent border-b border-transparent focus:border-blue-300 outline-none font-medium text-gray-700 w-full text-sm">
-                            <button type="submit" class="hidden group-hover:block text-blue-500 hover:text-blue-700 mx-1 flex-shrink-0" title="{{ t('edit') }}"><i class="fa-solid fa-save"></i></button>
+                            <button type="submit" class="hidden group-hover:block text-blue-500 hover:text-blue-700 flex-shrink-0" title="{{ t('edit') }}"><i class="fa-solid fa-save text-xs"></i></button>
                         </div>
-                        <details class="group/details">
-                            <div class="flex items-center gap-2">
-                                <input type="text" name="shop_url" value="{{ b.shop_url or '' }}"
-                                       placeholder="{{ t('brand_shop_url_placeholder') }}"
-                                       class="bg-transparent border-b border-transparent focus:border-blue-200 outline-none text-gray-400 text-xs w-full min-w-0">
-                                <summary class="list-none cursor-pointer text-gray-300 hover:text-blue-500 transition-colors flex-shrink-0" title="{{ t('brand_shop_url_hint') }}">
-                                    <i class="fa-solid fa-circle-info text-xs"></i>
-                                </summary>
-                            </div>
-                            <div class="hidden group-open/details:block mt-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-[11px] leading-4 text-blue-800">
-                                {{ t('brand_shop_url_hint') }}
-                            </div>
-                        </details>
+                        {% if b.shop_url %}
+                        <div class="text-[10px] text-gray-400 font-mono truncate mt-0.5">{{ b.shop_url }}</div>
+                        {% endif %}
                     </form>
-                    <span class="text-gray-400 text-xs whitespace-nowrap pt-1 ml-1 {% if b.filaments|length == 0 %}group-hover:hidden{% endif %}">{{ b.filaments|length }}</span>
-                    {% if b.filaments|length == 0 %}
-                    <form method="POST" class="absolute right-3 top-2 hidden group-hover:block" onsubmit="return confirm('{{ t('delete_confirm') }}');">
-                        <input type="hidden" name="action" value="delete_brand">
-                        <input type="hidden" name="id" value="{{ b.id }}">
-                        <button type="submit" class="text-red-400 hover:text-red-600" title="{{ t('delete') }}"><i class="fa-solid fa-trash-can"></i></button>
-                    </form>
-                    {% else %}
-                    <div class="absolute right-3 top-2 hidden group-hover:block text-gray-300 cursor-not-allowed" title="{{ t('cant_delete_in_use') }}">
-                        <i class="fa-solid fa-trash-can"></i>
+                    <div class="flex items-center gap-1.5 flex-shrink-0 pt-0.5">
+                        <button type="button"
+                                data-bid="{{ b.id }}"
+                                data-bname="{{ b.name|e }}"
+                                data-burl="{{ (b.shop_url or '')|e }}"
+                                @click="$dispatch('open-brand-shop-modal', {id: $el.dataset.bid, name: $el.dataset.bname, shopUrl: $el.dataset.burl})"
+                                class="{{ 'text-amber-500' if b.shop_url else 'text-gray-300' }} hover:text-amber-500 transition-colors"
+                                title="{{ t('brand_shop_url_btn') }}">
+                            <i class="fa-solid fa-cart-shopping text-xs"></i>
+                        </button>
+                        <span class="text-gray-400 text-xs {% if b.filaments|length == 0 %}group-hover:hidden{% endif %}">{{ b.filaments|length }}</span>
+                        {% if b.filaments|length == 0 %}
+                        <form method="POST" class="hidden group-hover:block" onsubmit="return confirm('{{ t('delete_confirm') }}');">
+                            <input type="hidden" name="action" value="delete_brand">
+                            <input type="hidden" name="id" value="{{ b.id }}">
+                            <button type="submit" class="text-red-400 hover:text-red-600 transition-colors" title="{{ t('delete') }}"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                        </form>
+                        {% else %}
+                        <div class="hidden group-hover:block text-gray-300 cursor-not-allowed" title="{{ t('cant_delete_in_use') }}">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% endif %}
                 </li>
                 {% endfor %}
             </ul>
@@ -388,36 +389,267 @@
     </div>
 
     <!-- Reorder shop URL -->
-    <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <div class="flex items-center gap-2 mb-4 border-b pb-3">
+    <div class="mt-8 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6"
+         x-data="{
+            reorderUrl: '',
+            testQuery: 'PLA filament bílý',
+            get previewUrl() {
+                if (!this.reorderUrl || !this.testQuery.trim()) return '';
+                return this.reorderUrl.replace('{query}', encodeURIComponent(this.testQuery.trim()));
+            },
+            get hasQuery() { return this.testQuery.trim().length > 0; }
+         }"
+         x-init="reorderUrl = $el.dataset.initUrl"
+         data-init-url="{{ (app_settings.reorder_shop_url if app_settings and app_settings.reorder_shop_url else '')|e }}">
+        <div class="flex items-center gap-2 mb-4 border-b border-gray-100 dark:border-slate-700 pb-3">
             <i class="fa-solid fa-cart-shopping text-green-500"></i>
-            <h2 class="text-xl font-bold text-gray-800">{{ t('reorder_shop_settings_title') }}</h2>
+            <h2 class="text-xl font-bold text-gray-800 dark:text-slate-100">{{ t('reorder_shop_settings_title') }}</h2>
         </div>
-        <p class="text-sm text-gray-500 mb-4">{{ t('reorder_shop_settings_desc') }}</p>
-        <form method="POST" class="flex flex-col gap-4 max-w-xl">
+        <p class="text-sm text-gray-500 dark:text-slate-400 mb-5">{{ t('reorder_shop_settings_desc') }}</p>
+        <form method="POST">
             <input type="hidden" name="action" value="reorder_shop_settings">
-            <div>
-                <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('reorder_shop_url_label') }}</label>
-                <input type="text" name="reorder_shop_url"
-                    value="{{ app_settings.reorder_shop_url if app_settings and app_settings.reorder_shop_url else '' }}"
-                    placeholder="https://www.alza.cz/search.htm?exps={query}"
-                    class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none font-mono">
-                <p class="text-xs text-gray-400 mt-1.5">{{ t('reorder_shop_url_hint') }}</p>
-            </div>
-            <div class="flex flex-wrap gap-2 text-xs">
-                <button type="button" onclick="document.querySelector('[name=reorder_shop_url]').value='https://www.alza.cz/search.htm?exps={query}'" class="ui-badge hover:bg-gray-100 cursor-pointer">Alza.cz</button>
-                <button type="button" onclick="document.querySelector('[name=reorder_shop_url]').value='https://allegro.cz/listing?string={query}'" class="ui-badge hover:bg-gray-100 cursor-pointer">Allegro.cz</button>
-                <button type="button" onclick="document.querySelector('[name=reorder_shop_url]').value='https://www.mironet.cz/search/?search={query}'" class="ui-badge hover:bg-gray-100 cursor-pointer">Mironet.cz</button>
-                <button type="button" onclick="document.querySelector('[name=reorder_shop_url]').value='https://www.amazon.de/s?k={query}'" class="ui-badge hover:bg-gray-100 cursor-pointer">Amazon.de</button>
-            </div>
-            <div>
-                <button type="submit" class="bg-green-500 hover:bg-green-600 transition-colors text-white font-semibold py-2 px-5 rounded-lg text-sm shadow">
-                    <i class="fa-solid fa-save"></i> {{ t('save') }}
-                </button>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                <!-- Left: inputs + preview + save -->
+                <div class="space-y-4">
+                    <!-- URL template -->
+                    <div>
+                        <label class="text-xs font-bold text-gray-600 dark:text-slate-300 block mb-1">{{ t('reorder_shop_url_label') }}</label>
+                        <input type="text" name="reorder_shop_url" x-model="reorderUrl"
+                               placeholder="https://www.alza.cz/search.htm?exps={query}"
+                               class="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none font-mono bg-white dark:bg-slate-700 dark:text-slate-100">
+                        <p class="text-xs text-gray-400 dark:text-slate-500 mt-1.5">
+                            <code class="bg-gray-100 dark:bg-slate-700 px-1 rounded">{query}</code>
+                            {{ t('reorder_shop_query_explain') }}
+                        </p>
+                    </div>
+
+                    <!-- Test query -->
+                    <div>
+                        <label class="text-xs font-bold text-gray-600 dark:text-slate-300 block mb-1">{{ t('reorder_shop_test_label') }}</label>
+                        <input type="text" x-model="testQuery"
+                               class="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white dark:bg-slate-700 dark:text-slate-100">
+                    </div>
+
+                    <!-- Live preview -->
+                    <div>
+                        <label class="text-xs font-bold text-gray-600 dark:text-slate-300 block mb-1.5">{{ t('reorder_shop_preview_label') }}</label>
+                        <template x-if="previewUrl && hasQuery">
+                            <div class="flex items-start gap-2">
+                                <span class="flex-1 font-mono text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg px-3 py-2 break-all leading-relaxed" x-text="previewUrl"></span>
+                                <a :href="previewUrl" target="_blank" rel="noopener noreferrer"
+                                   class="shrink-0 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5">
+                                    <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                                    {{ t('reorder_shop_open_preview') }}
+                                </a>
+                            </div>
+                        </template>
+                        <template x-if="!previewUrl || !hasQuery">
+                            <p class="text-xs text-gray-400 dark:text-slate-500 italic">{{ t('reorder_shop_no_query_warn') }}</p>
+                        </template>
+                    </div>
+
+                    <!-- Save -->
+                    <div>
+                        <button type="submit" class="bg-green-500 hover:bg-green-600 transition-colors text-white font-semibold py-2 px-5 rounded-lg text-sm shadow">
+                            <i class="fa-solid fa-save"></i> {{ t('save') }}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right: quick-fill examples -->
+                <div class="bg-gray-50 dark:bg-slate-700/50 rounded-xl p-4 border border-gray-100 dark:border-slate-600 self-start">
+                    <div class="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-3">{{ t('brand_shop_examples') }}</div>
+                    <div class="space-y-1">
+                        <button type="button" @click="reorderUrl = 'https://eu.store.bambulab.com/collections/bambu-lab-3d-printer-filament?q={query}'"
+                                class="w-full text-left text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-2 py-1.5 rounded-lg transition-colors flex items-center gap-2 group">
+                            <i class="fa-solid fa-arrow-right-to-bracket text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                            <span class="font-medium">Bambu Lab (EU)</span>
+                            <span class="font-mono text-gray-400 dark:text-slate-500 text-[10px] ml-auto">?q={query}</span>
+                        </button>
+                        <button type="button" @click="reorderUrl = 'https://www.prusa3d.com/cs/vyhledavani/?q={query}'"
+                                class="w-full text-left text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-2 py-1.5 rounded-lg transition-colors flex items-center gap-2 group">
+                            <i class="fa-solid fa-arrow-right-to-bracket text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                            <span class="font-medium">Prusa (CZ)</span>
+                            <span class="font-mono text-gray-400 dark:text-slate-500 text-[10px] ml-auto">?q={query}</span>
+                        </button>
+                        <button type="button" @click="reorderUrl = 'https://www.alza.cz/search.htm?exps={query}'"
+                                class="w-full text-left text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-2 py-1.5 rounded-lg transition-colors flex items-center gap-2 group">
+                            <i class="fa-solid fa-arrow-right-to-bracket text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                            <span class="font-medium">Alza.cz</span>
+                            <span class="font-mono text-gray-400 dark:text-slate-500 text-[10px] ml-auto">?exps={query}</span>
+                        </button>
+                        <button type="button" @click="reorderUrl = 'https://allegro.cz/vyhledavani?string={query}'"
+                                class="w-full text-left text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-2 py-1.5 rounded-lg transition-colors flex items-center gap-2 group">
+                            <i class="fa-solid fa-arrow-right-to-bracket text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                            <span class="font-medium">Allegro.cz</span>
+                            <span class="font-mono text-gray-400 dark:text-slate-500 text-[10px] ml-auto">?string={query}</span>
+                        </button>
+                        <button type="button" @click="reorderUrl = 'https://www.mironet.cz/ProductList/showSearch?EXPF={query}'"
+                                class="w-full text-left text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-2 py-1.5 rounded-lg transition-colors flex items-center gap-2 group">
+                            <i class="fa-solid fa-arrow-right-to-bracket text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                            <span class="font-medium">Mironet.cz</span>
+                            <span class="font-mono text-gray-400 dark:text-slate-500 text-[10px] ml-auto">?EXPF={query}</span>
+                        </button>
+                        <button type="button" @click="reorderUrl = 'https://www.amazon.de/s?k={query}'"
+                                class="w-full text-left text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-2 py-1.5 rounded-lg transition-colors flex items-center gap-2 group">
+                            <i class="fa-solid fa-arrow-right-to-bracket text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                            <span class="font-medium">Amazon.de</span>
+                            <span class="font-mono text-gray-400 dark:text-slate-500 text-[10px] ml-auto">?k={query}</span>
+                        </button>
+                        <button type="button" @click="reorderUrl = 'https://www.aliexpress.com/wholesale?SearchText={query}'"
+                                class="w-full text-left text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-2 py-1.5 rounded-lg transition-colors flex items-center gap-2 group">
+                            <i class="fa-solid fa-arrow-right-to-bracket text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                            <span class="font-medium">AliExpress</span>
+                            <span class="font-mono text-gray-400 dark:text-slate-500 text-[10px] ml-auto">?SearchText={query}</span>
+                        </button>
+                    </div>
+                </div>
+
             </div>
         </form>
     </div>
     </div> <!-- end tab: dicts -->
+
+    <!-- Brand Shop URL Modal -->
+    <div x-data="{
+            shopModalOpen: false,
+            shopBrandId: null,
+            shopBrandName: '',
+            shopUrl: '',
+            testQuery: 'PLA filament',
+            get previewUrl() {
+                if (!this.shopUrl.trim()) return '';
+                if (this.shopUrl.includes('{query}')) {
+                    return this.shopUrl.replace('{query}', encodeURIComponent(this.testQuery));
+                }
+                return this.shopUrl;
+            },
+            get hasQuery() { return this.shopUrl.includes('{query}'); }
+        }"
+        @open-brand-shop-modal.window="
+            shopModalOpen = true;
+            shopBrandId = $event.detail.id;
+            shopBrandName = $event.detail.name;
+            shopUrl = $event.detail.shopUrl;
+            testQuery = 'PLA filament';
+        "
+        @keydown.escape.window="shopModalOpen = false"
+        x-show="shopModalOpen"
+        x-cloak
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]" @click.stop x-transition>
+
+            <!-- Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-cart-shopping text-amber-500"></i>
+                    <h3 class="font-bold text-gray-800 dark:text-slate-100 text-lg">{{ t('brand_shop_modal_title') }}</h3>
+                    <span class="text-gray-400">—</span>
+                    <span class="font-semibold text-blue-600 dark:text-blue-400" x-text="shopBrandName"></span>
+                </div>
+                <button @click="shopModalOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Body -->
+            <div class="px-6 py-5 space-y-5 overflow-y-auto flex-1">
+
+                <!-- Description -->
+                <div class="bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800 rounded-xl px-4 py-3 text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
+                    {{ t('brand_shop_modal_desc') }}<br>
+                    <span class="font-mono bg-blue-100 dark:bg-blue-800 text-blue-900 dark:text-blue-100 px-1.5 py-0.5 rounded text-xs">{query}</span>
+                    <span class="text-xs">{{ t('brand_shop_query_explain') }}</span>
+                </div>
+
+                <!-- Quick-fill examples -->
+                <div>
+                    <div class="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-2">{{ t('brand_shop_examples') }}</div>
+                    <div class="space-y-1">
+                        <button type="button" @click="shopUrl = 'https://eu.store.bambulab.com/collections/bambu-lab-3d-printer-filament?q={query}'"
+                                class="w-full text-left text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-2 py-1.5 rounded-lg transition-colors flex items-center gap-2 group">
+                            <i class="fa-solid fa-arrow-right-to-bracket text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                            <span class="font-medium">Bambu Lab (EU)</span>
+                            <span class="font-mono text-gray-400 dark:text-slate-500 text-[10px]">eu.store.bambulab.com/…?q={query}</span>
+                        </button>
+                        <button type="button" @click="shopUrl = 'https://www.prusa3d.com/cs/vyhledavani/?q={query}'"
+                                class="w-full text-left text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-2 py-1.5 rounded-lg transition-colors flex items-center gap-2 group">
+                            <i class="fa-solid fa-arrow-right-to-bracket text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                            <span class="font-medium">Prusa (CZ)</span>
+                            <span class="font-mono text-gray-400 dark:text-slate-500 text-[10px]">prusa3d.com/cs/vyhledavani/?q={query}</span>
+                        </button>
+                        <button type="button" @click="shopUrl = 'https://www.alza.cz/search.htm?exps={query}'"
+                                class="w-full text-left text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-2 py-1.5 rounded-lg transition-colors flex items-center gap-2 group">
+                            <i class="fa-solid fa-arrow-right-to-bracket text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                            <span class="font-medium">Alza.cz</span>
+                            <span class="font-mono text-gray-400 dark:text-slate-500 text-[10px]">alza.cz/search.htm?exps={query}</span>
+                        </button>
+                        <button type="button" @click="shopUrl = 'https://www.aliexpress.com/wholesale?SearchText={query}'"
+                                class="w-full text-left text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-2 py-1.5 rounded-lg transition-colors flex items-center gap-2 group">
+                            <i class="fa-solid fa-arrow-right-to-bracket text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                            <span class="font-medium">AliExpress</span>
+                            <span class="font-mono text-gray-400 dark:text-slate-500 text-[10px]">aliexpress.com/wholesale?SearchText={query}</span>
+                        </button>
+                        <button type="button" @click="shopUrl = 'https://www.amazon.com/s?k={query}'"
+                                class="w-full text-left text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-2 py-1.5 rounded-lg transition-colors flex items-center gap-2 group">
+                            <i class="fa-solid fa-arrow-right-to-bracket text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                            <span class="font-medium">Amazon</span>
+                            <span class="font-mono text-gray-400 dark:text-slate-500 text-[10px]">amazon.com/s?k={query}</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- URL input -->
+                <form method="POST" id="brand-shop-url-form">
+                    <input type="hidden" name="action" value="edit_brand">
+                    <input type="hidden" name="id" :value="shopBrandId">
+                    <div>
+                        <label class="text-xs font-bold text-gray-600 dark:text-slate-300 block mb-1">{{ t('brand_shop_url_label') }}</label>
+                        <input type="text" name="shop_url" x-model="shopUrl"
+                               placeholder="{{ t('brand_shop_url_placeholder') }}"
+                               class="w-full border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm font-mono bg-white dark:bg-slate-700 text-gray-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-400 outline-none transition">
+                        <template x-if="shopUrl && !hasQuery">
+                            <div class="mt-1.5 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg px-3 py-2">
+                                <i class="fa-solid fa-triangle-exclamation flex-shrink-0"></i>
+                                {{ t('brand_shop_no_query_warn') }}
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Live preview -->
+                    <template x-if="shopUrl">
+                        <div class="mt-4 space-y-3">
+                            <template x-if="hasQuery">
+                                <div>
+                                    <label class="text-xs font-bold text-gray-600 dark:text-slate-300 block mb-1">{{ t('brand_shop_test_label') }}</label>
+                                    <input type="text" x-model="testQuery"
+                                           class="w-full border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 text-gray-800 dark:text-slate-100 focus:ring-2 focus:ring-blue-400 outline-none transition">
+                                </div>
+                            </template>
+                            <div>
+                                <label class="text-xs font-bold text-gray-600 dark:text-slate-300 block mb-1">{{ t('brand_shop_preview_label') }}</label>
+                                <div class="bg-gray-50 dark:bg-slate-700/50 rounded-lg border border-gray-200 dark:border-slate-600 px-3 py-2 text-xs font-mono text-gray-700 dark:text-slate-300 break-all" x-text="previewUrl"></div>
+                                <a :href="previewUrl" target="_blank" rel="noopener noreferrer"
+                                   class="mt-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1">
+                                    <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                                    {{ t('brand_shop_open_preview') }}
+                                </a>
+                            </div>
+                        </div>
+                    </template>
+                </form>
+            </div>
+
+            <!-- Footer -->
+            <div class="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 rounded-b-2xl flex-shrink-0">
+                <button type="button" @click="shopModalOpen = false" class="ui-badge">{{ t('cancel') }}</button>
+                <button type="submit" form="brand-shop-url-form" class="ui-badge ui-badge-brand">
+                    <i class="fa-solid fa-save"></i> {{ t('save') }}
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- TAB: Integrations (Bambu + PrusaLink configuration) -->
     <div x-show="activeTab === 'integrations'" x-cloak>

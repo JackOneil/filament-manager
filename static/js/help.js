@@ -338,6 +338,20 @@
                     }
                 },
                 {
+                    title: { cs: 'Nákupní odkaz výrobce (ikona košíku)', en: 'Brand shop link (cart icon)' },
+                    text: {
+                        cs: 'U každého výrobce v číselníku je ikona košíku 🛒. Kliknutím na ni otevřete modální okno, kde zadáte šablonu URL pro vyhledávání v e-shopu tohoto výrobce. Použijte {query} jako zástupný symbol — bude nahrazen názvem filamantu. Zadejte testovací dotaz a zobrazte si náhled výsledného odkazu ještě před uložením. K dispozici jsou předvyplněné příklady oblíbených obchodů (Bambu Lab, Prusa, Alza.cz, AliExpress, Amazon).',
+                        en: 'Each brand in the dictionary has a cart icon 🛒. Clicking it opens a modal where you set a URL template for searching this brand\'s shop. Use {query} as a placeholder — it will be replaced with the filament name. Enter a test query to preview the resulting link before saving. Quick-fill examples for popular shops are available (Bambu Lab, Prusa, Alza.cz, AliExpress, Amazon).'
+                    }
+                },
+                {
+                    title: { cs: 'Globální e-shop pro doobjednávání', en: 'Global reorder shop' },
+                    text: {
+                        cs: 'V sekci „E-shop pro doobjednávání" nastavte výchozí URL šablonu pro vyhledávání filamentů. Tato šablona se použije u filamentů, jejichž výrobce nemá vlastní nákupní odkaz. Použijte {query} jako zástupný symbol. Zadejte testovací dotaz a hned uvidíte náhled výsledného odkazu — kliknutím na „Otevřít v obchodě" si jej ověřte v prohlížeči. K dispozici jsou předvyplněné příklady: Bambu Lab (EU), Prusa, Alza.cz, Allegro.cz, Mironet.cz, Amazon.de, AliExpress.',
+                        en: 'In the "Reorder shop" section, set a default URL template for searching filaments. This template is used for filaments whose brand has no dedicated shop link. Use {query} as a placeholder. Enter a test query and see a live preview of the resulting link — click "Open in shop" to verify it in the browser. Quick-fill examples available: Bambu Lab (EU), Prusa, Alza.cz, Allegro.cz, Mironet.cz, Amazon.de, AliExpress.'
+                    }
+                },
+                {
                     title: { cs: 'Export a Import zálohy', en: 'Backup Export and Import' },
                     text: {
                         cs: 'Na záložce Data exportujte celou databázi do JSON souboru (filament, projekty, nastavení, uživatelé, soubory projektů jsou zakódovány v Base64). Import ze zálohy je idempotentní — existující záznamy se přeskočí.',
