@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.86.1] - 2026-05-27
+### Changed
+- **Consolidation of code duplications**: Refactored duplicate time formatting, color hex normalization, and project filament sync helper functions from Bambu and PrusaLink integration blueprints into centralized modules.
+- **Centralized duration formatting**: Extracted the duplicate `_format_duration` function from `routes/bambu.py` and `routes/prusa.py` into a unified `format_duration(seconds) -> str` in `utils.py` and registered it globally in template context.
+- **Unified color hex normalization**: Replaced the duplicate `_normalize_color_hex` in `routes/bambu.py` and renamed the private `_normalize_hex` in `utils.py` to a single public `normalize_hex(value) -> str | None` in `utils.py`.
+- **Integrated project filament consumption helper**: Moved the identical `_sync_project_filament` helper functions from `routes/bambu.py` and `routes/prusa.py` into a clean, reusable method `mark_planned_filament_used(filament_id)` directly on the `Project` model in `models.py`.
+
 ## [1.86.0] - 2026-05-27
 ### Added
 - **Auto-mapping filament to print jobs (Bambu Lab)**: After each Bambu Cloud sync, the system now automatically attempts to map unmapped material slots to inventory filaments by matching material type and colour hex. A single unambiguous match is assigned immediately; multiple candidates are shown as suggestion badges in the Overview Action Centre with an Accept button for one-click confirmation.

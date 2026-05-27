@@ -260,6 +260,16 @@ class Project(db.Model):
             return self.owner.name
         return (self.owner_name or '').strip()
 
+    def mark_planned_filament_used(self, filament_id: int) -> None:
+        """Mark a planned ProjectFilament record as actually used (if it exists)."""
+        pf = ProjectFilament.query.filter_by(
+            project_id=self.id,
+            filament_id=filament_id,
+            is_used=False,
+        ).first()
+        if pf:
+            pf.is_used = True
+
     def __repr__(self):
         return f'<Project {self.id} {self.name!r} status={self.status}>'
 

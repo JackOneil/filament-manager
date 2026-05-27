@@ -897,7 +897,7 @@ def build_action_center(now=None):
     return result
 
 
-def _normalize_hex(value: str | None) -> str | None:
+def normalize_hex(value: str | None) -> str | None:
     """Normalize a color hex value to uppercase #RRGGBB, or None if invalid."""
     if not value:
         return None
@@ -910,6 +910,18 @@ def _normalize_hex(value: str | None) -> str | None:
     if not re.fullmatch(r'[0-9a-fA-F]{6}', s):
         return None
     return f'#{s.upper()}'
+
+
+def format_duration(seconds) -> str:
+    """Format seconds as 'Xh Ym' or 'Ym' string."""
+    if not seconds:
+        return ''
+    total = int(seconds)
+    h, m = divmod(total, 3600)
+    m = m // 60
+    if h:
+        return f'{h}h {m}min'
+    return f'{m}min'
 
 
 def try_auto_map_filament(material_name: str | None, color_hex: str | None):
@@ -928,7 +940,7 @@ def try_auto_map_filament(material_name: str | None, color_hex: str | None):
     if not material_name and not color_hex:
         return None, []
 
-    norm_hex = _normalize_hex(color_hex)
+    norm_hex = normalize_hex(color_hex)
 
     base_q = (
         Filament.query
@@ -987,7 +999,7 @@ def compute_bambu_job_suggestions(job) -> list:
             suggestions.append({
                 'slot_id': mat.id,
                 'material_name': mat.material_name,
-                'color_hex': _normalize_hex(mat.color_hex),
+                'color_hex': normalize_hex(mat.color_hex),
                 'best': best,
                 'candidates': candidates,
             })
@@ -1003,7 +1015,7 @@ def compute_bambu_job_suggestions(job) -> list:
         suggestions.append({
             'slot_id': materials[0].id if materials else None,
             'material_name': material_name,
-            'color_hex': _normalize_hex(color_hex),
+            'color_hex': normalize_hex(color_hex),
             'best': best,
             'candidates': candidates,
         })

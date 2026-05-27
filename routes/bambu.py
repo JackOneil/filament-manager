@@ -21,7 +21,7 @@ from models import (
 )
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import joinedload
-from utils import deduct_filament_stock, decrypt_token, get_settings, log_movement, utc_now, try_auto_map_filament, invalidate_kpi_cache
+from utils import deduct_filament_stock, decrypt_token, get_settings, log_movement, utc_now, try_auto_map_filament, invalidate_kpi_cache, format_duration, normalize_hex
 
 _LOG = logging.getLogger(__name__)
 
@@ -99,18 +99,6 @@ def _resolve_status(raw) -> str:
             return _STATUS_STR_ALIASES[normalised]
         return raw.strip().upper() if raw.strip() else 'UNKNOWN'
     return 'UNKNOWN'
-
-
-def _format_duration(seconds) -> str:
-    """Format seconds as 'Xh Ym' or 'Ym' string."""
-    if not seconds:
-        return ''
-    total = int(seconds)
-    h, m = divmod(total, 3600)
-    m = m // 60
-    if h:
-        return f'{h}h {m}min'
-    return f'{m}min'
 
 
 def _thumb_dir() -> str:
@@ -262,20 +250,6 @@ def _thumbnail_placeholder_response():
     return response
 
 
-def _normalize_color_hex(value):
-    """Normalize color hex values from Cloud payloads to #RRGGBB when possible."""
-    if not value:
-        return None
-    s = str(value).strip().lstrip('#')
-    if len(s) == 8:
-        s = s[:6]
-    if len(s) != 6:
-        return None
-    if not re.fullmatch(r'[0-9a-fA-F]{6}', s):
-        return None
-    return f'#{s.upper()}'
-
-
 def _extract_job_meta(job: BambuPrintJob) -> tuple[dict, dict]:
     """Build UI-friendly metadata from raw_payload and per-slot fallbacks.
 
@@ -322,7 +296,7 @@ def _extract_job_meta(job: BambuPrintJob) -> tuple[dict, dict]:
             or raw.get('colorHex')
             or raw.get('color')
         )
-        color_hex = _normalize_color_hex(mat.color_hex) or _normalize_color_hex(raw_color)
+        color_hex = normalize_hex(mat.color_hex) or normalize_hex(raw_color)
         color_code = color_hex or (str(raw_color) if raw_color else None)
         material_type = (
             mat.material_name
@@ -372,28 +346,6 @@ def _clean_title(title: str) -> str:
         if part and part not in cleaned:
             cleaned.append(part)
     return ' + '.join(cleaned) if cleaned else title
-
-
-def _sync_project_filament(project_id: int, filament_id: int, actual_weight: float) -> None:
-    """Find or create a ProjectFilament record and mark it as actually used.
-
-    If a matching estimate already exists for this project+filament, mark
-    is_used=True and update estimated_weight to the actual consumed weight.
-    If no record exists yet, create one with is_used=True so the project
-    shows the real consumption without requiring a separate "consume" click.
-    Does NOT deduct filament.weight_remaining — that is handled by the caller.
-    """
-    pf = ProjectFilament.query.filter_by(
-        project_id=project_id,
-        filament_id=filament_id,
-        is_used=False,
-    ).first()
-    if pf:
-        # Mark existing planned estimate as actually used — do NOT change estimated_weight
-        pf.is_used = True
-    # If there is no existing estimate we intentionally do NOT create one here.
-    # The Bambu job itself already shows up in project_detail under "Bambu jobs",
-    # so creating a ProjectFilament entry would be a duplicate.
 
 
 def _job_unassigned_filter():
@@ -742,8 +694,8 @@ def _refetch_missing_thumbnails() -> dict:
 def register(app):
     bp = Blueprint('bambu', __name__)
 
-    # Make _format_duration available in all templates from this route module
-    app.jinja_env.globals['format_duration'] = _format_duration
+    # Make format_duration available in all templates from this route module
+    app.jinja_env.globals['format_duration'] = format_duration
 
     @bp.route('/bambu')
     def bambu_jobs():
@@ -972,7 +924,9 @@ def register(app):
                     # actually consumed in the project (find or create the link).
                     effective_project_id = project_id or job.project_id
                     if effective_project_id:
-                        _sync_project_filament(effective_project_id, filament_id, actual_amount)
+                        project_obj = db.session.get(Project, effective_project_id)
+                        if project_obj:
+                            project_obj.mark_planned_filament_used(filament_id)
 
         db.session.commit()
         if is_ajax:
@@ -1030,8 +984,8 @@ def register(app):
                     slot.deducted = True
                     actually_deducted = True
                     # Propagate to the linked project if any
-                    if job.project_id:
-                        _sync_project_filament(job.project_id, filament_id, actual_amount)
+                    if job.project:
+                        job.project.mark_planned_filament_used(filament_id)
 
         db.session.commit()
 

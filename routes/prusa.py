@@ -24,7 +24,7 @@ from models import (
     AppSetting, PrusaPrinter, PrusaPrintJob,
     Filament, Project, PrintHistory, ProjectFilament,
 )
-from utils import deduct_filament_stock, encrypt_token, decrypt_token, log_movement, utc_now
+from utils import deduct_filament_stock, encrypt_token, decrypt_token, log_movement, utc_now, format_duration
 
 _LOG = logging.getLogger(__name__)
 
@@ -46,18 +46,6 @@ def _clean_filename(raw: str) -> str:
     # Collapse multiple spaces
     name = re.sub(r'\s+', ' ', name).strip()
     return name or raw
-
-
-def _format_duration(seconds) -> str:
-    """Format seconds as 'Xh Ym' or 'Ym' string."""
-    if not seconds:
-        return ''
-    total = int(seconds)
-    h, m = divmod(total, 3600)
-    m = m // 60
-    if h:
-        return f'{h}h {m}min'
-    return f'{m}min'
 
 
 def _validate_host(host: str) -> str | None:
@@ -270,7 +258,7 @@ def do_test_connection(printer: PrusaPrinter) -> dict:
 def register(app):
     bp = Blueprint('prusa', __name__)
 
-    app.jinja_env.globals['prusa_format_duration'] = _format_duration
+    app.jinja_env.globals['prusa_format_duration'] = format_duration
 
     # ── Overview page ────────────────────────────────────────────────────
 
@@ -428,7 +416,9 @@ def register(app):
                     job.deducted = True
                     effective_pid = project_id or job.project_id
                     if effective_pid:
-                        _sync_project_filament(effective_pid, filament_id, actual_amount)
+                        project_obj = db.session.get(Project, effective_pid)
+                        if project_obj:
+                            project_obj.mark_planned_filament_used(filament_id)
 
         db.session.commit()
 
@@ -463,16 +453,3 @@ def register(app):
             db.session.commit()
         return redirect(url_for('prusa_jobs'))
     app.register_blueprint(bp)
-
-
-# ─── Project filament sync helper ────────────────────────────────────────────
-
-def _sync_project_filament(project_id: int, filament_id: int, actual_weight: float) -> None:
-    """Mark a planned ProjectFilament record as actually used (if it exists)."""
-    pf = ProjectFilament.query.filter_by(
-        project_id=project_id,
-        filament_id=filament_id,
-        is_used=False,
-    ).first()
-    if pf:
-        pf.is_used = True
