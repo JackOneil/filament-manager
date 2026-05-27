@@ -178,9 +178,15 @@ function appShell() {
         );
     });
 
-    // Patch window.fetch to send the CSRF header on every non-GET request
+    // Patch window.fetch to send the CSRF header on every non-GET same-origin request.
+    // Skip blob: and data: URLs — they are internal browser resources and the CSRF token
+    // is both unnecessary and blocked by CSP connect-src for those schemes.
     var _origFetch = window.fetch;
     window.fetch = function (url, opts) {
+        var urlStr = (typeof url === 'string') ? url : (url && url.url) || '';
+        if (/^(blob:|data:)/i.test(urlStr)) {
+            return _origFetch.call(this, url, opts);
+        }
         opts = opts || {};
         var method = (opts.method || 'GET').toUpperCase();
         if (method !== 'GET' && method !== 'HEAD') {

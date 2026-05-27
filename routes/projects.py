@@ -288,17 +288,33 @@ def _notify_project_comment(project, author):
 
 def _get_project_files_by_category(project):
     images, model_files, other_files = [], [], []
+    # Collect all files per version chain (root = parent_file_id is None)
+    roots = {}      # root_id -> root ProjectFile
+    children = {}   # root_id -> [child ProjectFile, ...]
     for project_file in project.files:
-        # Skip version files (children) — they appear under the parent
-        if project_file.parent_file_id is not None:
-            continue
-        ext = _get_extension(project_file.filename)
-        if ext in IMAGE_EXTENSIONS:
-            images.append(project_file)
-        elif ext in {'3mf', 'stl', 'obj', 'amf', 'step', 'stp', 'gcode', 'gc', 'bgcode'}:
-            model_files.append(project_file)
+        if project_file.parent_file_id is None:
+            roots[project_file.id] = project_file
         else:
-            other_files.append(project_file)
+            children.setdefault(project_file.parent_file_id, []).append(project_file)
+
+    for root_id, root_file in roots.items():
+        chain = [root_file] + children.get(root_id, [])
+        # The latest version (highest version number) is shown as the main file;
+        # all older versions are shown in the collapsible history section.
+        chain.sort(key=lambda f: f.version)
+        latest = chain[-1]
+        older = list(reversed(chain[:-1]))  # descending: newest-among-older first
+        # Attach the older-versions list as a plain Python attribute so the template
+        # can iterate it without mutating the SQLAlchemy relationship.
+        latest._older_versions = older
+
+        ext = _get_extension(latest.filename)
+        if ext in IMAGE_EXTENSIONS:
+            images.append(latest)
+        elif ext in {'3mf', 'stl', 'obj', 'amf', 'step', 'stp', 'gcode', 'gc', 'bgcode'}:
+            model_files.append(latest)
+        else:
+            other_files.append(latest)
     return images, model_files, other_files
 
 

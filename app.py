@@ -238,7 +238,7 @@ def create_app(test_config=None) -> Flask:
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
             "img-src 'self' data: https:; "
             "font-src 'self' https://fonts.gstatic.com; "
-            "connect-src 'self' ws: wss:;"
+            "connect-src 'self' ws: wss: blob:;"
         )
         if request_is_secure(response):
             response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
