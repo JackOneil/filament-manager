@@ -453,7 +453,8 @@
     <!--Scrollablecontent-->
     <main class="flex-1 overflow-x-hidden overflow-y-auto w-full pb-20 md:pb-6 relative pt-4 md:pt-6">
         <!-- Pull to refresh indicator on mobile -->
-        <div id="ptr-wrap" class="h-0 overflow-hidden w-full flex items-center justify-center bg-[var(--ui-surface)] border-b border-[var(--ui-border)] md:hidden">
+        <div id="ptr-wrap" class="h-0 overflow-hidden w-full flex items-center justify-center bg-[var(--ui-surface)] border-b border-[var(--ui-border)] md:hidden"
+             data-pull="{{ t('pull_to_refresh_pull') }}" data-release="{{ t('pull_to_refresh_release') }}" data-loading="{{ t('pull_to_refresh_loading') }}">
             <div class="flex items-center gap-2 py-3 text-sm text-[var(--ui-text-muted)]">
                 <i id="ptr-icon" class="fa-solid fa-arrow-down transition-transform duration-200"></i>
                 <span id="ptr-text">{{ t('pull_to_refresh_pull') }}</span>

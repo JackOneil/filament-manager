@@ -77,6 +77,9 @@
             const ptrWrap = document.getElementById('ptr-wrap');
             const ptrIcon = document.getElementById('ptr-icon');
             const ptrText = document.getElementById('ptr-text');
+            const ptrLabelPull    = ptrWrap ? (ptrWrap.dataset.pull    || 'Pull down to refresh') : 'Pull down to refresh';
+            const ptrLabelRelease = ptrWrap ? (ptrWrap.dataset.release || 'Release to refresh')   : 'Release to refresh';
+            const ptrLabelLoading = ptrWrap ? (ptrWrap.dataset.loading || 'Loading...')            : 'Loading...';
             
             if (mainEl && ptrWrap && ptrIcon && ptrText) {
                 let startY = 0;
@@ -106,10 +109,10 @@
 
                         if (pullHeight >= 50) {
                             ptrIcon.style.transform = 'rotate(180deg)';
-                            ptrText.innerText = "{{ t('pull_to_refresh_release') }}";
+                            ptrText.innerText = ptrLabelRelease;
                         } else {
                             ptrIcon.style.transform = 'rotate(0deg)';
-                            ptrText.innerText = "{{ t('pull_to_refresh_pull') }}";
+                            ptrText.innerText = ptrLabelPull;
                         }
                     }
                 }, { passive: false });
@@ -124,7 +127,7 @@
                         ptrWrap.style.height = '50px';
                         ptrIcon.className = 'fa-solid fa-spinner fa-spin';
                         ptrIcon.style.transform = 'none';
-                        ptrText.innerText = "{{ t('pull_to_refresh_loading') }}";
+                        ptrText.innerText = ptrLabelLoading;
                         window.location.reload();
                     } else {
                         // Cancel
