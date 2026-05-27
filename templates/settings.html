@@ -10,7 +10,7 @@
     </div>
 
     <!-- Tab navigation -->
-    <div class="flex flex-wrap gap-1 border-b border-gray-200 dark:border-slate-700 pb-0 -mb-px">
+    <div id="settings-tabs" class="flex flex-wrap gap-1 border-b border-gray-200 dark:border-slate-700 pb-0 -mb-px">
         {% for tab_id, tab_key, tab_icon in [
             ('general', 'settings_tab_general', 'fa-sliders'),
             ('printers', 'settings_tab_printers', 'fa-plug-circle-bolt'),
@@ -19,7 +19,7 @@
             ('data', 'settings_tab_data', 'fa-database'),
             ('dicts', 'settings_tab_dicts', 'fa-list'),
         ] %}
-        <button type="button" @click="activeTab = '{{ tab_id }}'"
+        <button type="button" data-tab-id="{{ tab_id }}" @click="activeTab = '{{ tab_id }}'"
                 :class="activeTab === '{{ tab_id }}' ? 'border-b-2 border-[var(--ui-brand)] text-[var(--ui-brand-strong)] bg-[var(--ui-brand-soft)]' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200'"
                 class="px-4 py-2.5 text-sm font-semibold rounded-t-lg transition-colors flex items-center gap-2 whitespace-nowrap">
             <i class="fa-solid {{ tab_icon }}"></i>
@@ -389,7 +389,7 @@
     </div>
 
     <!-- Reorder shop URL -->
-    <div class="mt-8 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6"
+    <div id="reorder-shop-section" class="mt-8 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6"
          x-data="{
             reorderUrl: '',
             testQuery: 'PLA filament bílý',

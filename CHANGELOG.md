@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.87.0] - 2026-06-17
+### Added
+- **Interactive page tour system** (`static/js/tour.js`): `TourEngine` class with SVG spotlight overlay, per-step element highlighting with indigo glow ring, tooltip with Prev/Next/Finish/Close controls, progress dots, and smooth scroll-to-element. Tours are defined for all 11 sections: `overview`, `filaments`, `projects`, `calculator`, `stats`, `storage`, `settings`, `bambu`, `prusa`, `waste`, `maintenance`.
+- **Help panel integration**: "Spustit průvodce" / "Start guided tour" button added to the help panel — appears both in the current-page block and inside each section accordion body when `hasTour: true`. Clicking the button closes the help panel and launches the tour with a 220 ms delay for a smooth transition.
+- **Translation key** `tour_start_btn` added to both `cs` and `en` dictionaries in `messages.py`.
+- **Element IDs** added to key UI elements used as tour step targets: `#btn-add-filament`, `#inventory-view-toggle` (inventory page), `#btn-create-project` (projects page), `#settings-tabs` and `#reorder-shop-section` (settings page).
+
 ## [1.86.1] - 2026-05-27
 ### Changed
 - **Consolidation of code duplications**: Refactored duplicate time formatting, color hex normalization, and project filament sync helper functions from Bambu and PrusaLink integration blueprints into centralized modules.

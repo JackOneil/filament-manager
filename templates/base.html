@@ -359,6 +359,7 @@
             </div>
         </header>
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/tour.js') }}"></script>
     <script src="{{ url_for('static', filename='js/help.js') }}"></script>
     <script>
         window.__helpLang = {{ current_lang | tojson }};
@@ -657,6 +658,16 @@
                                 {{ t('help_this_page') }}
                             </span>
                         </div>
+                        {# Tour button for current page #}
+                        <template x-if="currentSection.length > 0 && currentSection[0].hasTour">
+                            <div class="mb-2">
+                                <button @click="startTour(currentSection[0].id)"
+                                        class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[var(--ui-brand)] hover:opacity-90 text-white text-xs font-semibold transition-opacity">
+                                    <i class="fa-solid fa-route text-[11px]"></i>
+                                    <span>{{ t('tour_start_btn') }}</span>
+                                </button>
+                            </div>
+                        </template>
                         <template x-for="(tip, i) in currentTips" :key="i">
                             <div class="mb-1.5 rounded-xl border border-[var(--ui-brand-ring)] bg-[var(--ui-brand-soft)] overflow-hidden">
                                 <div class="px-4 py-3">
@@ -689,6 +700,16 @@
                             </button>
                             {# Accordion body #}
                             <div x-show="isOpen(section)" x-cloak class="border-t border-[var(--ui-border)]">
+                                {# Tour button inside accordion section #}
+                                <template x-if="section.hasTour">
+                                    <div class="px-4 pt-3 pb-1">
+                                        <button @click="startTour(section.id)"
+                                                class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[var(--ui-brand-soft)] hover:bg-[var(--ui-brand)] border border-[var(--ui-brand-ring)] text-[var(--ui-brand)] hover:text-white text-xs font-semibold transition-colors">
+                                            <i class="fa-solid fa-route text-[11px]"></i>
+                                            <span>{{ t('tour_start_btn') }}</span>
+                                        </button>
+                                    </div>
+                                </template>
                                 <template x-for="(tip, i) in section.tips" :key="i">
                                     <div class="px-4 py-3" :class="i > 0 ? 'border-t border-[var(--ui-border)]' : ''">
                                         <p class="font-semibold text-sm text-[var(--ui-text)] mb-1" x-text="tr(tip.title)"></p>

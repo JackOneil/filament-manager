@@ -11,6 +11,7 @@
         {
             id: 'overview',
             icon: 'fa-house',
+            hasTour: true,
             endpoints: ['overview', 'overview_user'],
             title: { cs: 'Přehled', en: 'Overview' },
             tips: [
@@ -47,6 +48,7 @@
         {
             id: 'filaments',
             icon: 'fa-boxes-stacked',
+            hasTour: true,
             endpoints: ['filaments_index', 'index_user', 'filament_detail', 'add_filament', 'edit_filament', 'use_filament', 'filament_import_csv'],
             title: { cs: 'Inventář filamentů', en: 'Filament Inventory' },
             tips: [
@@ -104,6 +106,7 @@
         {
             id: 'calculator',
             icon: 'fa-calculator',
+            hasTour: true,
             endpoints: ['calculator', 'calculator_history_delete'],
             title: { cs: 'Kalkulačka', en: 'Calculator' },
             tips: [
@@ -133,6 +136,7 @@
         {
             id: 'projects',
             icon: 'fa-folder-open',
+            hasTour: true,
             endpoints: ['projects_index', 'project_create', 'project_detail', 'project_edit', 'project_add_file', 'project_delete_file', 'project_add_link', 'project_delete_link', 'project_add_comment', 'project_add_filament', 'project_remove_filament', 'project_add_quote', 'project_change_status', 'project_add_todo', 'project_toggle_todo', 'project_delete_todo'],
             title: { cs: 'Projekty', en: 'Projects' },
             tips: [
@@ -197,6 +201,7 @@
         {
             id: 'storage',
             icon: 'fa-warehouse',
+            hasTour: true,
             endpoints: ['storage_index', 'storage_add_shelf', 'storage_edit_shelf', 'storage_delete_shelf', 'storage_add_slot', 'storage_remove_slot'],
             title: { cs: 'Úložiště', en: 'Storage' },
             tips: [
@@ -226,6 +231,7 @@
         {
             id: 'stats',
             icon: 'fa-chart-line',
+            hasTour: true,
             endpoints: ['stats_index'],
             title: { cs: 'Statistiky', en: 'Statistics' },
             tips: [
@@ -262,6 +268,7 @@
         {
             id: 'bambu',
             icon: 'fa-plug-circle-bolt',
+            hasTour: true,
             endpoints: ['bambu_index', 'bambu_sync', 'bambu_job_detail', 'bambu_job_delete', 'bambu_create_project', 'bambu_job_map', 'bambu_job_deduct_slot'],
             title: { cs: 'Bambu Lab', en: 'Bambu Lab' },
             tips: [
@@ -305,6 +312,7 @@
         {
             id: 'prusa',
             icon: 'fa-plug',
+            hasTour: true,
             endpoints: ['prusa_index', 'prusa_printer_detail', 'prusa_job_detail'],
             title: { cs: 'PrusaLink', en: 'PrusaLink' },
             tips: [
@@ -327,6 +335,7 @@
         {
             id: 'settings',
             icon: 'fa-sliders',
+            hasTour: true,
             endpoints: ['settings', 'toggle_theme', 'export_data', 'import_data'],
             title: { cs: 'Nastavení', en: 'Settings' },
             tips: [
@@ -391,6 +400,7 @@
         {
             id: 'maintenance',
             icon: 'fa-wrench',
+            hasTour: true,
             endpoints: ['maintenance_index', 'maintenance_add', 'maintenance_complete', 'maintenance_delete'],
             title: { cs: 'Údržba', en: 'Maintenance' },
             tips: [
@@ -413,6 +423,7 @@
         {
             id: 'waste',
             icon: 'fa-triangle-exclamation',
+            hasTour: true,
             endpoints: ['waste_index', 'waste_add', 'waste_edit', 'waste_delete', 'waste_upload_file', 'waste_serve_file', 'waste_download_file', 'waste_delete_file'],
             title: { cs: 'Zmetky a odpady', en: 'Waste & Scrap' },
             tips: [
@@ -592,7 +603,15 @@
             },
 
             /** Handle Escape key */
-            onKeydown(e) { if (e.key === 'Escape') this.close(); }
+            onKeydown(e) { if (e.key === 'Escape') this.close(); },
+
+            /** Close panel then start page tour */
+            startTour(sectionId) {
+                this.close();
+                setTimeout(function () {
+                    if (window.startPageTour) window.startPageTour(sectionId);
+                }, 220);
+            }
         };
     };
 })();
