@@ -167,6 +167,7 @@ def register(app):
                         request.form.get('bambu_auto_sync_interval_minutes', setting.bambu_auto_sync_interval_minutes or 60, type=int),
                         5,
                     )
+                    setting.auto_filament_mapping_enabled = request.form.get('auto_filament_mapping_enabled') == 'on'
                     app.logger.debug('Bambu Cloud settings updated.')
 
                 elif action == 'bambu_cloud_disconnect':

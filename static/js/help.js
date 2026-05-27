@@ -262,7 +262,7 @@
         {
             id: 'bambu',
             icon: 'fa-plug-circle-bolt',
-            endpoints: ['bambu_index', 'bambu_sync', 'bambu_job_detail', 'bambu_job_delete', 'bambu_create_project'],
+            endpoints: ['bambu_index', 'bambu_sync', 'bambu_job_detail', 'bambu_job_delete', 'bambu_create_project', 'bambu_job_map', 'bambu_job_deduct_slot'],
             title: { cs: 'Bambu Lab', en: 'Bambu Lab' },
             tips: [
                 {
@@ -270,6 +270,13 @@
                     text: {
                         cs: 'Tiskové úlohy se stahují automaticky na pozadí každých 60 sekund (interval lze změnit v Nastavení → Integrace). Ruční synchronizaci spustíte tlačítkem „Synchronizovat".',
                         en: 'Print jobs are fetched automatically in the background every 60 seconds (interval can be changed in Settings → Integrations). Trigger a manual sync with the "Synchronise" button.'
+                    }
+                },
+                {
+                    title: { cs: 'Automatické mapování filamentu', en: 'Auto-mapping Filament' },
+                    text: {
+                        cs: 'Po každé synchronizaci systém porovná barvu a materiál úlohy se zásobou v inventáři. Pokud najde přesně jednu shodu, přiřadí filament automaticky. U nejednoznačných shod zobrazí návrhy v Akčním centru přehledu s tlačítkem Přijmout. Funkci lze zapnout nebo vypnout v Nastavení → Integrace.',
+                        en: 'After each sync, the system matches the job\'s colour and material against inventory. If exactly one match is found, the filament is assigned automatically. For ambiguous matches, suggestions appear in the Overview Action Centre with an Accept button. The feature can be toggled in Settings → Integrations.'
                     }
                 },
                 {

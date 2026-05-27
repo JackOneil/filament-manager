@@ -478,6 +478,13 @@
                             <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('bambu_auto_sync_interval') }}</label>
                             <input type="number" name="bambu_auto_sync_interval_minutes" min="5" step="5" value="{{ app_settings.bambu_auto_sync_interval_minutes if app_settings else 60 }}" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                         </div>
+                        <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 md:col-span-2">
+                            <div>
+                                <label class="text-sm font-medium text-gray-700">{{ t('automap_setting_label') }}</label>
+                                <p class="text-xs text-gray-400 mt-0.5">{{ t('automap_setting_desc') }}</p>
+                            </div>
+                            <input type="checkbox" name="auto_filament_mapping_enabled" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" {% if app_settings and app_settings.auto_filament_mapping_enabled %}checked{% endif %}>
+                        </div>
                     </div>
                     {% if app_settings and app_settings.bambu_last_sync_at %}
                     <div class="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">

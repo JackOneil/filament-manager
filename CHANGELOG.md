@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.86.0] - 2026-05-27
+### Added
+- **Auto-mapping filament to print jobs (Bambu Lab)**: After each Bambu Cloud sync, the system now automatically attempts to map unmapped material slots to inventory filaments by matching material type and colour hex. A single unambiguous match is assigned immediately; multiple candidates are shown as suggestion badges in the Overview Action Centre with an Accept button for one-click confirmation.
+- **Auto-mapping toggle in Settings → Integrations**: New checkbox `auto_filament_mapping_enabled` (default on) controls whether auto-mapping runs after sync. The setting is preserved in backup export/import.
+- **Action Centre mapping suggestions**: The Overview dashboard now shows colour swatches, suggested filament names, and Accept/Choose buttons next to unmapped Bambu jobs that have mapping candidates in inventory.
+
 ## [1.85.16] - 2026-05-26
 ### Changed
 - **Help system — Bambu project creation tip**: Added a contextual tip to the Bambu Lab help section describing the one-click project creation from print jobs (fuzzy-match suggestions + inline "Create new project" button). Endpoint `bambu_create_project` added to the Bambu section's `endpoints[]` array so the tip shows on that page.

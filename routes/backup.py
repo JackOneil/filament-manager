@@ -179,6 +179,7 @@ def register(app):
                 'app_timezone': setting.app_timezone if setting and setting.app_timezone else 'Europe/Prague',
                 'onboarding_dismissed': setting.onboarding_dismissed if setting else False,
                 'audit_logging_enabled': getattr(setting, 'audit_logging_enabled', True) if setting else True,
+                'auto_filament_mapping_enabled': getattr(setting, 'auto_filament_mapping_enabled', True) if setting else True,
                 # bambu_token intentionally excluded for security
             } if setting else {},
 
@@ -583,6 +584,8 @@ def register(app):
                         setting.onboarding_dismissed = s.get('onboarding_dismissed', setting.onboarding_dismissed)
                         if 'audit_logging_enabled' in s:
                             setting.audit_logging_enabled = s['audit_logging_enabled']
+                        if 'auto_filament_mapping_enabled' in s:
+                            setting.auto_filament_mapping_enabled = s['auto_filament_mapping_enabled']
 
                 # ── 2b. Users, invites, notifications ────────────────
                 for user_data in data.get('users', []):

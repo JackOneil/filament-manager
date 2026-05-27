@@ -473,10 +473,43 @@
                         </div>
                         <div class="space-y-2">
                             {% for job in action_center.unmapped_bambu %}
-                            <a href="{{ url_for('bambu_jobs') }}" class="block rounded-xl border border-blue-100 dark:border-blue-900/40 bg-white/70 dark:bg-slate-800/60 px-3 py-2 hover:border-blue-300 dark:hover:border-blue-700 transition">
-                                <div class="font-semibold text-gray-800 dark:text-slate-100">{{ job.model_name or job.external_id }}</div>
-                                <div class="text-xs text-gray-500 dark:text-slate-400">Bambu · {{ t('overview_without_filament') }}</div>
-                            </a>
+                            {% set suggestions = action_center.bambu_suggestions.get(job.id, []) %}
+                            <div class="rounded-xl border border-blue-100 dark:border-blue-900/40 bg-white/70 dark:bg-slate-800/60 px-3 py-2">
+                                <a href="{{ url_for('bambu_jobs') }}" class="block hover:text-blue-600 transition">
+                                    <div class="font-semibold text-gray-800 dark:text-slate-100">{{ job.model_name or job.external_id }}</div>
+                                    <div class="text-xs text-gray-500 dark:text-slate-400">Bambu · {{ t('overview_without_filament') }}</div>
+                                </a>
+                                {% for sg in suggestions %}
+                                {% if sg.best %}
+                                <div class="mt-1 flex items-center gap-2 flex-wrap">
+                                    {% if sg.color_hex %}
+                                    <span class="inline-block w-3 h-3 rounded-full border border-gray-300 flex-shrink-0" style="background:{{ sg.color_hex }}"></span>
+                                    {% endif %}
+                                    <span class="text-xs text-gray-600 dark:text-slate-300">{{ t('automap_suggestion') }}: <strong>{{ sg.best.name }}</strong></span>
+                                    <button
+                                        type="button"
+                                        class="text-xs bg-green-100 hover:bg-green-200 dark:bg-green-900/40 dark:hover:bg-green-800/60 text-green-800 dark:text-green-300 px-2 py-0.5 rounded-full font-medium transition automap-confirm-btn"
+                                        data-job-id="{{ job.id }}"
+                                        data-filament-id="{{ sg.best.id }}"
+                                        data-slot-id="{{ sg.slot_id or '' }}"
+                                        data-is-mm="{{ 'true' if sg.slot_id else 'false' }}"
+                                        title="{{ t('automap_confirm_tooltip') }}">
+                                        <i class="fa-solid fa-check mr-0.5"></i>{{ t('automap_confirm') }}
+                                    </button>
+                                </div>
+                                {% elif sg.candidates %}
+                                <div class="mt-1 flex items-center gap-2 flex-wrap">
+                                    {% if sg.color_hex %}
+                                    <span class="inline-block w-3 h-3 rounded-full border border-gray-300 flex-shrink-0" style="background:{{ sg.color_hex }}"></span>
+                                    {% endif %}
+                                    <span class="text-xs text-amber-600 dark:text-amber-400">
+                                        <i class="fa-solid fa-triangle-exclamation mr-0.5"></i>{{ t('automap_ambiguous') }} ({{ sg.candidates|length }})
+                                    </span>
+                                    <a href="{{ url_for('bambu_jobs') }}" class="text-xs text-blue-600 hover:underline">{{ t('automap_resolve') }}</a>
+                                </div>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
                             {% endfor %}
                             {% for job in action_center.unmapped_prusa %}
                             <a href="{{ url_for('prusa_jobs') }}" class="block rounded-xl border border-blue-100 dark:border-blue-900/40 bg-white/70 dark:bg-slate-800/60 px-3 py-2 hover:border-blue-300 dark:hover:border-blue-700 transition">
@@ -728,5 +761,56 @@ function toggleOverviewEditMode() { overviewLayout.toggleEditMode(); }
 function moveOverviewWidgetUp(widgetId) { overviewLayout.moveUp(widgetId); }
 function moveOverviewWidgetDown(widgetId) { overviewLayout.moveDown(widgetId); }
 function resetOverviewLayout() { overviewLayout.reset(); }
+
+// Auto-mapping suggestion confirm buttons
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.automap-confirm-btn');
+    if (!btn) return;
+    e.preventDefault();
+    const jobId = btn.dataset.jobId;
+    const filamentId = btn.dataset.filamentId;
+    const slotId = btn.dataset.slotId;
+    const isMm = btn.dataset.isMm === 'true';
+    if (!jobId || !filamentId) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-0.5"></i>';
+
+    const csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+    let url, body;
+
+    if (isMm && slotId) {
+        url = `/bambu/job/${jobId}/deduct-slot?ajax=1`;
+        body = new URLSearchParams({ slot_id: slotId, filament_id: filamentId });
+    } else {
+        url = `/bambu/job/${jobId}/map?ajax=1`;
+        body = new URLSearchParams({ filament_id: filamentId });
+    }
+
+    fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': csrfToken },
+        body: body.toString(),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            const card = btn.closest('.rounded-xl');
+            if (card) {
+                const badge = document.createElement('span');
+                badge.className = 'text-xs text-green-600 dark:text-green-400 font-medium';
+                badge.innerHTML = '<i class="fa-solid fa-check mr-0.5"></i>{{ t("automap_confirmed") }}';
+                btn.parentNode.replaceChild(badge, btn);
+            }
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-check mr-0.5"></i>{{ t("automap_confirm") }}';
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-check mr-0.5"></i>{{ t("automap_confirm") }}';
+    });
+});
 </script>
 {% endblock %}

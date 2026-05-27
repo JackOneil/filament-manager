@@ -21,7 +21,7 @@ from models import (
 )
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import joinedload
-from utils import deduct_filament_stock, decrypt_token, get_settings, log_movement, utc_now
+from utils import deduct_filament_stock, decrypt_token, get_settings, log_movement, utc_now, try_auto_map_filament, invalidate_kpi_cache
 
 _LOG = logging.getLogger(__name__)
 
@@ -472,10 +472,10 @@ def do_sync(token: str, region: str) -> dict:
     Only the official *.bambulab.com / *.bambulab.cn domain is ever called.
     """
     added = updated = skipped = 0
+    new_job_ids: list = []  # IDs of newly inserted jobs (for auto-mapping)
 
     base = _api_base(region)
     url = f'{base}/v1/user-service/my/tasks'
-
     try:
         resp = requests.get(
             url,
@@ -596,6 +596,7 @@ def do_sync(token: str, region: str) -> dict:
         )
         db.session.add(job)
         db.session.flush()  # populate job.id
+        new_job_ids.append(job.id)
 
         for m in ams_list:
             slot_w = float(m.get('weight') or 0)
@@ -636,7 +637,64 @@ def do_sync(token: str, region: str) -> dict:
         _LOG.error('Bambu sync commit error: %s', exc)
         return {'added': 0, 'updated': 0, 'skipped': skipped, 'error': str(exc)}
 
+    # ── Auto-mapping (runs after commit so job IDs are stable) ───────────────
+    setting = get_settings()
+    if setting and getattr(setting, 'auto_filament_mapping_enabled', True) and new_job_ids:
+        auto_mapped = _auto_map_new_jobs(new_job_ids)
+        if auto_mapped:
+            _LOG.info('Auto-mapped %d filament slot(s) across %d new Bambu job(s)', auto_mapped, len(new_job_ids))
+
     return {'added': added, 'updated': updated, 'skipped': skipped, 'error': None}
+
+
+def _auto_map_new_jobs(job_ids: list) -> int:
+    """Run auto-mapping on the given job IDs.
+
+    For each unmapped material slot on those jobs, calls ``try_auto_map_filament``
+    and assigns the filament when there is exactly one candidate.
+
+    Returns the number of slots that were automatically mapped.
+    """
+    if not job_ids:
+        return 0
+
+    mapped_count = 0
+    jobs = BambuPrintJob.query.filter(BambuPrintJob.id.in_(job_ids)).all()
+
+    for job in jobs:
+        materials = list(job.materials)
+        is_mm = len(materials) > 1
+
+        if is_mm:
+            for mat in materials:
+                if mat.filament_id is not None:
+                    continue
+                best, _ = try_auto_map_filament(mat.material_name, mat.color_hex)
+                if best:
+                    mat.filament_id = best.id
+                    mapped_count += 1
+        else:
+            if job.filament_id is not None:
+                continue
+            color_hex = materials[0].color_hex if materials else None
+            material_name = materials[0].material_name if materials else None
+            best, _ = try_auto_map_filament(material_name, color_hex)
+            if best:
+                job.filament_id = best.id
+                if materials:
+                    materials[0].filament_id = best.id
+                mapped_count += 1
+
+    if mapped_count:
+        try:
+            db.session.commit()
+            invalidate_kpi_cache()
+        except Exception as exc:
+            db.session.rollback()
+            _LOG.error('Auto-mapping commit error: %s', exc)
+            return 0
+
+    return mapped_count
 
 
 def _refetch_missing_thumbnails() -> dict:

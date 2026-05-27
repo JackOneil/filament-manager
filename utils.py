@@ -18,6 +18,7 @@ from database import db
 from models import (
     AppSetting, BambuJobMaterial, BambuPrintJob, MovementHistory,
     Project, PrusaPrintJob, PrusaPrinter, FilamentUndoLog, ProjectFilament,
+    Filament, Material, Color,
 )
 
 # ---------------------------------------------------------------------------
@@ -880,10 +881,133 @@ def build_action_center(now=None):
             'unmapped_jobs': len(unmapped_bambu) + len(unmapped_prusa),
             'printer_issues': len(printer_issues),
         },
+        # Per-job auto-mapping suggestions (populated when settings allow)
+        'bambu_suggestions': {},
     }
+
+    # Compute mapping suggestions for unmapped Bambu jobs (shown in Action Center)
+    setting_for_suggestions = setting or AppSetting.query.first()
+    for job in unmapped_bambu:
+        suggestions = compute_bambu_job_suggestions(job)
+        if any(s['candidates'] for s in suggestions):
+            result['bambu_suggestions'][job.id] = suggestions
+
     if _use_cache:
         _action_center_cache.set(result)
     return result
+
+
+def _normalize_hex(value: str | None) -> str | None:
+    """Normalize a color hex value to uppercase #RRGGBB, or None if invalid."""
+    if not value:
+        return None
+    s = str(value).strip().lstrip('#')
+    # Strip alpha channel (RRGGBBAA → RRGGBB)
+    if len(s) == 8:
+        s = s[:6]
+    if len(s) != 6:
+        return None
+    if not re.fullmatch(r'[0-9a-fA-F]{6}', s):
+        return None
+    return f'#{s.upper()}'
+
+
+def try_auto_map_filament(material_name: str | None, color_hex: str | None):
+    """Try to find a filament match for the given material type and color.
+
+    Returns a tuple ``(best_match, candidates)`` where:
+    - ``best_match`` is a single :class:`Filament` when there is exactly one
+      candidate matching both material **and** color, or the single result of a
+      material-only search.  ``None`` when there are zero or multiple matches.
+    - ``candidates`` is the full list of :class:`Filament` objects that matched
+      (may be empty, one, or many).
+
+    Only in-stock filaments (quantity > 0 or weight_remaining > 0) are
+    considered so depleted reels don't pollute the results.
+    """
+    if not material_name and not color_hex:
+        return None, []
+
+    norm_hex = _normalize_hex(color_hex)
+
+    base_q = (
+        Filament.query
+        .join(Filament.material)
+        .join(Filament.color)
+        .filter(db.or_(Filament.quantity > 0, Filament.weight_remaining > 0))
+    )
+
+    if material_name:
+        norm_mat = material_name.strip().upper()
+        base_q = base_q.filter(db.func.upper(Material.name) == norm_mat)
+
+    # ── Strict match: material + color ───────────────────────────────────────
+    if norm_hex:
+        strict_results = base_q.filter(
+            db.func.upper(Color.hex_value) == norm_hex
+        ).all()
+        if len(strict_results) == 1:
+            return strict_results[0], strict_results
+        if len(strict_results) > 1:
+            return None, strict_results
+
+    # ── Fallback: material-only match ─────────────────────────────────────────
+    if material_name:
+        fallback_results = base_q.all()
+        if len(fallback_results) == 1:
+            return fallback_results[0], fallback_results
+        if len(fallback_results) > 1:
+            return None, fallback_results
+
+    return None, []
+
+
+def compute_bambu_job_suggestions(job) -> list:
+    """Return auto-mapping suggestions for an unmapped BambuPrintJob.
+
+    Each entry in the returned list describes one material slot::
+
+        {
+            'slot_id': int | None,   # BambuJobMaterial.id (None for single-slot jobs)
+            'material_name': str | None,
+            'color_hex': str | None,
+            'best': Filament | None,  # only set when 1 candidate
+            'candidates': [Filament, ...],
+        }
+    """
+    suggestions = []
+    materials = list(job.materials)
+    is_mm = len(materials) > 1
+
+    if is_mm:
+        for mat in materials:
+            if mat.filament_id is not None:
+                continue  # already mapped
+            best, candidates = try_auto_map_filament(mat.material_name, mat.color_hex)
+            suggestions.append({
+                'slot_id': mat.id,
+                'material_name': mat.material_name,
+                'color_hex': _normalize_hex(mat.color_hex),
+                'best': best,
+                'candidates': candidates,
+            })
+    else:
+        if job.filament_id is not None:
+            return []
+        color_hex = None
+        material_name = None
+        if materials:
+            color_hex = materials[0].color_hex
+            material_name = materials[0].material_name
+        best, candidates = try_auto_map_filament(material_name, color_hex)
+        suggestions.append({
+            'slot_id': materials[0].id if materials else None,
+            'material_name': material_name,
+            'color_hex': _normalize_hex(color_hex),
+            'best': best,
+            'candidates': candidates,
+        })
+    return suggestions
 
 
 def top_tags(items, attr_name='tag_text', limit=10):

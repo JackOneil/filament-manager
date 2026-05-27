@@ -134,6 +134,9 @@ def run_migrations(app: Flask) -> None:
         # ── Audit logging toggle ─────────────────────────────────────────────
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN audit_logging_enabled BOOLEAN NOT NULL DEFAULT 1")
 
+        # ── Auto filament mapping ─────────────────────────────────────────────
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN auto_filament_mapping_enabled BOOLEAN NOT NULL DEFAULT 1")
+
         # ── Project file versioning ──────────────────────────────────────────
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN parent_file_id INTEGER DEFAULT NULL")

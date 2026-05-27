@@ -204,6 +204,9 @@ class AppSetting(db.Model):
     # Audit logging toggle
     audit_logging_enabled = db.Column(db.Boolean, default=True)
 
+    # Auto filament mapping
+    auto_filament_mapping_enabled = db.Column(db.Boolean, default=True)
+
 
 class PrintHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
