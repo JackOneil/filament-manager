@@ -218,6 +218,40 @@ def _live_printers():
     return live
 
 
+def _low_stock_filaments(app_settings, limit=20):
+    """Return filaments sorted by remaining percentage (lowest first), with shop URLs resolved."""
+    from utils import collect_usage_windows
+
+    filaments = (
+        Filament.query
+        .options(joinedload(Filament.brand), joinedload(Filament.material), joinedload(Filament.color))
+        .filter(Filament.quantity > 0)
+        .all()
+    )
+
+    usage_windows = collect_usage_windows(filaments)
+
+    results = []
+    for fil in filaments:
+        capacity_all = fil.quantity * fil.weight_total
+        pct = round(fil.weight_remaining / capacity_all * 100) if capacity_all > 0 else 0
+        usage = usage_windows.get(fil.id, {})
+        status_info = compute_stock_status(fil, usage.get('usage_30', 0.0), usage.get('usage_90', 0.0))
+
+        results.append({
+            'filament': fil,
+            'pct': pct,
+            'remaining': float(fil.weight_remaining or 0),
+            'status': status_info['status'],
+            'recommended_spools': status_info.get('recommended_spools', 0),
+            'recommended_grams': status_info.get('recommended_grams', 0),
+            'recommended_order_grams': status_info.get('recommended_order_grams', 0),
+        })
+
+    results.sort(key=lambda x: x['pct'])
+    return results[:limit]
+
+
 def _overview_focus(action_center, live_printers, now=None):
     now = now or utc_now()
     today_start = datetime(now.year, now.month, now.day)
@@ -693,6 +727,8 @@ def register(app):
             action_center=action_center,
             live_printers=live_printers,
             overview_focus=_overview_focus(action_center, live_printers),
+            low_stock_filaments=_low_stock_filaments(app_settings),
+            app_settings=app_settings,
             today=utc_now().date(),
             show_onboarding=show_onboarding,
             onboarding_steps=onboarding_steps,

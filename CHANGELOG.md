@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.88.0] - 2026-05-29
+### Added
+- **Overview "Lowest Stock" widget** — New dashboard widget on the overview page showing filaments sorted by remaining weight percentage (lowest first). Each filament row displays a colour swatch, name (linked to detail), brand/material info, remaining grams with status-coloured percentage, recommended-spools badge, and a shopping cart button linking to the configured shop URL (direct link → brand search → global template, in priority order). The widget is fully draggable, resizable, supports row-limit selection, and can be hidden/restored — just like all other overview widgets.
+- **`openReorderShop` global helper** — Moved from `inventory.js` to `app-shell.js` so the shop-search URL resolver is available on every page, including the overview where it previously wasn't loaded.
+- Translation keys added to both `cs` and `en`: `overview_widget_lowest_stock`, `overview_restock_label`, `overview_lowest_stock_title`, `overview_no_lowest_stock`.
+- Help tip added for the new lowest-stock widget (Czech + English).
+
 ## [1.87.3] - 2026-06-18
 ### Added
 - **TODO due dates** — Each project TODO item can now have an optional due date (`due_date` column on `project_todo`). A date picker appears in both the add form and the inline edit form.

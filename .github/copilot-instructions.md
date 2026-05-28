@@ -65,7 +65,7 @@ routes/
   pwa.py                # /manifest.json, /sw.js — Progressive Web App support
 templates/
   base.html             # Shared layout (nav, toast, Alpine, Tailwind CDN, CSRF injection)
-  overview.html         # Admin overview (Action Center, live printers)
+  overview.html         # Admin overview (Action Center, live printers, lowest stock, 9-widget dashboard)
   overview_user.html    # Regular user overview (own projects summary)
   index.html            # Filament inventory — admin (Alpine.js inventoryApp(), filters, bulk ops)
   index_user.html       # Filament inventory — user (read-only, paginated)
@@ -399,6 +399,7 @@ This is already applied to `projects_index.html` and overrides any stale localSt
 - Shared frontend states (e.g., active theme, sidebar pinned layout, mobile menu visibility, and command palette open state) must be stored in the global `appState` store defined in `static/js/app-shell.js`.
 - Always reference these properties in HTML templates via `$store.appState` (e.g., `$store.appState.theme` or `$store.appState.mobileOpen`).
 - Avoid replicating local state inside individual components for these shared application-level values.
+- **Shop URL resolver**: `app-shell.js` also defines `window.openReorderShop(name, template)` which replaces `{query}` (or any `{placeholder}`) tokens in a shop search URL template with the URL-encoded filament name and opens the result in a new tab. This function is available on every page and is used by filament cards, list rows, the statistics purchase table, and the overview lowest-stock widget.
 
 ### Rule 27 — Lazy Loading of Heavy JS Libraries
 - To optimize page load time, heavy third-party JavaScript libraries (specifically `Chart.js` and `Online3DViewer`) must not be loaded statically via `<script>` tags in the page header.

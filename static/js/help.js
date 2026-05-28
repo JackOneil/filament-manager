@@ -42,6 +42,13 @@
                         cs: 'Klikněte na tlačítko „Upravit rozvržení" vpravo nahoře. Widgety pak lze přetahovat, měnit jejich šířku pomocí úchytu a skrývat. Nastavení se uloží do prohlížeče a přežije i obnovení stránky.',
                         en: 'Click "Edit layout" in the top right. Widgets can then be dragged, resized with the handle, and hidden. The layout is saved in the browser and survives page refresh.'
                     }
+                },
+                {
+                    title: { cs: 'Nejnižší zásoby a nákup', en: 'Lowest Stock and Shopping' },
+                    text: {
+                        cs: 'Widget „Nejnižší zásoby" zobrazuje filamenty seřazené podle procenta zbývající hmotnosti (od nejmenší zásoby). U každého filamentu je ikona nákupního košíku, která otevře odkaz na produkt v e-shopu (podle nastavení buď přímý odkaz, vyhledávání podle značky, nebo globální šablona).',
+                        en: 'The "Lowest Stock" widget shows filaments sorted by remaining weight percentage (lowest first). Each filament has a shopping cart icon that opens the product link in your shop (either a direct URL, brand-specific search, or global search template, depending on your settings).'
+                    }
                 }
             ]
         },

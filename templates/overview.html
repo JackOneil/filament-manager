@@ -733,6 +733,60 @@
             </div>
         </section>
 
+        {# ── Lowest Stock ─────────────────────────────────────────────── #}
+        <section class="dashboard-widget xl:col-span-2 col-span-1" data-widget-id="lowest_stock">
+            <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
+                <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('overview_widget_lowest_stock') }}</span>
+                <div class="ml-auto flex items-center gap-1">
+                    <button onclick="moveOverviewWidgetUp('lowest_stock')" title="{{ t('stats_move_up') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-up text-xs"></i></button>
+                    <button onclick="moveOverviewWidgetDown('lowest_stock')" title="{{ t('stats_move_down') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-down text-xs"></i></button>
+                </div>
+            </div>
+            <div class="ui-panel h-full">
+                <div class="ui-label">{{ t('overview_restock_label') }}</div>
+                <h2 class="text-xl font-bold mb-4">{{ t('overview_lowest_stock_title') }}</h2>
+                <div class="space-y-2">
+                    {% for item in low_stock_filaments %}
+                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 dark:border-slate-700 bg-white/60 dark:bg-slate-800/50 px-3 py-2.5 min-w-0" data-row-index="{{ loop.index0 }}">
+                        <div class="w-5 h-5 rounded-full border shadow-sm shrink-0" style="background-color: #{{ item.filament.color.hex_value.lstrip('#') if item.filament.color and item.filament.color.hex_value else 'eee' }};"></div>
+                        <div class="min-w-0 flex-1">
+                            <a href="{{ url_for('filament_detail', id=item.filament.id) }}" class="text-sm font-semibold text-gray-800 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate block">{{ item.filament.name }}</a>
+                            <div class="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1.5 truncate mt-0.5">
+                                <span>{{ item.filament.brand.name if item.filament.brand else '' }}{{ ' · ' if item.filament.brand and item.filament.material else '' }}{{ item.filament.material.name if item.filament.material else '' }}</span>
+                                <span class="text-gray-400">·</span>
+                                <span class="font-medium {% if item.status == 'critical' %}text-red-600{% elif item.status == 'warning' %}text-amber-600{% else %}text-gray-500{% endif %}">{{ item.remaining | int }} g · {{ item.pct }} %</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 flex-shrink-0">
+                            {% if item.recommended_spools > 0 %}
+                            <span class="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-semibold whitespace-nowrap">{{ item.recommended_spools }} {{ t('pieces') }}</span>
+                            {% endif %}
+                            {% if item.filament.shop_url %}
+                            <a href="{{ item.filament.shop_url }}" target="_blank" rel="noopener noreferrer" class="w-8 h-8 rounded-full flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-800/40 transition flex-shrink-0" title="{{ t('stats_open_shop') }}">
+                                <i class="fa-solid fa-cart-shopping text-xs"></i>
+                            </a>
+                            {% elif item.filament.brand.shop_url %}
+                            <button type="button" onclick="openReorderShop('{{ item.filament.name|e }}', '{{ item.filament.brand.shop_url|e }}')" class="w-8 h-8 rounded-full flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-800/40 transition flex-shrink-0" title="{{ t('stats_search_shop') }}">
+                                <i class="fa-solid fa-cart-shopping text-xs"></i>
+                            </button>
+                            {% elif app_settings and app_settings.reorder_shop_url %}
+                            <button type="button" onclick="openReorderShop('{{ item.filament.name|e }}', '{{ app_settings.reorder_shop_url|e }}')" class="w-8 h-8 rounded-full flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-800/40 transition flex-shrink-0" title="{{ t('stats_search_shop') }}">
+                                <i class="fa-solid fa-cart-shopping text-xs"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="flex flex-col items-center justify-center py-8 text-gray-400 gap-2">
+                        <i class="fa-solid fa-boxes-stacked text-3xl opacity-30"></i>
+                        <p class="text-sm">{{ t('overview_no_lowest_stock') }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+
         {# ── Activity Heatmap ──────────────────────────────────────────── #}
         <section class="dashboard-widget md:col-span-2 xl:col-span-4" data-widget-id="activity_heatmap">
             <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
@@ -809,7 +863,7 @@ const overviewLayout = createWidgetLayoutManager({
     showBtnTitle: {{ t('dashboard_show_widget')|tojson }},
     limitAllText: {{ t('stats_limit_all')|tojson }},
     mdGridCols: 2,
-    defaultOrder: ['recent_activity', 'live_printers', 'action_center', 'upcoming_deadlines', 'usage_7d', 'top_turnover', 'quick_links', 'activity_heatmap'],
+    defaultOrder: ['recent_activity', 'live_printers', 'action_center', 'lowest_stock', 'upcoming_deadlines', 'usage_7d', 'top_turnover', 'quick_links', 'activity_heatmap'],
 });
 
 function toggleOverviewEditMode() { overviewLayout.toggleEditMode(); }

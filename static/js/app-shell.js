@@ -178,6 +178,15 @@ function appShell() {
         );
     });
 
+    // ── Shop URL resolver ─────────────────────────────────────────────────
+    // Shared by filament cards, list rows, stats, and overview widgets.
+    // Replaces {query} (or any {placeholder}) in a shop URL template with
+    // the URL-encoded filament name, then opens the result in a new tab.
+    window.openReorderShop = function (name, template) {
+        var url = template.replace(/\{[^}]+\}/g, encodeURIComponent(name));
+        window.open(url, '_blank', 'noopener,noreferrer');
+    };
+
     // Patch window.fetch to send the CSRF header on every non-GET same-origin request.
     // Skip blob: and data: URLs — they are internal browser resources and the CSRF token
     // is both unnecessary and blocked by CSP connect-src for those schemes.
