@@ -637,53 +637,131 @@
                             <p class="text-sm text-gray-500 mt-2">{{ t('project_printer_jobs_desc') }}</p>
                         </div>
                     </div>
-                    <div class="space-y-3">
+                    <div class="divide-y divide-gray-100 dark:divide-slate-700 -mx-1">
                         {% for item in job_feed %}
-                        <div class="ui-card-soft p-4">
-                            <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
-                                <div class="min-w-0">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <span class="ui-badge {% if item.source == 'bambu' %}ui-badge-brand{% else %}ui-badge{% endif %}">
-                                            {% if item.source == 'bambu' %}{{ t('project_job_source_bambu') }}{% else %}{{ t('project_job_source_prusa') }}{% endif %}
-                                        </span>
-                                        {% if item.deducted %}
-                                        <span class="ui-badge ui-badge-success"><i class="fa-solid fa-check-double"></i> {{ t('bambu_deducted') }}</span>
-                                        {% endif %}
-                                        {% if item.unmapped %}
-                                        <span class="ui-badge ui-badge-warning"><i class="fa-solid fa-link-slash"></i> {{ t('project_job_unmapped') }}</span>
-                                        {% endif %}
-                                    </div>
-                                    <div class="font-semibold text-gray-800 mt-3 truncate">{{ item.title }}</div>
-                                    <div class="text-sm text-gray-500 mt-1">
-                                        {% if item.printer_name %}{{ item.printer_name }} · {% endif %}
-                                        {{ item.status or '-' }}
-                                        {% if item.timestamp and item.timestamp.year > 1900 %} · {{ item.timestamp | fmt_dt('%d.%m.%Y %H:%M') }}{% endif %}
-                                    </div>
-                                    <div class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-gray-500">
-                                        {% if item.filament_name %}
-                                        <span><i class="fa-solid fa-fill-drip mr-1 text-gray-400"></i>{{ item.filament_name }}</span>
-                                        {% endif %}
-                                        {% if item.material_slots > 1 %}
-                                        <span><i class="fa-solid fa-layer-group mr-1 text-gray-400"></i>{{ item.material_slots }} {{ t('project_job_material_slots') }}</span>
-                                        {% endif %}
-                                        {% if item.weight_grams %}
-                                        <span><i class="fa-solid fa-weight-hanging mr-1 text-gray-400"></i>{{ item.weight_grams }} g</span>
-                                        {% endif %}
-                                        {% if item.cost_time %}
-                                        <span><i class="fa-solid fa-clock mr-1 text-gray-400"></i>{% set job_h = (item.cost_time // 3600) | int %}{% set job_m = ((item.cost_time % 3600) // 60) | int %}{% if job_h %}{{ job_h }}h {% endif %}{{ job_m }}min</span>
-                                        {% endif %}
-                                        {% if item.total_cost > 0 %}
-                                        <span class="font-semibold text-indigo-600"><i class="fa-solid fa-coins mr-1"></i>{{ item.total_cost }} {{ current_currency }}</span>
-                                        {% endif %}
+                        <div x-data="{open: false}" class="rounded-lg">
+                            {# Compact summary row — click to expand #}
+                            <button type="button" @click="open = !open" class="w-full flex items-center gap-3 px-1 py-2.5 hover:bg-gray-50 dark:hover:bg-slate-700/40 rounded-lg transition-colors group text-left">
+                                {# Chevron #}
+                                <i class="fa-solid fa-chevron-right text-gray-300 dark:text-slate-600 text-[10px] shrink-0 transition-transform duration-200" :class="open && 'rotate-90'"></i>
+                                {# Source badge + status #}
+                                <div class="shrink-0 flex flex-col items-center gap-1 w-12">
+                                    <span class="ui-badge text-[10px] px-1.5 py-0 leading-5 {% if item.source == 'bambu' %}ui-badge-brand{% else %}ui-badge{% endif %}">
+                                        {% if item.source == 'bambu' %}Bambu{% else %}Prusa{% endif %}
+                                    </span>
+                                    {% if item.deducted %}
+                                    <span class="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400"><i class="fa-solid fa-check-double text-[8px]"></i></span>
+                                    {% elif item.unmapped %}
+                                    <span class="text-[9px] font-semibold text-amber-500"><i class="fa-solid fa-link-slash text-[8px]"></i></span>
+                                    {% endif %}
+                                </div>
+                                {# Title + printer/date #}
+                                <div class="min-w-0 flex-1">
+                                    <div class="text-sm font-medium text-gray-800 dark:text-slate-200 truncate leading-tight">{{ item.title }}</div>
+                                    <div class="text-xs text-gray-400 dark:text-slate-500 mt-0.5 truncate">
+                                        {% if item.printer_name %}<span>{{ item.printer_name }}</span>{% endif %}
+                                        {% if item.printer_name and item.timestamp and item.timestamp.year > 1900 %}<span class="mx-1">·</span>{% endif %}
+                                        {% if item.timestamp and item.timestamp.year > 1900 %}<span>{{ item.timestamp | fmt_dt('%d.%m.%Y %H:%M') }}</span>{% endif %}
                                     </div>
                                 </div>
-                                <div class="flex gap-2 items-start">
-                                    <a href="{{ item.detail_url }}" class="ui-badge ui-badge-brand"><i class="fa-solid fa-arrow-up-right-from-square"></i> {{ t('project_job_open_source') }}</a>
+                                {# Color dots + filament name #}
+                                <div class="shrink-0 items-center gap-1.5 max-w-[160px] hidden sm:flex">
+                                    {% if item.filament_colors %}
+                                    <span class="flex items-center gap-0.5">
+                                        {% for hex in item.filament_colors[:5] %}
+                                        <span class="inline-block w-3 h-3 rounded-full border border-black/15 shrink-0" style="background-color: {{ hex }}"></span>
+                                        {% endfor %}
+                                    </span>
+                                    {% endif %}
+                                    {% if item.filament_name %}
+                                    <span class="text-xs text-gray-500 dark:text-slate-400 truncate">{{ item.filament_name }}</span>
+                                    {% elif item.material_slots > 1 %}
+                                    <span class="text-xs text-gray-400"><i class="fa-solid fa-layer-group mr-0.5"></i>{{ item.material_slots }}×</span>
+                                    {% elif not item.filament_colors %}
+                                    <span class="text-xs text-gray-300">—</span>
+                                    {% endif %}
+                                </div>
+                                {# Stats #}
+                                <div class="shrink-0 hidden lg:flex items-center gap-3 text-xs text-gray-400 dark:text-slate-500 tabular-nums">
+                                    {% if item.weight_grams %}
+                                    <span class="flex items-center gap-1"><i class="fa-solid fa-weight-hanging text-[10px]"></i>{{ item.weight_grams }}g</span>
+                                    {% endif %}
+                                    {% if item.cost_time %}
+                                    {% set job_h = (item.cost_time // 3600) | int %}{% set job_m = ((item.cost_time % 3600) // 60) | int %}
+                                    <span class="flex items-center gap-1"><i class="fa-solid fa-clock text-[10px]"></i>{% if job_h %}{{ job_h }}h {% endif %}{{ job_m }}m</span>
+                                    {% endif %}
+                                    {% if item.total_cost > 0 %}
+                                    <span class="flex items-center gap-1 font-semibold text-indigo-500 dark:text-indigo-400"><i class="fa-solid fa-coins text-[10px]"></i>{{ item.total_cost }} {{ current_currency }}</span>
+                                    {% endif %}
+                                </div>
+                            </button>
+
+                            {# Expanded detail panel #}
+                            <div x-show="open" x-cloak
+                                 x-transition:enter="transition ease-out duration-150"
+                                 x-transition:enter-start="opacity-0 -translate-y-1"
+                                 x-transition:enter-end="opacity-100 translate-y-0"
+                                 x-transition:leave="transition ease-in duration-100"
+                                 x-transition:leave-start="opacity-100 translate-y-0"
+                                 x-transition:leave-end="opacity-0 -translate-y-1"
+                                 class="ml-8 mb-2 mr-1">
+                                <div class="bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-gray-100 dark:border-slate-700 p-3">
+                                    {# Header row: status + full date + link #}
+                                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mb-3 text-xs text-gray-500 dark:text-slate-400">
+                                        {% if item.status %}
+                                        <span><i class="fa-solid fa-circle-dot mr-1"></i>{{ item.status }}</span>
+                                        {% endif %}
+                                        {% if item.timestamp and item.timestamp.year > 1900 %}
+                                        <span><i class="fa-solid fa-calendar mr-1"></i>{{ item.timestamp | fmt_dt('%d.%m.%Y %H:%M') }}</span>
+                                        {% endif %}
+                                        {% if item.weight_grams %}
+                                        <span><i class="fa-solid fa-weight-hanging mr-1"></i>{{ item.weight_grams }} g</span>
+                                        {% endif %}
+                                        {% if item.cost_time %}
+                                        {% set dh = (item.cost_time // 3600) | int %}{% set dm = ((item.cost_time % 3600) // 60) | int %}
+                                        <span><i class="fa-solid fa-clock mr-1"></i>{% if dh %}{{ dh }}h {% endif %}{{ dm }} min</span>
+                                        {% endif %}
+                                        {% if item.total_cost > 0 %}
+                                        <span class="font-semibold text-indigo-500 dark:text-indigo-400"><i class="fa-solid fa-coins mr-1"></i>{{ item.total_cost }} {{ current_currency }}</span>
+                                        {% endif %}
+                                        <a href="{{ item.detail_url }}" class="ml-auto text-blue-500 hover:text-blue-600 font-medium flex items-center gap-1">
+                                            <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> {{ t('project_job_open_source') }}
+                                        </a>
+                                    </div>
+                                    {# Per-slot material breakdown #}
+                                    {% if item.slots %}
+                                    <div class="flex flex-wrap gap-2">
+                                        {% for slot in item.slots %}
+                                        <div class="flex items-center gap-2 bg-white dark:bg-slate-700/60 rounded-lg border border-gray-100 dark:border-slate-600 px-2.5 py-1.5 min-w-0">
+                                            {# Color swatch #}
+                                            {% if slot.color_hex %}
+                                            <span class="inline-block w-4 h-4 rounded-full border border-black/15 shrink-0" style="background-color: {{ slot.color_hex }}"></span>
+                                            {% else %}
+                                            <span class="inline-block w-4 h-4 rounded-full bg-gray-200 dark:bg-slate-600 border border-gray-300 dark:border-slate-500 shrink-0"></span>
+                                            {% endif %}
+                                            <div class="min-w-0">
+                                                {% if slot.filament_url %}
+                                                <a href="{{ slot.filament_url }}" class="text-xs font-medium text-gray-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 truncate block max-w-[140px]">{{ slot.filament_name or slot.material_name or '?' }}</a>
+                                                {% else %}
+                                                <span class="text-xs font-medium text-gray-500 dark:text-slate-400 truncate block max-w-[140px]">{{ slot.filament_name or slot.material_name or '?' }}</span>
+                                                {% endif %}
+                                                <div class="flex items-center gap-1.5 text-[10px] text-gray-400 dark:text-slate-500 mt-0.5">
+                                                    {% if slot.material_name and slot.filament_name %}<span>{{ slot.material_name }}</span>{% endif %}
+                                                    {% if slot.weight_grams %}<span class="{% if slot.material_name and slot.filament_name %}before:content-['·'] before:mr-1{% endif %}">{{ slot.weight_grams }}g</span>{% endif %}
+                                                    {% if not slot.filament_url %}<span class="text-amber-400"><i class="fa-solid fa-link-slash"></i></span>{% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    {% else %}
+                                    <p class="text-xs text-gray-400">{{ t('project_job_unmapped') }}</p>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
                         {% else %}
-                        <p class="text-sm text-gray-400">{{ t('project_no_printer_jobs') }}</p>
+                        <p class="text-sm text-gray-400 px-1 py-3">{{ t('project_no_printer_jobs') }}</p>
                         {% endfor %}
                     </div>
 
@@ -826,6 +904,8 @@ function projectFilamentPicker() {
 
 <script>
 let viewerInstance = null;
+let _viewerCurrentUrl = null;
+let _viewerColorDebounce = null;
 
 function hexToRgb(hex) {
     const normalized = (hex || '#3b82f6').replace('#', '');
@@ -838,30 +918,40 @@ function hexToRgb(hex) {
     };
 }
 
-function open3DViewer(url, colorHex) {
+function _doInitViewer(url, colorHex) {
     window.loadScript("{{ url_for('static', filename='js/o3dv.min.js') }}")
         .then(() => {
-            setTimeout(() => {
-                const container = document.getElementById('3d-viewer-container');
-                if (!container) return;
-                container.innerHTML = '';
-                const color = hexToRgb(colorHex);
-                viewerInstance = new OV.EmbeddedViewer(container, {
-                    backgroundColor: new OV.RGBAColor(15, 23, 42, 255),
-                    defaultColor: new OV.RGBColor(color.r, color.g, color.b)
-                });
-                viewerInstance.LoadModelFromUrlList([url]);
-            }, 50);
+            const container = document.getElementById('3d-viewer-container');
+            if (!container) return;
+            container.innerHTML = '';
+            const color = hexToRgb(colorHex);
+            viewerInstance = new OV.EmbeddedViewer(container, {
+                backgroundColor: new OV.RGBAColor(15, 23, 42, 255),
+                defaultColor: new OV.RGBColor(color.r, color.g, color.b)
+            });
+            viewerInstance.LoadModelFromUrlList([url]);
         })
         .catch(err => {
             console.error("Failed to load Online3DViewer library", err);
         });
 }
 
-function close3DViewer() {
-    if (viewerInstance) {
-        // Keeping the current viewer instance alive avoids expensive reinitialization.
+function open3DViewer(url, colorHex) {
+    clearTimeout(_viewerColorDebounce);
+    if (_viewerCurrentUrl !== url) {
+        // New model — load immediately
+        _viewerCurrentUrl = url;
+        _doInitViewer(url, colorHex);
+    } else {
+        // Same model, color changed — debounce to avoid reload spam while dragging picker
+        _viewerColorDebounce = setTimeout(() => _doInitViewer(url, colorHex), 350);
     }
+}
+
+function close3DViewer() {
+    clearTimeout(_viewerColorDebounce);
+    _viewerCurrentUrl = null;
+    viewerInstance = null;
 }
 
 // Interactive markdown checkboxes — toggle without entering edit mode

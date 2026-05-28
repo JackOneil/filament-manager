@@ -302,7 +302,13 @@
                             <i class="fa-solid {{ icon_data[0] }} text-xs"></i>
                         </span>
                         <div class="min-w-0 flex-1">
-                            <div class="text-sm font-semibold text-gray-800 dark:text-slate-100 truncate">{{ entry.filament_name or '—' }}</div>
+                            <div class="text-sm font-semibold text-gray-800 dark:text-slate-100 truncate">
+                                {% if entry.filament_id %}
+                                <a href="{{ url_for('filament_detail', id=entry.filament_id) }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{{ entry.filament_name or '—' }}</a>
+                                {% else %}
+                                {{ entry.filament_name or '—' }}
+                                {% endif %}
+                            </div>
                             <div class="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1.5 truncate">
                                 <span>{{ t('action_type_' ~ entry.action_type) if ('action_type_' ~ entry.action_type) in ['action_type_add','action_type_remove','action_type_bambu_print','action_type_bulk_add_weight','action_type_bulk_delete','action_type_bulk_add_spool','action_type_bulk_remove_spool'] else entry.action_type | replace('_',' ') | title }}</span>
                                 {% if entry.weight %}<span class="text-gray-400">·</span><span>{{ entry.weight | round(1) }} g</span>{% endif %}

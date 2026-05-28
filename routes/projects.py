@@ -101,6 +101,58 @@ def _job_cost_parts(job, setting, bambu_powers=None, prusa_powers=None):
     return round(weight_grams, 1), round(material_cost, 2), round(energy_cost, 2)
 
 
+def _job_slots(job, source, weight_grams_total):
+    """Return per-slot detail list for expanded view."""
+    slots = []
+    if source == 'bambu':
+        for slot in getattr(job, 'materials', []) or []:
+            fil = slot.filament
+            color = slot.color_hex or (fil.color.hex_value if fil and fil.color else None)
+            slots.append({
+                'color_hex': color,
+                'material_name': slot.material_name or (fil.material.name if fil and fil.material else None),
+                'weight_grams': slot.weight_grams,
+                'filament_id': slot.filament_id,
+                'filament_name': fil.name if fil else None,
+                'filament_url': url_for('filament_detail', id=slot.filament_id) if slot.filament_id else None,
+            })
+    else:
+        fil = job.filament
+        if fil:
+            slots.append({
+                'color_hex': fil.color.hex_value if fil.color else None,
+                'material_name': fil.material.name if fil.material else None,
+                'weight_grams': weight_grams_total,
+                'filament_id': fil.id,
+                'filament_name': fil.name,
+                'filament_url': url_for('filament_detail', id=fil.id),
+            })
+    return slots
+
+
+def _job_colors(job, source):
+    """Return a deduplicated list of color hex strings for a job.
+    For Bambu: prefer per-slot color_hex (available even without filament mapping).
+    For Prusa: use the mapped filament's color.
+    Falls back to the mapped filament color on the job itself."""
+    colors = []
+    seen = set()
+    if source == 'bambu':
+        for slot in getattr(job, 'materials', []) or []:
+            c = slot.color_hex
+            if not c:
+                # fallback: mapped filament color for this slot
+                c = slot.filament.color.hex_value if slot.filament and slot.filament.color else None
+            if c and c not in seen:
+                seen.add(c)
+                colors.append(c)
+    if not colors and job.filament and job.filament.color:
+        c = job.filament.color.hex_value
+        if c:
+            colors.append(c)
+    return colors
+
+
 def _build_project_job_feed(project, setting, show_bambu_jobs, show_prusa_jobs, bambu_powers=None, prusa_powers=None):
     items = []
 
@@ -119,6 +171,8 @@ def _build_project_job_feed(project, setting, show_bambu_jobs, show_prusa_jobs, 
                 'energy_cost': energy_cost,
                 'total_cost': round(material_cost + energy_cost, 2),
                 'filament_name': job.filament.name if job.filament else None,
+                'filament_colors': _job_colors(job, 'bambu'),
+                'slots': _job_slots(job, 'bambu', weight_grams),
                 'material_slots': len([slot for slot in getattr(job, 'materials', []) or [] if slot.weight_grams]),
                 'deducted': bool(job.deducted),
                 'detail_url': url_for('bambu_jobs'),
@@ -144,6 +198,8 @@ def _build_project_job_feed(project, setting, show_bambu_jobs, show_prusa_jobs, 
                 'energy_cost': energy_cost,
                 'total_cost': round(material_cost + energy_cost, 2),
                 'filament_name': job.filament.name if job.filament else None,
+                'filament_colors': _job_colors(job, 'prusa'),
+                'slots': _job_slots(job, 'prusa', weight_grams),
                 'material_slots': 0,
                 'deducted': bool(job.deducted),
                 'detail_url': url_for('prusa_jobs'),
@@ -690,7 +746,8 @@ def register(app):
                 joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.filament).joinedload(Filament.color),
                 joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.filament).joinedload(Filament.brand),
                 joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.filament).joinedload(Filament.material),
-                joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.materials).joinedload(BambuJobMaterial.filament),
+                joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.materials).joinedload(BambuJobMaterial.filament).joinedload(Filament.color),
+                joinedload(Project.bambu_jobs).joinedload(BambuPrintJob.materials).joinedload(BambuJobMaterial.filament).joinedload(Filament.material),
                 joinedload(Project.prusa_jobs).joinedload(PrusaPrintJob.printer),
                 joinedload(Project.prusa_jobs).joinedload(PrusaPrintJob.filament).joinedload(Filament.color),
                 joinedload(Project.prusa_jobs).joinedload(PrusaPrintJob.filament).joinedload(Filament.brand),

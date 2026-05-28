@@ -8,53 +8,67 @@
                 <p class="text-sm text-gray-500 mt-2">{{ t('project_printer_jobs_desc') }}</p>
             </div>
         </div>
-        <div class="space-y-3">
+        <div class="divide-y divide-gray-100 dark:divide-slate-700 -mx-1">
             {% for item in job_feed %}
-            <div class="ui-card-soft p-4">
-                <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
-                    <div class="min-w-0">
-                        <div class="flex flex-wrap items-center gap-2">
-                            <span class="ui-badge {% if item.source == 'bambu' %}ui-badge-brand{% else %}ui-badge{% endif %}">
-                                {% if item.source == 'bambu' %}{{ t('project_job_source_bambu') }}{% else %}{{ t('project_job_source_prusa') }}{% endif %}
-                            </span>
-                            {% if item.deducted %}
-                            <span class="ui-badge ui-badge-success"><i class="fa-solid fa-check-double"></i> {{ t('bambu_deducted') }}</span>
-                            {% endif %}
-                            {% if item.unmapped %}
-                            <span class="ui-badge ui-badge-warning"><i class="fa-solid fa-link-slash"></i> {{ t('project_job_unmapped') }}</span>
-                            {% endif %}
-                        </div>
-                        <div class="font-semibold text-gray-800 mt-3 truncate">{{ item.title }}</div>
-                        <div class="text-sm text-gray-500 mt-1">
-                            {% if item.printer_name %}{{ item.printer_name }} · {% endif %}
-                            {{ item.status or '-' }}
-                            {% if item.timestamp and item.timestamp.year > 1900 %} · {{ item.timestamp | fmt_dt('%d.%m.%Y %H:%M') }}{% endif %}
-                        </div>
-                        <div class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-gray-500">
-                            {% if item.filament_name %}
-                            <span><i class="fa-solid fa-fill-drip mr-1 text-gray-400"></i>{{ item.filament_name }}</span>
-                            {% endif %}
-                            {% if item.material_slots > 1 %}
-                            <span><i class="fa-solid fa-layer-group mr-1 text-gray-400"></i>{{ item.material_slots }} {{ t('project_job_material_slots') }}</span>
-                            {% endif %}
-                            {% if item.weight_grams %}
-                            <span><i class="fa-solid fa-weight-hanging mr-1 text-gray-400"></i>{{ item.weight_grams }} g</span>
-                            {% endif %}
-                            {% if item.cost_time %}
-                            <span><i class="fa-solid fa-clock mr-1 text-gray-400"></i>{% set job_h = (item.cost_time // 3600) | int %}{% set job_m = ((item.cost_time % 3600) // 60) | int %}{% if job_h %}{{ job_h }}h {% endif %}{{ job_m }}min</span>
-                            {% endif %}
-                            {% if item.total_cost > 0 %}
-                            <span class="font-semibold text-indigo-600"><i class="fa-solid fa-coins mr-1"></i>{{ item.total_cost }} {{ current_currency }}</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="flex gap-2 items-start">
-                        <a href="{{ item.detail_url }}" class="ui-badge ui-badge-brand"><i class="fa-solid fa-arrow-up-right-from-square"></i> {{ t('project_job_open_source') }}</a>
+            <div class="flex items-center gap-3 px-1 py-2.5 hover:bg-gray-50 dark:hover:bg-slate-700/40 rounded-lg transition-colors group">
+
+                {# Source + status badges #}
+                <div class="shrink-0 flex flex-col items-center gap-1 w-14">
+                    <span class="ui-badge text-[10px] px-1.5 py-0 leading-5 {% if item.source == 'bambu' %}ui-badge-brand{% else %}ui-badge{% endif %}">
+                        {% if item.source == 'bambu' %}Bambu{% else %}Prusa{% endif %}
+                    </span>
+                    {% if item.deducted %}
+                    <span class="text-[9px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5"><i class="fa-solid fa-check-double text-[8px]"></i>OK</span>
+                    {% elif item.unmapped %}
+                    <span class="text-[9px] font-semibold text-amber-500 flex items-center gap-0.5"><i class="fa-solid fa-link-slash text-[8px]"></i></span>
+                    {% endif %}
+                </div>
+
+                {# Title + meta #}
+                <div class="min-w-0 flex-1">
+                    <div class="text-sm font-medium text-gray-800 dark:text-slate-200 truncate leading-tight">{{ item.title }}</div>
+                    <div class="text-xs text-gray-400 dark:text-slate-500 mt-0.5 truncate">
+                        {% if item.printer_name %}<span>{{ item.printer_name }}</span>{% endif %}
+                        {% if item.printer_name and item.timestamp and item.timestamp.year > 1900 %}<span class="mx-1">·</span>{% endif %}
+                        {% if item.timestamp and item.timestamp.year > 1900 %}<span>{{ item.timestamp | fmt_dt('%d.%m.%Y %H:%M') }}</span>{% endif %}
                     </div>
                 </div>
+
+                {# Filament color + name #}
+                <div class="shrink-0 flex items-center gap-1.5 max-w-[140px] hidden sm:flex">
+                    {% if item.filament_color_hex %}
+                    <span class="inline-block w-3.5 h-3.5 rounded-full border border-black/10 shrink-0" style="background-color: {{ item.filament_color_hex }}"></span>
+                    {% endif %}
+                    {% if item.filament_name %}
+                    <span class="text-xs text-gray-500 dark:text-slate-400 truncate">{{ item.filament_name }}</span>
+                    {% elif item.material_slots > 1 %}
+                    <span class="text-xs text-gray-400"><i class="fa-solid fa-layer-group mr-0.5"></i>{{ item.material_slots }}×</span>
+                    {% else %}
+                    <span class="text-xs text-gray-300">—</span>
+                    {% endif %}
+                </div>
+
+                {# Stats #}
+                <div class="shrink-0 hidden lg:flex items-center gap-3 text-xs text-gray-400 dark:text-slate-500 tabular-nums">
+                    {% if item.weight_grams %}
+                    <span class="flex items-center gap-1"><i class="fa-solid fa-weight-hanging text-[10px]"></i>{{ item.weight_grams }}g</span>
+                    {% endif %}
+                    {% if item.cost_time %}
+                    {% set job_h = (item.cost_time // 3600) | int %}{% set job_m = ((item.cost_time % 3600) // 60) | int %}
+                    <span class="flex items-center gap-1"><i class="fa-solid fa-clock text-[10px]"></i>{% if job_h %}{{ job_h }}h {% endif %}{{ job_m }}m</span>
+                    {% endif %}
+                    {% if item.total_cost > 0 %}
+                    <span class="flex items-center gap-1 font-semibold text-indigo-500 dark:text-indigo-400"><i class="fa-solid fa-coins text-[10px]"></i>{{ item.total_cost }} {{ current_currency }}</span>
+                    {% endif %}
+                </div>
+
+                {# Link #}
+                <a href="{{ item.detail_url }}" class="shrink-0 text-gray-300 hover:text-blue-500 transition-colors opacity-0 group-hover:opacity-100 text-sm pl-1">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                </a>
             </div>
             {% else %}
-            <p class="text-sm text-gray-400">{{ t('project_no_printer_jobs') }}</p>
+            <p class="text-sm text-gray-400 px-1 py-3">{{ t('project_no_printer_jobs') }}</p>
             {% endfor %}
         </div>
 

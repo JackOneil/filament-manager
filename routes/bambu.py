@@ -5,6 +5,7 @@ filament mapping, and stock deduction.
 No Flask Blueprints — all routes are registered directly on the app object.
 """
 import json
+import math
 import re
 import logging
 import os
@@ -879,6 +880,7 @@ def register(app):
             job.model_name = model_name_input
 
         single_slot = job.materials[0] if len(job.materials) == 1 else None
+        old_filament_id = job.filament_id
         if filament_id:
             job.filament_id = filament_id
             if single_slot:
@@ -888,6 +890,8 @@ def register(app):
             job.project_id = None
         elif project_id:
             job.project_id = project_id
+
+        job_label = job.model_name or job.external_id or str(job.id)
 
         if (
             deduct_now
@@ -906,7 +910,7 @@ def register(app):
                         actual_amount,
                         project_id=project_id or job.project_id,
                         bambu_job_id=job.id,
-                        note=f'Bambu job: {job.model_name or job.external_id}',
+                        note=f'Bambu job: {job_label}',
                     )
                     db.session.add(PrintHistory(
                         filament_name=(
@@ -927,6 +931,46 @@ def register(app):
                         project_obj = db.session.get(Project, effective_project_id)
                         if project_obj:
                             project_obj.mark_planned_filament_used(filament_id)
+
+        elif (
+            job.deducted
+            and filament_id
+            and old_filament_id
+            and filament_id != old_filament_id
+            and job.weight_grams
+            and job.weight_grams > 0
+        ):
+            # Job was already deducted but a different filament is being assigned
+            # → restore stock to the old filament and deduct from the new one.
+            old_filament = db.session.get(Filament, old_filament_id)
+            new_filament = db.session.get(Filament, filament_id)
+            if old_filament:
+                old_filament.weight_remaining = old_filament.weight_remaining + job.weight_grams
+                if old_filament.weight_total > 0:
+                    expected_qty = math.ceil(old_filament.weight_remaining / old_filament.weight_total)
+                    if expected_qty > old_filament.quantity:
+                        old_filament.quantity = expected_qty
+                log_movement(
+                    old_filament,
+                    'add',
+                    job.weight_grams,
+                    project_id=project_id or job.project_id,
+                    bambu_job_id=job.id,
+                    note=f'Bambu remap (vrácení): {job_label}',
+                )
+            if new_filament:
+                actual_amount = deduct_filament_stock(new_filament, job.weight_grams)
+                if actual_amount > 0:
+                    log_movement(
+                        new_filament,
+                        'bambu_print',
+                        actual_amount,
+                        project_id=project_id or job.project_id,
+                        bambu_job_id=job.id,
+                        note=f'Bambu remap: {job_label}',
+                    )
+            if single_slot:
+                single_slot.deducted = True
 
         db.session.commit()
         if is_ajax:
@@ -996,6 +1040,79 @@ def register(app):
                 'filament_name': filament_name,
                 'deducted': actually_deducted,
             })
+        return redirect(url_for('bambu_jobs'))
+
+    @bp.route('/bambu/job/<int:job_id>/remap-slot', methods=['POST'])
+    def bambu_job_remap_slot(job_id):
+        """Reassign an AMS slot to a different filament with a full stock correction.
+
+        When the slot was already deducted the old filament's stock is restored
+        and the new filament is deducted by the same weight — keeping the
+        inventory consistent.  No correction is made for slots that were never
+        deducted (only the FK is updated).
+        """
+        is_ajax = request.args.get('ajax') == '1'
+        job = db.session.get(BambuPrintJob, job_id)
+        if not job:
+            if is_ajax:
+                return jsonify({'ok': False, 'error': 'not found'}), 404
+            return redirect(url_for('bambu_jobs'))
+
+        slot_id = request.form.get('slot_id', type=int)
+        filament_id = request.form.get('filament_id', type=int)
+        slot = db.session.get(BambuJobMaterial, slot_id) if slot_id else None
+
+        filament_name = None
+        if slot and slot.job_id == job_id and filament_id:
+            old_filament_id = slot.filament_id
+            weight = slot.weight_grams or 0.0
+            job_label = job.model_name or job.external_id or str(job.id)
+
+            # --- Stock correction when the slot was already deducted ---
+            if slot.deducted and old_filament_id and old_filament_id != filament_id and weight > 0:
+                old_filament = db.session.get(Filament, old_filament_id)
+                new_filament = db.session.get(Filament, filament_id)
+                if old_filament:
+                    # Restore stock to old filament
+                    old_filament.weight_remaining = old_filament.weight_remaining + weight
+                    if old_filament.weight_total > 0:
+                        expected_qty = math.ceil(old_filament.weight_remaining / old_filament.weight_total)
+                        if expected_qty > old_filament.quantity:
+                            old_filament.quantity = expected_qty
+                    log_movement(
+                        old_filament,
+                        'add',
+                        weight,
+                        project_id=job.project_id,
+                        bambu_job_id=job.id,
+                        note=f'Bambu remap (vrácení): {job_label}',
+                    )
+                if new_filament:
+                    actual = deduct_filament_stock(new_filament, weight)
+                    if actual > 0:
+                        log_movement(
+                            new_filament,
+                            'bambu_print',
+                            actual,
+                            project_id=job.project_id,
+                            bambu_job_id=job.id,
+                            note=f'Bambu remap: {job_label}',
+                        )
+
+            # Update the FK on the slot
+            slot.filament_id = filament_id
+            new_filament_obj = db.session.get(Filament, filament_id)
+            filament_name = new_filament_obj.name if new_filament_obj else None
+
+            # For single-slot jobs also sync the top-level filament_id
+            materials = list(job.materials)
+            if len(materials) == 1:
+                job.filament_id = filament_id
+
+        db.session.commit()
+
+        if is_ajax:
+            return jsonify({'ok': True, 'filament_id': filament_id, 'filament_name': filament_name})
         return redirect(url_for('bambu_jobs'))
 
     @bp.route('/bambu/job/<int:job_id>/delete', methods=['POST'])

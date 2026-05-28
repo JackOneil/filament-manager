@@ -477,6 +477,9 @@
                                 {% endif %}
                             </span>
                         </label>
+                        {% if show_deducted %}
+                        <span class="text-xs text-gray-400 italic">{{ t('bambu_remap_no_stock') }}</span>
+                        {% endif %}
                     </div>
 
                     {# Save #}
@@ -529,15 +532,66 @@
                             </div>
 
                             {# Assigned filament badge — shown when a filament is assigned #}
-                            <span x-show="assignedLabel" x-cloak
+                            <span x-show="assignedLabel && !remapping" x-cloak
                                 class="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium flex-shrink-0 inline-flex items-center gap-1">
                                 <i class="fa-solid fa-spool"></i>
                                 <span x-text="assignedLabel"></span>
                                 <i x-show="deducted" class="fa-solid fa-check text-emerald-500"></i>
                             </span>
 
+                            {# Remap button (edit pencil) — shown when deducted and not in remap mode #}
+                            {% if is_mm %}
+                            <button type="button" x-show="deducted && !remapping" x-cloak
+                                @click="remapping = true; remapQ = assignedLabel; remapOpen = false"
+                                class="ml-auto text-xs text-gray-400 hover:text-blue-600 transition-colors px-2 py-1 rounded flex-shrink-0"
+                                title="{{ t('bambu_remap_filament') }}">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                            {# Remap panel — filament picker + confirm + cancel #}
+                            <div x-show="remapping" x-cloak class="ml-auto flex items-center gap-2 flex-wrap">
+                                <div class="relative" @click.outside="remapOpen = false">
+                                    <input type="text"
+                                        x-model="remapQ"
+                                        @focus="remapOpen = true"
+                                        @input="remapOpen = true"
+                                        class="border rounded px-2 py-1 text-xs focus:ring-blue-500 outline-none w-44"
+                                        placeholder="{{ t('filter_search') }}">
+                                    <div x-show="remapOpen" x-cloak
+                                        class="absolute z-40 mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                                        <template x-for="f in filteredRemapFilaments" :key="f.id">
+                                            <button type="button"
+                                                @click="selectRemap(f.id, f.label)"
+                                                class="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0">
+                                                <span x-text="f.label"></span>
+                                                <span class="text-gray-400 ml-1" x-text="f.mat"></span>
+                                            </button>
+                                        </template>
+                                        <button type="button"
+                                            x-show="canShowAllRemapFilamentsButton"
+                                            x-cloak
+                                            @click="showAllRemapChoices()"
+                                            class="w-full text-left px-2 py-1.5 text-xs text-blue-600 hover:bg-blue-50 border-t border-blue-100 font-semibold">
+                                            {{ t('bambu_other_filament') }}
+                                        </button>
+                                    </div>
+                                </div>
+                                <button type="button" @click="remapSlot()"
+                                    :disabled="!remapFilamentId || saving"
+                                    class="text-xs bg-blue-600 hover:bg-blue-700 transition-colors text-white font-semibold px-3 py-1 rounded-lg flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                                    :title="'{{ t('bambu_remap_no_stock') }}'">
+                                    <i x-show="!saving" class="fa-solid fa-check"></i>
+                                    <i x-show="saving" class="fa-solid fa-spinner fa-spin"></i>
+                                    {{ t('bambu_remap_filament') }}
+                                </button>
+                                <button type="button" @click="remapping = false"
+                                    class="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded flex-shrink-0">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                            {% endif %}
+
                             {# Assign + deduct action — only relevant for multimaterial slots #}
-                            <div {% if not is_mm %}class="hidden"{% else %}x-show="!deducted" x-cloak class="flex items-center gap-2 ml-auto flex-wrap"{% endif %}>
+                            <div {% if not is_mm %}class="hidden"{% else %}x-show="!deducted && !remapping" x-cloak class="flex items-center gap-2 ml-auto flex-wrap"{% endif %}>
                                 <div class="relative" @click.outside="slotOpen = false">
                                     <input type="text"
                                         x-model="slotQ"
@@ -983,6 +1037,11 @@ function bambuSlotMap(jobId, slotId, initFilamentId, initFilamentLabel, initDedu
         slotFilamentId: initFilamentId || '',
         assignedLabel: initFilamentLabel || '',
         deducted: initDeducted,
+        remapping: false,
+        remapQ: initFilamentLabel || '',
+        remapOpen: false,
+        showAllRemapFilaments: false,
+        remapFilamentId: initFilamentId || '',
         slotMaterial: (slotMaterial || '').toLowerCase(),
         slotColorHex: _normHex(slotColorHex),
         saving: false,
@@ -1033,6 +1092,61 @@ function bambuSlotMap(jobId, slotId, initFilamentId, initFilamentLabel, initDedu
                 if (data.ok) {
                     if (data.filament_name) this.assignedLabel = data.filament_name;
                     this.deducted = data.deducted;
+                }
+            } catch (e) { /* network error — silently ignore */ }
+            finally {
+                this.saving = false;
+            }
+        },
+        get filteredRemapFilaments() {
+            const q = this.remapQ.toLowerCase().trim();
+            let base = _BF;
+            if (q) {
+                base = _BF.filter(f =>
+                    f.label.toLowerCase().includes(q)
+                    || f.mat.toLowerCase().includes(q)
+                    || (f.material_name || '').toLowerCase().includes(q)
+                    || (f.color_hex || '').toLowerCase().includes(q)
+                );
+            }
+            const ranked = _rankFilaments(base, this.slotMaterial, this.slotColorHex);
+            if (q || this.showAllRemapFilaments) return ranked;
+            return _suggestedFilaments(ranked, this.slotMaterial, this.slotColorHex);
+        },
+        get canShowAllRemapFilamentsButton() {
+            const q = this.remapQ.toLowerCase().trim();
+            if (q || this.showAllRemapFilaments) return false;
+            const ranked = _rankFilaments(_BF, this.slotMaterial, this.slotColorHex);
+            const suggested = _suggestedFilaments(ranked, this.slotMaterial, this.slotColorHex);
+            return suggested.length < ranked.length;
+        },
+        showAllRemapChoices() {
+            this.showAllRemapFilaments = true;
+            this.remapOpen = true;
+        },
+        selectRemap(id, label) {
+            this.remapFilamentId = id;
+            this.remapQ = label;
+            this.remapOpen = false;
+        },
+        async remapSlot() {
+            if (!this.remapFilamentId) return;
+            this.saving = true;
+            const fd = new FormData();
+            fd.append('slot_id', slotId);
+            fd.append('filament_id', this.remapFilamentId);
+            try {
+                const r = await fetch(`/bambu/job/${jobId}/remap-slot?ajax=1`, {
+                    method: 'POST',
+                    body: fd,
+                });
+                const data = await r.json();
+                if (data.ok) {
+                    if (data.filament_name) {
+                        this.assignedLabel = data.filament_name;
+                        this.remapQ = data.filament_name;
+                    }
+                    this.remapping = false;
                 }
             } catch (e) { /* network error — silently ignore */ }
             finally {

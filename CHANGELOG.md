@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.87.1] - 2026-06-17
+### Added
+- **Bambu filament remap with stock correction** — When reassigning a filament on an already-deducted Bambu print job, the stock is properly corrected: the old filament's weight is restored (logged as `add`) and the new filament is deducted (logged as `bambu_print`). Works for both single-material jobs (via the "Map filament" save panel) and individual AMS slots in multi-material jobs (via the new pencil-edit button). If the job/slot was not yet deducted, the remap only updates the FK with no stock change.
+
 ## [1.87.0] - 2026-06-17
 ### Added
 - **Interactive page tour system** (`static/js/tour.js`): `TourEngine` class with SVG spotlight overlay, per-step element highlighting with indigo glow ring, tooltip with Prev/Next/Finish/Close controls, progress dots, and smooth scroll-to-element. Tours are defined for all 11 sections: `overview`, `filaments`, `projects`, `calculator`, `stats`, `storage`, `settings`, `bambu`, `prusa`, `waste`, `maintenance`.
