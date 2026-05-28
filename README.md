@@ -20,6 +20,7 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 
 ### Projects & Client Workflow
 - **Project Management** — Track 3D print jobs as unified projects with client names, due dates, statuses (NEW → PRINTING → DONE), file attachments, and external links with rich preview cards.
+- **Project TODO Checklists** — Per-project task checklists with optional due dates. Overdue and near-deadline tasks are highlighted with colour-coded badges and surfaced automatically on the overview page in the Action Center hot list.
 - **Kanban Board** — Overview of all projects by status with paginated columns, due-date calendar strip, and estimate-vs-actual metrics.
 - **Activity Timeline** — Dedicated project tab showing a chronological timeline of all project events (quotes, uploads, comments, tasks) with colour-coded icons.
 - **File Versioning** — Re-uploading a file with the same name automatically creates a versioned history grouped under the root file.

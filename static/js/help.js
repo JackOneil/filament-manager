@@ -137,7 +137,7 @@
             id: 'projects',
             icon: 'fa-folder-open',
             hasTour: true,
-            endpoints: ['projects_index', 'project_create', 'project_detail', 'project_edit', 'project_add_file', 'project_delete_file', 'project_add_link', 'project_delete_link', 'project_add_comment', 'project_add_filament', 'project_remove_filament', 'project_add_quote', 'project_change_status', 'project_add_todo', 'project_toggle_todo', 'project_delete_todo'],
+            endpoints: ['projects_index', 'project_create', 'project_detail', 'project_edit', 'project_add_file', 'project_delete_file', 'project_add_link', 'project_delete_link', 'project_add_comment', 'project_add_filament', 'project_remove_filament', 'project_add_quote', 'project_change_status', 'project_add_todo', 'project_toggle_todo', 'project_delete_todo', 'project_edit_todo'],
             title: { cs: 'Projekty', en: 'Projects' },
             tips: [
                 {
@@ -171,8 +171,15 @@
                 {
                     title: { cs: 'Komentáře a úkoly', en: 'Comments and Todos' },
                     text: {
-                        cs: 'Každý projekt má kartu komentářů (Markdown s náhledem) a seznam úkolů (checklistů). Úkoly lze označit jako splněné kliknutím na checkbox. Komentáře jsou seřazeny chronologicky.',
-                        en: 'Each project has a comments tab (Markdown with preview) and a todo list (checklists). Todos can be marked as done by clicking the checkbox. Comments are sorted chronologically.'
+                        cs: 'Každý projekt má kartu komentářů (Markdown s náhledem) a kartu úkolů (TODO seznam). U každého úkolu lze nastavit volitelný termín splnění — červená ikona hodiny = po termínu, oranžová = blíží se termín. Úkoly lze přejmenovat přes tlačítko tužky přímo v řádku.',
+                        en: 'Each project has a comments tab (Markdown with preview) and a Todo tab. Each todo can have an optional due date — a red clock means overdue, orange means due soon. Todos can be renamed inline using the pencil button.'
+                    }
+                },
+                {
+                    title: { cs: 'Termíny úkolů v přehledu', en: 'Todo Due Dates in Overview' },
+                    text: {
+                        cs: 'Úkoly s prošlým nebo blížícím se termínem se automaticky zobrazují v sekci „Hoří teď" na hlavní stránce i jako samostatná karta v Akčním centru. Klik na řádek otevře přímo kartu Úkolů daného projektu.',
+                        en: 'Todos with overdue or approaching due dates are automatically shown in the hot list on the overview page and as a dedicated card in the Action Centre. Clicking a row opens the Todo tab of that project directly.'
                     }
                 },
                 {
