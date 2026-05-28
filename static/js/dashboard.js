@@ -185,6 +185,13 @@ function _dashMakeColorPickerBtn(currentColorId, onSelect) {
 //                        Set to 2 if the grid container uses md:grid-cols-2.
 //                        When 1, md:col-span-* classes are suppressed to prevent
 //                        implicit grid-column creation in a 1-col md grid.
+//
+// Features:
+//   • FLIP-animated live reorder during drag (items slide into position as you drag)
+//   • Clean pill-style drag ghost with subtle shadow
+//   • Resize handles with snap-to-grid
+//   • Colour pickers, visibility panel, row-limit selectors
+//   • localStorage persistence of order, sizes, heights, visibility, limits, colors
 // ─────────────────────────────────────────────────────────────────────────────
 function createWidgetLayoutManager(config) {
     var container = document.getElementById(config.containerId);
@@ -203,8 +210,11 @@ function createWidgetLayoutManager(config) {
     var dragSrc      = null;
     var dragGhostEl  = null;
     var resizeState  = null;
+    var _flipLock    = false;  // Prevent concurrent FLIP animations
 
-    // ── Storage ───────────────────────────────────────────────────────────────
+    // ========================================================================
+    //  STORAGE
+    // ========================================================================
     function loadLayout() {
         try {
             var raw = JSON.parse(localStorage.getItem(config.storageKey) || '{}');
@@ -235,7 +245,9 @@ function createWidgetLayoutManager(config) {
         localStorage.setItem(config.storageKey, JSON.stringify(layout));
     }
 
-    // ── CSS helpers ───────────────────────────────────────────────────────────
+    // ========================================================================
+    //  CSS HELPERS
+    // ========================================================================
     function clearSizeClasses(item) {
         item.className = item.className
             .replace(/\bxl:col-span-\d+\b/g, '')
@@ -252,8 +264,65 @@ function createWidgetLayoutManager(config) {
         return 'xl:col-span-' + size;
     }
 
-    // ── Layout apply ──────────────────────────────────────────────────────────
-    function applyLayout() {
+    // ========================================================================
+    //  FLIP ANIMATION — smooth reorder transitions
+    // ========================================================================
+    // Capture the current bounding rect of every widget (keyed by widget ID).
+    function _captureRects() {
+        var rects = {};
+        items().forEach(function(item) {
+            var id = item.dataset.widgetId;
+            if (id) rects[id] = item.getBoundingClientRect();
+        });
+        return rects;
+    }
+
+    // Animate all widgets from previously-captured positions to their current
+    // positions. The dragged element is skipped (its own opacity animation runs).
+    function _flipAnimate(beforeRects, duration) {
+        if (_flipLock) return;
+        _flipLock = true;
+        var dur = duration || 220;
+
+        var afterRects = _captureRects();
+        items().forEach(function(item) {
+            var id = item.dataset.widgetId;
+            if (!id) return;
+            if (item === dragSrc) return;           // dragged item has its own visual
+            if (item.dataset._flipAnimating === '1') return; // prevent double-animation
+
+            var b = beforeRects[id];
+            var a = afterRects[id];
+            if (!b || !a) return;
+
+            var dx = b.left - a.left;
+            var dy = b.top  - a.top;
+            if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+
+            item.dataset._flipAnimating = '1';
+            item.animate(
+                [
+                    { transform: 'translate(' + dx + 'px, ' + dy + 'px)' },
+                    { transform: 'translate(0, 0)' }
+                ],
+                {
+                    duration: dur,
+                    easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+                    fill: 'backwards'
+                }
+            ).onfinish = function() {
+                item.dataset._flipAnimating = '0';
+            };
+        });
+
+        // Release the lock after all animations should be done
+        setTimeout(function() { _flipLock = false; }, dur + 50);
+    }
+
+    // ========================================================================
+    //  LAYOUT APPLY — restore saved state on page load
+    // ========================================================================
+    function applyLayout(animate) {
         var map = {};
         items().forEach(function(item) {
             var id = item.dataset.widgetId;
@@ -390,15 +459,26 @@ function createWidgetLayoutManager(config) {
             }
         });
 
-        // Re-order DOM items
-        layout.order.forEach(function(id) {
-            if (map[id]) { container.appendChild(map[id]); delete map[id]; }
-        });
-        Object.values(map).forEach(function(item) { container.appendChild(item); });
+        // Re-order DOM items (with FLIP animation if requested)
+        if (animate && items().length > 0) {
+            var beforeRects = _captureRects();
+            layout.order.forEach(function(id) {
+                if (map[id]) { container.appendChild(map[id]); delete map[id]; }
+            });
+            Object.values(map).forEach(function(item) { container.appendChild(item); });
+            _flipAnimate(beforeRects, 280);
+        } else {
+            layout.order.forEach(function(id) {
+                if (map[id]) { container.appendChild(map[id]); delete map[id]; }
+            });
+            Object.values(map).forEach(function(item) { container.appendChild(item); });
+        }
         saveLayout();
     }
 
-    // ── Resize ────────────────────────────────────────────────────────────────
+    // ========================================================================
+    //  RESIZE
+    // ========================================================================
     function getMaxCols() {
         var m = (container.className || '').match(/xl:grid-cols-(\d+)/);
         return m ? parseInt(m[1], 10) : 4;
@@ -474,78 +554,186 @@ function createWidgetLayoutManager(config) {
         applyLayout();
     }
 
+    // ========================================================================
+    //  DRAG GHOST — clean pill-style badge
+    // ========================================================================
     function makeDragGhost(item) {
-        var rect = item.getBoundingClientRect();
-        var ghost = item.cloneNode(true);
-        ghost.classList.remove('drag-over', 'is-dragging', 'drag-source');
-        ghost.style.position = 'fixed';
-        ghost.style.top = '-9999px';
-        ghost.style.left = '-9999px';
-        ghost.style.width = Math.min(rect.width, 460) + 'px';
-        ghost.style.maxHeight = '220px';
-        ghost.style.overflow = 'hidden';
-        ghost.style.pointerEvents = 'none';
-        ghost.style.opacity = '0.92';
-        ghost.style.transform = 'rotate(1deg)';
-        ghost.style.boxShadow = '0 24px 55px rgba(15, 23, 42, 0.24)';
-        ghost.style.borderRadius = '14px';
-        ghost.style.zIndex = '9999';
-        document.body.appendChild(ghost);
-        return ghost;
+        var titleEl = item.querySelector('.dashboard-edit-bar span.text-sm') ||
+                      item.querySelector('h2') ||
+                      item.querySelector('[class*="font-bold"]');
+        var title = titleEl ? titleEl.textContent.trim().substring(0, 40) : 'Widget';
+
+        var wrapper = document.createElement('div');
+        wrapper.style.position = 'fixed';
+        wrapper.style.top = '-9999px';
+        wrapper.style.left = '-9999px';
+        wrapper.style.pointerEvents = 'none';
+        wrapper.style.zIndex = '9999';
+        wrapper.style.opacity = '0.95';
+        wrapper.style.transition = 'none';
+
+        // Inner pill
+        var pill = document.createElement('div');
+        pill.style.cssText =
+            'background:white;' +
+            'border-radius:12px;' +
+            'padding:10px 18px;' +
+            'box-shadow:0 16px 40px rgba(15,23,42,0.22),0 0 0 1px rgba(59,130,246,0.25);' +
+            'display:flex;align-items:center;gap:10px;' +
+            'font-family:"Plus Jakarta Sans",ui-sans-serif,system-ui,sans-serif;' +
+            'white-space:nowrap;';
+        pill.innerHTML =
+            '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#3b82f6;flex-shrink:0;"></span>' +
+            '<span style="font-weight:700;font-size:13px;color:#1e293b;">' + _escHtml(title) + '</span>';
+
+        wrapper.appendChild(pill);
+        document.body.appendChild(wrapper);
+        return wrapper;
     }
 
-    // ── Drag-to-reorder ───────────────────────────────────────────────────────
+    function _escHtml(str) {
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(str));
+        return div.innerHTML;
+    }
+
+    // ========================================================================
+    //  DRAG-TO-REORDER — with live FLIP-animated reorder
+    // ========================================================================
     function onDragStart(e) {
         if (resizeState) { e.preventDefault(); return; }
         dragSrc = this;
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', this.dataset.widgetId);
         container.classList.add('drag-session');
-        this.classList.add('drag-source');
+        this.classList.add('drag-source', 'is-dragging');
+
+        // Promote to own layer for smooth animations when other items FLIP
+        this.style.willChange = 'transform, opacity';
+        this.style.transition = 'none';
 
         try {
             dragGhostEl = makeDragGhost(this);
-            e.dataTransfer.setDragImage(dragGhostEl, 28, 22);
+            // Position ghost at cursor via a follow handler
+            var rect = this.getBoundingClientRect();
+            e.dataTransfer.setDragImage(dragGhostEl, Math.round(rect.width * 0.15), 20);
+            // Track ghost position manually for live cursor follow
+            document.addEventListener('dragover', _trackGhost);
         } catch (_err) {
             if (dragGhostEl && dragGhostEl.parentNode) {
                 dragGhostEl.parentNode.removeChild(dragGhostEl);
             }
             dragGhostEl = null;
         }
-
-        var self = this;
-        setTimeout(function() { self.classList.add('is-dragging'); }, 0);
     }
-    function onDragOver(e)  { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
-    function onDragEnter(e) { e.preventDefault(); if (this !== dragSrc) this.classList.add('drag-over'); }
-    function onDragLeave()  { this.classList.remove('drag-over'); }
+
+    // Track the ghost to follow cursor (native dragimage doesn't follow precisely)
+    function _trackGhost(e) {
+        if (!dragGhostEl) return;
+        dragGhostEl.style.left = (e.clientX + 16) + 'px';
+        dragGhostEl.style.top  = (e.clientY - 10) + 'px';
+    }
+
+    function onDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    }
+
+    function onDragEnter(e) {
+        e.preventDefault();
+        if (!dragSrc || this === dragSrc) return;
+
+        var allItems = items();
+        var srcIdx = allItems.indexOf(dragSrc);
+        var dstIdx = allItems.indexOf(this);
+        if (srcIdx < 0 || dstIdx < 0) return;
+
+        // Determine insertion point: above or below the midpoint of target
+        var targetRect = this.getBoundingClientRect();
+        var midY = targetRect.top + targetRect.height / 2;
+
+        // Capture positions before the move
+        var beforeRects = _captureRects();
+
+        // Compute new dstIdx after potential move
+        var newSrcIdx = allItems.indexOf(dragSrc);
+
+        if (e.clientY < midY) {
+            // Insert before target
+            if (newSrcIdx > dstIdx) {
+                // Moving up: insert dragSrc before target
+                container.insertBefore(dragSrc, this);
+            } else if (newSrcIdx < dstIdx - 1) {
+                // Target is further down, insert before the item just before target
+                container.insertBefore(dragSrc, this);
+            }
+        } else {
+            // Insert after target
+            if (newSrcIdx < dstIdx) {
+                // Moving down: insert dragSrc after target
+                container.insertBefore(dragSrc, this.nextSibling);
+            } else if (newSrcIdx > dstIdx + 1) {
+                // Target is further up, insert after target
+                container.insertBefore(dragSrc, this.nextSibling);
+            }
+        }
+
+        // Animate the layout shift
+        _flipAnimate(beforeRects, 200);
+
+        // Show insertion indicator on the target
+        // Remove from all first
+        allItems.forEach(function(item) { item.classList.remove('drag-insert-before', 'drag-insert-after'); });
+        // Add to current target
+        if (e.clientY < midY) {
+            this.classList.add('drag-insert-before');
+        } else {
+            this.classList.add('drag-insert-after');
+        }
+
+        // Visual highlight on the target area
+        this.classList.add('drag-over');
+
+        // Save layout progressively during drag for live feedback
+        saveLayout();
+    }
+
+    function onDragLeave(e) {
+        this.classList.remove('drag-over', 'drag-insert-before', 'drag-insert-after');
+    }
+
     function onDrop(e) {
-        e.preventDefault(); e.stopPropagation();
-        this.classList.remove('drag-over');
+        e.preventDefault();
+        e.stopPropagation();
+        this.classList.remove('drag-over', 'drag-insert-before', 'drag-insert-after');
+
         if (dragSrc && dragSrc !== this) {
-            var all    = items();
-            var srcIdx = all.indexOf(dragSrc);
-            var dstIdx = all.indexOf(this);
-            if (srcIdx < dstIdx) container.insertBefore(dragSrc, this.nextSibling);
-            else                 container.insertBefore(dragSrc, this);
+            // Items are already in the correct order from live reorder; just save
             saveLayout();
+            // Pulse animation on the drop target
             var dropTarget = this;
             dropTarget.classList.add('drop-pulse');
             setTimeout(function() {
                 dropTarget.classList.remove('drop-pulse');
-            }, 240);
+            }, 300);
         }
     }
+
     function onDragEnd() {
-        this.classList.remove('is-dragging');
-        this.classList.remove('drag-source');
-        items().forEach(function(i) { i.classList.remove('drag-over'); });
+        this.classList.remove('is-dragging', 'drag-source');
+        this.style.willChange = '';
+        this.style.transition = '';
+        items().forEach(function(i) {
+            i.classList.remove('drag-over', 'drag-insert-before', 'drag-insert-after');
+        });
         container.classList.remove('drag-session');
         if (dragGhostEl && dragGhostEl.parentNode) {
             dragGhostEl.parentNode.removeChild(dragGhostEl);
         }
         dragGhostEl = null;
         dragSrc = null;
+        document.removeEventListener('dragover', _trackGhost);
+        saveLayout();
     }
 
     function enableDrag() {
@@ -569,16 +757,22 @@ function createWidgetLayoutManager(config) {
             item.removeEventListener('dragleave', onDragLeave);
             item.removeEventListener('drop',      onDrop);
             item.removeEventListener('dragend',   onDragEnd);
-            item.classList.remove('drag-over', 'is-dragging', 'drag-source', 'drop-pulse');
+            item.classList.remove('drag-over', 'drag-insert-before', 'drag-insert-after',
+                                  'is-dragging', 'drag-source', 'drop-pulse');
+            item.style.willChange = '';
+            item.style.transition = '';
         });
         container.classList.remove('drag-session');
         if (dragGhostEl && dragGhostEl.parentNode) {
             dragGhostEl.parentNode.removeChild(dragGhostEl);
         }
         dragGhostEl = null;
+        document.removeEventListener('dragover', _trackGhost);
     }
 
-    // ── Visibility panel (shown in edit mode, lists all widgets) ─────────────
+    // ========================================================================
+    //  VISIBILITY PANEL — shown in edit mode, lists all widgets
+    // ========================================================================
     function syncVisibility() {
         var panel = document.getElementById(config.visibilityPanelId);
         if (!panel) return;
@@ -641,7 +835,9 @@ function createWidgetLayoutManager(config) {
         });
     }
 
-    // ── Controls / edit mode ──────────────────────────────────────────────────
+    // ========================================================================
+    //  CONTROLS / EDIT MODE
+    // ========================================================================
     function syncControls() {
         var scope = document.getElementById(config.scopeId) || container;
         var btn   = document.getElementById(config.editButtonId);
@@ -678,16 +874,28 @@ function createWidgetLayoutManager(config) {
     function moveUp(widgetId) {
         var all = items();
         var idx = all.findIndex(function(i) { return i.dataset.widgetId === widgetId; });
-        if (idx > 0) { container.insertBefore(all[idx], all[idx - 1]); saveLayout(); }
+        if (idx > 0) {
+            var beforeRects = _captureRects();
+            container.insertBefore(all[idx], all[idx - 1]);
+            saveLayout();
+            _flipAnimate(beforeRects, 200);
+        }
     }
 
     function moveDown(widgetId) {
         var all = items();
         var idx = all.findIndex(function(i) { return i.dataset.widgetId === widgetId; });
-        if (idx >= 0 && idx < all.length - 1) { container.insertBefore(all[idx + 1], all[idx]); saveLayout(); }
+        if (idx >= 0 && idx < all.length - 1) {
+            var beforeRects = _captureRects();
+            container.insertBefore(all[idx + 1], all[idx]);
+            saveLayout();
+            _flipAnimate(beforeRects, 200);
+        }
     }
 
-    // ── Row limits ────────────────────────────────────────────────────────────
+    // ========================================================================
+    //  ROW LIMITS
+    // ========================================================================
     function applyWidgetLimits() {
         items().forEach(function(item) {
             var id    = item.dataset.widgetId;
@@ -702,7 +910,9 @@ function createWidgetLayoutManager(config) {
         });
     }
 
-    // ── Reset ─────────────────────────────────────────────────────────────────
+    // ========================================================================
+    //  RESET
+    // ========================================================================
     function reset() {
         localStorage.removeItem(config.storageKey);
         layout = loadLayout();
@@ -715,13 +925,14 @@ function createWidgetLayoutManager(config) {
         applyWidgetLimits();
     }
 
-    // ── Init ──────────────────────────────────────────────────────────────────
+    // ========================================================================
+    //  INIT
+    // ========================================================================
     if (items().length > 0) {
-        applyLayout();
+        applyLayout();  // restore saved layout instantly, no animation on page load
         applyWidgetLimits();
         syncControls();
         syncVisibility();
-        applyLayout();
     }
 
     return { toggleEditMode: toggleEditMode, moveUp: moveUp, moveDown: moveDown, reset: reset };
@@ -936,6 +1147,13 @@ function createCardResizeManager(config) {
         });
     }
 
+    function applySizesAndLimits() {
+        applySizes();
+        applyHeights();
+        applyLimits();
+        applyColors();
+    }
+
     return {
         initHandles:  initHandles,
         applySize:    applySize,
@@ -946,5 +1164,6 @@ function createCardResizeManager(config) {
         applySizes:   applySizes,
         applyHeights: applyHeights,
         applyColors:  applyColors,
+        applySizesAndLimits: applySizesAndLimits,
     };
 }

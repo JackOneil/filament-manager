@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.89.0] - 2026-05-29
+### Changed
+- **Smooth dashboard drag-and-drop** — Completely rewritten widget reorder system with FLIP animations (First, Last, Invert, Play) using `Element.animate()`. Widgets now slide smoothly into position as you drag over them instead of jumping after drop. Animated insertion-line indicator with shimmer gradient shows exactly where the dragged widget will land. Clean new pill-shaped drag ghost replaces the old rotated clone. Resize handles scale up on hover for better affordance. Edit bars fade in with a subtle animation. All changes apply to both Overview and Projects dashboard layouts.
+
 ## [1.88.0] - 2026-05-29
 ### Added
 - **Overview "Lowest Stock" widget** — New dashboard widget on the overview page showing filaments sorted by remaining weight percentage (lowest first). Each filament row displays a colour swatch, name (linked to detail), brand/material info, remaining grams with status-coloured percentage, recommended-spools badge, and a shopping cart button linking to the configured shop URL (direct link → brand search → global template, in priority order). The widget is fully draggable, resizable, supports row-limit selection, and can be hidden/restored — just like all other overview widgets.

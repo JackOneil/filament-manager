@@ -746,49 +746,86 @@
         .dashboard-widget {
             position: relative;
             min-width: 0; /* prevent grid blowout */
-            transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease, outline-color 180ms ease;
+            transition: box-shadow 200ms ease, opacity 200ms ease;
         }
+        .layout-edit-mode .dashboard-widget {
+            transition: box-shadow 200ms ease, opacity 200ms ease;
+            will-change: transform;
+        }
+        /* ── Drag-over highlight — subtle blue glow ─────────────────────── */
         .dashboard-widget.drag-over {
-            outline: 2px dashed #3b82f6;
-            outline-offset: 4px;
+            box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.35);
             border-radius: 1rem;
-            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.16);
-            transform: translateY(-2px);
         }
         .dashboard-widget.drag-source {
-            outline: 2px solid rgba(59, 130, 246, 0.55);
-            outline-offset: 3px;
+            outline: 2px solid rgba(59, 130, 246, 0.45);
+            outline-offset: 2px;
             border-radius: 1rem;
         }
         .dashboard-widget.is-dragging {
-            opacity: 0.18;
+            opacity: 0.22;
             transform: scale(0.985);
-            filter: saturate(0.86);
+            filter: saturate(0.7) brightness(0.98);
+            transition: opacity 150ms ease, transform 150ms ease, filter 150ms ease;
         }
         .layout-edit-mode .drag-session .dashboard-widget:not(.is-dragging):not(.drag-over) {
-            opacity: 0.84;
+            opacity: 0.78;
         }
         .layout-edit-mode .dashboard-widget:not(.is-dragging):not(.drag-over) {
             opacity: 0.94;
         }
+        /* ── Insertion line indicator ──────────────────────────────────── */
+        .dashboard-widget.drag-insert-before::before,
+        .dashboard-widget.drag-insert-after::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 3px;
+            border-radius: 2px;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6, #3b82f6);
+            background-size: 200% 100%;
+            animation: insert-line-shimmer 0.8s linear infinite;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .dashboard-widget.drag-insert-before::before {
+            top: -3px;
+        }
+        .dashboard-widget.drag-insert-after::after {
+            bottom: -3px;
+        }
+        @keyframes insert-line-shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        /* ── Drop pulse animation ──────────────────────────────────────── */
         .dashboard-widget.drop-pulse {
-            animation: dashboard-drop-pulse 240ms ease-out;
+            animation: dashboard-drop-pulse 300ms ease-out;
         }
         @keyframes dashboard-drop-pulse {
             0% {
                 transform: scale(0.985);
-                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.35);
+                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4), inset 0 0 0 2px rgba(59, 130, 246, 0.3);
+            }
+            50% {
+                box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.15), inset 0 0 0 2px rgba(59, 130, 246, 0.1);
             }
             100% {
                 transform: scale(1);
-                box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+                box-shadow: 0 0 0 18px rgba(59, 130, 246, 0), inset 0 0 0 2px rgba(59, 130, 246, 0);
             }
         }
         .dashboard-edit-bar {
             display: none;
+            animation: edit-bar-in 200ms ease-out both;
         }
         .layout-edit-mode .dashboard-edit-bar {
             display: flex;
+        }
+        @keyframes edit-bar-in {
+            from { opacity: 0; transform: translateY(-4px); }
+            to   { opacity: 1; transform: translateY(0); }
         }
         /* ── Resize handle ─────────────────────────────────────────── */
         .resize-handle {
@@ -807,12 +844,16 @@
             border-radius: 0 0 1rem 0;
             user-select: none;
             -webkit-user-select: none;
+            transition: color 150ms ease, transform 150ms ease;
         }
         .layout-edit-mode .resize-handle,
         #stats-page.edit-mode .resize-handle {
             display: flex;
         }
-        .resize-handle:hover { color: #3b82f6; }
+        .resize-handle:hover {
+            color: #3b82f6;
+            transform: scale(1.15);
+        }
         .resize-dragging,
         .resize-dragging * { cursor: se-resize !important; user-select: none !important; }
         /* Prevent inner panels from blowing out their grid column */

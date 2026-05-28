@@ -39,8 +39,8 @@
                 {
                     title: { cs: 'Přeuspořádání widgetů', en: 'Rearranging Widgets' },
                     text: {
-                        cs: 'Klikněte na tlačítko „Upravit rozvržení" vpravo nahoře. Widgety pak lze přetahovat, měnit jejich šířku pomocí úchytu a skrývat. Nastavení se uloží do prohlížeče a přežije i obnovení stránky.',
-                        en: 'Click "Edit layout" in the top right. Widgets can then be dragged, resized with the handle, and hidden. The layout is saved in the browser and survives page refresh.'
+                        cs: 'Klikněte na tlačítko „Upravit rozvržení" vpravo nahoře. Widgety lze přetahovat — ostatní widgety se plynule posunou, aby uvolnily místo. Barevná linka ukazuje, kam se widget přesune. Šířku změníte tahem za úchyt v pravém dolním rohu, výšku tahem dolů. Widgety lze také skrýt a znovu zobrazit přes panel viditelnosti. Vše se ukládá do prohlížeče.',
+                        en: 'Click "Edit layout" in the top right. Widgets can be dragged — other widgets smoothly slide aside to make room. A coloured line shows where the widget will land. Resize by dragging the handle in the bottom-right corner (width) or pulling down (height). Widgets can also be hidden and restored via the visibility panel. Everything is saved in the browser.'
                     }
                 },
                 {
@@ -152,6 +152,13 @@
                     text: {
                         cs: 'Projekty jsou uspořádány do sloupců podle stavu: Návrh → Schváleno → Tisk → Dokončeno → Zrušeno. Přepněte na tabulkové zobrazení kliknutím na ikonu tabulky vpravo nahoře.',
                         en: 'Projects are arranged in columns by status: Draft → Approved → Printing → Done → Cancelled. Switch to table view by clicking the table icon in the top right.'
+                    }
+                },
+                {
+                    title: { cs: 'Přeuspořádání widgetů', en: 'Rearranging Widgets' },
+                    text: {
+                        cs: 'Klikněte na tlačítko „Upravit rozvržení" vpravo nahoře. Sloupce Kanbanu a tabulku projektů lze přetahovat — ostatní widgety se plynule posunou, aby uvolnily místo. Barevná linka ukazuje, kam se widget přesune. Šířku změníte tahem za úchyt v pravém dolním rohu. Widgety lze skrýt přes panel viditelnosti. Nastavení se ukládá do prohlížeče.',
+                        en: 'Click "Edit layout" in the top right. Kanban columns and the project table can be dragged — other widgets smoothly slide aside to make room. A coloured line shows where the widget will land. Resize by dragging the handle in the bottom-right corner. Widgets can be hidden via the visibility panel. Settings are saved in the browser.'
                     }
                 },
                 {
