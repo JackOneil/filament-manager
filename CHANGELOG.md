@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.87.3] - 2026-06-18
+### Added
+- **TODO due dates** — Each project TODO item can now have an optional due date (`due_date` column on `project_todo`). A date picker appears in both the add form and the inline edit form.
+- **Due date badges on TODO items** — When a due date is set, a coloured badge is shown next to the task: red (“Po termínu” / “Overdue”) if the date is past, amber (“Blíží se termín” / “Due soon”) within the next 3 days, or a neutral calendar badge otherwise. Completed tasks show the date as crossed-out text.
+- **Action Center integration** — Overdue and due-within-3-days TODO items from active projects now appear in the “Hoří teď” hot-items list on the overview page and in a dedicated action-center card, linking directly to the TODO tab of the project.
+- Translation keys added to both `cs` and `en`: `project_todo_due_date`, `project_todo_overdue`, `project_todo_due_soon`.
+
+## [1.87.2] - 2026-06-17
+### Added
+- **Project TODO dedicated tab** — Moved the TODO list from the project detail sidebar into its own full-width "Úkoly / To-Do" tab with a cleaner layout: progress bar, filter pills (All / Open / Done), and a prominent add form.
+- **Inline edit for TODO items** — Each TODO item now has a pencil button that expands an inline edit form within the row. Changes are saved via the new `project_edit_todo` endpoint (`POST /projects/<id>/todos/<todo_id>/edit`). Pressing Escape cancels the edit.
+- **Filter pills** — Client-side Alpine.js filter pills allow switching between all, open, and done items without a page reload.
+- **Compact TODO summary card** in the sidebar shows the done/total count and a direct button to open the TODO tab.
+- Translation keys: `project_workspace_tab_todos`, `project_todo_edit`, `project_todo_edit_save`, `project_todo_edit_cancel`, `project_todo_filter_all`, `project_todo_filter_open`, `project_todo_filter_done` added to both `cs` and `en`.
+
 ## [1.87.1] - 2026-06-17
 ### Added
 - **Bambu filament remap with stock correction** — When reassigning a filament on an already-deducted Bambu print job, the stock is properly corrected: the old filament's weight is restored (logged as `add`) and the new filament is deducted (logged as `bambu_print`). Works for both single-material jobs (via the "Map filament" save panel) and individual AMS slots in multi-material jobs (via the new pencil-edit button). If the job/slot was not yet deducted, the remap only updates the FK with no stock change.

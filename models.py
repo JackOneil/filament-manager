@@ -292,6 +292,7 @@ class ProjectTodo(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True, index=True)
     body = db.Column(db.String(255), nullable=False)
     is_done = db.Column(db.Boolean, nullable=False, default=False)
+    due_date = db.Column(db.Date, nullable=True)
     created_at = db.Column(db.DateTime, default=_utc_now, index=True)
     completed_at = db.Column(db.DateTime, nullable=True)
 

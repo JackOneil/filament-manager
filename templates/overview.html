@@ -213,6 +213,32 @@
                             <span class="ui-badge ui-badge-critical flex-shrink-0">{{ t('status_' ~ project.status|lower) }}</span>
                         </a>
                         {% endfor %}
+                        {% for todo in action_center.overdue_todos %}
+                        {% set ns.has_items = true %}
+                        <a href="{{ url_for('project_detail', id=todo.project_id) }}?tab=todos" class="flex items-center justify-between gap-3 rounded-2xl border border-white/60 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60 px-4 py-3 hover:border-red-200 dark:hover:border-red-700 transition">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span class="w-2 h-2 rounded-full bg-red-500 flex-shrink-0"></span>
+                                <div class="min-w-0">
+                                    <div class="font-semibold text-gray-800 dark:text-slate-100 truncate">{{ todo.project.name }}: {{ todo.body | truncate(50, true, '…') }}</div>
+                                    <div class="text-xs text-red-600 mt-0.5">{{ t('project_todo_overdue') }}: {{ todo.due_date.strftime('%d.%m.%Y') }}</div>
+                                </div>
+                            </div>
+                            <span class="ui-badge ui-badge-critical flex-shrink-0">{{ t('project_todo_overdue') }}</span>
+                        </a>
+                        {% endfor %}
+                        {% for todo in action_center.upcoming_todos %}
+                        {% set ns.has_items = true %}
+                        <a href="{{ url_for('project_detail', id=todo.project_id) }}?tab=todos" class="flex items-center justify-between gap-3 rounded-2xl border border-white/60 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60 px-4 py-3 hover:border-amber-200 dark:hover:border-amber-700 transition">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span class="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0"></span>
+                                <div class="min-w-0">
+                                    <div class="font-semibold text-gray-800 dark:text-slate-100 truncate">{{ todo.project.name }}: {{ todo.body | truncate(50, true, '…') }}</div>
+                                    <div class="text-xs text-amber-600 mt-0.5">{{ t('project_todo_due_soon') }}: {{ todo.due_date.strftime('%d.%m.%Y') }}</div>
+                                </div>
+                            </div>
+                            <span class="ui-badge ui-badge-warning flex-shrink-0">{{ t('project_todo_due_soon') }}</span>
+                        </a>
+                        {% endfor %}
                         {% if not ns.has_items %}
                         <div class="rounded-2xl border border-dashed border-gray-200 dark:border-slate-700 px-4 py-8 text-center text-sm text-gray-400">{{ t('overview_all_clear') }}</div>
                         {% endif %}
@@ -465,11 +491,34 @@
                             {% for project in action_center.overdue_projects %}
                             <a href="{{ url_for('project_detail', id=project.id) }}" class="block rounded-xl border border-red-100 dark:border-red-900/40 bg-white/70 dark:bg-slate-800/60 px-3 py-2 hover:border-red-300 dark:hover:border-red-700 transition">
                                 <div class="font-semibold text-gray-800 dark:text-slate-100">{{ project.name }}</div>
-                                <div class="text-xs text-red-600">{{ project.due_date.strftime('%d.%m.%Y') }} · {{ t('project_status') }} {{ t('status_' ~ project.status|lower) }}</div>
+                                <div class="text-xs text-red-600">{{ project.due_date.strftime('%d.%m.%Y') }} &middot; {{ t('project_status') }} {{ t('status_' ~ project.status|lower) }}</div>
                             </a>
                             {% else %}
                             <p class="text-sm text-gray-400">{{ t('overview_no_due_issues') }}</p>
                             {% endfor %}
+                        </div>
+                    </div>
+                    <div class="action-center-card card-danger p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="ui-badge ui-badge-critical"><i class="fa-solid fa-list-check"></i> {{ t('project_todo_overdue') }} / {{ t('project_todo_due_soon') }}</span>
+                            <span class="text-sm text-gray-500">{{ action_center.counts.overdue_todos + action_center.counts.upcoming_todos }}</span>
+                        </div>
+                        <div class="space-y-2">
+                            {% for todo in action_center.overdue_todos %}
+                            <a href="{{ url_for('project_detail', id=todo.project_id) }}?tab=todos" class="block rounded-xl border border-red-100 dark:border-red-900/40 bg-white/70 dark:bg-slate-800/60 px-3 py-2 hover:border-red-300 dark:hover:border-red-700 transition">
+                                <div class="font-semibold text-gray-800 dark:text-slate-100 truncate">{{ todo.project.name }}: {{ todo.body | truncate(50, true, '…') }}</div>
+                                <div class="text-xs text-red-600">{{ todo.due_date.strftime('%d.%m.%Y') }} &middot; {{ t('project_todo_overdue') }}</div>
+                            </a>
+                            {% endfor %}
+                            {% for todo in action_center.upcoming_todos %}
+                            <a href="{{ url_for('project_detail', id=todo.project_id) }}?tab=todos" class="block rounded-xl border border-amber-100 dark:border-amber-900/40 bg-white/70 dark:bg-slate-800/60 px-3 py-2 hover:border-amber-300 dark:hover:border-amber-700 transition">
+                                <div class="font-semibold text-gray-800 dark:text-slate-100 truncate">{{ todo.project.name }}: {{ todo.body | truncate(50, true, '…') }}</div>
+                                <div class="text-xs text-amber-600">{{ todo.due_date.strftime('%d.%m.%Y') }} &middot; {{ t('project_todo_due_soon') }}</div>
+                            </a>
+                            {% endfor %}
+                            {% if not action_center.overdue_todos and not action_center.upcoming_todos %}
+                            <p class="text-sm text-gray-400">{{ t('overview_no_due_issues') }}</p>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="action-center-card card-brand p-4">

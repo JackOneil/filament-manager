@@ -8,7 +8,7 @@ import socket
 import threading
 import time
 from collections import Counter
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from urllib.parse import urljoin, urlparse, urlunparse
 
 import requests
@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 from database import db
 from models import (
     AppSetting, BambuJobMaterial, BambuPrintJob, MovementHistory,
-    Project, PrusaPrintJob, PrusaPrinter, FilamentUndoLog, ProjectFilament,
+    Project, ProjectTodo, PrusaPrintJob, PrusaPrinter, FilamentUndoLog, ProjectFilament,
     Filament, Material, Color,
 )
 
@@ -778,6 +778,36 @@ def build_action_center(now=None):
         .all()
     )
 
+    today = now.date()
+    overdue_todos = (
+        ProjectTodo.query
+        .join(Project)
+        .filter(
+            ProjectTodo.is_done == False,
+            ProjectTodo.due_date.is_not(None),
+            ProjectTodo.due_date < today,
+            Project.status != 'DONE',
+        )
+        .order_by(ProjectTodo.due_date.asc())
+        .limit(6)
+        .all()
+    )
+    upcoming_limit = today + timedelta(days=3)
+    upcoming_todos = (
+        ProjectTodo.query
+        .join(Project)
+        .filter(
+            ProjectTodo.is_done == False,
+            ProjectTodo.due_date.is_not(None),
+            ProjectTodo.due_date >= today,
+            ProjectTodo.due_date <= upcoming_limit,
+            Project.status != 'DONE',
+        )
+        .order_by(ProjectTodo.due_date.asc())
+        .limit(6)
+        .all()
+    )
+
     unmapped_bambu = (
         BambuPrintJob.query
         .filter(
@@ -871,6 +901,8 @@ def build_action_center(now=None):
     result = {
         'low_stock': low_stock_rows[:6],
         'overdue_projects': overdue_projects,
+        'overdue_todos': overdue_todos,
+        'upcoming_todos': upcoming_todos,
         'unmapped_bambu': unmapped_bambu,
         'unmapped_prusa': unmapped_prusa,
         'printer_issues': printer_issues[:6],
@@ -878,6 +910,8 @@ def build_action_center(now=None):
         'counts': {
             'low_stock': len(low_stock_rows),
             'overdue_projects': len(overdue_projects),
+            'overdue_todos': len(overdue_todos),
+            'upcoming_todos': len(upcoming_todos),
             'unmapped_jobs': len(unmapped_bambu) + len(unmapped_prusa),
             'printer_issues': len(printer_issues),
         },

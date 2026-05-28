@@ -150,6 +150,7 @@ def run_migrations(app: Flask) -> None:
         # ── Printer Specific Power Profile ───────────────────────────────────
         _safe_alter(app, "ALTER TABLE bambu_printer ADD COLUMN power_draw_watts INTEGER DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN power_draw_watts INTEGER DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE project_todo ADD COLUMN due_date DATE DEFAULT NULL")
 
         # ── Seed data (only runs once on fresh database) ─────────────────────
         if not Brand.query.first():

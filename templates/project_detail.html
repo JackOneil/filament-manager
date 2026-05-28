@@ -164,6 +164,7 @@
             <button type="button" @click="setTab('materials')" :class="workspaceTab === 'materials' ? 'ui-badge ui-badge-brand' : 'ui-badge'">{{ t('project_workspace_tab_materials') }}</button>
             <button type="button" @click="setTab('files')" :class="workspaceTab === 'files' ? 'ui-badge ui-badge-brand' : 'ui-badge'">{{ t('project_workspace_tab_files') }}</button>
             <button type="button" @click="setTab('jobs')" :class="workspaceTab === 'jobs' ? 'ui-badge ui-badge-brand' : 'ui-badge'">{{ t('project_workspace_tab_jobs') }}</button>
+            <button type="button" @click="setTab('todos')" :class="workspaceTab === 'todos' ? 'ui-badge ui-badge-brand' : 'ui-badge'"><i class="fa-solid fa-list-check"></i> {{ t('project_workspace_tab_todos') }}{% if project_todos %} <span class="ml-1 opacity-70">({{ todo_done_count }}/{{ project_todos|length }})</span>{% endif %}</button>
             <button type="button" @click="setTab('activity')" :class="workspaceTab === 'activity' ? 'ui-badge ui-badge-brand' : 'ui-badge'"><i class="fa-solid fa-timeline"></i> {{ t('project_tab_activity') }}</button>
         </div>
     </div>
@@ -174,52 +175,14 @@
                 <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.16),transparent_34%)] pointer-events-none"></div>
                 <div class="relative">
                     <div class="ui-label">{{ t('project_todo_title') }}</div>
-                    <h2 class="text-2xl font-bold mt-2">{{ t('project_todo_heading') }}</h2>
-                    <p class="text-sm text-gray-500 mt-2">{{ t('project_todo_desc') }}</p>
-                    {% if can_edit_project %}
-                    <form method="POST" action="{{ url_for('project_add_todo', id=project.id) }}" class="ui-card-soft p-4 mt-4">
-                        <div class="flex flex-col sm:flex-row gap-2">
-                            <input type="text" name="body" maxlength="255" required class="flex-1 min-w-0 border border-gray-300 rounded-xl px-4 py-2.5" placeholder="{{ t('project_todo_placeholder') }}">
-                            <button type="submit" class="shrink-0 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-semibold transition sm:w-auto">{{ t('save') }}</button>
-                        </div>
-                    </form>
-                    {% endif %}
-                    <div class="space-y-3 mt-4">
-                        {% for todo in project_todos %}
-                        <div class="rounded-2xl border border-white/70 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60 px-4 py-3">
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="flex items-start gap-3 min-w-0">
-                                    {% if can_edit_project %}
-                                    <form method="POST" action="{{ url_for('project_toggle_todo', id=project.id, todo_id=todo.id) }}">
-                                        <button type="submit" class="mt-0.5 w-6 h-6 rounded-full border flex items-center justify-center transition {% if todo.is_done %}bg-emerald-500 border-emerald-500 text-white{% else %}border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500{% endif %}" aria-label="{{ t('project_todo_toggle') }}">
-                                            <i class="fa-solid fa-check text-xs"></i>
-                                        </button>
-                                    </form>
-                                    {% else %}
-                                    <span class="mt-0.5 w-6 h-6 rounded-full border flex items-center justify-center {% if todo.is_done %}bg-emerald-500 border-emerald-500 text-white{% else %}border-gray-300 text-gray-300{% endif %}">
-                                        <i class="fa-solid fa-check text-xs"></i>
-                                    </span>
-                                    {% endif %}
-                                    <div class="min-w-0">
-                                        <div class="text-sm font-semibold {% if todo.is_done %}line-through text-gray-500{% else %}text-gray-800 dark:text-slate-200{% endif %}">{{ todo.body }}</div>
-                                        <div class="text-xs text-gray-400 mt-1">
-                                            {% if todo.user %}{{ todo.user.name }} · {% endif %}
-                                            {{ todo.created_at | fmt_dt('%d.%m.%Y %H:%M') }}
-                                            {% if todo.is_done and todo.completed_at %} · {{ t('project_todo_done_at') }} {{ todo.completed_at | fmt_dt('%d.%m.%Y %H:%M') }}{% endif %}
-                                        </div>
-                                    </div>
-                                </div>
-                                {% if can_edit_project %}
-                                <form method="POST" action="{{ url_for('project_delete_todo', id=project.id, todo_id=todo.id) }}" onsubmit="return confirm('{{ t('delete') }}?');">
-                                    <button type="submit" class="text-gray-400 hover:text-red-500 transition"><i class="fa-solid fa-trash"></i></button>
-                                </form>
-                                {% endif %}
-                            </div>
-                        </div>
-                        {% else %}
-                        <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{{ t('project_todo_empty') }}</div>
-                        {% endfor %}
+                    <div class="flex items-baseline gap-2 mt-2">
+                        <span class="text-3xl font-bold">{{ todo_done_count }}/{{ project_todos|length }}</span>
                     </div>
+                    <p class="text-sm text-gray-500 mt-1">{{ t('project_todo_summary') }}</p>
+                    <button type="button" @click="setTab('todos')"
+                        class="mt-4 w-full text-center bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition">
+                        <i class="fa-solid fa-list-check mr-1"></i> {{ t('project_workspace_tab_todos') }}
+                    </button>
                 </div>
             </div>
 
@@ -293,6 +256,8 @@
 
         <section class="space-y-4 order-1">
             {% include '_project_overview.html' %}
+
+            {% include '_project_todos.html' %}
 
             <div x-show="workspaceTab === 'materials'" x-cloak class="space-y-4">
                 <div class="ui-panel relative z-20">

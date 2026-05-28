@@ -2,7 +2,7 @@ import math
 import os
 import threading
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from types import SimpleNamespace
 
 from flask import abort, current_app, flash, jsonify, redirect, render_template, request, send_from_directory, url_for, Blueprint
@@ -761,7 +761,7 @@ def register(app):
         show_bambu_jobs = bool(setting and setting.bambu_token)
         show_prusa_jobs = PrusaPrinter.query.filter_by(enabled=True).first() is not None
         active_tab = request.args.get('tab', 'overview')
-        if active_tab not in {'overview', 'materials', 'files', 'jobs', 'activity'}:
+        if active_tab not in {'overview', 'materials', 'files', 'jobs', 'activity', 'todos'}:
             active_tab = 'overview'
 
         bambu_powers = {p.device_id: p.power_draw_watts for p in BambuPrinter.query.all() if p.device_id}
@@ -825,6 +825,7 @@ def register(app):
             project_print_items=project_print_items,
             print_items_total=print_items_total,
             print_items_done=print_items_done,
+            today_date=utc_now().date(),
             can_edit_project=_project_write_allowed(project),
             can_manage_project=is_admin(),
         )
@@ -1197,13 +1198,21 @@ def register(app):
         body = request.form.get('body', '').strip()
         user = get_current_user()
         if body:
+            due_date_str = request.form.get('due_date', '').strip()
+            due_date = None
+            if due_date_str:
+                try:
+                    due_date = date.fromisoformat(due_date_str)
+                except ValueError:
+                    pass
             db.session.add(ProjectTodo(
                 project_id=project.id,
                 user_id=user.id if user else None,
                 body=body[:255],
+                due_date=due_date,
             ))
             db.session.commit()
-        return _project_detail_redirect(id, 'overview')
+        return _project_detail_redirect(id, 'todos')
 
     @bp.route('/projects/<int:id>/todos/<int:todo_id>/toggle', methods=['POST'])
     def project_toggle_todo(id, todo_id):
@@ -1216,7 +1225,7 @@ def register(app):
         todo.is_done = not todo.is_done
         todo.completed_at = utc_now() if todo.is_done else None
         db.session.commit()
-        return _project_detail_redirect(id, 'overview')
+        return _project_detail_redirect(id, 'todos')
 
     @bp.route('/projects/<int:id>/todos/<int:todo_id>/delete', methods=['POST'])
     def project_delete_todo(id, todo_id):
@@ -1228,7 +1237,29 @@ def register(app):
             abort(404)
         db.session.delete(todo)
         db.session.commit()
-        return _project_detail_redirect(id, 'overview')
+        return _project_detail_redirect(id, 'todos')
+
+    @bp.route('/projects/<int:id>/todos/<int:todo_id>/edit', methods=['POST'])
+    def project_edit_todo(id, todo_id):
+        project = _project_or_404(id)
+        if not _project_write_allowed(project):
+            abort(403)
+        todo = db.get_or_404(ProjectTodo, todo_id)
+        if todo.project_id != id:
+            abort(404)
+        body = request.form.get('body', '').strip()
+        if body:
+            todo.body = body[:255]
+        due_date_str = request.form.get('due_date', '').strip()
+        if due_date_str:
+            try:
+                todo.due_date = date.fromisoformat(due_date_str)
+            except ValueError:
+                pass
+        elif 'due_date' in request.form:
+            todo.due_date = None
+        db.session.commit()
+        return _project_detail_redirect(id, 'todos')
 
     # ── Print items (pieces tracking) ─────────────────────────────────────────
 

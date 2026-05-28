@@ -283,6 +283,7 @@ def register(app):
                     'user': _user_ref(todo.user),
                     'body': todo.body,
                     'is_done': todo.is_done,
+                    'due_date': todo.due_date.isoformat() if todo.due_date else None,
                     'created_at': todo.created_at.isoformat() if todo.created_at else None,
                     'completed_at': todo.completed_at.isoformat() if todo.completed_at else None,
                 } for todo in proj.todos],
@@ -519,7 +520,7 @@ def register(app):
 
     @bp.route('/import', methods=['POST'])
     def import_data():
-        from datetime import datetime
+        from datetime import datetime, date
         file = request.files.get('file')
         if not file or file.filename == '':
             return redirect(url_for('settings'))
@@ -813,6 +814,7 @@ def register(app):
                                 user_id=todo_user.id if todo_user else None,
                                 body=(todo_data.get('body') or '')[:255],
                                 is_done=todo_data.get('is_done', False),
+                                due_date=date.fromisoformat(todo_data['due_date']) if todo_data.get('due_date') else None,
                                 created_at=todo_ts,
                                 completed_at=datetime.fromisoformat(todo_data['completed_at']) if todo_data.get('completed_at') else None,
                             ))
