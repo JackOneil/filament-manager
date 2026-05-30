@@ -291,25 +291,99 @@ def _overview_focus(action_center, live_printers, now=None):
             Project.due_date >= today_start,
         )
         .order_by(Project.due_date.asc(), Project.created_at.desc())
-        .limit(15)
+        .limit(30)
         .all()
     )
 
-    from utils import collect_usage_windows
+    from utils import collect_usage_windows, translate
 
     seven_days_ago = datetime.combine(now.date() - timedelta(days=6), datetime.min.time())
-    recent_movements = MovementHistory.query.filter(
-        MovementHistory.action_type.in_(('remove', 'bambu_print')),
+    kpi_trend_cutoff = datetime.combine(now.date() - timedelta(days=7), datetime.min.time())
+
+    # All movements in the last 7 days (for usage_7d bars + kpi trends)
+    all_movements_7d = MovementHistory.query.filter(
         MovementHistory.created_at >= seven_days_ago
     ).all()
-    
+
     usage_7d = [0.0] * 7
-    for row in recent_movements:
-        if row.weight:
-            row_date = (row.created_at or now).date()
-            days_ago = (now.date() - row_date).days
+    net_grams_7d = 0.0
+    net_spools_7d = 0
+    for row in all_movements_7d:
+        w = float(row.weight or 0)
+        row_date = (row.created_at or now).date()
+        days_ago = (now.date() - row_date).days
+        if row.action_type in ('remove', 'bambu_print'):
             if 0 <= days_ago < 7:
-                 usage_7d[6 - days_ago] += row.weight
+                usage_7d[6 - days_ago] += w
+            net_grams_7d -= w
+        elif row.action_type in ('add', 'bulk_add_weight', 'bulk_add_spool'):
+            net_grams_7d += w
+            if row.action_type == 'bulk_add_spool':
+                net_spools_7d += 1
+        elif row.action_type == 'bulk_remove_spool':
+            net_grams_7d -= w
+            net_spools_7d -= 1
+
+    new_projects_7d = Project.query.filter(
+        Project.created_at >= kpi_trend_cutoff
+    ).count()
+
+    # Prints this week vs last week (calendar weeks, Mon–Sun)
+    days_since_monday = now.weekday()
+    this_week_start = datetime.combine(now.date() - timedelta(days=days_since_monday), datetime.min.time())
+    last_week_start = this_week_start - timedelta(days=7)
+
+    prints_this_week = (
+        BambuPrintJob.query.filter(BambuPrintJob.started_at >= this_week_start).count()
+        + PrusaPrintJob.query.filter(PrusaPrintJob.started_at >= this_week_start).count()
+    )
+    prints_last_week = (
+        BambuPrintJob.query.filter(
+            BambuPrintJob.started_at >= last_week_start,
+            BambuPrintJob.started_at < this_week_start,
+        ).count()
+        + PrusaPrintJob.query.filter(
+            PrusaPrintJob.started_at >= last_week_start,
+            PrusaPrintJob.started_at < this_week_start,
+        ).count()
+    )
+    prints_delta = prints_this_week - prints_last_week
+
+    def _trend(delta, unit=''):
+        sign = '+' if delta >= 0 else ''
+        return {
+            'delta': delta,
+            'delta_str': f'{sign}{delta:,}{unit}',
+            'dir': 'up' if delta > 0 else ('down' if delta < 0 else 'flat'),
+        }
+
+    kpi_trends = {
+        'total_remaining': _trend(int(round(net_grams_7d)), ' g'),
+        'total_spools': _trend(net_spools_7d),
+        'active_projects': {'delta': new_projects_7d, 'delta_str': f'+{new_projects_7d}', 'dir': 'up' if new_projects_7d > 0 else 'flat'},
+        'live_printers': {
+            'delta': prints_delta,
+            'delta_str': ('+' if prints_delta >= 0 else '') + str(prints_delta),
+            'dir': 'up' if prints_delta > 0 else ('down' if prints_delta < 0 else 'flat'),
+            'period': 'last_week',
+        },
+    }
+
+    # Day labels for usage_7d chart (translation keys)
+    usage_7d_labels = []
+    for i in range(7):
+        day_date = now.date() - timedelta(days=6 - i)
+        usage_7d_labels.append('today' if i == 6 else f'weekday_{day_date.weekday()}')
+
+    # Mini-calendar days (next 7 days from today)
+    mini_cal_days = []
+    for i in range(7):
+        cal_date = today_start.date() + timedelta(days=i)
+        mini_cal_days.append({
+            'date': cal_date,
+            'day_key': f'weekday_{cal_date.weekday()}',
+            'is_today': i == 0,
+        })
                  
     all_filaments = Filament.query.options(joinedload(Filament.brand), joinedload(Filament.material), joinedload(Filament.color)).all()
     usage_windows = collect_usage_windows(all_filaments, now=now)
@@ -367,8 +441,13 @@ def _overview_focus(action_center, live_printers, now=None):
         'upcoming_deadlines': upcoming_deadlines,
         'active_projects': active_projects,
         'usage_7d': usage_7d,
+        'usage_7d_labels': usage_7d_labels,
         'top_turnover_month': top_turnover_month,
         'recent_activity': recent_activity,
+        'kpi_trends': kpi_trends,
+        'mini_cal_days': mini_cal_days,
+        'prints_this_week': prints_this_week,
+        'prints_last_week': prints_last_week,
     }
 
 

@@ -52,6 +52,7 @@ SECTION_BY_ENDPOINT = {
     'filaments_index': SECTION_FILAMENTS,
     'filament_detail': SECTION_FILAMENTS,
     'api_filaments_list': SECTION_FILAMENTS,
+    'api_live_printers_partial': SECTION_OVERVIEW,
     'add': SECTION_FILAMENTS,
     'edit': SECTION_FILAMENTS,
     'use_filament': SECTION_FILAMENTS,

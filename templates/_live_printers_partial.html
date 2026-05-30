@@ -1,0 +1,63 @@
+{% if live_printers %}
+<div class="space-y-3 overflow-y-auto flex-1 min-h-0">
+    {% for lp in live_printers %}
+    <div class="rounded-xl border border-gray-100 dark:border-slate-700 bg-white/60 dark:bg-slate-800/50 px-4 py-3">
+        <div class="flex items-center justify-between gap-3 mb-2">
+            <div class="flex items-center gap-2 min-w-0">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0 animate-pulse"></span>
+                <span class="font-semibold text-gray-800 dark:text-slate-100 truncate">{{ lp.printer.name }}</span>
+                {% if lp.printer.printer_model %}
+                <span class="ui-badge text-xs">{{ lp.printer.printer_model }}</span>
+                {% endif %}
+            </div>
+            {% if lp.type == 'prusa' %}
+            <span class="ui-badge ui-badge-brand text-xs">Prusa · {{ lp.progress_pct }}%</span>
+            {% elif lp.progress_pct is not none %}
+            <span class="ui-badge ui-badge-brand text-xs">Bambu · {{ lp.progress_pct }}%</span>
+            {% else %}
+            <span class="ui-badge ui-badge-brand text-xs">Bambu</span>
+            {% endif %}
+        </div>
+        <div class="text-sm font-medium text-gray-700 dark:text-slate-300 truncate mb-2">
+            {{ lp.job.display_name or lp.job.file_name or t('overview_unknown_job') }}
+        </div>
+        {% if lp.progress_pct is not none %}
+        <div class="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden mb-1">
+            <div class="{% if lp.type == 'prusa' %}bg-blue-500{% else %}bg-teal-500{% endif %} h-full rounded-full transition-all" style="width: {{ lp.progress_pct }}%;"></div>
+        </div>
+        {% elif lp.type == 'bambu' %}
+        <div class="w-full h-1.5 rounded-full overflow-hidden bg-gray-100 dark:bg-slate-700 mb-1">
+            <div class="h-full rounded-full bg-gradient-to-r from-teal-400 via-blue-500 to-teal-400 bg-[length:200%_100%] animate-[shimmer_1.5s_linear_infinite]"></div>
+        </div>
+        {% endif %}
+        {% if lp.type == 'bambu' and lp.job.material_swatches %}
+        <div class="flex gap-1 mt-2 flex-wrap">
+            {% for swatch in lp.job.material_swatches %}
+            <div class="flex items-center gap-1 text-xs text-gray-500 dark:text-slate-400">
+                <span class="w-3 h-3 rounded-full border border-gray-200 flex-shrink-0" style="background-color: {{ swatch.color_hex }};"></span>
+                <span>{{ swatch.material_name }}{% if swatch.weight_grams %} · {{ swatch.weight_grams|round(1) }}g{% endif %}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% elif lp.type == 'prusa' and lp.job.weight_grams %}
+        <div class="text-xs text-gray-500 dark:text-slate-400 mt-1">
+            <i class="fa-solid fa-weight-hanging text-gray-400 mr-1"></i>{{ lp.job.weight_grams|round(1) }} g
+        </div>
+        {% endif %}
+        <div class="flex items-center justify-between text-xs text-gray-400 mt-1 gap-2">
+            {% if lp.job.started_at %}
+            <span>{{ t('overview_started') }} {{ lp.job.started_at | fmt_dt('%d.%m') }} <span class="text-gray-300 dark:text-slate-500 mx-0.5">·</span> {{ lp.job.started_at | fmt_dt('%H:%M') }}</span>
+            {% endif %}
+            {% if lp.eta_at %}
+            <span class="text-emerald-600 dark:text-emerald-400 font-medium">{{ t('overview_eta') }} {{ lp.eta_at | fmt_dt('%d.%m') }} <span class="text-emerald-300 dark:text-emerald-700 mx-0.5">·</span> {{ lp.eta_at | fmt_dt('%H:%M') }}</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="flex flex-col items-center justify-center py-8 text-gray-400 gap-2 flex-1">
+    <i class="fa-solid fa-print text-3xl opacity-30"></i>
+    <p class="text-sm">{{ t('overview_no_live_printers') }}</p>
+</div>
+{% endif %}

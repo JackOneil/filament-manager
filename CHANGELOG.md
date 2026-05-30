@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.90.0] - 2026-06-18
+### Added
+- **KPI trend arrows on overview cards** — Each selectable KPI card on the admin overview now shows a coloured trend indicator (arrow + delta value) for metrics that have 7-day movement data: `total_remaining` (net weight change), `total_spools` (net spool change), `active_projects` (new projects created this week). Trend arrows are green for up, red for down, gray for flat.
+- **Auto-refresh for Live Printers widget** — The live printers section on the overview page now refreshes automatically every 60 seconds via a new `GET /api/overview/live-printers` endpoint. A spinner indicator is shown briefly during refresh. Live printer content extracted into reusable `_live_printers_partial.html`.
+- **Day names in 7-day usage chart** — The bar chart axis now shows abbreviated weekday names (Po–Ne / Mon–Sun) instead of a static "-7 … today" label.
+- **Mini-calendar deadlines widget** — The "Upcoming Deadlines" widget now displays a 7-day mini-calendar grid with coloured dots for each project due that day (colour-coded by status: blue = printing, green = approved, amber = pending approval). Below the calendar a compact list shows the nearest deadlines, plus an overflow count for projects beyond the 7-day window.
+- Translation keys added to both `cs` and `en`: `kpi_trend_vs_7d`, `weekday_0`–`weekday_6`, `overview_mini_cal_title`, `overview_mini_cal_no_events`, `overview_mini_cal_more`, `overview_live_printers_auto_refresh`.
+
 ## [1.89.0] - 2026-05-29
 ### Changed
 - **Smooth dashboard drag-and-drop** — Completely rewritten widget reorder system with FLIP animations (First, Last, Invert, Play) using `Element.animate()`. Widgets now slide smoothly into position as you drag over them instead of jumping after drop. Animated insertion-line indicator with shimmer gradient shows exactly where the dragged widget will land. Clean new pill-shaped drag ghost replaces the old rotated clone. Resize handles scale up on hover for better affordance. Edit bars fade in with a subtle animation. All changes apply to both Overview and Projects dashboard layouts.

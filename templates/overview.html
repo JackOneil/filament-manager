@@ -107,17 +107,22 @@
                      @click.away="closeAll()">
                     {# Pass all available metrics as JSON #}
                     <script>
+                    const _KPI_TRENDS = {{ overview_focus.kpi_trends | tojson }};
+                    const _KPI_PERIOD_LABELS = {
+                        '7d':        {{ t('kpi_trend_vs_7d')|tojson }},
+                        'last_week': {{ t('kpi_trend_vs_last_week')|tojson }},
+                    };
                     function kpiCards() {
                         const ALL = {
-                            total_value:      { label: {{ t('total_value')|tojson }},      value: {{ '{:,.0f}'.format(stats.value)|tojson }},               sub: {{ (stats.spools|string ~ ' ' ~ t('total_spools')|lower)|tojson }},     color: 'text-emerald-500' },
-                            total_remaining:  { label: {{ t('total_remaining')|tojson }},  value: {{ ('{:.1f}'.format(stats.remaining/1000) ~ ' kg')|tojson }}, sub: '',                                                                    color: 'text-teal-500' },
-                            total_spools:     { label: {{ t('total_spools')|tojson }},     value: {{ stats.spools|tojson }},                                  sub: '',                                                                    color: 'text-sky-500' },
-                            due_today:        { label: {{ t('overview_command_center_due_today')|tojson }}, value: {{ overview_focus.due_today_total|tojson }},sub: {{ t('projects_due_calendar_title')|tojson }},                         color: 'text-amber-500' },
-                            active_projects:  { label: {{ t('overview_command_center_active')|tojson }},   value: {{ overview_focus.active_total|tojson }},   sub: {{ (overview_focus.printing_total|string ~ ' ' ~ t('status_printing')|lower)|tojson }}, color: 'text-sky-600' },
-                            printing_now:     { label: {{ t('status_printing')|tojson }},  value: {{ overview_focus.printing_total|tojson }},                 sub: '',                                                                    color: 'text-violet-500' },
-                            live_printers:    { label: {{ t('overview_live_printers_title')|tojson }}, value: {{ overview_focus.live_total|tojson }},          sub: {{ t('overview_recent_prints_title')|tojson }},                        color: 'text-emerald-600' },
-                            low_stock:        { label: {{ t('low_stock')|tojson }},        value: {{ action_center.low_stock|length|tojson }},                sub: '',                                                                    color: 'text-orange-500' },
-                            overdue:          { label: {{ t('overview_due_dates_title')|tojson }}, value: {{ action_center.overdue_projects|length|tojson }},  sub: '',                                                                    color: 'text-red-500' },
+                            total_value:      { label: {{ t('total_value')|tojson }},      value: {{ '{:,.0f}'.format(stats.value)|tojson }},               sub: {{ (stats.spools|string ~ ' ' ~ t('total_spools')|lower)|tojson }},     color: 'text-emerald-500', trend: null },
+                            total_remaining:  { label: {{ t('total_remaining')|tojson }},  value: {{ ('{:.1f}'.format(stats.remaining/1000) ~ ' kg')|tojson }}, sub: '',                                                                    color: 'text-teal-500',    trend: _KPI_TRENDS.total_remaining || null },
+                            total_spools:     { label: {{ t('total_spools')|tojson }},     value: {{ stats.spools|tojson }},                                  sub: '',                                                                    color: 'text-sky-500',     trend: _KPI_TRENDS.total_spools || null },
+                            due_today:        { label: {{ t('overview_command_center_due_today')|tojson }}, value: {{ overview_focus.due_today_total|tojson }},sub: {{ t('projects_due_calendar_title')|tojson }},                         color: 'text-amber-500',   trend: null },
+                            active_projects:  { label: {{ t('overview_command_center_active')|tojson }},   value: {{ overview_focus.active_total|tojson }},   sub: {{ (overview_focus.printing_total|string ~ ' ' ~ t('status_printing')|lower)|tojson }}, color: 'text-sky-600', trend: _KPI_TRENDS.active_projects || null },
+                            printing_now:     { label: {{ t('status_printing')|tojson }},  value: {{ overview_focus.printing_total|tojson }},                 sub: '',                                                                    color: 'text-violet-500',  trend: null },
+                            live_printers:    { label: {{ t('overview_live_printers_title')|tojson }}, value: {{ overview_focus.live_total|tojson }},          sub: {{ (overview_focus.prints_this_week|string ~ ' ' ~ t('kpi_prints_this_week'))|tojson }}, color: 'text-emerald-600', trend: _KPI_TRENDS.live_printers || null },
+                            low_stock:        { label: {{ t('low_stock')|tojson }},        value: {{ action_center.low_stock|length|tojson }},                sub: '',                                                                    color: 'text-orange-500',  trend: null },
+                            overdue:          { label: {{ t('overview_due_dates_title')|tojson }}, value: {{ action_center.overdue_projects|length|tojson }},  sub: '',                                                                    color: 'text-red-500',     trend: null },
                         };
                         const DEFAULT_SLOTS = ['total_value', 'due_today', 'active_projects', 'live_printers'];
                         const STORAGE_KEY = 'overview_kpi_v1';
@@ -135,6 +140,16 @@
                             selectMetric(slotIdx, key) { this.slots[slotIdx] = key; this.openMenu = null; localStorage.setItem(STORAGE_KEY, JSON.stringify(this.slots)); },
                             closeAll() { this.openMenu = null; },
                             metricLabel(key) { return (ALL[key] || {}).label || key; },
+                            trendIcon(dir) {
+                                if (dir === 'up') return 'fa-arrow-trend-up';
+                                if (dir === 'down') return 'fa-arrow-trend-down';
+                                return 'fa-minus';
+                            },
+                            trendColor(dir) {
+                                if (dir === 'up') return 'text-emerald-500';
+                                if (dir === 'down') return 'text-red-400';
+                                return 'text-gray-400';
+                            },
                         };
                     }
                     </script>
@@ -166,6 +181,14 @@
                             <div class="text-xs font-semibold uppercase tracking-[0.18em]" :class="metric(slotIdx).color" x-text="metric(slotIdx).label"></div>
                             <div class="text-xl sm:text-3xl font-bold mt-2 leading-none" x-text="metric(slotIdx).value"></div>
                             <div class="text-sm text-gray-500 mt-2" x-text="metric(slotIdx).sub || ''"></div>
+                            {# Trend indicator — only shown when trend data is available #}
+                            <template x-if="metric(slotIdx).trend">
+                                <div class="mt-2 flex items-center gap-1.5" :class="trendColor(metric(slotIdx).trend.dir)">
+                                    <i class="fa-solid text-xs" :class="trendIcon(metric(slotIdx).trend.dir)"></i>
+                                    <span class="text-xs font-semibold" x-text="metric(slotIdx).trend.delta_str"></span>
+                                    <span class="text-xs text-gray-400" x-text="_KPI_PERIOD_LABELS[metric(slotIdx).trend.period || '7d'] || ''"></span>
+                                </div>
+                            </template>
                         </div>
                     </template>
                 </div>
@@ -368,76 +391,38 @@
                         <div class="ui-label">{{ t('overview_live_printers_label') }}</div>
                         <h2 class="text-xl font-bold mt-1">{{ t('overview_live_printers_title') }}</h2>
                     </div>
-                    <div class="flex gap-2">
+                    <div class="flex gap-2 items-center">
+                        <span id="live-printers-refresh-indicator" class="text-xs text-gray-400 hidden">
+                            <i class="fa-solid fa-rotate fa-spin text-blue-400 mr-1"></i>
+                        </span>
                         <a href="{{ url_for('bambu_jobs') }}" class="ui-badge"><i class="fa-solid fa-print"></i> Bambu</a>
                         <a href="{{ url_for('prusa_jobs') }}" class="ui-badge"><i class="fa-solid fa-network-wired"></i> Prusa</a>
                     </div>
                 </div>
-                {% if live_printers %}
-                <div class="space-y-3 overflow-y-auto flex-1 min-h-0">
-                    {% for lp in live_printers %}
-                    <div class="rounded-xl border border-gray-100 dark:border-slate-700 bg-white/60 dark:bg-slate-800/50 px-4 py-3">
-                        <div class="flex items-center justify-between gap-3 mb-2">
-                            <div class="flex items-center gap-2 min-w-0">
-                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0 animate-pulse"></span>
-                                <span class="font-semibold text-gray-800 dark:text-slate-100 truncate">{{ lp.printer.name }}</span>
-                                {% if lp.printer.printer_model %}
-                                <span class="ui-badge text-xs">{{ lp.printer.printer_model }}</span>
-                                {% endif %}
-                            </div>
-                            {% if lp.type == 'prusa' %}
-                            <span class="ui-badge ui-badge-brand text-xs">Prusa · {{ lp.progress_pct }}%</span>
-                            {% elif lp.progress_pct is not none %}
-                            <span class="ui-badge ui-badge-brand text-xs">Bambu · {{ lp.progress_pct }}%</span>
-                            {% else %}
-                            <span class="ui-badge ui-badge-brand text-xs">Bambu</span>
-                            {% endif %}
-                        </div>
-                        <div class="text-sm font-medium text-gray-700 dark:text-slate-300 truncate mb-2">
-                            {{ lp.job.display_name or lp.job.file_name or t('overview_unknown_job') }}
-                        </div>
-                        {% if lp.progress_pct is not none %}
-                        <div class="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden mb-1">
-                            <div class="{% if lp.type == 'prusa' %}bg-blue-500{% else %}bg-teal-500{% endif %} h-full rounded-full transition-all" style="width: {{ lp.progress_pct }}%;"></div>
-                        </div>
-                        {% elif lp.type == 'bambu' %}
-                        <div class="w-full h-1.5 rounded-full overflow-hidden bg-gray-100 dark:bg-slate-700 mb-1">
-                            <div class="h-full rounded-full bg-gradient-to-r from-teal-400 via-blue-500 to-teal-400 bg-[length:200%_100%] animate-[shimmer_1.5s_linear_infinite]"></div>
-                        </div>
-                        {% endif %}
-                        {% if lp.type == 'bambu' and lp.job.material_swatches %}
-                        <div class="flex gap-1 mt-2 flex-wrap">
-                            {% for swatch in lp.job.material_swatches %}
-                            <div class="flex items-center gap-1 text-xs text-gray-500 dark:text-slate-400">
-                                <span class="w-3 h-3 rounded-full border border-gray-200 flex-shrink-0" style="background-color: {{ swatch.color_hex }};"></span>
-                                <span>{{ swatch.material_name }}{% if swatch.weight_grams %} · {{ swatch.weight_grams|round(1) }}g{% endif %}</span>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        {% elif lp.type == 'prusa' and lp.job.weight_grams %}
-                        <div class="text-xs text-gray-500 dark:text-slate-400 mt-1">
-                            <i class="fa-solid fa-weight-hanging text-gray-400 mr-1"></i>{{ lp.job.weight_grams|round(1) }} g
-                        </div>
-                        {% endif %}
-                        <div class="flex items-center justify-between text-xs text-gray-400 mt-1 gap-2">
-                            {% if lp.job.started_at %}
-                            <span>{{ t('overview_started') }} {{ lp.job.started_at | fmt_dt('%d.%m') }} <span class="text-gray-300 dark:text-slate-500 mx-0.5">·</span> {{ lp.job.started_at | fmt_dt('%H:%M') }}</span>
-                            {% endif %}
-                            {% if lp.eta_at %}
-                            <span class="text-emerald-600 dark:text-emerald-400 font-medium">{{ t('overview_eta') }} {{ lp.eta_at | fmt_dt('%d.%m') }} <span class="text-emerald-300 dark:text-emerald-700 mx-0.5">·</span> {{ lp.eta_at | fmt_dt('%H:%M') }}</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endfor %}
+                <div id="live-printers-content" class="flex flex-col flex-1 min-h-0">
+                    {% include '_live_printers_partial.html' %}
                 </div>
-                {% else %}
-                <div class="flex flex-col items-center justify-center py-8 text-gray-400 gap-2 flex-1">
-                    <i class="fa-solid fa-print text-3xl opacity-30"></i>
-                    <p class="text-sm">{{ t('overview_no_live_printers') }}</p>
-                </div>
-                {% endif %}
             </div>
         </section>
+        <script>
+        (function() {
+            var refreshInterval = setInterval(function() {
+                var indicator = document.getElementById('live-printers-refresh-indicator');
+                var content = document.getElementById('live-printers-content');
+                if (!content) { clearInterval(refreshInterval); return; }
+                if (indicator) indicator.classList.remove('hidden');
+                fetch('/api/overview/live-printers')
+                    .then(function(r) { return r.ok ? r.json() : null; })
+                    .then(function(data) {
+                        if (data && data.html) { content.innerHTML = data.html; }
+                        if (indicator) indicator.classList.add('hidden');
+                    })
+                    .catch(function() {
+                        if (indicator) indicator.classList.add('hidden');
+                    });
+            }, 60000);
+        })();
+        </script>
 
         <section class="dashboard-widget md:col-span-2 xl:col-span-4" data-widget-id="action_center">
             <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
@@ -663,20 +648,62 @@
             </div>
             <div class="ui-panel h-full">
                 <div class="ui-label">{{ t('overview_deadlines_label') }}</div>
-                <h2 class="text-xl font-bold mb-4">{{ t('overview_upcoming_projects_title') }}</h2>
-                <div class="space-y-3">
-                   {% for project in overview_focus.upcoming_deadlines %}
-                   <a href="{{ url_for('project_detail', id=project.id) }}" class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-slate-700 hover:border-blue-200 dark:hover:border-blue-700 transition bg-white/50 dark:bg-slate-800/50" data-row-index="{{ loop.index0 }}">
-                       <div class="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold shrink-0">{{ project.due_date.strftime('%d') }}</div>
-                       <div class="min-w-0 flex-1">
-                           <div class="font-bold text-gray-800 dark:text-slate-100 truncate">{{ project.name }}</div>
-                           <div class="text-xs text-gray-500 dark:text-slate-400">{{ project.due_date.strftime('%b %Y') }} · {{ t('status_' ~ project.status|lower) }}</div>
-                       </div>
-                   </a>
-                   {% else %}
-                   <div class="text-sm text-gray-400">{{ t('overview_no_deadlines') }}</div>
-                   {% endfor %}
+                <h2 class="text-xl font-bold mb-4">{{ t('overview_mini_cal_title') }}</h2>
+                {# 7-day mini-calendar grid #}
+                <div class="grid grid-cols-7 gap-1 mb-4">
+                    {% for cal_day in overview_focus.mini_cal_days %}
+                    {% set ns = namespace(day_projects=[]) %}
+                    {% for p in overview_focus.upcoming_deadlines %}
+                        {% if p.due_date and p.due_date.date() == cal_day.date %}
+                            {% set ns.day_projects = ns.day_projects + [p] %}
+                        {% endif %}
+                    {% endfor %}
+                    <div class="flex flex-col items-center gap-1 min-w-0">
+                        <div class="text-xs text-gray-400 dark:text-slate-500">{{ t(cal_day.day_key) }}</div>
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold {% if cal_day.is_today %}bg-blue-500 text-white{% else %}bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300{% endif %}">
+                            {{ cal_day.date.day }}
+                        </div>
+                        <div class="flex flex-col gap-0.5 w-full items-center">
+                            {% for p in ns.day_projects[:3] %}
+                            <a href="{{ url_for('project_detail', id=p.id) }}" title="{{ p.name }}"
+                               class="w-2 h-2 rounded-full {% if p.status == 'PRINTING' %}bg-blue-500{% elif p.status == 'APPROVED' %}bg-emerald-500{% elif p.status == 'PENDING_APPROVAL' %}bg-amber-400{% else %}bg-gray-400{% endif %}">
+                            </a>
+                            {% endfor %}
+                            {% if ns.day_projects|length > 3 %}
+                            <span class="text-xs text-gray-400">+{{ ns.day_projects|length - 3 }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
+                {# Upcoming list — projects with deadline in next 7 days, sorted by date #}
+                {% set cal_end = overview_focus.mini_cal_days[-1].date %}
+                {% set upcoming_in_range = [] %}
+                {% for p in overview_focus.upcoming_deadlines %}
+                    {% if p.due_date and p.due_date.date() <= cal_end %}
+                        {% if upcoming_in_range.append(p) %}{% endif %}
+                    {% endif %}
+                {% endfor %}
+                {% if upcoming_in_range %}
+                <div class="space-y-2 mt-1">
+                    {% for project in upcoming_in_range[:5] %}
+                    <a href="{{ url_for('project_detail', id=project.id) }}" class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition" data-row-index="{{ loop.index0 }}">
+                        <div class="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xs shrink-0">{{ project.due_date.strftime('%d') }}</div>
+                        <div class="min-w-0 flex-1">
+                            <div class="font-semibold text-sm text-gray-800 dark:text-slate-100 truncate">{{ project.name }}</div>
+                            <div class="text-xs text-gray-500 dark:text-slate-400">{{ project.due_date.strftime('%d.%m') }} · {{ t('status_' ~ project.status|lower) }}</div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-sm text-gray-400 mt-2">{{ t('overview_mini_cal_no_events') }}</div>
+                {% endif %}
+                {# Count of projects with deadlines beyond the 7-day window #}
+                {% set beyond_count = overview_focus.upcoming_deadlines | selectattr('due_date') | list | length - upcoming_in_range | length %}
+                {% if beyond_count > 0 %}
+                <div class="text-xs text-gray-400 mt-3 text-center">{{ t('overview_mini_cal_more').replace('{n}', beyond_count|string) }}</div>
+                {% endif %}
             </div>
         </section>
 
@@ -700,9 +727,10 @@
                     </div>
                     {% endfor %}
                 </div>
-                <div class="flex justify-between text-xs text-gray-400 mt-2">
-                    <span>-7</span>
-                    <span>{{ t('today') }}</span>
+                <div class="flex justify-between text-xs text-gray-400 mt-1">
+                    {% for lbl in overview_focus.usage_7d_labels %}
+                    <div class="flex-1 text-center">{{ t(lbl) }}</div>
+                    {% endfor %}
                 </div>
             </div>
         </section>

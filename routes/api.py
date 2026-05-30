@@ -230,4 +230,16 @@ def register(app):
                 })
                 
         return jsonify({'results': results})
+
+    @bp.route('/api/overview/live-printers')
+    def api_live_printers_partial():
+        user = get_current_user()
+        if not user or not is_admin(user):
+            from flask import abort
+            abort(403)
+        from routes.inventory import _live_printers
+        live = _live_printers()
+        html = render_template('_live_printers_partial.html', live_printers=live)
+        return jsonify({'html': html})
+
     app.register_blueprint(bp)
