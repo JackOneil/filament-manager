@@ -1,7 +1,10 @@
 """
 Route registration helpers.
-Each module exposes a register(app) function that attaches routes directly onto
-the Flask app — no Blueprints, so url_for('endpoint') works in templates as-is.
+
+Each module exposes a register(app) function that creates a Flask Blueprint
+and registers it on the app. A custom url_for BuildError fallback handler
+(in app.py) resolves legacy unprefixed endpoint names to blueprint-prefixed
+ones, so url_for('endpoint') works as-is in templates.
 """
 from routes.inventory import register as register_inventory
 from routes.auth import register as register_auth

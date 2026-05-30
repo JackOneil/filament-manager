@@ -61,6 +61,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>
 <body x-data="appShell()" x-init="init()" class="flex h-[100dvh] overflow-hidden bg-[var(--ui-bg)] antialiased">
+    <script id="swipe-routes-data" type="application/json">{{ {"index": {"next": url_for("filaments_index"), "prev": none}, "filaments_index": {"next": url_for("projects_index"), "prev": url_for("index")}, "projects_index": {"next": none, "prev": url_for("filaments_index")}} | tojson }}</script>
     {% set endpoint = (request.endpoint or '').split('.')[-1] %}
     
     <!--Sidebar-->

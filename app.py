@@ -13,7 +13,8 @@ Structure:
     api.py             — /api/filaments-list, /api/search  (AJAX)
     calculator.py      — /calculator + print history
     history.py         — /history  (movement log)
-    settings.py        — /settings, /export, /import
+    settings.py        — /settings, dictionary management, integrations
+    backup.py          — /export, /import
     projects.py        — /projects, /projects/<id>/*, comments, files, todos, quotes
     bambu.py           — /bambu, Bambu Cloud sync + job mapping
     prusa.py           — /prusa, PrusaLink polling + job mapping
@@ -49,7 +50,7 @@ from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
 
-APP_VERSION = '1.93.1'
+APP_VERSION = '1.93.2'
 
 csrf = CSRFProtect()
 

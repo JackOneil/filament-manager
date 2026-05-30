@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.93.2] - 2026-05-30
+### Fixed
+- **Codebase cleanup — Quick Wins batch 1** — Fixed six structural issues identified in the comprehensive `CODE_IMPROVEMENTS.md` audit:
+  - Corrected contradictory docstrings in `routes/__init__.py`, `routes/bambu.py`, and `routes/prusa.py` to accurately state that Flask Blueprints are used (with a `url_for` fallback handler for legacy templates).
+  - Fixed non-functional mobile swipe navigation — `static/js/mobile-ux.js` previously contained Jinja2 `url_for()` template syntax that was never rendered (static JS). Replaced with an inline `<script type="application/json">` block in `base.html` providing route URLs as JSON, read by the JS at runtime.
+  - Removed 11 unused imports from `routes/settings.py`: `base64`, `gzip`, `io`, `json`, `os`, `tarfile`, `uuid`, `secure_filename`, `Response`, `decrypt_token`, `utc_now` + 19 unused model imports.
+  - Fixed `pytest.ini` — removed `--html=test_report.html --self-contained-html` args that required the missing `pytest-html` plugin.
+  - Updated `app.py` docstring to correctly attribute export/import to `backup.py` (not `settings.py`).
+  - Updated `.github/copilot-instructions.md` Rule 15 from `routes/settings.py` → `routes/backup.py`.
+- **Documentation** — Added `CODE_IMPROVEMENTS.md` containing a detailed audit of 20 code quality issues with priorities and suggested fix roadmap.
+
 ## [1.93.1] - 2026-05-30
 ### Fixed
 - **Projects search flicker** — Replaced destructive full-DOM replacement on every keystroke with targeted inner-content updates via DOMParser fragment extraction. The widget shells, search inputs, and layout manager remain stable during AJAX filtering, eliminating visual flicker. Added AbortController to cancel in-flight requests on new filter changes and deduplication guard (`_fetchPending`) to prevent concurrent fetches.

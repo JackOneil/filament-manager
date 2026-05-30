@@ -8,7 +8,8 @@ header. Only the current job state is available (no cloud history), so
 this integration polls each printer periodically and records completed
 or in-progress print jobs.
 
-No Flask Blueprints — all routes are registered directly on the app object.
+Routes are registered via a Flask Blueprint (prusa). A url_for fallback
+handler in app.py maps unprefixed endpoint names to blueprint-prefixed ones.
 """
 import json
 import logging

@@ -30,11 +30,11 @@
             const maxSwipeVerticalDeviation = 60; // to prevent horizontal swipe triggering on diagonal/vertical scroll
 
             const currentEndpoint = window.__helpEndpoint;
-            const swipeRoutes = {
-                'index': { next: "{{ url_for('filaments_index') }}", prev: null },
-                'filaments_index': { next: "{{ url_for('projects_index') }}", prev: "{{ url_for('index') }}" },
-                'projects_index': { next: null, prev: "{{ url_for('filaments_index') }}" }
-            };
+            const swipeRoutesEl = document.getElementById('swipe-routes-data');
+            let swipeRoutes = {};
+            if (swipeRoutesEl) {
+                try { swipeRoutes = JSON.parse(swipeRoutesEl.textContent); } catch (e) { /* ignore */ }
+            }
 
             if (currentEndpoint && swipeRoutes[currentEndpoint]) {
                 document.addEventListener('touchstart', e => {

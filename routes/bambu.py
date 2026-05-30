@@ -2,7 +2,8 @@
 Bambu Lab Cloud integration — idempotent print-job sync, job list, manual
 filament mapping, and stock deduction.
 
-No Flask Blueprints — all routes are registered directly on the app object.
+Routes are registered via a Flask Blueprint (bambu). A url_for fallback
+handler in app.py maps unprefixed endpoint names to blueprint-prefixed ones.
 """
 import json
 import math

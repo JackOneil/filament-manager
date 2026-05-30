@@ -321,7 +321,7 @@ When modifying this project, always follow these rules:
 
 ### Rule 15 — Backup Schema (Export / Import)
 
-The `/export` and `/import` functions in `routes/settings.py` must cover the **entire persistent application state**:
+The `/export` and `/import` functions in `routes/backup.py` must cover the **entire persistent application state**:
 
 | Category             | Tables / Data                                                          |
 |----------------------|------------------------------------------------------------------------|
