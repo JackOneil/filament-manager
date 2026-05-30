@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.94.2] - 2026-05-30
+### Fixed
+- **Bambu job card detail cleanup** — The expanded Bambu job detail no longer renders a second model thumbnail. Thumbnail fetching and preview remain unchanged in the job card header, so each job now shows only one preview image.
+
 ## [1.94.1] - 2026-05-30
 ### Fixed
 - **Bambu filament assignment search without diacritics** — In Bambu print history mapping UI, filament search now ignores diacritics for both single-material job mapping and multi-material AMS slot mapping/remapping. Typing terms without Czech accents now correctly matches records that contain accented characters.
