@@ -30,38 +30,72 @@
 
     <!-- TAB: Printers (diagnostics) -->
     <div x-show="activeTab === 'printers'" x-cloak>
+    <div id="printer-health-summary" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+        <div class="flex items-center gap-2 mb-4 border-b pb-3">
+            <i class="fa-solid fa-heart-pulse text-emerald-500"></i>
+            <h2 class="text-xl font-bold text-gray-800">{{ t('settings_printer_health_title') }}</h2>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="rounded-lg border border-gray-100 bg-gray-50 p-4">
+                <div class="text-xs font-semibold text-gray-500 uppercase">{{ t('settings_printer_last_sync') }}</div>
+                <div class="text-sm font-semibold text-gray-800 mt-1">
+                    {% if printer_health.last_sync_at %}
+                    {{ printer_health.last_sync_at | fmt_dt('%d.%m.%Y %H:%M') }}
+                    {% else %}
+                    {{ t('settings_no_status_data') }}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="rounded-lg border border-gray-100 bg-gray-50 p-4">
+                <div class="text-xs font-semibold text-gray-500 uppercase">{{ t('settings_printer_errors_24h') }}</div>
+                <div class="text-sm font-semibold mt-1 {% if printer_health.errors_24h %}text-red-600{% else %}text-emerald-700{% endif %}">
+                    {{ printer_health.errors_24h }}
+                </div>
+            </div>
+            <div class="rounded-lg border border-gray-100 bg-gray-50 p-4">
+                <div class="text-xs font-semibold text-gray-500 uppercase">{{ t('settings_printer_offline') }}</div>
+                <div class="text-sm font-semibold mt-1 {% if printer_health.offline_count %}text-amber-700{% else %}text-emerald-700{% endif %}">
+                    {{ printer_health.offline_count }}
+                </div>
+                {% if printer_health.prusa_offline_names %}
+                <div class="text-xs text-gray-500 mt-1">{{ printer_health.prusa_offline_names|join(', ') }}</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
     <div id="printer-diagnostics" class="ui-panel">
         <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
             <div>
-                <div class="ui-label">Printer Diagnostics</div>
+                <div class="ui-label">{{ t('printer_diagnostics') }}</div>
                 <h2 class="text-2xl font-bold mt-1">{{ t('settings_sync_action_center') }}</h2>
             </div>
             <div class="flex flex-wrap gap-2">
                 <span class="ui-badge {% if action_center.counts.printer_issues %}ui-badge-critical{% else %}ui-badge-success{% endif %}">
-                    <i class="fa-solid fa-plug-circle-bolt"></i> {{ action_center.counts.printer_issues }} sync issues
+                    <i class="fa-solid fa-plug-circle-bolt"></i> {{ action_center.counts.printer_issues }} {{ t('settings_sync_issues') }}
                 </span>
                 <span class="ui-badge {% if action_center.counts.unmapped_jobs %}ui-badge-warning{% else %}ui-badge-success{% endif %}">
-                    <i class="fa-solid fa-link-slash"></i> {{ action_center.counts.unmapped_jobs }} unmapped jobs
+                    <i class="fa-solid fa-link-slash"></i> {{ action_center.counts.unmapped_jobs }} {{ t('settings_unmapped_jobs') }}
                 </span>
             </div>
         </div>
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div class="ui-card-soft p-4">
                 <div class="flex items-center justify-between">
-                    <div class="font-semibold text-gray-800">Bambu Cloud</div>
+                    <div class="font-semibold text-gray-800">{{ t('bambu_cloud_title') }}</div>
                     <form method="POST" action="{{ url_for('bambu_sync') }}" onsubmit="event.preventDefault(); fetch(this.action, { method: 'POST' }).then(() => window.location.reload());">
-                        <button type="submit" class="ui-badge ui-badge-brand"><i class="fa-solid fa-rotate"></i> Sync now</button>
+                        <button type="submit" class="ui-badge ui-badge-brand"><i class="fa-solid fa-rotate"></i> {{ t('settings_sync_now') }}</button>
                     </form>
                 </div>
                 <div class="text-sm text-gray-500 mt-3">
-                    {% if app_settings and app_settings.bambu_last_sync_at %}Last sync: {{ app_settings.bambu_last_sync_at | fmt_dt('%d.%m.%Y %H:%M') }}{% else %}{{ t('bambu_no_sync_yet') }}{% endif %}
+                    {% if app_settings and app_settings.bambu_last_sync_at %}{{ t('settings_printer_last_sync') }}: {{ app_settings.bambu_last_sync_at | fmt_dt('%d.%m.%Y %H:%M') }}{% else %}{{ t('bambu_no_sync_yet') }}{% endif %}
                 </div>
                 <div class="text-sm mt-2 {% if bambu_sync_status.error %}text-red-600{% else %}text-gray-500{% endif %}">
-                    {% if bambu_sync_status.error %}{{ bambu_sync_status.error }}{% elif bambu_sync_status.ok %}Added {{ bambu_sync_status.added }}, updated {{ bambu_sync_status.updated }}, skipped {{ bambu_sync_status.skipped }}{% else %}{{ t('settings_no_status_data') }}{% endif %}
+                    {% if bambu_sync_status.error %}{{ bambu_sync_status.error }}{% elif bambu_sync_status.ok %}{{ t('settings_sync_added') }} {{ bambu_sync_status.added }}, {{ t('settings_sync_updated') }} {{ bambu_sync_status.updated }}, {{ t('settings_sync_skipped') }} {{ bambu_sync_status.skipped }}{% else %}{{ t('settings_no_status_data') }}{% endif %}
                 </div>
             </div>
             <div class="ui-card-soft p-4 xl:col-span-2">
-                <div class="font-semibold text-gray-800 mb-3">PrusaLink</div>
+                <div class="font-semibold text-gray-800 mb-3">{{ t('prusa_settings_title') }}</div>
                 <div class="space-y-3">
                     {% for printer in prusa_printers %}
                     {% set sync = prusa_sync_states.get(printer.id) %}
@@ -70,13 +104,13 @@
                             <div class="font-semibold text-gray-800">{{ printer.name }}</div>
                             <div class="text-sm text-gray-500">{{ printer.host }}</div>
                             <div class="text-xs mt-1 {% if sync and sync.error %}text-red-600{% else %}text-gray-400{% endif %}">
-                                {% if printer.last_sync_at %}Last sync {{ printer.last_sync_at | fmt_dt('%d.%m.%Y %H:%M') }}{% else %}{{ t('prusa_no_sync_yet') }}{% endif %}
-                                {% if printer.last_success_at %} · success {{ printer.last_success_at | fmt_dt('%d.%m.%Y %H:%M') }}{% endif %}
+                                {% if printer.last_sync_at %}{{ t('settings_printer_last_sync') }} {{ printer.last_sync_at | fmt_dt('%d.%m.%Y %H:%M') }}{% else %}{{ t('prusa_no_sync_yet') }}{% endif %}
+                                {% if printer.last_success_at %} · {{ t('settings_sync_success') }} {{ printer.last_success_at | fmt_dt('%d.%m.%Y %H:%M') }}{% endif %}
                                 {% if sync and sync.error %} · {{ sync.error }}{% endif %}
                             </div>
                         </div>
                         <form method="POST" action="{{ url_for('prusa_printer_sync', printer_id=printer.id) }}" onsubmit="event.preventDefault(); fetch(this.action, { method: 'POST' }).then(() => window.location.reload());">
-                            <button type="submit" class="ui-badge ui-badge-brand"><i class="fa-solid fa-rotate"></i> Sync printer</button>
+                            <button type="submit" class="ui-badge ui-badge-brand"><i class="fa-solid fa-rotate"></i> {{ t('settings_sync_printer') }}</button>
                         </form>
                     </div>
                     {% else %}
@@ -679,7 +713,7 @@
                     {% endif %}
                 </div>
 
-                <form method="POST" class="space-y-4">
+                <form method="POST" class="space-y-4" x-data="{showToken:false, testing:false, testStatus:null}">
                     <input type="hidden" name="action" value="bambu_cloud_settings">
                     <div>
                         <div class="flex items-center gap-2 mb-1">
@@ -688,11 +722,31 @@
                                 <i class="fa-solid fa-circle-question"></i>
                             </button>
                         </div>
-                        <input type="password" name="bambu_token"
-                            placeholder="{{ t('bambu_token_placeholder') }}"
-                            autocomplete="off"
-                            class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono">
+                        <div class="flex gap-2">
+                            <input :type="showToken ? 'text' : 'password'" name="bambu_token"
+                                placeholder="{{ t('bambu_token_placeholder') }}"
+                                autocomplete="off"
+                                class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono">
+                            <button type="button" @click="showToken = !showToken" class="px-3 py-2 text-xs rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold whitespace-nowrap">
+                                <span x-show="!showToken">{{ t('settings_show_token') }}</span>
+                                <span x-show="showToken" x-cloak>{{ t('settings_hide_token') }}</span>
+                            </button>
+                            <button type="button"
+                                @click="testing = true; testStatus = null; fetch('{{ url_for('settings_bambu_test') }}', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: new URLSearchParams({bambu_token: ($el.closest('form').querySelector('input[name=bambu_token]').value || ''), bambu_region: ($el.closest('form').querySelector('select[name=bambu_region]').value || 'global')})}).then(r=>r.json()).then(d=>{testing=false; testStatus=d;}).catch(()=>{testing=false; testStatus={ok:false,error:'request_failed'};});"
+                                class="px-3 py-2 text-xs rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold whitespace-nowrap">
+                                <i class="fa-solid" :class="testing ? 'fa-spinner fa-spin' : 'fa-plug-circle-check'"></i>
+                                <span class="ml-1" x-show="!testing">{{ t('settings_test_connection') }}</span>
+                            </button>
+                        </div>
                         <p class="text-xs text-gray-400 mt-1">{{ t('bambu_cloud_desc') }}</p>
+                        <div x-show="testStatus !== null" x-cloak class="mt-2 text-xs">
+                            <span x-show="testStatus && testStatus.ok" class="inline-flex items-center gap-1.5 text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-full">
+                                <i class="fa-solid fa-circle-check"></i> {{ t('settings_connection_ok') }}
+                            </span>
+                            <span x-show="testStatus && !testStatus.ok" class="inline-flex items-center gap-1.5 text-red-700 bg-red-50 border border-red-200 px-2.5 py-1 rounded-full">
+                                <i class="fa-solid fa-circle-exclamation"></i> {{ t('settings_connection_error') }}
+                            </span>
+                        </div>
                     </div>
                     <div>
                         <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('bambu_region_label') }}</label>
@@ -723,6 +777,14 @@
                         {{ t('bambu_last_sync_at') }}: {{ app_settings.bambu_last_sync_at | fmt_dt('%d.%m.%Y %H:%M') }}
                         {% if app_settings.bambu_last_sync_status %}
                         <span class="text-gray-400">|</span> {{ app_settings.bambu_last_sync_status }}
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if app_settings and app_settings.bambu_last_test_at %}
+                    <div class="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                        {{ t('settings_bambu_last_tested') }}: {{ app_settings.bambu_last_test_at | fmt_dt('%d.%m.%Y %H:%M') }}
+                        {% if app_settings.bambu_last_test_status %}
+                        <span class="text-gray-400">|</span> {{ app_settings.bambu_last_test_status }}
                         {% endif %}
                     </div>
                     {% endif %}
@@ -822,7 +884,7 @@
                                 <input type="number" name="power_draw_watts" min="0" max="2000"
                                     value="{{ p.power_draw_watts or '' }}"
                                     class="w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                    placeholder="e.g. 150">
+                                    placeholder="{{ t('settings_placeholder_watts') }}">
                                 <span class="text-xs text-gray-400">W</span>
                             </div>
                             <div>
@@ -888,7 +950,7 @@
                         <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('printer_power_draw_label') }}</label>
                         <input type="number" name="power_draw_watts" min="0" max="2000"
                             class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
-                            placeholder="e.g. 150">
+                            placeholder="{{ t('settings_placeholder_watts') }}">
                         <p class="text-xs text-gray-400 mt-1">{{ t('printer_power_draw_desc') }}</p>
                     </div>
                     <div class="flex gap-3">
@@ -994,7 +1056,7 @@
                                     <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('printer_power_draw_label') }}</label>
                                     <input type="number" name="power_draw_watts" value="{{ pp.power_draw_watts or '' }}" min="0" max="2000"
                                         class="w-full border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
-                                        placeholder="e.g. 150">
+                                        placeholder="{{ t('settings_placeholder_watts') }}">
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
@@ -1083,44 +1145,44 @@
     <div class="mt-0 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div class="flex items-center gap-2 mb-4 border-b pb-3">
             <i class="fa-solid fa-file-invoice text-indigo-500"></i>
-            <h2 class="text-xl font-bold text-gray-800">{{ t('billing_settings_title') if t('billing_settings_title') != 'billing_settings_title' else 'Fakturační údaje' }}</h2>
+            <h2 class="text-xl font-bold text-gray-800">{{ t('billing_settings_title') }}</h2>
         </div>
-        <p class="text-sm text-gray-500 mb-4">Tyto údaje se automaticky vyplní jako "Dodavatel" při exportu cenových nabídek a faktur.</p>
+        <p class="text-sm text-gray-500 mb-4">{{ t('settings_billing_desc') }}</p>
         <form method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-4xl">
             <input type="hidden" name="action" value="billing_settings">
             
             <div class="md:col-span-2">
-                <label class="text-xs font-bold text-gray-600 block mb-1">Název společnosti / Jméno</label>
+                <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('settings_billing_company_name') }}</label>
                 <input type="text" name="company_name" value="{{ app_settings.company_name or '' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
             </div>
 
             <div class="md:col-span-2">
-                <label class="text-xs font-bold text-gray-600 block mb-1">Ulice a číslo popisné</label>
+                <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('settings_billing_street') }}</label>
                 <input type="text" name="company_street" value="{{ app_settings.company_street or '' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
             </div>
 
             <div>
-                <label class="text-xs font-bold text-gray-600 block mb-1">Město</label>
+                <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('settings_billing_city') }}</label>
                 <input type="text" name="company_city" value="{{ app_settings.company_city or '' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
             </div>
 
             <div>
-                <label class="text-xs font-bold text-gray-600 block mb-1">PSČ</label>
+                <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('settings_billing_zip') }}</label>
                 <input type="text" name="company_zip" value="{{ app_settings.company_zip or '' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
             </div>
 
             <div>
-                <label class="text-xs font-bold text-gray-600 block mb-1">IČO</label>
+                <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('settings_billing_id') }}</label>
                 <input type="text" name="company_id" value="{{ app_settings.company_id or '' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
             </div>
 
             <div>
-                <label class="text-xs font-bold text-gray-600 block mb-1">DIČ</label>
+                <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('settings_billing_vat') }}</label>
                 <input type="text" name="company_vat_id" value="{{ app_settings.company_vat_id or '' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
             </div>
 
             <div class="md:col-span-2">
-                <label class="text-xs font-bold text-gray-600 block mb-1">Bankovní účet / IBAN</label>
+                <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('settings_billing_bank') }}</label>
                 <input type="text" name="company_bank_account" value="{{ app_settings.company_bank_account or '' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
             </div>
 
@@ -1137,20 +1199,59 @@
     <div x-show="activeTab === 'data'" x-cloak>
 
     <!-- Export / Import -->
-    <div class="mt-0 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <div class="mt-0 bg-white rounded-xl shadow-sm border border-gray-100 p-6" x-data="{conflictMode:'merge'}">
         <div class="flex items-center gap-2 mb-4 border-b pb-3">
             <i class="fa-solid fa-database text-green-500"></i>
             <h2 class="text-xl font-bold text-gray-800">{{ t('database_backup') }}</h2>
         </div>
-            <div class="bg-gray-50 rounded-lg p-5 border border-dashed border-gray-200 text-center">
+            <div class="bg-gray-50 rounded-lg p-5 border border-dashed border-gray-200">
                 <p class="text-gray-500 text-sm mb-4">{{ t('export_desc') }}</p>
-                <a href="{{ url_for('export_data') }}" class="inline-block bg-green-600 hover:bg-green-700 transition-colors text-white font-bold py-3 px-6 rounded-lg text-sm shadow">
-                    <i class="fa-solid fa-download mr-1"></i> {{ t('export_db') }}
-                </a>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                    <a href="{{ url_for('export_data', include_files=1) }}" class="inline-flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 transition-colors text-white font-bold py-3 px-6 rounded-lg text-sm shadow">
+                        <i class="fa-solid fa-download"></i> {{ t('settings_export_full') }}
+                    </a>
+                    <a href="{{ url_for('export_data', include_files=0) }}" class="inline-flex items-center justify-center gap-2 bg-emerald-100 hover:bg-emerald-200 transition-colors text-emerald-800 font-bold py-3 px-6 rounded-lg text-sm">
+                        <i class="fa-solid fa-database"></i> {{ t('settings_export_db_only') }}
+                    </a>
+                </div>
+                <div class="text-xs text-gray-500 bg-white border border-gray-200 rounded-lg p-3">
+                    <div>{{ t('settings_backup_meta_version') }}: {{ app_version }}</div>
+                    {% if backup_last_meta %}
+                    <div class="mt-1">{{ t('settings_backup_meta_last_total') }}: {{ backup_last_meta.total_records or 0 }}</div>
+                    <div class="mt-1">{{ t('settings_backup_meta_last_mode') }}: {% if backup_last_meta.include_files %}{{ t('settings_export_full') }}{% else %}{{ t('settings_export_db_only') }}{% endif %}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <div class="font-semibold">{{ t('settings_backup_recommendation_title') }}</div>
+                <div class="mt-1">{{ t('settings_backup_recommendation_desc') }}</div>
+                {% if app_settings and app_settings.backup_last_export_at %}
+                <div class="mt-1 text-xs">{{ t('settings_backup_last_export') }}: {{ app_settings.backup_last_export_at | fmt_dt('%d.%m.%Y %H:%M') }}</div>
+                {% else %}
+                <div class="mt-1 text-xs">{{ t('settings_backup_never_exported') }}</div>
+                {% endif %}
             </div>
             
-            <form action="{{ url_for('import_data') }}" method="POST" enctype="multipart/form-data" class="bg-gray-50 rounded-lg p-5 border border-dashed border-gray-200 text-center flex flex-col justify-center items-center">
+            <form action="{{ url_for('import_data') }}" method="POST" enctype="multipart/form-data" class="bg-gray-50 rounded-lg p-5 border border-dashed border-gray-200 text-center flex flex-col justify-center items-center mt-4">
                 <input type="file" name="file" accept=".tar.gz,.json,.json.gz,.gz" class="mb-4 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer" required title="{{ t('import_hint') }}">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 w-full mb-4 text-left">
+                    <label class="flex items-center gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                        <input type="checkbox" name="dry_run" class="rounded border-gray-300 text-green-600 focus:ring-green-500">
+                        {{ t('settings_import_dry_run') }}
+                    </label>
+                    <div class="bg-white border border-gray-200 rounded-lg px-3 py-2">
+                        <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('settings_import_conflict_mode') }}</label>
+                        <select name="conflict_mode" x-model="conflictMode" class="w-full border border-gray-200 rounded px-2 py-1 text-sm">
+                            <option value="skip">{{ t('settings_conflict_skip') }}</option>
+                            <option value="merge" selected>{{ t('settings_conflict_merge') }}</option>
+                            <option value="overwrite">{{ t('settings_conflict_overwrite') }}</option>
+                        </select>
+                    </div>
+                </div>
+                <div x-show="conflictMode === 'overwrite'" x-cloak class="w-full mb-4 text-left text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                    {{ t('settings_import_overwrite_warning') }}
+                </div>
                 <button type="submit" class="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 transition-colors text-white font-bold py-3 px-6 rounded-lg text-sm shadow" onclick="return confirm('{{ t('import_confirm') }}');">
                     <i class="fa-solid fa-upload mr-1"></i> {{ t('import_db') }}
                 </button>
@@ -1185,7 +1286,7 @@
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
                 <p class="text-sm text-blue-800">
                     <i class="fa-solid fa-lightbulb text-blue-500 mr-2"></i>
-                    <strong>Tip:</strong> {{ t('bambu_cloud_desc') }}
+                    <strong>{{ t('settings_tip_label') }}:</strong> {{ t('bambu_cloud_desc') }}
                 </p>
             </div>
         </div>

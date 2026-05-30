@@ -138,6 +138,7 @@ SECTION_BY_ENDPOINT = {
     'storage_update_orientation': SECTION_STORAGE,
     'storage_delete_placement': SECTION_STORAGE,
     'settings': SECTION_SETTINGS,
+    'settings_bambu_test': SECTION_SETTINGS,
     'export_data': SECTION_SETTINGS,
     'import_data': SECTION_SETTINGS,
     'toggle_theme': SECTION_NOTIFICATIONS,

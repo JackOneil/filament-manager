@@ -180,7 +180,13 @@ class AppSetting(db.Model):
     bambu_auto_sync_interval_minutes = db.Column(db.Integer, default=60)
     bambu_last_sync_at = db.Column(db.DateTime, nullable=True)
     bambu_last_sync_status = db.Column(db.String(255), nullable=True)
+    bambu_last_test_at = db.Column(db.DateTime, nullable=True)
+    bambu_last_test_status = db.Column(db.String(255), nullable=True)
     reorder_shop_url = db.Column(db.Text, nullable=True)
+
+    # Backup metadata
+    backup_last_export_at = db.Column(db.DateTime, nullable=True)
+    backup_last_export_meta = db.Column(db.Text, nullable=True)
     
     # Billing / Invoice Details
     company_name = db.Column(db.String(200), nullable=True)

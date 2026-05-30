@@ -34,6 +34,10 @@ def run_migrations(app: Flask) -> None:
         _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN bambu_auto_sync_interval_minutes INTEGER NOT NULL DEFAULT 60')
         _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN bambu_last_sync_at DATETIME DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN bambu_last_sync_status VARCHAR(255) DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN bambu_last_test_at DATETIME DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN bambu_last_test_status VARCHAR(255) DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN backup_last_export_at DATETIME DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN backup_last_export_meta TEXT DEFAULT NULL')
 
         # Billing details
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN company_name VARCHAR(200) DEFAULT NULL")

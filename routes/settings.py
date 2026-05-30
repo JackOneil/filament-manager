@@ -1,12 +1,71 @@
 """Settings, dictionary management, integrations, and theme routes."""
 import logging
-from flask import render_template, request, redirect, url_for, Blueprint
+import re
+from datetime import timedelta
+
+import requests
+from flask import render_template, request, redirect, url_for, Blueprint, flash, jsonify
 from database import db
 from models import (
     Brand, Color, Material, AppSetting, Filament, Project,
     BambuPrinter, PrusaPrinter,
 )
-from utils import build_action_center, encrypt_token, format_tags, parse_sync_status, remove_tag, top_tags
+from utils import (
+    build_action_center,
+    decrypt_token,
+    encrypt_token,
+    format_tags,
+    parse_sync_status,
+    remove_tag,
+    top_tags,
+    utc_now,
+)
+
+
+def _get_or_create_settings():
+    setting = AppSetting.query.first()
+    if setting is None:
+        setting = AppSetting()
+        db.session.add(setting)
+        db.session.flush()
+    return setting
+
+
+def _tab_for_action(action):
+    dict_actions = {
+        'brand', 'color', 'material',
+        'edit_brand', 'edit_material', 'edit_color',
+        'delete_brand', 'delete_material', 'delete_color',
+    }
+    printers_actions = {
+        'printer_energy_settings',
+        'edit_bambu_printer', 'delete_bambu_printer',
+        'add_prusa_printer', 'edit_prusa_printer', 'delete_prusa_printer',
+    }
+    integrations_actions = {
+        'bambu_cloud_settings', 'bambu_cloud_disconnect',
+        'reorder_shop_settings',
+        'delete_filament_tag', 'delete_project_tag',
+    }
+    company_actions = {'billing_settings'}
+
+    if action in dict_actions:
+        return 'dicts'
+    if action in printers_actions:
+        return 'printers'
+    if action in integrations_actions:
+        return 'integrations'
+    if action in company_actions:
+        return 'company'
+    return 'general'
+
+
+def _is_valid_reorder_template(url_value):
+    if not url_value:
+        return True
+    if not re.match(r'^https://', url_value, re.IGNORECASE):
+        return False
+    return '{query}' in url_value
 
 
 
@@ -19,11 +78,15 @@ def register(app):
     def settings():
         if request.method == 'POST':
             action = request.form.get('action')
+            success_key = 'settings_saved'
             try:
+                setting = _get_or_create_settings()
                 if action == 'brand':
                     brand_name = request.form.get('name', '').strip()
                     if not brand_name:
-                        raise ValueError('Brand name is required')
+                        raise ValueError('settings_brand_required')
+                    if Brand.query.filter_by(name=brand_name).first():
+                        raise ValueError('settings_brand_exists')
                     db.session.add(Brand(name=brand_name))
                     app.logger.debug(f"Added brand: {brand_name}")
 
@@ -31,36 +94,36 @@ def register(app):
                     color_name = request.form.get('name', '').strip()
                     color_hex = request.form.get('hex_value', '').strip()
                     if not color_name:
-                        raise ValueError('Color name is required')
+                        raise ValueError('settings_color_required')
+                    if Color.query.filter_by(name=color_name).first():
+                        raise ValueError('settings_color_exists')
                     db.session.add(Color(name=color_name, hex_value=color_hex))
                     app.logger.debug(f"Added color: {color_name}")
 
                 elif action == 'material':
                     material_name = request.form.get('name', '').strip()
                     if not material_name:
-                        raise ValueError('Material name is required')
+                        raise ValueError('settings_material_required')
+                    if Material.query.filter_by(name=material_name).first():
+                        raise ValueError('settings_material_exists')
                     db.session.add(Material(name=material_name))
                     app.logger.debug(f"Added material: {material_name}")
 
                 elif action == 'language':
-                    setting = AppSetting.query.first()
                     old = setting.lang
                     setting.lang = request.form.get('lang', setting.lang)
                     app.logger.debug(f"Language changed: {old} -> {setting.lang}")
 
                 elif action == 'currency':
-                    setting = AppSetting.query.first()
                     old = setting.currency
                     setting.currency = request.form.get('currency', setting.currency)
                     app.logger.debug(f"Currency changed: {old} -> {setting.currency}")
 
                 elif action == 'items_per_page':
-                    setting = AppSetting.query.first()
                     setting.items_per_page = request.form.get('items_per_page', setting.items_per_page, type=int)
                     app.logger.debug(f"Items per page changed to: {setting.items_per_page}")
 
                 elif action == 'nav_palette':
-                    setting = AppSetting.query.first()
                     palette = request.form.get('nav_palette', 'teal').strip().lower()
                     if palette not in {'teal', 'slate', 'ocean', 'sunset'}:
                         palette = 'teal'
@@ -68,7 +131,6 @@ def register(app):
                     app.logger.debug(f"Navigation palette changed to: {setting.nav_palette}")
 
                 elif action == 'debug_logging':
-                    setting = AppSetting.query.first()
                     setting.debug_logging = request.form.get('debug_logging') == 'on'
                     if setting.debug_logging:
                         app.logger.setLevel(logging.DEBUG)
@@ -77,7 +139,6 @@ def register(app):
                         app.logger.setLevel(logging.INFO)
 
                 elif action == 'audit_logging':
-                    setting = AppSetting.query.first()
                     setting.audit_logging_enabled = request.form.get('audit_logging_enabled') == 'on'
                     app.logger.debug(f"Audit logging {'enabled' if setting.audit_logging_enabled else 'disabled'}.")
 
@@ -131,6 +192,7 @@ def register(app):
                                 filament.tag_text = new_tags or None
                                 updated_count += 1
                         app.logger.debug(f"Deleted filament tag '{tag_name}' from {updated_count} filaments")
+                        success_key = 'settings_tags_removed'
 
                 elif action == 'delete_project_tag':
                     tag_name = request.form.get('tag', '').strip()
@@ -142,9 +204,9 @@ def register(app):
                                 project.tag_text = new_tags or None
                                 updated_count += 1
                         app.logger.debug(f"Deleted project tag '{tag_name}' from {updated_count} projects")
+                        success_key = 'settings_tags_removed'
 
                 elif action == 'bambu_cloud_settings':
-                    setting = AppSetting.query.first()
                     token = request.form.get('bambu_token', '').strip()
                     region = request.form.get('bambu_region', 'global')
                     if region not in ('global', 'china'):
@@ -159,11 +221,12 @@ def register(app):
                     )
                     setting.auto_filament_mapping_enabled = request.form.get('auto_filament_mapping_enabled') == 'on'
                     app.logger.debug('Bambu Cloud settings updated.')
+                    success_key = 'settings_bambu_connection_saved'
 
                 elif action == 'bambu_cloud_disconnect':
-                    setting = AppSetting.query.first()
                     setting.bambu_token = None
                     app.logger.debug('Bambu Cloud token cleared.')
+                    success_key = 'settings_bambu_disconnected'
 
                 elif action == 'edit_bambu_printer':
                     printer = db.session.get(BambuPrinter, request.form.get('id', type=int))
@@ -193,36 +256,48 @@ def register(app):
                         app.logger.debug(f'Deleted Bambu printer: {printer.name} ({printer.device_id})')
 
                 elif action == 'printer_energy_settings':
-                    setting = AppSetting.query.first()
                     try:
                         setting.kwh_price = float(request.form.get('kwh_price', setting.kwh_price))
                         setting.printer_power = int(request.form.get('printer_power', setting.printer_power))
                     except (ValueError, TypeError):
-                        pass
+                        raise ValueError('settings_invalid_number')
                     app.logger.debug(f"Printer/energy settings updated: kwh={setting.kwh_price}, power={setting.printer_power}W")
 
                 elif action == 'add_prusa_printer':
-                    from routes.prusa import _validate_host
+                    from routes.prusa import _validate_host, do_test_connection
                     host_raw = request.form.get('host', '').strip()
                     host = _validate_host(host_raw)
                     alias = request.form.get('name', '').strip()
                     api_key_raw = request.form.get('api_key', '').strip()
+                    if not host or not alias or not api_key_raw:
+                        raise ValueError('settings_prusa_required_fields')
                     power_raw = request.form.get('power_draw_watts', '').strip()
                     power_val = None
                     if power_raw:
                         try:
                             power_val = max(0, int(power_raw))
                         except (ValueError, TypeError):
-                            pass
-                    if host and alias and api_key_raw:
-                        db.session.add(PrusaPrinter(
+                            raise ValueError('settings_invalid_number')
+
+                    if not app.config.get('TESTING'):
+                        test_probe = PrusaPrinter(
                             name=alias,
                             host=host,
                             api_key=encrypt_token(api_key_raw),
-                            notes=request.form.get('notes', '').strip() or None,
-                            power_draw_watts=power_val,
-                        ))
-                        app.logger.debug(f'Added PrusaLink printer: {alias} @ {host}')
+                        )
+                        test_result = do_test_connection(test_probe)
+                        if not test_result.get('ok'):
+                            raise ValueError('settings_prusa_test_failed')
+
+                    db.session.add(PrusaPrinter(
+                        name=alias,
+                        host=host,
+                        api_key=encrypt_token(api_key_raw),
+                        notes=request.form.get('notes', '').strip() or None,
+                        power_draw_watts=power_val,
+                    ))
+                    app.logger.debug(f'Added PrusaLink printer: {alias} @ {host}')
+                    success_key = 'settings_prusa_test_passed_saved'
 
                 elif action == 'edit_prusa_printer':
                     from routes.prusa import _validate_host
@@ -256,14 +331,14 @@ def register(app):
                         app.logger.debug(f'Deleted PrusaLink printer: {printer.name}')
 
                 elif action == 'reorder_shop_settings':
-                    setting = AppSetting.query.first()
                     url_raw = request.form.get('reorder_shop_url', '').strip()
+                    if not _is_valid_reorder_template(url_raw):
+                        raise ValueError('settings_reorder_url_invalid')
                     setting.reorder_shop_url = url_raw or None
                     app.logger.debug(f'Reorder shop URL updated: {setting.reorder_shop_url}')
 
                 elif action == 'app_timezone':
                     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-                    setting = AppSetting.query.first()
                     tz_raw = request.form.get('app_timezone', '').strip()
                     if tz_raw:
                         try:
@@ -271,10 +346,9 @@ def register(app):
                             setting.app_timezone = tz_raw
                             app.logger.debug(f'App timezone set to: {tz_raw}')
                         except (ZoneInfoNotFoundError, KeyError):
-                            app.logger.warning(f'Invalid timezone rejected: {tz_raw}')
+                            raise ValueError('settings_timezone_invalid')
 
                 elif action == 'billing_settings':
-                    setting = AppSetting.query.first()
                     setting.company_name = request.form.get('company_name', '').strip() or None
                     setting.company_street = request.form.get('company_street', '').strip() or None
                     setting.company_city = request.form.get('company_city', '').strip() or None
@@ -284,36 +358,19 @@ def register(app):
                     setting.company_bank_account = request.form.get('company_bank_account', '').strip() or None
                     app.logger.debug('Billing settings updated.')
 
+                else:
+                    raise ValueError('settings_unknown_action')
+
                 db.session.commit()
+                flash(success_key, 'success')
+            except ValueError as e:
+                db.session.rollback()
+                flash(str(e), 'error')
             except Exception as e:
                 db.session.rollback()
                 app.logger.error(f"Settings action error: {str(e)}")
-            _dicts_actions = {
-                'brand', 'color', 'material',
-                'edit_brand', 'edit_material', 'edit_color',
-                'delete_brand', 'delete_material', 'delete_color',
-            }
-            _printers_actions = {
-                'printer_energy_settings',
-                'edit_bambu_printer', 'delete_bambu_printer',
-            }
-            _integrations_actions = {
-                'bambu_cloud_settings', 'bambu_cloud_disconnect',
-                'reorder_shop_settings',
-                'add_prusa_printer', 'edit_prusa_printer', 'delete_prusa_printer',
-                'delete_filament_tag', 'delete_project_tag',
-            }
-            _company_actions = {'billing_settings'}
-            if action in _dicts_actions:
-                tab = 'dicts'
-            elif action in _printers_actions:
-                tab = 'printers'
-            elif action in _integrations_actions:
-                tab = 'integrations'
-            elif action in _company_actions:
-                tab = 'company'
-            else:
-                tab = 'general'
+                flash('settings_save_failed', 'error')
+            tab = _tab_for_action(action)
             return redirect(url_for('settings') + f'?tab={tab}')
 
         brands = Brand.query.order_by(Brand.name).all()
@@ -326,6 +383,48 @@ def register(app):
         project_tag_cloud = top_tags(Project.query.all())
         bambu_sync_status = parse_sync_status(app_settings.bambu_last_sync_status if app_settings else None)
         prusa_sync_states = {printer.id: parse_sync_status(printer.last_sync_status) for printer in prusa_printers}
+
+        now = utc_now()
+        cutoff_24h = now - timedelta(hours=24)
+        last_sync_candidates = [
+            app_settings.bambu_last_sync_at if app_settings else None,
+            *[p.last_sync_at for p in prusa_printers if p.last_sync_at],
+        ]
+        last_sync_candidates = [ts for ts in last_sync_candidates if ts is not None]
+        last_sync_at = max(last_sync_candidates) if last_sync_candidates else None
+
+        prusa_offline = [
+            p for p in prusa_printers
+            if not p.last_success_at or (now - p.last_success_at).total_seconds() > 2 * 3600
+        ]
+        bambu_stale = bool(printers) and (
+            not app_settings
+            or not app_settings.bambu_last_sync_at
+            or (now - app_settings.bambu_last_sync_at).total_seconds() > 2 * 3600
+        )
+        errors_24h = sum(
+            1 for p in prusa_printers
+            if p.last_sync_at and p.last_sync_at >= cutoff_24h and parse_sync_status(p.last_sync_status).get('error')
+        )
+        if app_settings and app_settings.bambu_last_sync_at and app_settings.bambu_last_sync_at >= cutoff_24h and bambu_sync_status.get('error'):
+            errors_24h += 1
+
+        backup_last_meta = None
+        if app_settings and app_settings.backup_last_export_meta:
+            import json
+            try:
+                backup_last_meta = json.loads(app_settings.backup_last_export_meta)
+            except (ValueError, TypeError):
+                backup_last_meta = None
+
+        printer_health = {
+            'last_sync_at': last_sync_at,
+            'errors_24h': errors_24h,
+            'offline_count': len(prusa_offline) + (len(printers) if bambu_stale else 0),
+            'prusa_offline_names': [p.name for p in prusa_offline[:3]],
+            'bambu_stale': bambu_stale,
+        }
+
         return render_template(
             'settings.html',
             brands=brands, colors=colors, materials=materials,
@@ -334,8 +433,50 @@ def register(app):
             filament_tag_cloud=filament_tag_cloud, project_tag_cloud=project_tag_cloud,
             bambu_sync_status=bambu_sync_status,
             prusa_sync_states=prusa_sync_states,
+            printer_health=printer_health,
+            backup_last_meta=backup_last_meta,
             action_center=build_action_center(),
         )
+
+    @bp.route('/settings/bambu/test', methods=['POST'])
+    def settings_bambu_test():
+        from routes.bambu import _api_base
+
+        setting = _get_or_create_settings()
+        token_raw = request.form.get('bambu_token', '').strip()
+        region = request.form.get('bambu_region', '').strip().lower()
+        if region not in ('global', 'china'):
+            region = setting.bambu_region if setting and setting.bambu_region in ('global', 'china') else 'global'
+
+        token = token_raw or (decrypt_token(setting.bambu_token) if setting and setting.bambu_token else '')
+        if not token:
+            setting.bambu_last_test_at = utc_now()
+            setting.bambu_last_test_status = 'error: token missing'
+            db.session.commit()
+            return jsonify({'ok': False, 'error': 'token_missing'}), 400
+
+        base_url = _api_base(region)
+        try:
+            resp = requests.get(
+                f'{base_url}/v1/user-service/my/tasks',
+                params={'limit': 1, 'offset': 0},
+                headers={'Authorization': f'Bearer {token}'},
+                timeout=15,
+            )
+            setting.bambu_last_test_at = utc_now()
+            if resp.ok:
+                setting.bambu_last_test_status = f'ok: HTTP {resp.status_code}'
+                db.session.commit()
+                return jsonify({'ok': True, 'status': f'HTTP {resp.status_code}'})
+
+            setting.bambu_last_test_status = f'error: HTTP {resp.status_code}'
+            db.session.commit()
+            return jsonify({'ok': False, 'error': f'http_{resp.status_code}'}), 400
+        except Exception:
+            setting.bambu_last_test_at = utc_now()
+            setting.bambu_last_test_status = 'error: request failed'
+            db.session.commit()
+            return jsonify({'ok': False, 'error': 'request_failed'}), 400
 
 
 

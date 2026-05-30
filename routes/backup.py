@@ -6,7 +6,7 @@ import json
 import os
 import tarfile
 import uuid
-from flask import current_app as app, request, redirect, url_for, Response, Blueprint
+from flask import current_app as app, request, redirect, url_for, Response, Blueprint, flash
 
 from database import db
 from models import (
@@ -16,7 +16,7 @@ from models import (
     PrusaPrinter, PrusaPrintJob, ProjectComment, ProjectTodo, ProjectPrintItem, User, UserInvite, Notification, AuditLog,
     PrinterMaintenance, WasteRecord, WasteFile, FilamentUndoLog, ProjectTemplate,
 )
-from utils import encrypt_token, format_tags, utc_now
+from utils import encrypt_token, format_tags, utc_now, translate
 
 
 def _filament_ref(filament):
@@ -138,12 +138,16 @@ def register(app):
 
     @bp.route('/export')
     def export_data():
+        include_files = request.args.get('include_files', '1') != '0'
         setting = AppSetting.query.first()
 
         data = {
             'backup_meta': {
                 'format_version': 2,
                 'packaging': 'tar.gz',
+                'include_files': include_files,
+                'app_version': app.config.get('APP_VERSION', 'unknown'),
+                'created_at': utc_now().isoformat(),
             },
             # ── Enumerations ───────────────────────────────────────────
             'brands': [{'name': b.name, 'shop_url': b.shop_url} for b in Brand.query.all()],
@@ -166,6 +170,8 @@ def register(app):
                 'bambu_auto_sync_interval_minutes': setting.bambu_auto_sync_interval_minutes if setting else 60,
                 'bambu_last_sync_at': setting.bambu_last_sync_at.isoformat() if setting and setting.bambu_last_sync_at else None,
                 'bambu_last_sync_status': setting.bambu_last_sync_status if setting else None,
+                'bambu_last_test_at': setting.bambu_last_test_at.isoformat() if setting and setting.bambu_last_test_at else None,
+                'bambu_last_test_status': setting.bambu_last_test_status if setting else None,
                 'reorder_shop_url': setting.reorder_shop_url if setting else None,
                 'company_name': setting.company_name if setting else None,
                 'company_street': setting.company_street if setting else None,
@@ -180,6 +186,8 @@ def register(app):
                 'onboarding_dismissed': setting.onboarding_dismissed if setting else False,
                 'audit_logging_enabled': getattr(setting, 'audit_logging_enabled', True) if setting else True,
                 'auto_filament_mapping_enabled': getattr(setting, 'auto_filament_mapping_enabled', True) if setting else True,
+                'backup_last_export_at': setting.backup_last_export_at.isoformat() if setting and setting.backup_last_export_at else None,
+                'backup_last_export_meta': setting.backup_last_export_meta if setting else None,
                 # bambu_token intentionally excluded for security
             } if setting else {},
 
@@ -246,7 +254,7 @@ def register(app):
                 'owner': _user_ref(proj.owner),
                 'owner_name': proj.owner_name,
                 'created_by': _user_ref(proj.created_by),
-                'files': [_project_file_payload(pf) for pf in proj.files],
+                'files': ([_project_file_payload(pf) for pf in proj.files] if include_files else []),
                 'links': [{
                     'url': pl.url,
                     'name': pl.name,
@@ -471,12 +479,12 @@ def register(app):
                 'notes': w.notes,
                 'created_at': w.created_at.isoformat() if w.created_at else None,
                 'recorded_by': _user_ref(w.recorded_by),
-                'files': [{
+                'files': ([{
                     'filename': wf.filename,
                     'archive_path': f'waste_files/w{w.id}_{wf.id}_{wf.filename}',
                     'filepath': wf.filepath,
                     'uploaded_at': wf.uploaded_at.isoformat() if wf.uploaded_at else None,
-                } for wf in w.files],
+                } for wf in w.files] if include_files else []),
             } for w in WasteRecord.query.order_by(WasteRecord.created_at).all()],
 
             # ── Undo log ─────────────────────────────────────────────
@@ -493,41 +501,64 @@ def register(app):
             } for ul in FilamentUndoLog.query.order_by(FilamentUndoLog.created_at).all()],
         }
 
+        counts = {
+            'brands': len(data['brands']),
+            'materials': len(data['materials']),
+            'colors': len(data['colors']),
+            'filaments': len(data['filaments']),
+            'projects': len(data['projects']),
+            'users': len(data['users']),
+            'bambu_jobs': len(data['bambu_jobs']),
+            'prusa_jobs': len(data['prusa_jobs']),
+            'movement_history': len(data['movement_history']),
+            'waste_records': len(data['waste_records']),
+        }
+        data['backup_meta']['record_counts'] = counts
+        data['backup_meta']['total_records'] = sum(counts.values())
+
         app.logger.debug(
             f"Export: {len(data['filaments'])} filaments, "
             f"{len(data['projects'])} projects, "
             f"{len(data['bambu_jobs'])} Bambu jobs"
         )
+
+        if setting:
+            setting.backup_last_export_at = utc_now()
+            setting.backup_last_export_meta = json.dumps(data['backup_meta'], ensure_ascii=False)
+            db.session.commit()
+
         archive_buffer = io.BytesIO()
         manifest_bytes = json.dumps(data, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
         with tarfile.open(fileobj=archive_buffer, mode='w:gz') as archive:
             manifest_info = tarfile.TarInfo('manifest.json')
             manifest_info.size = len(manifest_bytes)
             archive.addfile(manifest_info, io.BytesIO(manifest_bytes))
-            for project in data.get('projects', []):
-                for file_data in project.get('files', []):
-                    archive_path = file_data.get('archive_path')
-                    source_path = file_data.get('filepath')
-                    if not archive_path or not source_path or not os.path.isfile(source_path):
-                        continue
-                    with open(source_path, 'rb') as handle:
-                        content = handle.read()
-                    file_info = tarfile.TarInfo(archive_path)
-                    file_info.size = len(content)
-                    archive.addfile(file_info, io.BytesIO(content))
-            for w_rec in data.get('waste_records', []):
-                for file_data in w_rec.get('files', []):
-                    archive_path = file_data.get('archive_path')
-                    source_path = file_data.get('filepath')
-                    if not archive_path or not source_path or not os.path.isfile(source_path):
-                        continue
-                    with open(source_path, 'rb') as handle:
-                        content = handle.read()
-                    file_info = tarfile.TarInfo(archive_path)
-                    file_info.size = len(content)
-                    archive.addfile(file_info, io.BytesIO(content))
+            if include_files:
+                for project in data.get('projects', []):
+                    for file_data in project.get('files', []):
+                        archive_path = file_data.get('archive_path')
+                        source_path = file_data.get('filepath')
+                        if not archive_path or not source_path or not os.path.isfile(source_path):
+                            continue
+                        with open(source_path, 'rb') as handle:
+                            content = handle.read()
+                        file_info = tarfile.TarInfo(archive_path)
+                        file_info.size = len(content)
+                        archive.addfile(file_info, io.BytesIO(content))
+                for w_rec in data.get('waste_records', []):
+                    for file_data in w_rec.get('files', []):
+                        archive_path = file_data.get('archive_path')
+                        source_path = file_data.get('filepath')
+                        if not archive_path or not source_path or not os.path.isfile(source_path):
+                            continue
+                        with open(source_path, 'rb') as handle:
+                            content = handle.read()
+                        file_info = tarfile.TarInfo(archive_path)
+                        file_info.size = len(content)
+                        archive.addfile(file_info, io.BytesIO(content))
         response = Response(archive_buffer.getvalue(), mimetype='application/gzip')
-        response.headers['Content-Disposition'] = 'attachment; filename=filament_backup.tar.gz'
+        suffix = 'filament_backup.tar.gz' if include_files else 'filament_backup_db_only.tar.gz'
+        response.headers['Content-Disposition'] = f'attachment; filename={suffix}'
         return response
 
     @bp.route('/import', methods=['POST'])
@@ -537,11 +568,33 @@ def register(app):
         if not file or file.filename == '':
             return redirect(url_for('settings'))
 
+        dry_run = request.form.get('dry_run') == 'on'
+        conflict_mode = (request.form.get('conflict_mode') or 'merge').strip().lower()
+        if conflict_mode not in {'skip', 'overwrite', 'merge'}:
+            conflict_mode = 'merge'
+        overwrite_mode = conflict_mode == 'overwrite'
+        skip_mode = conflict_mode == 'skip'
+
         imported_filaments = 0
         upload_folder = app.config.get('PROJECT_UPLOAD_FOLDER')
         os.makedirs(upload_folder, exist_ok=True)
         try:
             data, backup_files = _load_backup_package(file)
+            if not isinstance(data, dict):
+                flash(translate('backup_import_incompatible'), 'error')
+                return redirect(url_for('settings') + '?tab=data')
+
+            meta = data.get('backup_meta', {}) or {}
+            format_version = meta.get('format_version', 1)
+            if isinstance(format_version, int) and format_version > 2:
+                flash(translate('backup_import_incompatible'), 'error')
+                return redirect(url_for('settings') + '?tab=data')
+
+            if dry_run:
+                total = len(data.get('filaments', [])) + len(data.get('projects', [])) + len(data.get('users', []))
+                flash(translate('backup_dry_run_ok').format(total=total), 'success')
+                return redirect(url_for('settings') + '?tab=data')
+
             with db.session.begin():
                 # ── 1. Enumerations ────────────────────────────────────
                 for b_data in data.get('brands', []):
@@ -551,7 +604,9 @@ def register(app):
                     existing = Brand.query.filter_by(name=b_name).first()
                     if not existing:
                         db.session.add(Brand(name=b_name, shop_url=b_data.get('shop_url') if isinstance(b_data, dict) else None))
-                    elif isinstance(b_data, dict) and b_data.get('shop_url'):
+                    elif overwrite_mode and isinstance(b_data, dict):
+                        existing.shop_url = b_data['shop_url']
+                    elif conflict_mode == 'merge' and isinstance(b_data, dict) and b_data.get('shop_url') and not existing.shop_url:
                         existing.shop_url = b_data['shop_url']
 
                 for m_name in data.get('materials', []):
@@ -559,14 +614,19 @@ def register(app):
                         db.session.add(Material(name=m_name))
 
                 for c in data.get('colors', []):
-                    if not Color.query.filter_by(name=c.get('name')).first():
+                    existing_color = Color.query.filter_by(name=c.get('name')).first()
+                    if not existing_color:
                         db.session.add(Color(name=c.get('name'), hex_value=c.get('hex_value', '')))
+                    elif overwrite_mode:
+                        existing_color.hex_value = c.get('hex_value', existing_color.hex_value)
+                    elif conflict_mode == 'merge' and not existing_color.hex_value:
+                        existing_color.hex_value = c.get('hex_value', existing_color.hex_value)
 
                 db.session.flush()
 
                 # ── 2. App settings ────────────────────────────────────
                 s = data.get('app_settings', {})
-                if s:
+                if s and not skip_mode:
                     setting = AppSetting.query.first()
                     if setting:
                         setting.lang = s.get('lang', setting.lang)
@@ -583,6 +643,8 @@ def register(app):
                         setting.bambu_auto_sync_interval_minutes = s.get('bambu_auto_sync_interval_minutes', setting.bambu_auto_sync_interval_minutes)
                         setting.bambu_last_sync_at = datetime.fromisoformat(s['bambu_last_sync_at']) if s.get('bambu_last_sync_at') else setting.bambu_last_sync_at
                         setting.bambu_last_sync_status = s.get('bambu_last_sync_status', setting.bambu_last_sync_status)
+                        setting.bambu_last_test_at = datetime.fromisoformat(s['bambu_last_test_at']) if s.get('bambu_last_test_at') else setting.bambu_last_test_at
+                        setting.bambu_last_test_status = s.get('bambu_last_test_status', setting.bambu_last_test_status)
                         setting.reorder_shop_url = s.get('reorder_shop_url', setting.reorder_shop_url)
                         setting.company_name = s.get('company_name', setting.company_name)
                         setting.company_street = s.get('company_street', setting.company_street)
@@ -595,6 +657,8 @@ def register(app):
                         setting.invoice_counter = s.get('invoice_counter', setting.invoice_counter)
                         setting.app_timezone = s.get('app_timezone', setting.app_timezone)
                         setting.onboarding_dismissed = s.get('onboarding_dismissed', setting.onboarding_dismissed)
+                        setting.backup_last_export_at = datetime.fromisoformat(s['backup_last_export_at']) if s.get('backup_last_export_at') else setting.backup_last_export_at
+                        setting.backup_last_export_meta = s.get('backup_last_export_meta', setting.backup_last_export_meta)
                         if 'audit_logging_enabled' in s:
                             setting.audit_logging_enabled = s['audit_logging_enabled']
                         if 'auto_filament_mapping_enabled' in s:
@@ -668,6 +732,23 @@ def register(app):
                                 shop_url=f.get('shop_url'),
                             ))
                             imported_filaments += 1
+                        elif overwrite_mode:
+                            exists.weight_total = f.get('weight_total', exists.weight_total)
+                            exists.weight_remaining = f.get('weight_remaining', exists.weight_remaining)
+                            exists.price = f.get('price', exists.price)
+                            exists.quantity = f.get('quantity', exists.quantity)
+                            exists.min_stock_grams = f.get('min_stock_grams', exists.min_stock_grams)
+                            exists.max_stock_grams = f.get('max_stock_grams', exists.max_stock_grams)
+                            exists.tag_text = format_tags(f.get('tag_text', exists.tag_text or ''))
+                            exists.quality_stringing = f.get('quality_stringing', exists.quality_stringing)
+                            exists.quality_adhesion = f.get('quality_adhesion', exists.quality_adhesion)
+                            exists.quality_drying = f.get('quality_drying', exists.quality_drying)
+                            exists.quality_profile = f.get('quality_profile', exists.quality_profile)
+                            exists.quality_notes = f.get('quality_notes', exists.quality_notes)
+                            exists.recommended_nozzle_temp = f.get('recommended_nozzle_temp', exists.recommended_nozzle_temp)
+                            exists.recommended_bed_temp = f.get('recommended_bed_temp', exists.recommended_bed_temp)
+                            exists.reorder_alert_snoozed = f.get('reorder_alert_snoozed', exists.reorder_alert_snoozed)
+                            exists.shop_url = f.get('shop_url', exists.shop_url)
 
                 db.session.flush()
 
@@ -1174,9 +1255,11 @@ def register(app):
                     ))
 
             app.logger.debug(f"Import finished: {imported_filaments} filaments, projects and Bambu jobs processed.")
+            flash(translate('backup_import_success'), 'success')
         except Exception as e:
             db.session.rollback()
             app.logger.error(f"Import failed: {str(e)}")
+            flash(translate('backup_import_failed'), 'error')
 
-        return redirect(url_for('settings'))
+        return redirect(url_for('settings') + '?tab=data')
     app.register_blueprint(bp)

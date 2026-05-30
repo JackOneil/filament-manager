@@ -413,7 +413,7 @@
             id: 'settings',
             icon: 'fa-sliders',
             hasTour: true,
-            endpoints: ['settings', 'toggle_theme', 'export_data', 'import_data'],
+            endpoints: ['settings', 'settings_bambu_test', 'toggle_theme', 'export_data', 'import_data'],
             title: { cs: 'Nastavení', en: 'Settings' },
             tips: [
                 {
@@ -440,8 +440,8 @@
                 {
                     title: { cs: 'Export a Import zálohy', en: 'Backup Export and Import' },
                     text: {
-                        cs: 'Na záložce Data exportujte celou databázi do JSON souboru (filament, projekty, nastavení, uživatelé, soubory projektů jsou zakódovány v Base64). Import ze zálohy je idempotentní — existující záznamy se přeskočí.',
-                        en: 'On the Data tab, export the entire database to a JSON file (filament, projects, settings, users, project files are Base64-encoded). Import from backup is idempotent — existing records are skipped.'
+                        cs: 'Na záložce Data lze vybrat plný export (včetně souborů) nebo rychlý export bez souborů. Import podporuje dry-run kontrolu kompatibility a režimy konfliktů (skip / merge / overwrite), takže předem víte, co bude přepsáno.',
+                        en: 'On the Data tab, you can choose full export (including files) or a quick export without files. Import supports compatibility dry-run and conflict modes (skip / merge / overwrite), so you know in advance what will be overwritten.'
                     }
                 },
                 {

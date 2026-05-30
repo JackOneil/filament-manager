@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.94.1] - 2026-05-30
+### Fixed
+- **Bambu filament assignment search without diacritics** — In Bambu print history mapping UI, filament search now ignores diacritics for both single-material job mapping and multi-material AMS slot mapping/remapping. Typing terms without Czech accents now correctly matches records that contain accented characters.
+
+## [1.94.0] - 2026-05-30
+### Added
+- **Settings UX unification** — Added consistent save/confirm/error feedback via toast messages across settings actions, plus stricter backend validation for dictionaries, numeric fields, timezone, reorder URL template, and Prusa add-printer form requirements.
+- **Printer health summary card** — New summary block on Settings → Printers with latest sync timestamp, sync errors in the last 24h, and offline printer count.
+- **Bambu connection test (without save)** — New endpoint `/settings/bambu/test` and UI button for testing token/region connectivity before saving credentials. Stores last tested timestamp and status in `AppSetting`.
+- **Prusa pre-save connectivity test** — New printer creation now verifies connectivity before persisting the printer.
+- **Backup export modes and metadata** — Data tab now supports full export (with files) and database-only export; metadata includes app version, timestamp, include-files mode, and record counts.
+- **Import safety tools** — Added dry-run compatibility check and conflict modes (`skip`, `merge`, `overwrite`) on backup import.
+
+### Changed
+- **Settings localization coverage** — Localized newly introduced settings labels, warnings, action buttons, and validation/error messages in both Czech and English.
+- **Data tab UX** — Added last-backup visibility and recommendation panel for regular backup routine.
+
+### Technical
+- Added new `AppSetting` columns and migrations:
+  - `bambu_last_test_at`, `bambu_last_test_status`
+  - `backup_last_export_at`, `backup_last_export_meta`
+- Updated endpoint access map (`auth.SECTION_BY_ENDPOINT`) and help-system endpoint coverage for the new settings test endpoint.
+
 ## [1.93.2] - 2026-05-30
 ### Fixed
 - **Codebase cleanup — Quick Wins batch 1** — Fixed six structural issues identified in the comprehensive `CODE_IMPROVEMENTS.md` audit:

@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.93.2***
+*Current version: **v1.94.1***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -59,6 +59,7 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 - **Bilingual** — Complete Czech and English translations (700+ keys).
 - **Full Backup / Restore** — Compressed `.tar.gz` export with `manifest.json` plus real uploaded project files and waste record photos stored directly in the archive. Import also supports older `.json.gz` and legacy plain JSON backups.
 - **Settings Tabs** — Settings page is organized into six tabs: General, Printers, Integrations, Company, Data, and Dictionaries.
+- **Settings UX & Backup Safety** — Unified save/confirm/error toasts, printer health summary card, Bambu connection test without saving token, Prusa pre-save connectivity check, and Data-tab backup tooling with full/database-only export, backup metadata, dry-run import compatibility checks, and conflict modes (`skip`/`merge`/`overwrite`).
 - **Onboarding Checklist** — Guided setup checklist after first installation (currency, energy cost, printer connection, first filament) with auto-dismiss.
 - **Toast Notifications** — Non-blocking pop-up notifications with auto-dismiss via Alpine.js.
 - **Custom Dictionaries** — Pre-seeded brands, materials, and colors. All freely expandable, renamable, and safely deletable.

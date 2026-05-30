@@ -340,6 +340,8 @@ The `/export` and `/import` functions in `routes/backup.py` must cover the **ent
 - **Referential integrity**: resolve FKs by name/serial before inserting dependent rows. Commit in order: enumerations → filaments → history → projects → integrations → users.
 - **Idempotency**: "skip if already exists" by natural key.
 - **Any new model or column must be reflected in both export and import in the same commit.**
+- **Data-tab backup UX**: `/export` supports both full backup (including uploaded files) and database-only backup; `backup_meta` must include `app_version`, timestamp, include-files mode, and record counts.
+- **Import safety controls**: `/import` supports dry-run compatibility checks and conflict mode selection (`skip`, `merge`, `overwrite`).
 
 ### Rule 16 — Stats Page Draggable Layout
 - The Statistics page has **6 named sections**, each a `<div class="stats-section" data-section-id="...">`:

@@ -265,9 +265,20 @@ function _hexDistance(a, b) {
 function _normMaterialName(value) {
     if (!value) return '';
     return String(value)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase()
         .replace(/[_\-/]+/g, ' ')
         .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function _normSearchText(value) {
+    if (!value) return '';
+    return String(value)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
         .trim();
 }
 
@@ -365,14 +376,14 @@ function bambuMap(jobId) {
         preferredMaterial: (init.prefMaterial || '').toLowerCase(),
         preferredColorHex: _normHex(init.prefColor),
         get filteredFilaments() {
-            const q = this.filamentQ.toLowerCase().trim();
+            const q = _normSearchText(this.filamentQ);
             let base = _BF;
             if (q) {
                 base = _BF.filter(f =>
-                    f.label.toLowerCase().includes(q)
-                    || f.mat.toLowerCase().includes(q)
-                    || (f.material_name || '').toLowerCase().includes(q)
-                    || (f.color_hex || '').toLowerCase().includes(q)
+                    _normSearchText(f.label).includes(q)
+                    || _normSearchText(f.mat).includes(q)
+                    || _normSearchText(f.material_name || '').includes(q)
+                    || _normSearchText(f.color_hex || '').includes(q)
                 );
             }
 
@@ -381,7 +392,7 @@ function bambuMap(jobId) {
             return _suggestedFilaments(ranked, this.preferredMaterial, this.preferredColorHex);
         },
         get canShowAllFilamentsButton() {
-            const q = this.filamentQ.toLowerCase().trim();
+            const q = _normSearchText(this.filamentQ);
             if (q || this.showAllFilaments) return false;
             const ranked = _rankFilaments(_BF, this.preferredMaterial, this.preferredColorHex);
             const suggested = _suggestedFilaments(ranked, this.preferredMaterial, this.preferredColorHex);
@@ -492,14 +503,14 @@ function bambuSlotMap(jobId, slotId, initFilamentId, initFilamentLabel, initDedu
         slotColorHex: _normHex(slotColorHex),
         saving: false,
         get filteredSlotFilaments() {
-            const q = this.slotQ.toLowerCase().trim();
+            const q = _normSearchText(this.slotQ);
             let base = _BF;
             if (q) {
                 base = _BF.filter(f =>
-                    f.label.toLowerCase().includes(q)
-                    || f.mat.toLowerCase().includes(q)
-                    || (f.material_name || '').toLowerCase().includes(q)
-                    || (f.color_hex || '').toLowerCase().includes(q)
+                    _normSearchText(f.label).includes(q)
+                    || _normSearchText(f.mat).includes(q)
+                    || _normSearchText(f.material_name || '').includes(q)
+                    || _normSearchText(f.color_hex || '').includes(q)
                 );
             }
 
@@ -508,7 +519,7 @@ function bambuSlotMap(jobId, slotId, initFilamentId, initFilamentLabel, initDedu
             return _suggestedFilaments(ranked, this.slotMaterial, this.slotColorHex);
         },
         get canShowAllSlotFilamentsButton() {
-            const q = this.slotQ.toLowerCase().trim();
+            const q = _normSearchText(this.slotQ);
             if (q || this.showAllSlotFilaments) return false;
             const ranked = _rankFilaments(_BF, this.slotMaterial, this.slotColorHex);
             const suggested = _suggestedFilaments(ranked, this.slotMaterial, this.slotColorHex);
@@ -545,14 +556,14 @@ function bambuSlotMap(jobId, slotId, initFilamentId, initFilamentLabel, initDedu
             }
         },
         get filteredRemapFilaments() {
-            const q = this.remapQ.toLowerCase().trim();
+            const q = _normSearchText(this.remapQ);
             let base = _BF;
             if (q) {
                 base = _BF.filter(f =>
-                    f.label.toLowerCase().includes(q)
-                    || f.mat.toLowerCase().includes(q)
-                    || (f.material_name || '').toLowerCase().includes(q)
-                    || (f.color_hex || '').toLowerCase().includes(q)
+                    _normSearchText(f.label).includes(q)
+                    || _normSearchText(f.mat).includes(q)
+                    || _normSearchText(f.material_name || '').includes(q)
+                    || _normSearchText(f.color_hex || '').includes(q)
                 );
             }
             const ranked = _rankFilaments(base, this.slotMaterial, this.slotColorHex);
@@ -560,7 +571,7 @@ function bambuSlotMap(jobId, slotId, initFilamentId, initFilamentLabel, initDedu
             return _suggestedFilaments(ranked, this.slotMaterial, this.slotColorHex);
         },
         get canShowAllRemapFilamentsButton() {
-            const q = this.remapQ.toLowerCase().trim();
+            const q = _normSearchText(this.remapQ);
             if (q || this.showAllRemapFilaments) return false;
             const ranked = _rankFilaments(_BF, this.slotMaterial, this.slotColorHex);
             const suggested = _suggestedFilaments(ranked, this.slotMaterial, this.slotColorHex);

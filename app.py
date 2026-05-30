@@ -50,13 +50,14 @@ from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
 
-APP_VERSION = '1.93.2'
+APP_VERSION = '1.94.1'
 
 csrf = CSRFProtect()
 
 
 def create_app(test_config=None) -> Flask:
     app = Flask(__name__)
+    app.config['APP_VERSION'] = APP_VERSION
     # Secret key: must be set via SECRET_KEY env var in production.
     # Defaults to a random value (sessions lost on restart) if not configured.
     app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24).hex())
