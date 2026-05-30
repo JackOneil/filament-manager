@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="page-hero">
+        <div class="flex items-start gap-3">
+            <div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <h1 class="page-title">{{ project.name }}</h1>
+                    {% if project.status == 'PENDING_APPROVAL' %}
+                    <span class="ui-badge ui-badge-warning">{{ t('status_pending_approval') }}</span>
+                    {% elif project.status == 'APPROVED' %}
+                    <span class="ui-badge ui-badge-approved">{{ t('status_approved') }}</span>
+                    {% elif project.status == 'REJECTED' %}
+                    <span class="ui-badge ui-badge-critical">{{ t('status_rejected') }}</span>
+                    {% elif project.status == 'NEW' %}
+                    <span class="ui-badge">{{ t('status_new') }}</span>
+                    {% elif project.status == 'PRINTING' %}
+                    <span class="ui-badge ui-badge-printing">{{ t('status_printing') }}</span>
+                    {% else %}
+                    <span class="ui-badge ui-badge-success">{{ t('status_done') }}</span>
+                    {% endif %}
+                    {% if project.priority == 'urgent' %}
+                    <span class="ui-badge ui-badge-critical"><i class="fa-solid fa-fire"></i> {{ t('priority_urgent') }}</span>
+                    {% elif project.priority == 'high' %}
+                    <span class="ui-badge ui-badge-warning"><i class="fa-solid fa-arrow-up"></i> {{ t('priority_high') }}</span>
+                    {% elif project.priority == 'low' %}
+                    <span class="ui-badge text-gray-500"><i class="fa-solid fa-arrow-down"></i> {{ t('priority_low') }}</span>
+                    {% endif %}
+                </div>
+                <p class="mt-1 text-gray-500">
+                    {{ project.client_name or t('project_client_missing_label') }}
+                    {% if project.due_date %} · {{ project.due_date.strftime('%d.%m.%Y') }}{% endif %}
+                </p>
+                <div class="mt-2 flex items-center gap-2 text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 w-fit">
+                    <i class="fa-solid fa-link"></i>
+                    <span>{{ t('project_share_view_title') }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if project.description %}
+    <div class="ui-panel">
+        <div class="ui-label">{{ t('project_description') }}</div>
+        <div class="mt-3 text-base text-gray-700 space-y-3 break-words [&_a]:text-blue-600 [&_a:hover]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-gray-200 [&_blockquote]:pl-4 [&_blockquote]:italic [&_code]:bg-gray-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-4 [&_pre]:rounded-2xl [&_pre]:overflow-x-auto [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:leading-7">
+            {{ description_html }}
+        </div>
+    </div>
+    {% endif %}
+
+    {% set print_items = project.print_items %}
+    {% if print_items %}
+    {% set pi_total = print_items | sum(attribute='quantity_total') %}
+    {% set pi_done = print_items | sum(attribute='quantity_done') %}
+    <div class="ui-panel">
+        <div class="ui-label">{{ t('project_print_items_title') }}</div>
+        <div class="mt-3 space-y-2">
+            {% for item in print_items %}
+            <div class="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-gray-50 border border-gray-100">
+                <div class="flex items-center gap-3 min-w-0">
+                    <i class="fa-solid {% if item.done %}fa-circle-check text-emerald-500{% else %}fa-circle text-gray-300{% endif %} text-lg flex-shrink-0"></i>
+                    <span class="font-medium {% if item.done %}line-through text-gray-400{% else %}text-gray-800{% endif %} truncate">{{ item.item_name }}</span>
+                </div>
+                <span class="text-sm font-semibold text-gray-500 flex-shrink-0">{{ item.quantity_done }}/{{ item.quantity_total }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% if pi_total > 0 %}
+        {% set pi_pct = ((pi_done / pi_total) * 100) | int %}
+        <div class="mt-3 flex items-center gap-3">
+            <div class="flex-1 h-2 rounded-full bg-gray-200 overflow-hidden">
+                <div class="h-full rounded-full {% if pi_pct == 100 %}bg-emerald-500{% else %}bg-blue-500{% endif %}" style="width: {{ pi_pct }}%"></div>
+            </div>
+            <span class="text-sm font-semibold text-gray-600">{{ pi_done }}/{{ pi_total }}</span>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+
+</div>
+{% endblock %}

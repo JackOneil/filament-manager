@@ -244,9 +244,13 @@ class Project(db.Model):
     created_at = db.Column(db.DateTime, default=_utc_now, index=True)
     due_date = db.Column(db.DateTime, nullable=True, index=True)
     client_name = db.Column(db.String(100), nullable=True)
+    client_email = db.Column(db.String(255), nullable=True)
+    client_phone = db.Column(db.String(50), nullable=True)
     estimated_print_time = db.Column(db.Integer, default=0) # in minutes
     status = db.Column(db.String(20), default='NEW', index=True) # PENDING_APPROVAL, APPROVED, REJECTED, PRINTING, DONE
+    priority = db.Column(db.String(10), nullable=False, default='medium')  # low, medium, high, urgent
     tag_text = db.Column(db.Text, nullable=True)
+    share_token = db.Column(db.String(64), unique=True, nullable=True, index=True)
     owner_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, index=True)
     owner_name = db.Column(db.String(120), nullable=True)
     created_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, index=True)
@@ -349,6 +353,41 @@ class ProjectPrintItem(db.Model):
 
     def __repr__(self):
         return f'<ProjectPrintItem {self.id} {self.name!r} {self.quantity_done}/{self.quantity_total}>'
+
+
+class ProjectTemplate(db.Model):
+    """Reusable project templates — saved without client-specific data."""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    estimated_print_time = db.Column(db.Integer, default=0)
+    tag_text = db.Column(db.Text, nullable=True)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
+    created_at = db.Column(db.DateTime, default=_utc_now)
+
+    created_by = db.relationship('User', foreign_keys=[created_by_user_id])
+
+    def __repr__(self):
+        return f'<ProjectTemplate {self.id} {self.name!r}>'
+
+
+class ProjectCommentReaction(db.Model):
+    """Emoji reactions on project comments."""
+    id = db.Column(db.Integer, primary_key=True)
+    comment_id = db.Column(db.Integer, db.ForeignKey('project_comment.id', ondelete='CASCADE'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False, index=True)
+    emoji = db.Column(db.String(10), nullable=False)
+    created_at = db.Column(db.DateTime, default=_utc_now)
+
+    comment = db.relationship('ProjectComment', backref=db.backref('reactions', lazy=True, cascade='all, delete-orphan'))
+    user = db.relationship('User', backref=db.backref('comment_reactions', lazy=True))
+
+    __table_args__ = (
+        db.UniqueConstraint('comment_id', 'user_id', 'emoji', name='uq_comment_user_emoji'),
+    )
+
+    def __repr__(self):
+        return f'<ProjectCommentReaction {self.id} comment={self.comment_id} emoji={self.emoji!r}>'
 
 
 class StorageShelf(db.Model):

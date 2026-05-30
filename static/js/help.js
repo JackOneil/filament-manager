@@ -144,7 +144,7 @@
             id: 'projects',
             icon: 'fa-folder-open',
             hasTour: true,
-            endpoints: ['projects_index', 'project_create', 'project_detail', 'project_edit', 'project_add_file', 'project_delete_file', 'project_add_link', 'project_delete_link', 'project_add_comment', 'project_add_filament', 'project_remove_filament', 'project_add_quote', 'project_change_status', 'project_add_todo', 'project_toggle_todo', 'project_delete_todo', 'project_edit_todo'],
+            endpoints: ['projects_index', 'project_create', 'project_detail', 'project_edit', 'project_add_file', 'project_delete_file', 'project_add_link', 'project_delete_link', 'project_add_comment', 'project_add_filament', 'project_remove_filament', 'project_add_quote', 'project_change_status', 'project_add_todo', 'project_toggle_todo', 'project_delete_todo', 'project_edit_todo', 'project_advance_status', 'project_clone', 'project_generate_share_token', 'project_revoke_share_token', 'project_share', 'project_templates_index', 'project_template_save', 'project_template_delete', 'project_create_from_template', 'project_comment_react'],
             title: { cs: 'Projekty', en: 'Projects' },
             tips: [
                 {
@@ -215,6 +215,41 @@
                     text: {
                         cs: 'Přidejte tagy pro snadné filtrování (např. „klient-novak", „prototyp"). Priority (Nízká / Střední / Vysoká / Kritická) zvýrazní projekty barevně na Kanban boardu.',
                         en: 'Add tags for easy filtering (e.g. "client-novak", "prototype"). Priorities (Low / Medium / High / Critical) colour-code projects on the Kanban board.'
+                    }
+                },
+                {
+                    title: { cs: 'Rychlý posun stavu', en: 'Quick Status Advance' },
+                    text: {
+                        cs: 'Tlačítko „Posunout do dalšího stavu" v záhlaví projektu automaticky přesune projekt na další krok ve workflow (Nový → Čeká na schválení → Schváleno → Tisk → Hotovo) bez nutnosti ručně vybírat stav.',
+                        en: 'The "Advance to next status" button in the project header automatically moves the project to the next step in the workflow (New → Pending Approval → Approved → Printing → Done) without manually selecting a status.'
+                    }
+                },
+                {
+                    title: { cs: 'Duplikace projektu', en: 'Duplicate Project' },
+                    text: {
+                        cs: 'Tlačítkem „Duplikovat projekt" vytvoříte kopii projektu s přenesenými filamenty a tiskovými položkami. Komentáře, soubory a joby se nekopírují.',
+                        en: 'The "Duplicate project" button creates a copy of the project with its filaments and print items. Comments, files, and jobs are not copied.'
+                    }
+                },
+                {
+                    title: { cs: 'Šablony projektů', en: 'Project Templates' },
+                    text: {
+                        cs: 'Uložte opakující se projekty jako šablony přes tlačítko „Uložit jako šablonu" v detailu projektu. Při zakládání nového projektu vyberte šablonu z rozbalovacího seznamu a formulář se předvyplní. Správa šablon je dostupná přes odkaz „Šablony" v horní liště seznamu projektů.',
+                        en: 'Save recurring projects as templates using the "Save as template" button in the project detail. When creating a new project, select a template from the dropdown and the form is pre-filled. Manage templates via the "Templates" link in the project list header.'
+                    }
+                },
+                {
+                    title: { cs: 'Veřejný odkaz pro sdílení', en: 'Public Share Link' },
+                    text: {
+                        cs: 'Vygenerujte veřejný odkaz pro sdílení projektu s klientem (čtení bez přihlášení). Odkaz se zobrazí v postranním panelu detailu projektu. Odkaz lze kdykoliv zrušit.',
+                        en: 'Generate a public share link to show the project to a client (read-only, no login required). The link is shown in the project detail sidebar. The link can be revoked at any time.'
+                    }
+                },
+                {
+                    title: { cs: 'Reakce na komentáře', en: 'Comment Reactions' },
+                    text: {
+                        cs: 'Pod každým komentářem klikněte na ikonu smajlíka a přidejte emoji reakci (👍 ✅ 🔄 🎉 ❤️). Kliknutím na existující reakci ji přidáte nebo odeberete. Počty reakcí jsou viditelné všem.',
+                        en: 'Below each comment, click the smiley icon to add an emoji reaction (👍 ✅ 🔄 🎉 ❤️). Clicking an existing reaction toggles it on or off. Reaction counts are visible to everyone.'
                     }
                 }
             ]

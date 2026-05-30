@@ -45,6 +45,7 @@ PUBLIC_ENDPOINTS = {
     'manifest',
     'service_worker',
     'static',
+    'project_share',
 }
 
 SECTION_BY_ENDPOINT = {
@@ -88,6 +89,15 @@ SECTION_BY_ENDPOINT = {
     'project_remove_filament': SECTION_PROJECTS,
     'project_update_filament': SECTION_PROJECTS,
     'project_status': SECTION_PROJECTS,
+    'project_advance_status': SECTION_PROJECTS,
+    'project_clone': SECTION_PROJECTS,
+    'project_generate_share_token': SECTION_PROJECTS,
+    'project_revoke_share_token': SECTION_PROJECTS,
+    'project_templates_index': SECTION_PROJECTS,
+    'project_template_save': SECTION_PROJECTS,
+    'project_template_delete': SECTION_PROJECTS,
+    'project_create_from_template': SECTION_PROJECTS,
+    'project_comment_react': SECTION_PROJECTS,
     'project_consume_filament': SECTION_PROJECTS,
     'project_add_comment': SECTION_PROJECTS,
     'project_update_comment': SECTION_PROJECTS,

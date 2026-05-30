@@ -14,7 +14,7 @@ from models import (
     PrintHistory, Project, ProjectFile, ProjectLink, ProjectFilament, ProjectQuote,
     BambuPrinter, BambuPrintJob, BambuJobMaterial, StoragePlacement, StorageShelf,
     PrusaPrinter, PrusaPrintJob, ProjectComment, ProjectTodo, ProjectPrintItem, User, UserInvite, Notification, AuditLog,
-    PrinterMaintenance, WasteRecord, WasteFile, FilamentUndoLog,
+    PrinterMaintenance, WasteRecord, WasteFile, FilamentUndoLog, ProjectTemplate,
 )
 from utils import encrypt_token, format_tags, utc_now
 
@@ -236,6 +236,9 @@ def register(app):
                 'description': proj.description,
                 'status': proj.status,
                 'client_name': proj.client_name,
+                'client_email': proj.client_email,
+                'client_phone': proj.client_phone,
+                'priority': proj.priority,
                 'tag_text': proj.tag_text,
                 'estimated_print_time': proj.estimated_print_time,
                 'due_date': proj.due_date.isoformat() if proj.due_date else None,
@@ -296,6 +299,15 @@ def register(app):
                     'created_at': pi.created_at.isoformat() if pi.created_at else None,
                 } for pi in proj.print_items],
             } for proj in Project.query.order_by(Project.created_at).all()],
+
+            'project_templates': [{
+                'name': tpl.name,
+                'description': tpl.description,
+                'estimated_print_time': tpl.estimated_print_time,
+                'tag_text': tpl.tag_text,
+                'created_by': _user_ref(tpl.created_by),
+                'created_at': tpl.created_at.isoformat() if tpl.created_at else None,
+            } for tpl in ProjectTemplate.query.order_by(ProjectTemplate.created_at).all()],
 
             'users': [{
                 'email': user.email,
@@ -683,6 +695,9 @@ def register(app):
                             description=proj_data.get('description'),
                             status=proj_data.get('status', 'NEW'),
                             client_name=proj_data.get('client_name'),
+                            client_email=proj_data.get('client_email'),
+                            client_phone=proj_data.get('client_phone'),
+                            priority=proj_data.get('priority', 'medium'),
                             tag_text=format_tags(proj_data.get('tag_text', '')),
                             estimated_print_time=proj_data.get('estimated_print_time', 0),
                             due_date=datetime.fromisoformat(proj_data['due_date']) if proj_data.get('due_date') else None,
@@ -695,6 +710,12 @@ def register(app):
                         db.session.flush()
                     else:
                         proj.tag_text = format_tags(proj_data.get('tag_text', proj.tag_text or ''))
+                        if proj_data.get('client_email'):
+                            proj.client_email = proj_data.get('client_email')
+                        if proj_data.get('client_phone'):
+                            proj.client_phone = proj_data.get('client_phone')
+                        if proj_data.get('priority'):
+                            proj.priority = proj_data.get('priority', 'medium')
                         if 'owner_name' in proj_data:
                             proj.owner_name = (proj_data.get('owner_name') or '').strip() or None
 
@@ -836,6 +857,18 @@ def register(app):
                                 sort_order=int(pi_data.get('sort_order', 0) or 0),
                                 created_at=pi_ts,
                             ))
+
+                # ── 5b. Project templates ──────────────────────────────
+                for tpl_data in data.get('project_templates', []):
+                    if not ProjectTemplate.query.filter_by(name=tpl_data.get('name')).first():
+                        db.session.add(ProjectTemplate(
+                            name=tpl_data.get('name', ''),
+                            description=tpl_data.get('description'),
+                            estimated_print_time=tpl_data.get('estimated_print_time', 0),
+                            tag_text=tpl_data.get('tag_text'),
+                            created_by_user_id=_resolve_user_ref(tpl_data.get('created_by')).id if _resolve_user_ref(tpl_data.get('created_by')) else None,
+                            created_at=datetime.fromisoformat(tpl_data['created_at']) if tpl_data.get('created_at') else utc_now(),
+                        ))
 
                 # ── 6. Bambu printers ─────────────────────────────────
                 for bp in data.get('bambu_printers', []):

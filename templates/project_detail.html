@@ -47,6 +47,13 @@
                         {% else %}
                         <span class="ui-badge ui-badge-success">{{ t('status_done') }}</span>
                         {% endif %}
+                        {% if project.priority == 'urgent' %}
+                        <span class="ui-badge ui-badge-critical"><i class="fa-solid fa-fire"></i> {{ t('priority_urgent') }}</span>
+                        {% elif project.priority == 'high' %}
+                        <span class="ui-badge ui-badge-warning"><i class="fa-solid fa-arrow-up"></i> {{ t('priority_high') }}</span>
+                        {% elif project.priority == 'low' %}
+                        <span class="ui-badge text-gray-500"><i class="fa-solid fa-arrow-down"></i> {{ t('priority_low') }}</span>
+                        {% endif %}
                         {% if project_tags %}
                             {% for tag in project_tags.split(',') %}
                                 {% if tag.strip() %}
@@ -67,6 +74,18 @@
                 <a href="{{ url_for('project_edit', id=project.id) }}" class="ui-badge"><i class="fa-solid fa-pen"></i> {{ t('edit') }}</a>
                 {% endif %}
                 {% if can_manage_project %}
+                {% set flow_local = ['NEW', 'PENDING_APPROVAL', 'APPROVED', 'PRINTING', 'DONE'] %}
+                {% if project.status != 'DONE' and project.status in flow_local %}
+                <form method="POST" action="{{ url_for('project_advance_status', id=project.id) }}">
+                    <button type="submit" class="ui-badge ui-badge-approved" title="{{ t('project_advance_status') }}"><i class="fa-solid fa-arrow-right"></i> {{ t('project_advance_status') }}</button>
+                </form>
+                {% endif %}
+                <form method="POST" action="{{ url_for('project_clone', id=project.id) }}">
+                    <button type="submit" class="ui-badge"><i class="fa-solid fa-copy"></i> {{ t('project_clone') }}</button>
+                </form>
+                <form method="POST" action="{{ url_for('project_template_save', id=project.id) }}">
+                    <button type="submit" class="ui-badge" title="{{ t('project_template_save_as') }}"><i class="fa-solid fa-layer-group"></i> {{ t('project_template_save_as') }}</button>
+                </form>
                 <form method="POST" action="{{ url_for('project_delete', id=project.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');">
                     <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-trash"></i> {{ t('delete') }}</button>
                 </form>
@@ -251,6 +270,60 @@
                     </div>
                 </div>
             </div>
+
+            {% if project.client_email or project.client_phone %}
+            <div class="ui-panel">
+                <div class="ui-label">{{ t('project_client') }}</div>
+                <div class="mt-3 space-y-2 text-sm">
+                    {% if project.client_email %}
+                    <div class="flex items-center gap-2 text-gray-700">
+                        <i class="fa-solid fa-envelope text-gray-400 w-4"></i>
+                        <a href="mailto:{{ project.client_email }}" class="hover:text-blue-600 transition">{{ project.client_email }}</a>
+                    </div>
+                    {% endif %}
+                    {% if project.client_phone %}
+                    <div class="flex items-center gap-2 text-gray-700">
+                        <i class="fa-solid fa-phone text-gray-400 w-4"></i>
+                        <a href="tel:{{ project.client_phone }}" class="hover:text-blue-600 transition">{{ project.client_phone }}</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if can_manage_project %}
+            <div class="ui-panel" x-data="{ copied: false, shareUrl: '{{ request.host_url.rstrip('/') }}{{ url_for('project_share', token=project.share_token) if project.share_token else '' }}' }">
+                <div class="ui-label">{{ t('project_share_link_title') }}</div>
+                {% if project.share_token %}
+                <div class="mt-3 space-y-2">
+                    <div class="flex items-center gap-2">
+                        <input type="text" readonly :value="shareUrl"
+                            class="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-xs bg-gray-50 text-gray-600 truncate">
+                        <button type="button" @click="navigator.clipboard.writeText(shareUrl); copied=true; setTimeout(()=>copied=false, 2000)"
+                            class="p-1.5 rounded-lg bg-gray-100 hover:bg-blue-100 text-gray-500 hover:text-blue-600 transition text-xs"
+                            title="{{ t('project_share_link_copy') }}">
+                            <i class="fa-solid fa-copy" x-show="!copied"></i>
+                            <i class="fa-solid fa-check text-emerald-500" x-show="copied" x-cloak></i>
+                        </button>
+                    </div>
+                    <form method="POST" action="{{ url_for('project_revoke_share_token', id=project.id) }}" class="mt-2">
+                        <button type="submit" class="text-xs text-red-600 hover:text-red-700 transition">
+                            <i class="fa-solid fa-ban"></i> {{ t('project_share_link_revoke') }}
+                        </button>
+                    </form>
+                </div>
+                {% else %}
+                <div class="mt-3">
+                    <p class="text-xs text-gray-500 mb-3">{{ t('project_share_no_token') }}</p>
+                    <form method="POST" action="{{ url_for('project_generate_share_token', id=project.id) }}">
+                        <button type="submit" class="ui-badge ui-badge-brand w-full justify-center">
+                            <i class="fa-solid fa-link"></i> {{ t('project_share_link_generate') }}
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
 
         </aside>
 

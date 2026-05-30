@@ -152,6 +152,12 @@ def run_migrations(app: Flask) -> None:
         _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN power_draw_watts INTEGER DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE project_todo ADD COLUMN due_date DATE DEFAULT NULL")
 
+        # ── Project extended fields ───────────────────────────────────────────
+        _safe_alter(app, "ALTER TABLE project ADD COLUMN priority VARCHAR(10) NOT NULL DEFAULT 'medium'")
+        _safe_alter(app, "ALTER TABLE project ADD COLUMN client_email VARCHAR(255) DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE project ADD COLUMN client_phone VARCHAR(50) DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE project ADD COLUMN share_token VARCHAR(64) DEFAULT NULL")
+
         # ── Seed data (only runs once on fresh database) ─────────────────────
         if not Brand.query.first():
             for name in ['Prusament', 'Hatchbox', 'eSUN', 'Sunlu', 'Polymaker', 'Overture', 'Spectrum', 'Fiberlogy']:

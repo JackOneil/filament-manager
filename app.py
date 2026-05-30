@@ -42,14 +42,14 @@ from models import (
     BambuPrinter, BambuPrintJob, BambuJobMaterial,
     PrusaPrinter, PrusaPrintJob,
     User, UserInvite, Notification, AuditLog, ProjectComment,
-    PrinterMaintenance, FilamentUndoLog,
+    PrinterMaintenance, FilamentUndoLog, ProjectTemplate, ProjectCommentReaction,
 )  # noqa: F401
 from utils import get_settings, utc_now
 from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
 
-APP_VERSION = '1.91.0'
+APP_VERSION = '1.92.0'
 
 csrf = CSRFProtect()
 

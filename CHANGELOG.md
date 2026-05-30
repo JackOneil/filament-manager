@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.92.0] - 2026-06-01
+### Added
+- **Quick text search** — Search bar on the projects index page instantly filters projects by name; results are fetched via the existing AJAX endpoint and debounced.
+- **Project priority field** — Projects have a `priority` column (`low` / `medium` / `high` / `urgent`). Priority badges appear on Kanban cards and in the project detail header. Create and edit forms include a priority selector.
+- **Advance to next status button** — One-click button in the project detail header moves the project to the next status step in the workflow without requiring the status drop-down.
+- **Clone project** — "Duplicate project" button creates a copy of a project with its filaments, print items, client info, priority, tags and due date. Comments, files and jobs are not copied.
+- **Client contact fields** — Projects can store `client_email` and `client_phone`. Clickable links appear in the project detail sidebar when populated.
+- **Image thumbnails in file list** — Image attachments (jpg, jpeg, png, gif, webp) in the Files tab show a 40×40 clickable thumbnail that opens the existing full-screen lightbox.
+- **Public share link** — Generate a read-only token-based share URL for a project (no login required). The link can be revoked at any time. Public route is excluded from authentication checks.
+- **Project templates** — Save a project as a reusable template from its detail page. When creating a new project, pick a template from the dropdown to pre-fill name, description, tags and estimated print time. Template management available at `/projects/templates`.
+- **Emoji reactions on comments** — Click the smiley icon below any comment to toggle one of five emoji reactions (👍 ✅ 🔄 🎉 ❤️). Counts update instantly via AJAX without reloading the page.
+- New translation keys in `cs` and `en`: `project_priority`, `priority_low`, `priority_medium`, `priority_high`, `priority_urgent`, `project_client_email`, `project_client_phone`, `project_advance_status`, `project_advance_status_no_next`, `project_clone`, `project_clone_suffix`, `project_clone_success`, `project_share_link_title`, `project_share_link_generate`, `project_share_link_revoke`, `project_share_link_copy`, `project_share_link_generated`, `project_share_link_revoked`, `project_share_view_title`, `project_share_no_token`, `project_templates_title`, `project_templates_heading`, `project_templates_empty`, `project_template_save_as`, `project_template_create_from`, `project_template_delete_confirm`, `project_template_saved`, `project_template_deleted`, `project_template_select`, `project_reaction_add`, `project_quick_filter`.
+
 ## [1.91.0] - 2026-05-30
 ### Added
 - **Drag-to-reorder shelves** — Each shelf panel now has a ⠿ drag handle. Shelves can be reordered by dragging them to a new position; the new order is persisted to the database via `POST /storage/shelf/reorder`. Shelf drag events are isolated from slot drag-and-drop so both can coexist without interference.

@@ -83,12 +83,26 @@
                 <div class="ui-label">{{ t('project_attachments_title') }}</div>
                 <div class="space-y-3 mt-3">
                     {% for file in other_files %}
+                    {% set ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else '' %}
+                    {% set is_img = ext in ('jpg', 'jpeg', 'png', 'gif', 'webp') %}
                     <div class="flex items-center justify-between gap-3">
-                        <div>
-                            <div class="font-semibold text-gray-800">{{ file.filename }}</div>
-                            <div class="text-xs text-gray-500">{{ file.filename.rsplit('.', 1)[-1].upper() if '.' in file.filename else 'FILE' }}</div>
+                        <div class="flex items-center gap-3 min-w-0">
+                            {% if is_img %}
+                            <img src="{{ url_for('project_image_file', id=project.id, file_id=file.id) }}"
+                                 alt="{{ file.filename }}"
+                                 class="w-10 h-10 rounded-lg object-cover border border-gray-200 cursor-pointer flex-shrink-0"
+                                 @click="lightboxOpen = true; lightboxImg = '{{ url_for('project_image_file', id=project.id, file_id=file.id) }}'; lightboxTitle = '{{ file.filename|escape }}'; lightboxDownload = '{{ url_for('project_download_file', id=project.id, file_id=file.id) }}'">
+                            {% else %}
+                            <div class="w-10 h-10 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center flex-shrink-0">
+                                <i class="fa-solid fa-file text-gray-400 text-sm"></i>
+                            </div>
+                            {% endif %}
+                            <div class="min-w-0">
+                                <div class="font-semibold text-gray-800 truncate">{{ file.filename }}</div>
+                                <div class="text-xs text-gray-500">{{ ext.upper() if ext else 'FILE' }}</div>
+                            </div>
                         </div>
-                        <div class="flex gap-2">
+                        <div class="flex gap-2 flex-shrink-0">
                             <a href="{{ url_for('project_download_file', id=project.id, file_id=file.id) }}" class="ui-badge"><i class="fa-solid fa-download"></i> {{ t('download') }}</a>
                             {% if can_edit_project %}
                             <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=file.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');">

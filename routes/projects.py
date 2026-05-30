@@ -20,11 +20,13 @@ from models import (
     Filament,
     Project,
     ProjectComment,
+    ProjectCommentReaction,
     ProjectFile,
     ProjectFilament,
     ProjectLink,
     ProjectPrintItem,
     ProjectQuote,
+    ProjectTemplate,
     ProjectTodo,
     PrusaPrintJob,
     PrusaPrinter,
@@ -433,8 +435,17 @@ def _build_project_activity_events(project):
 
 
 def _build_project_comments(project):
+    user = get_current_user()
     project_comments = []
     for comment in sorted(project.comments, key=lambda item: item.created_at or datetime.min, reverse=True):
+        # Build reaction summary: {emoji: {count, user_reacted}}
+        reaction_summary = {}
+        for reaction in comment.reactions:
+            if reaction.emoji not in reaction_summary:
+                reaction_summary[reaction.emoji] = {'count': 0, 'user_reacted': False}
+            reaction_summary[reaction.emoji]['count'] += 1
+            if user and reaction.user_id == user.id:
+                reaction_summary[reaction.emoji]['user_reacted'] = True
         project_comments.append({
             'id': comment.id,
             'user': comment.user,
@@ -444,6 +455,7 @@ def _build_project_comments(project):
             'updated_at': comment.updated_at,
             'can_edit': _comment_edit_allowed(comment),
             'can_delete': _comment_delete_allowed(comment),
+            'reactions': reaction_summary,
         })
     return project_comments
 
@@ -680,20 +692,28 @@ def register(app):
             name = request.form.get('name', '').strip()
             description = request.form.get('description', '').strip()
             client_name = user.name if user and not is_admin(user) else request.form.get('client_name', '').strip()
+            client_email = request.form.get('client_email', '').strip()
+            client_phone = request.form.get('client_phone', '').strip()
             due_date_str = request.form.get('due_date', '').strip()
             hours = request.form.get('print_hours', 0, type=int)
             minutes = request.form.get('print_minutes', 0, type=int)
             estimated_print_time = hours * 60 + minutes if hours > 0 or minutes > 0 else 0
             due_date = datetime.strptime(due_date_str, '%Y-%m-%d') if due_date_str else None
-            
+            priority = request.form.get('priority', 'medium')
+            if priority not in ('low', 'medium', 'high', 'urgent'):
+                priority = 'medium'
+
             owner_user_id, owner_name = _resolve_project_owner_from_form(user)
-            
+
             project = Project(
                 name=name,
                 description=description,
                 client_name=client_name,
+                client_email=client_email or None,
+                client_phone=client_phone or None,
                 due_date=due_date,
                 estimated_print_time=estimated_print_time,
+                priority=priority,
                 tag_text=format_tags(request.form.get('tag_text', '')),
                 owner_user_id=owner_user_id,
                 owner_name=owner_name,
@@ -724,6 +744,8 @@ def register(app):
             is_admin_user=is_admin(user),
             default_client_name=user.name if user and not is_admin(user) else '',
             suggestions=suggestions,
+            project_templates=ProjectTemplate.query.order_by(ProjectTemplate.created_at.desc()).all(),
+            prefill_template=None,
         )
 
 
@@ -828,6 +850,8 @@ def register(app):
             today_date=utc_now().date(),
             can_edit_project=_project_write_allowed(project),
             can_manage_project=is_admin(),
+            users_for_mentions=[{'id': u.id, 'name': u.name} for u in User.query.filter_by(is_active=True).order_by(User.name).all()],
+            status_flow=['NEW', 'PENDING_APPROVAL', 'APPROVED', 'PRINTING', 'DONE'],
         )
 
     @bp.route('/projects/<int:id>/edit', methods=['GET', 'POST'])
@@ -840,7 +864,13 @@ def register(app):
             project.name = request.form.get('name', '').strip()
             project.description = request.form.get('description', '').strip()
             project.client_name = request.form.get('client_name', '').strip()
+            project.client_email = request.form.get('client_email', '').strip() or None
+            project.client_phone = request.form.get('client_phone', '').strip() or None
             project.tag_text = format_tags(request.form.get('tag_text', ''))
+            priority = request.form.get('priority', 'medium')
+            if priority not in ('low', 'medium', 'high', 'urgent'):
+                priority = 'medium'
+            project.priority = priority
             due_date_str = request.form.get('due_date', '').strip()
             hours = request.form.get('print_hours', 0, type=int)
             minutes = request.form.get('print_minutes', 0, type=int)
@@ -1082,6 +1112,155 @@ def register(app):
         _notify_project_status(project)
         db.session.commit()
         return redirect(url_for('project_detail', id=id))
+
+    @bp.route('/projects/<int:id>/advance_status', methods=['POST'])
+    def project_advance_status(id):
+        project = _project_or_404(id)
+        _require_project_admin()
+        flow = ['NEW', 'PENDING_APPROVAL', 'APPROVED', 'PRINTING', 'DONE']
+        current_idx = flow.index(project.status) if project.status in flow else -1
+        if current_idx < len(flow) - 1:
+            old_status = project.status
+            project.status = flow[current_idx + 1]
+            _notify_project_status(project)
+            db.session.commit()
+        else:
+            flash(translate('project_advance_status_no_next'), 'info')
+        return redirect(url_for('project_detail', id=id))
+
+    @bp.route('/projects/<int:id>/clone', methods=['POST'])
+    def project_clone(id):
+        user = get_current_user()
+        project = _project_or_404(id)
+        clone = Project(
+            name=project.name + ' ' + translate('project_clone_suffix'),
+            description=project.description,
+            client_name=project.client_name,
+            client_email=project.client_email,
+            client_phone=project.client_phone,
+            estimated_print_time=project.estimated_print_time,
+            priority=project.priority,
+            tag_text=project.tag_text,
+            due_date=project.due_date,
+            owner_user_id=project.owner_user_id,
+            owner_name=project.owner_name,
+            created_by_user_id=user.id if user else None,
+            status='APPROVED' if is_admin(user) else 'PENDING_APPROVAL',
+        )
+        db.session.add(clone)
+        db.session.flush()
+        for pf in project.filaments:
+            db.session.add(ProjectFilament(
+                project_id=clone.id,
+                filament_id=pf.filament_id,
+                estimated_weight=pf.estimated_weight,
+                actual_weight=0,
+                color_override=pf.color_override,
+            ))
+        for pi in project.print_items:
+            db.session.add(ProjectPrintItem(
+                project_id=clone.id,
+                item_name=pi.item_name,
+                quantity=pi.quantity,
+                done=False,
+                notes=pi.notes,
+            ))
+        db.session.commit()
+        flash(translate('project_clone_success'), 'success')
+        return redirect(url_for('project_detail', id=clone.id))
+
+    @bp.route('/projects/<int:id>/generate_share_token', methods=['POST'])
+    def project_generate_share_token(id):
+        _require_project_admin()
+        project = _project_or_404(id)
+        import secrets as _secrets
+        project.share_token = _secrets.token_urlsafe(32)
+        db.session.commit()
+        flash(translate('project_share_link_generated'), 'success')
+        return redirect(url_for('project_detail', id=id))
+
+    @bp.route('/projects/<int:id>/revoke_share_token', methods=['POST'])
+    def project_revoke_share_token(id):
+        _require_project_admin()
+        project = _project_or_404(id)
+        project.share_token = None
+        db.session.commit()
+        flash(translate('project_share_link_revoked'), 'success')
+        return redirect(url_for('project_detail', id=id))
+
+    @bp.route('/projects/share/<token>')
+    def project_share(token):
+        project = Project.query.filter_by(share_token=token).first_or_404()
+        description_html = Markup(render_markdown(project.description or ''))
+        return render_template('project_share.html', project=project, description_html=description_html)
+
+    @bp.route('/projects/templates')
+    def project_templates_index():
+        user = get_current_user()
+        if is_admin():
+            templates = ProjectTemplate.query.order_by(ProjectTemplate.created_at.desc()).all()
+        else:
+            templates = ProjectTemplate.query.filter_by(created_by_user_id=user.id if user else -1).order_by(ProjectTemplate.created_at.desc()).all()
+        return render_template('project_templates.html', templates=templates, can_manage_project=is_admin())
+
+    @bp.route('/projects/<int:id>/save_as_template', methods=['POST'])
+    def project_template_save(id):
+        user = get_current_user()
+        project = _project_or_404(id)
+        tpl = ProjectTemplate(
+            name=project.name,
+            description=project.description,
+            estimated_print_time=project.estimated_print_time,
+            tag_text=project.tag_text,
+            created_by_user_id=user.id if user else None,
+        )
+        db.session.add(tpl)
+        db.session.commit()
+        flash(translate('project_template_saved'), 'success')
+        return redirect(url_for('project_detail', id=id))
+
+    @bp.route('/projects/templates/<int:tid>/delete', methods=['POST'])
+    def project_template_delete(tid):
+        _require_project_admin()
+        tpl = ProjectTemplate.query.get_or_404(tid)
+        db.session.delete(tpl)
+        db.session.commit()
+        flash(translate('project_template_deleted'), 'success')
+        return redirect(url_for('project_templates_index'))
+
+    @bp.route('/projects/create/from_template/<int:tid>')
+    def project_create_from_template(tid):
+        tpl = ProjectTemplate.query.get_or_404(tid)
+        user = get_current_user()
+        return render_template(
+            'project_create.html',
+            is_admin_user=is_admin(user),
+            default_client_name=user.name if user and not is_admin(user) else '',
+            suggestions=[],
+            project_templates=ProjectTemplate.query.order_by(ProjectTemplate.created_at.desc()).all(),
+            prefill_template=tpl,
+        )
+
+    @bp.route('/projects/<int:id>/comments/<int:cid>/react', methods=['POST'])
+    def project_comment_react(id, cid):
+        user = get_current_user()
+        if not user:
+            return jsonify({'error': 'unauthorized'}), 401
+        comment = ProjectComment.query.filter_by(id=cid, project_id=id).first_or_404()
+        emoji = request.form.get('emoji', '').strip()
+        ALLOWED_EMOJIS = {'👍', '✅', '🔄', '🎉', '❤️'}
+        if emoji not in ALLOWED_EMOJIS:
+            return jsonify({'error': 'invalid emoji'}), 400
+        existing = ProjectCommentReaction.query.filter_by(comment_id=cid, user_id=user.id, emoji=emoji).first()
+        if existing:
+            db.session.delete(existing)
+            reacted = False
+        else:
+            db.session.add(ProjectCommentReaction(comment_id=cid, user_id=user.id, emoji=emoji))
+            reacted = True
+        db.session.commit()
+        count = ProjectCommentReaction.query.filter_by(comment_id=cid, emoji=emoji).count()
+        return jsonify({'reacted': reacted, 'count': count, 'emoji': emoji})
 
     @bp.route('/projects/<int:id>/consume/<int:pf_id>', methods=['POST'])
     def project_consume_filament(id, pf_id):
