@@ -78,6 +78,7 @@ templates/
   bambu.html            # Bambu Cloud job list with filter pills
   prusa.html            # PrusaLink job list with filter pills
   settings.html         # Full settings + dictionaries + integrations
+  _users_table.html     # Users list table partial (AJAX-targeted DOM update)
   ...                   # Auth pages, forms, partials (_filament_cards.html, _filament_list_rows.html,
                         #   _project_overview.html, _project_materials.html, _project_files.html,
                         #   _project_jobs.html, _project_activity.html)

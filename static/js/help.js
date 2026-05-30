@@ -475,13 +475,6 @@
                     }
                 },
                 {
-                    title: { cs: 'Správa uživatelů', en: 'User Management' },
-                    text: {
-                        cs: 'V sekci Uživatelé (přístupné jen adminu) vytvořte pozvánky, přiřaďte role (Admin / Uživatel) a deaktivujte účty. Pozvánka je jednorázový odkaz s platností 7 dní.',
-                        en: 'In the Users section (admin only), create invitations, assign roles (Admin / User), and deactivate accounts. An invitation is a one-time link valid for 7 days.'
-                    }
-                },
-                {
                     title: { cs: 'Energie a náklady tisku', en: 'Energy and Print Costs' },
                     text: {
                         cs: 'Nastavte cenu kWh a výkon tiskárny (W). Tyto hodnoty se pak automaticky použijí v kalkulačce pro výpočet nákladů na energii. Nastavit lze i délku přípravy tiskárny před tiskem.',
@@ -500,6 +493,50 @@
                     text: {
                         cs: 'V Nastavení → Obecné nastavte časové pásmo aplikace. Všechna data a časy (historie pohybů, tiskové úlohy) se zobrazují v tomto pásmu.',
                         en: 'In Settings → General, set the application timezone. All dates and times (movement history, print jobs) are displayed in this timezone.'
+                    }
+                }
+            ]
+        },
+        {
+            id: 'users',
+            icon: 'fa-users',
+            hasTour: true,
+            endpoints: ['users_index', 'user_detail', 'audit_logs', 'invite_delete'],
+            title: { cs: 'Uživatelé', en: 'Users' },
+            tips: [
+                {
+                    title: { cs: 'Vytváření pozvánek', en: 'Creating Invitations' },
+                    text: {
+                        cs: 'V levém panelu vytvořte pozvánku zadáním e-mailu a výběrem role (Admin / Uživatel). Uživatelům lze dále nastavit přístupová práva k jednotlivým sekcím. Pozvánka je jednorázový odkaz s platností 14 dní. Vygenerovaný odkaz lze jedním kliknutím zkopírovat do schránky.',
+                        en: 'In the left panel, create an invite by entering an email and selecting a role (Admin / User). Permissions for individual sections can be configured for users. The invite is a one-time link valid for 14 days. The generated link can be copied to clipboard with one click.'
+                    }
+                },
+                {
+                    title: { cs: 'Seznam a filtrování účtů', en: 'Account List and Filtering' },
+                    text: {
+                        cs: 'Pravý panel zobrazuje přehled všech účtů s možností vyhledávání, filtrování podle role a stavu, a řazení. Tabulka je stránkovaná a veškeré filtrování probíhá bez obnovení stránky. U každého účtu jsou k dispozici checkboxy pro hromadné akce.',
+                        en: 'The right panel shows all accounts with search, role/status filtering, and sorting. The table is paginated and all filtering happens without page reload. Each account has a checkbox for bulk actions.'
+                    }
+                },
+                {
+                    title: { cs: 'Hromadné akce', en: 'Bulk Actions' },
+                    text: {
+                        cs: 'Zaškrtněte více účtů a pomocí tlačítka v horní liště proveďte hromadnou akci: aktivovat, deaktivovat nebo smazat účty. Při hromadném mazání jsou projekty přeřazeny na vás. Není možné smazat vlastní účet ani posledního administrátora.',
+                        en: 'Check multiple accounts and use the button in the top bar to perform a bulk action: activate, deactivate, or delete accounts. Projects are reassigned to you during bulk deletion. You cannot delete your own account or the last administrator.'
+                    }
+                },
+                {
+                    title: { cs: 'Detail a správa účtu', en: 'Account Detail and Management' },
+                    text: {
+                        cs: 'Na stránce detailu uživatele lze upravit jméno, e-mail, roli, stav účtu, notifikační preference a přístupová práva. V pravé části jsou zobrazeny poslední projekty, komentáře a auditní záznamy daného uživatele. Tlačítkem „Smazat účet" lze účet trvale odstranit (s ochranou proti smazání sebe sama a posledního admina).',
+                        en: 'On the user detail page, you can edit name, email, role, account status, notification preferences, and access permissions. The right side shows recent projects, comments, and audit entries for the user. The "Delete Account" button permanently removes the account (with protection against deleting yourself or the last admin).'
+                    }
+                },
+                {
+                    title: { cs: 'Audit log', en: 'Audit Log' },
+                    text: {
+                        cs: 'V sekci Uživatelé → Audit log zobrazíte historii všech důležitých akcí: přihlášení, změny nastavení, přidání/smazání filamentu atd. Lze filtrovat podle akce, typu objektu a fulltextově vyhledávat.',
+                        en: 'In Users → Audit Log you can view a history of all important actions: logins, setting changes, filament additions/deletions, etc. Filter by action, object type, and fulltext search are available.'
                     }
                 }
             ]

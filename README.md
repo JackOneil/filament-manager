@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.96.0***
+*Current version: **v1.97.0***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -35,7 +35,10 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 
 ### Multi-User Workspace
 - **Role-Based Access** — Administrators have full read/write access; regular users see only permitted sections and their own projects.
-- **Self-Registration & Invites** — Users register themselves or receive invite codes with pre-configured role and section permissions.
+- **Self-Registration & Invites** — Users register themselves or receive invite codes with pre-configured role and section permissions. Invite links can be cancelled and show expiration status.
+- **User Management Page** — Admin-only `/users` page with paginated table, AJAX filtering (search, role, status, sort), and bulk actions (activate/deactivate/delete).
+- **User Deletion** — Permanent account removal with safety checks (cannot delete self or last admin). Owned projects are automatically reassigned.
+- **Enhanced User Detail** — Per-user activity view showing recent projects, comments, notification count, and audit trail with deep-link to full audit log.
 - **Operator Mode** — Admins can switch to a read-only Operator view without logging out; an amber indicator badge appears in the top bar.
 - **Project Collaboration** — Project ownership, approval workflow (Pending → Approved/Rejected), per-project comments, and in-app notifications.
 - **Admin Audit Log** — Successful administrator actions are recorded with user, IP/session, endpoint, target object, and before/after snapshots.

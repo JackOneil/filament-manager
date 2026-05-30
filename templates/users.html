@@ -1,28 +1,33 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto space-y-6">
+<div class="max-w-7xl mx-auto space-y-6" x-data="usersApp()">
     <div class="page-hero">
         <h1 class="page-title"><span class="page-title-icon"><i class="fa-solid fa-users"></i></span><span>{{ t('users_nav') }}</span></h1>
         <p>{{ t('users_desc') }}</p>
     </div>
 
     <div class="grid grid-cols-1 xl:grid-cols-[340px_minmax(0,1fr)] gap-6">
+        {# --- Left Sidebar: Invites --- #}
         <div class="ui-panel">
             <div class="ui-label">{{ t('users_invite_title') }}</div>
             <h2 class="text-2xl font-bold mt-1 mb-4">{{ t('users_invite_heading') }}</h2>
             {% if generated_invite %}
             <div class="ui-card-soft p-4 mb-4 text-sm">
                 <div class="font-semibold">{{ t('users_invite_generated') }}</div>
-                <div class="mt-2 break-all">{{ generated_invite }}</div>
-                <div class="mt-2 text-gray-500">{{ request.url_root.rstrip('/') }}{{ url_for('activate_invite') }}?code={{ generated_invite }}</div>
+                {% set invite_url = request.url_root.rstrip('/') + url_for('activate_invite') + '?code=' + generated_invite %}
+                <div class="mt-2 break-all text-xs bg-gray-50 rounded-lg p-2 font-mono">{{ invite_url }}</div>
+                <button onclick="navigator.clipboard.writeText('{{ invite_url|e }}').then(() => { this.textContent = '{{ t('copied') }}'; setTimeout(() => { this.textContent = '{{ t('users_copy_link') }}'; }, 2000); })"
+                        class="mt-2 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition font-semibold">
+                    <i class="fa-regular fa-copy mr-1"></i>{{ t('users_copy_link') }}
+                </button>
             </div>
             {% endif %}
             <form method="POST" class="space-y-3">
                 <input type="hidden" name="action" value="invite">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('auth_email') }}</label>
-                    <input type="email" name="email" class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
+                    <input type="email" name="email" class="w-full border border-gray-300 rounded-xl px-4 py-2.5" placeholder="email@example.com">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('users_role') }}</label>
@@ -43,134 +48,281 @@
             </form>
 
             {% if invites %}
-            <div class="mt-6 pt-6 border-t border-gray-100 space-y-3">
-                <div class="ui-label">{{ t('users_recent_invites') }}</div>
+            <div class="mt-6 pt-6 border-t border-gray-100 space-y-2">
+                <div class="ui-label mb-2">{{ t('users_recent_invites') }}</div>
                 {% for invite in invites %}
-                <div class="ui-card-soft p-3 text-sm">
-                    <div class="font-semibold text-gray-800">{{ invite.email or t('users_invite_without_email') }}</div>
-                    <div class="text-xs text-gray-500 mt-1">{{ invite.role }} · {{ invite.created_at | fmt_dt('%d.%m.%Y %H:%M') or '-' }}</div>
+                <div class="ui-card-soft p-3 text-sm flex items-start justify-between gap-2">
+                    <div class="min-w-0">
+                        <div class="font-semibold text-gray-800 truncate">{{ invite.email or t('users_invite_without_email') }}</div>
+                        <div class="text-xs text-gray-500 mt-0.5">
+                            {{ invite.role }} · {{ invite.created_at | fmt_dt('%d.%m.%Y %H:%M') or '-' }}
+                            {% if invite.is_used %}
+                            <span class="ui-badge ui-badge-success text-[10px] ml-1">{{ t('users_invite_used') }}</span>
+                            {% elif invite.expires_at and invite.expires_at < now %}
+                            <span class="ui-badge ui-badge-critical text-[10px] ml-1">{{ t('users_invite_expired') }}</span>
+                            {% else %}
+                            <span class="ui-badge text-[10px] ml-1">{{ t('users_invite_pending') }}</span>
+                            {% if invite.expires_at %}
+                            <span class="text-gray-400"> · {{ t('users_invite_expires_in') }} {{ (invite.expires_at - now).days }} {{ t('users_days') }}</span>
+                            {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if not invite.is_used %}
+                    <form method="POST" action="{{ url_for('invite_delete', invite_id=invite.id) }}"
+                          onsubmit="return confirm('{{ t('users_invite_delete_confirm')|e }}')">
+                        <button type="submit" class="text-red-500 hover:text-red-700 transition" title="{{ t('delete') }}">
+                            <i class="fa-solid fa-xmark text-lg"></i>
+                        </button>
+                    </form>
+                    {% endif %}
                 </div>
                 {% endfor %}
             </div>
             {% endif %}
         </div>
 
+        {# --- Right Side: Users List --- #}
         <div class="space-y-4">
-            <form method="GET" class="ui-panel">
+            {# Filters form (non-AJAX for initial load) #}
+            <div class="ui-panel">
                 <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
                     <div class="md:col-span-2">
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('filter_search') }}</label>
-                        <input type="text" name="q" value="{{ filters.q }}" placeholder="{{ t('users_filter_placeholder') }}" class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
+                        <input type="text" x-model="searchQ" placeholder="{{ t('users_filter_placeholder') }}" class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('users_role') }}</label>
-                        <select name="role" class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
+                        <select x-model="roleFilter" class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
                             <option value="">{{ t('filter_all') }}</option>
-                            <option value="admin" {% if filters.role == 'admin' %}selected{% endif %}>{{ t('users_role_admin') }}</option>
-                            <option value="user" {% if filters.role == 'user' %}selected{% endif %}>{{ t('users_role_user') }}</option>
+                            <option value="admin">{{ t('users_role_admin') }}</option>
+                            <option value="user">{{ t('users_role_user') }}</option>
                         </select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('users_status') }}</label>
-                        <select name="status" class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
+                        <select x-model="statusFilter" class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
                             <option value="">{{ t('filter_all') }}</option>
-                            <option value="active" {% if filters.status == 'active' %}selected{% endif %}>{{ t('users_status_active') }}</option>
-                            <option value="inactive" {% if filters.status == 'inactive' %}selected{% endif %}>{{ t('users_status_inactive') }}</option>
+                            <option value="active">{{ t('users_status_active') }}</option>
+                            <option value="inactive">{{ t('users_status_inactive') }}</option>
                         </select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('sort_by') }}</label>
-                        <select name="sort_by" class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
-                            <option value="created_at" {% if filters.sort_by == 'created_at' %}selected{% endif %}>{{ t('users_sort_created_at') }}</option>
-                            <option value="last_login_at" {% if filters.sort_by == 'last_login_at' %}selected{% endif %}>{{ t('users_sort_last_login_at') }}</option>
-                            <option value="name" {% if filters.sort_by == 'name' %}selected{% endif %}>{{ t('name') }}</option>
-                            <option value="email" {% if filters.sort_by == 'email' %}selected{% endif %}>{{ t('auth_email') }}</option>
-                            <option value="role" {% if filters.sort_by == 'role' %}selected{% endif %}>{{ t('users_role') }}</option>
+                        <select x-model="sortBy" class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
+                            <option value="created_at">{{ t('users_sort_created_at') }}</option>
+                            <option value="last_login_at">{{ t('users_sort_last_login_at') }}</option>
+                            <option value="name">{{ t('name') }}</option>
+                            <option value="email">{{ t('auth_email') }}</option>
+                            <option value="role">{{ t('users_role') }}</option>
                         </select>
                     </div>
                 </div>
-                <div class="mt-3 flex flex-wrap gap-3">
+                <div class="mt-3 flex flex-wrap items-center gap-3">
                     <label class="inline-flex items-center gap-2 text-sm text-gray-600">
-                        <input type="radio" name="sort_direction" value="desc" {% if filters.sort_direction != 'asc' %}checked{% endif %}>
+                        <input type="radio" name="sort_direction" x-model="sortDirection" value="desc">
                         <span>{{ t('sort_desc') }}</span>
                     </label>
                     <label class="inline-flex items-center gap-2 text-sm text-gray-600">
-                        <input type="radio" name="sort_direction" value="asc" {% if filters.sort_direction == 'asc' %}checked{% endif %}>
+                        <input type="radio" name="sort_direction" x-model="sortDirection" value="asc">
                         <span>{{ t('sort_asc') }}</span>
                     </label>
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-semibold transition">{{ t('filter_apply') }}</button>
+                    <button @click="resetFilters()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl font-semibold transition text-sm">
+                        <i class="fa-solid fa-rotate-left mr-1"></i>{{ t('reset_filters') }}
+                    </button>
                 </div>
-            </form>
+            </div>
 
+            {# Bulk actions bar #}
             <div class="ui-panel overflow-hidden">
                 <div class="flex items-center justify-between gap-3 mb-4">
                     <div>
                         <div class="ui-label">{{ t('users_list_title') }}</div>
                         <h2 class="text-2xl font-bold mt-1">{{ t('users_list_heading') }}</h2>
                     </div>
-                    <div class="text-sm text-gray-500">{{ users|length }} {{ t('users_count_suffix') }}</div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-gray-500" x-text="selectedCount + ' ' + (selectedCount == 1 ? '{{ t('users_selected_suffix') }}' : '{{ t('users_selected_plural_suffix') }}')" x-show="selectedCount > 0" x-cloak></span>
+                        <template x-if="selectedCount > 0">
+                            <div class="flex items-center gap-1">
+                                <form method="POST" class="inline-flex items-center gap-1" @submit.prevent="if (bulkAction === 'delete') { if (!confirm('{{ t('users_bulk_delete_confirm')|e }}')) return; }">
+                                    <input type="hidden" name="action" value="bulk">
+                                    <input type="hidden" name="bulk_action" x-model="bulkAction">
+                                    <template x-for="uid in selectedUsers" :key="uid">
+                                        <input type="hidden" name="selected_users" :value="uid">
+                                    </template>
+                                    <select x-model="bulkAction" class="text-xs border border-gray-300 rounded-lg px-2 py-1.5">
+                                        <option value="activate">{{ t('users_bulk_activate') }}</option>
+                                        <option value="deactivate">{{ t('users_bulk_deactivate') }}</option>
+                                        <option value="delete">{{ t('users_bulk_delete') }}</option>
+                                    </select>
+                                    <button type="submit" class="ui-badge ui-badge-brand text-xs whitespace-nowrap">{{ t('bulk_apply') }}</button>
+                                </form>
+                            </div>
+                        </template>
+                    </div>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                        <thead>
-                            <tr class="text-left text-gray-500 border-b border-gray-200">
-                                {% set sort_fields = [
-                                    ('name', 'auth_name'),
-                                    ('email', 'auth_email'),
-                                    ('role', 'users_role'),
-                                    ('created_at', 'users_created_at'),
-                                    ('last_login_at', 'users_last_login_at'),
-                                    ('is_active', 'users_status'),
-                                ] %}
-                                {% for field, label_key in sort_fields %}
-                                <th class="py-3 pr-4">
-                                    <a href="{{ url_for('users_index', q=filters.q, role=filters.role, status=filters.status, sort_by=field, sort_direction='asc' if (filters.sort_by == field and filters.sort_direction != 'asc') else 'desc') }}"
-                                       class="inline-flex items-center gap-1 hover:text-gray-800 transition-colors">
-                                        {{ t(label_key) }}
-                                        {% if filters.sort_by == field %}
-                                            {% if filters.sort_direction == 'asc' %}
-                                                <i class="fas fa-sort-up text-gray-700"></i>
-                                            {% else %}
-                                                <i class="fas fa-sort-down text-gray-700"></i>
-                                            {% endif %}
-                                        {% else %}
-                                            <i class="fas fa-sort text-gray-300"></i>
-                                        {% endif %}
-                                    </a>
-                                </th>
-                                {% endfor %}
-                                <th class="py-3 text-right">{{ t('detail') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for user in users %}
-                            <tr class="border-b border-gray-100 last:border-b-0">
-                                <td class="py-3 pr-4 font-semibold text-gray-800">{{ user.name }}</td>
-                                <td class="py-3 pr-4 text-gray-600">{{ user.email }}</td>
-                                <td class="py-3 pr-4">
-                                    <span class="ui-badge {% if user.role == 'admin' %}ui-badge-brand{% endif %}">{{ t('users_role_admin') if user.role == 'admin' else t('users_role_user') }}</span>
-                                </td>
-                                <td class="py-3 pr-4 text-gray-600">{{ user.created_at | fmt_dt('%d.%m.%Y %H:%M') or '-' }}</td>
-                                <td class="py-3 pr-4 text-gray-600">{{ user.last_login_at | fmt_dt('%d.%m.%Y %H:%M') or t('users_never_logged_in') }}</td>
-                                <td class="py-3 pr-4">
-                                    <span class="ui-badge {% if user.is_active %}ui-badge-success{% else %}ui-badge-warning{% endif %}">
-                                        {{ t('users_status_active') if user.is_active else t('users_status_inactive') }}
-                                    </span>
-                                </td>
-                                <td class="py-3 text-right">
-                                    <a href="{{ url_for('user_detail', user_id=user.id) }}" class="text-blue-600 hover:text-blue-800 font-semibold">{{ t('detail') }}</a>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="7" class="py-10 text-center text-gray-500">{{ t('users_empty') }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+
+                {# Table + Pagination container — replaced by AJAX #}
+                <div id="users-table-container" :class="loading ? 'opacity-60 pointer-events-none' : ''">
+                    {% include '_users_table.html' %}
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+function usersApp() {
+    return {
+        searchQ: {{ filters.q|default('')|tojson }},
+        roleFilter: {{ filters.role|default('')|tojson }},
+        statusFilter: {{ filters.status|default('')|tojson }},
+        sortBy: {{ filters.sort_by|default('created_at')|tojson }},
+        sortDirection: {{ filters.sort_direction|default('desc')|tojson }},
+        page: {{ filters.page|default(1)|tojson }},
+        loading: false,
+        _fetchPending: false,
+        _fetchController: null,
+
+        // Bulk selection
+        selectedUsers: [],
+        bulkAction: 'activate',
+
+        get selectedCount() {
+            return this.selectedUsers.length;
+        },
+
+        init() {
+            window.__users = this;
+
+            // Watch for filter changes
+            this.$watch('searchQ', () => { this.page = 1; this.fetchContent(); });
+            this.$watch('roleFilter', () => { this.page = 1; this.fetchContent(); });
+            this.$watch('statusFilter', () => { this.page = 1; this.fetchContent(); });
+            this.$watch('sortBy', () => { this.page = 1; this.fetchContent(); });
+            this.$watch('sortDirection', () => { this.page = 1; this.fetchContent(); });
+        },
+
+        toggleSort(field) {
+            if (this.sortBy === field) {
+                this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.sortBy = field;
+                this.sortDirection = 'desc';
+            }
+        },
+
+        fetchPage(p) {
+            if (p) this.page = p;
+            this.fetchContent();
+        },
+
+        resetFilters() {
+            this.searchQ = '';
+            this.roleFilter = '';
+            this.statusFilter = '';
+            this.sortBy = 'created_at';
+            this.sortDirection = 'desc';
+            this.page = 1;
+            this.selectedUsers = [];
+        },
+
+        async fetchContent() {
+            if (this._fetchPending) return;
+            this._fetchPending = true;
+            this.loading = true;
+
+            if (this._fetchController) {
+                this._fetchController.abort();
+            }
+            this._fetchController = new AbortController();
+            const signal = this._fetchController.signal;
+
+            try {
+                let params = new URLSearchParams();
+                params.append('ajax', '1');
+                if (this.searchQ) params.append('q', this.searchQ);
+                if (this.roleFilter) params.append('role', this.roleFilter);
+                if (this.statusFilter) params.append('status', this.statusFilter);
+                if (this.sortBy) params.append('sort_by', this.sortBy);
+                if (this.sortDirection) params.append('sort_direction', this.sortDirection);
+                if (this.page > 1) params.append('page', this.page);
+
+                const res = await fetch(`{{ url_for('users_index') }}?${params.toString()}`, { signal });
+                const data = await res.json();
+
+                if (data.html) {
+                    const wrapper = document.getElementById('users-table-container');
+                    if (!wrapper) return;
+
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(data.html, 'text/html');
+
+                    // 1) Replace table contents
+                    const tableBody = wrapper.querySelector('#users-table-body');
+                    const newBody = doc.querySelector('#users-table-body');
+                    if (tableBody && newBody) {
+                        tableBody.innerHTML = newBody.innerHTML;
+                    } else if (tableBody && !newBody) {
+                        tableBody.innerHTML = '';
+                    }
+
+                    // 2) Replace pagination (outerHTML preserve container)
+                    const pagEl = wrapper.querySelector('#users-pagination');
+                    const newPag = doc.querySelector('#users-pagination');
+                    if (pagEl && newPag) {
+                        pagEl.outerHTML = newPag.outerHTML;
+                    } else if (pagEl && !newPag) {
+                        pagEl.remove();
+                    }
+
+                    // 3) Update selected users: remove any that no longer exist in DOM
+                    const existingIds = new Set();
+                    wrapper.querySelectorAll('.user-checkbox').forEach(cb => existingIds.add(cb.value));
+                    this.selectedUsers = this.selectedUsers.filter(uid => existingIds.has(String(uid)));
+
+                    // 4) Push URL state
+                    let urlParams = new URLSearchParams();
+                    if (this.searchQ) urlParams.append('q', this.searchQ);
+                    if (this.roleFilter) urlParams.append('role', this.roleFilter);
+                    if (this.statusFilter) urlParams.append('status', this.statusFilter);
+                    if (this.sortBy) urlParams.append('sort_by', this.sortBy);
+                    if (this.sortDirection && this.sortDirection !== 'desc') urlParams.append('sort_direction', this.sortDirection);
+                    if (this.page > 1) urlParams.append('page', this.page);
+                    const newUrl = `${window.location.pathname}${urlParams.toString() ? '?' + urlParams.toString() : ''}`;
+                    window.history.replaceState({path: newUrl}, '', newUrl);
+                }
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error(err);
+                }
+            } finally {
+                this.loading = false;
+                this._fetchPending = false;
+                this._fetchController = null;
+            }
+        }
+    };
+}
+
+// Global helpers for select-all and checkbox management
+function toggleSelectAll(source) {
+    document.querySelectorAll('.user-checkbox').forEach(cb => {
+        cb.checked = source.checked;
+        cb.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+}
+
+// Event delegation handles checkbox changes for both initial and AJAX-loaded checkboxes
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('user-checkbox')) {
+        const usersApp = document.querySelector('[x-data="usersApp()"]');
+        if (usersApp && usersApp.__x) {
+            const instance = usersApp.__x.$data;
+            const checked = document.querySelectorAll('.user-checkbox:checked');
+            instance.selectedUsers = Array.from(checked).map(cb => parseInt(cb.value));
+        }
+    }
+});
+</script>
 {% endblock %}

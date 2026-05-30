@@ -1,0 +1,98 @@
+{% set sort_fields = [
+    ('name', 'auth_name'),
+    ('email', 'auth_email'),
+    ('role', 'users_role'),
+    ('created_at', 'users_created_at'),
+    ('last_login_at', 'users_last_login_at'),
+    ('is_active', 'users_status'),
+] %}
+<div class="overflow-x-auto">
+    <table class="min-w-full text-sm">
+        <thead>
+            <tr class="text-left text-gray-500 border-b border-gray-200">
+                <th class="py-3 pr-2 w-8">
+                    <input type="checkbox" id="select-all-users" onchange="toggleSelectAll(this)" class="rounded border-gray-300">
+                </th>
+                {% for field, label_key in sort_fields %}
+                <th class="py-3 pr-4">
+                    <a href="#"
+                       onclick="window.__users && window.__users.toggleSort('{{ field }}'); return false;"
+                       class="inline-flex items-center gap-1 hover:text-gray-800 transition-colors">
+                        {{ t(label_key) }}
+                        {% if filters.sort_by == field %}
+                            {% if filters.sort_direction == 'asc' %}
+                                <i class="fas fa-sort-up text-gray-700"></i>
+                            {% else %}
+                                <i class="fas fa-sort-down text-gray-700"></i>
+                            {% endif %}
+                        {% else %}
+                            <i class="fas fa-sort text-gray-300"></i>
+                        {% endif %}
+                    </a>
+                </th>
+                {% endfor %}
+                <th class="py-3 text-right">{{ t('detail') }}</th>
+            </tr>
+        </thead>
+        <tbody id="users-table-body">
+            {% for user in users.items %}
+            <tr class="border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors">
+                <td class="py-3 pr-2">
+                    <input type="checkbox" name="selected_users" value="{{ user.id }}" class="user-checkbox rounded border-gray-300">
+                </td>
+                <td class="py-3 pr-4 font-semibold text-gray-800">{{ user.name }}</td>
+                <td class="py-3 pr-4 text-gray-600">{{ user.email }}</td>
+                <td class="py-3 pr-4">
+                    <span class="ui-badge {% if user.role == 'admin' %}ui-badge-brand{% endif %}">{{ t('users_role_admin') if user.role == 'admin' else t('users_role_user') }}</span>
+                </td>
+                <td class="py-3 pr-4 text-gray-600">{{ user.created_at | fmt_dt('%d.%m.%Y %H:%M') or '-' }}</td>
+                <td class="py-3 pr-4 text-gray-600">{{ user.last_login_at | fmt_dt('%d.%m.%Y %H:%M') or t('users_never_logged_in') }}</td>
+                <td class="py-3 pr-4">
+                    <span class="ui-badge {% if user.is_active %}ui-badge-success{% else %}ui-badge-warning{% endif %}">
+                        {{ t('users_status_active') if user.is_active else t('users_status_inactive') }}
+                    </span>
+                </td>
+                <td class="py-3 text-right">
+                    <a href="{{ url_for('user_detail', user_id=user.id) }}" class="text-blue-600 hover:text-blue-800 font-semibold text-sm">{{ t('detail') }}</a>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="8" class="py-10 text-center text-gray-500">{{ t('users_empty') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div id="users-pagination" class="flex items-center justify-between mt-4">
+    <div class="text-sm text-gray-500">
+        {{ t('users_page_status').format(page=users.page, pages=users.pages, total=users.total) }}
+    </div>
+    <div class="flex items-center gap-2">
+        {% if users.has_prev %}
+        <button onclick="window.__users && window.__users.fetchPage({{ users.prev_num }})"
+                class="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm font-medium transition">
+            <i class="fa-solid fa-chevron-left mr-1"></i>{{ t('prev_page') }}
+        </button>
+        {% endif %}
+        {% for p in range(1, users.pages + 1) %}
+            {% if p == users.page %}
+            <span class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium">{{ p }}</span>
+            {% elif p == 1 or p == users.pages or (p >= users.page - 2 and p <= users.page + 2) %}
+            <button onclick="window.__users && window.__users.fetchPage({{ p }})"
+                    class="px-3 py-1.5 rounded-lg hover:bg-gray-100 text-sm font-medium text-gray-600 transition">
+                {{ p }}
+            </button>
+            {% elif p == users.page - 3 or p == users.page + 3 %}
+            <span class="px-1 text-gray-400">...</span>
+            {% endif %}
+        {% endfor %}
+        {% if users.has_next %}
+        <button onclick="window.__users && window.__users.fetchPage({{ users.next_num }})"
+                class="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm font-medium transition">
+            {{ t('next_page') }}<i class="fa-solid fa-chevron-right ml-1"></i>
+        </button>
+        {% endif %}
+    </div>
+</div>

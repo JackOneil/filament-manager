@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.97.0] - 2026-05-30
+### Added
+- **Users page pagination** — User list now uses server-side pagination (20 per page) instead of loading all users at once.
+- **Users AJAX filtering** — Filter changes (search, role, status, sorting) now use targeted DOMParser-based DOM updates (Rule 31 pattern) instead of full page reload.
+- **Invite management** — Unused invites can now be revoked/cancelled. Invite cards show expiration status (pending/expired/used) with remaining days count.
+- **User deletion** — Permanent account removal with safety checks: cannot delete self or last admin. Owned projects are reassigned to the deleting admin.
+- **Bulk user actions** — Checkbox selection with bulk activate/deactivate/delete operations.
+- **Enhanced user detail page** — New activity panels: recent projects list, recent comments timeline, notification count KPI, and recent audit log entries with deep-link to full audit.
+- **Copy invite link** — One-click clipboard copy for generated invitation URLs.
+- **Dedicated Users help section** — New `users` section in `HELP_SECTIONS` with 5 contextual tips covering invitations, filtering, bulk actions, account management, and audit log. Old user-management tip removed from settings section and audit tip removed from general tips.
+
+### Changed
+- **`routes/auth.py`** — Refactored `_build_users_query()` into shared helper; `users_index` returns JSON partial on `?ajax=1`; added endpoints: `invite_delete`, `user_delete`, `users_bulk`.
+- **`auth.py`** — Added `invite_delete` to `SECTION_BY_ENDPOINT` mapping.
+- **Help system** — Audit log tip moved from general tips to the new dedicated users help section.
+
 ## [1.96.0] - 2026-05-30
 ### Added
 - **History page filtering** — Movement history (`/history`) now supports fulltext search by filament name or note, action type filter dropdown, and date range (from/to) inputs with persistent URL parameters and a reset button.

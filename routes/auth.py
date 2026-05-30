@@ -1,7 +1,7 @@
 from datetime import datetime
 from utils import utc_now
 
-from flask import abort, flash, redirect, render_template, request, url_for, Blueprint
+from flask import abort, flash, jsonify, redirect, render_template, request, url_for, Blueprint
 from sqlalchemy import or_
 
 from auth import (
@@ -43,6 +43,45 @@ def _permissions_from_form():
         'settings': _bool_field('perm_settings'),
         'users': _bool_field('perm_users'),
     }
+
+
+def _build_users_query(q, role, status, sort_by, sort_direction):
+    """Build and return a User query with filters and sorting."""
+    users_query = User.query
+
+    if q:
+        from utils import escape_like
+        pattern = f'%{escape_like(q)}%'
+        users_query = users_query.filter(or_(User.name.ilike(pattern), User.email.ilike(pattern)))
+    if role in {'admin', 'user'}:
+        users_query = users_query.filter(User.role == role)
+    if status == 'active':
+        users_query = users_query.filter(User.is_active.is_(True))
+    elif status == 'inactive':
+        users_query = users_query.filter(User.is_active.is_(False))
+
+    sort_map = {
+        'name': User.name,
+        'email': User.email,
+        'created_at': User.created_at,
+        'last_login_at': User.last_login_at,
+        'role': User.role,
+        'is_active': User.is_active,
+    }
+    order_expr = sort_map.get(sort_by, User.created_at)
+    if sort_by in ('role', 'is_active'):
+        users_query = users_query.order_by(
+            order_expr.desc() if sort_direction == 'desc' else order_expr.asc(),
+            User.name.asc()
+        )
+    else:
+        null_rank = db.case((order_expr.is_(None), 1), else_=0)
+        if sort_direction == 'asc':
+            users_query = users_query.order_by(null_rank.asc(), order_expr.asc(), User.name.asc())
+        else:
+            users_query = users_query.order_by(null_rank.asc(), order_expr.desc(), User.name.asc())
+
+    return users_query
 
 
 def register(app):
@@ -150,47 +189,22 @@ def register(app):
                 db.session.commit()
                 flash('users_invite_created', 'success')
                 return redirect(url_for('users_index', invite=invite.code))
+            elif action == 'bulk':
+                return _users_bulk_action()
+
+        page = request.args.get('page', 1, type=int)
         q = request.args.get('q', '').strip()
         role = request.args.get('role', '').strip()
         status = request.args.get('status', '').strip()
         sort_by = request.args.get('sort_by', 'created_at')
         sort_direction = request.args.get('sort_direction', 'desc')
+        ajax = request.args.get('ajax') == '1'
 
-        users_query = User.query
-
-        if q:
-            from utils import escape_like
-            pattern = f'%{escape_like(q)}%'
-            users_query = users_query.filter(or_(User.name.ilike(pattern), User.email.ilike(pattern)))
-        if role in {'admin', 'user'}:
-            users_query = users_query.filter(User.role == role)
-        if status == 'active':
-            users_query = users_query.filter(User.is_active.is_(True))
-        elif status == 'inactive':
-            users_query = users_query.filter(User.is_active.is_(False))
-
-        sort_map = {
-            'name': User.name,
-            'email': User.email,
-            'created_at': User.created_at,
-            'last_login_at': User.last_login_at,
-            'role': User.role,
-            'is_active': User.is_active,
-        }
-        order_expr = sort_map.get(sort_by, User.created_at)
-        if sort_by in ('role', 'is_active'):
-            users_query = users_query.order_by(order_expr.desc() if sort_direction == 'desc' else order_expr.asc(), User.name.asc())
-        else:
-            null_rank = db.case((order_expr.is_(None), 1), else_=0)
-            if sort_direction == 'asc':
-                users_query = users_query.order_by(null_rank.asc(), order_expr.asc(), User.name.asc())
-            else:
-                users_query = users_query.order_by(null_rank.asc(), order_expr.desc(), User.name.asc())
-
-        users = users_query.all()
+        users_query = _build_users_query(q, role, status, sort_by, sort_direction)
+        users = db.paginate(users_query.statement, page=page, per_page=20, error_out=False)
         invites = UserInvite.query.order_by(UserInvite.created_at.desc()).limit(10).all()
-        return render_template(
-            'users.html',
+
+        context = dict(
             users=users,
             invites=invites,
             generated_invite=request.args.get('invite', ''),
@@ -200,15 +214,51 @@ def register(app):
                 'status': status,
                 'sort_by': sort_by,
                 'sort_direction': sort_direction,
+                'page': page,
             },
             default_permissions=default_section_permissions(),
+            now=utc_now(),
         )
+
+        if ajax:
+            html = render_template('_users_table.html', **context)
+            return jsonify({'html': html})
+
+        return render_template('users.html', **context)
+
+    def _check_delete_user_allowed(target_user, current_user):
+        """Validate that a user can be deleted. Raises abort(400) if not."""
+        if target_user.id == current_user.id:
+            abort(400, translate('users_cannot_delete_self'))
+        admin_count = User.query.filter_by(role='admin', is_active=True).count()
+        if target_user.role == 'admin' and admin_count <= 1:
+            abort(400, translate('users_cannot_delete_last_admin'))
+        if not target_user.is_active:
+            # Allow deleting inactive users
+            pass
 
     @bp.route('/users/<int:user_id>', methods=['GET', 'POST'])
     @require_admin
     def user_detail(user_id):
         user = db.get_or_404(User, user_id)
+
         if request.method == 'POST':
+            action = request.form.get('action', '')
+            if action == 'delete':
+                current = get_current_user()
+                _check_delete_user_allowed(user, current)
+                # Reassign owned projects to the deleting admin
+                for project in user.owned_projects:
+                    project.owner_user_id = current.id
+                # Reassign projects created by this user
+                for project in user.created_projects:
+                    project.created_by_user_id = current.id
+                db.session.delete(user)
+                db.session.commit()
+                flash('users_user_deleted', 'success')
+                return redirect(url_for('users_index'))
+
+            # Regular update
             role = 'admin' if request.form.get('role') == 'admin' else 'user'
             user.name = request.form.get('name', '').strip() or user.name
             user.email = request.form.get('email', '').strip().lower() or user.email
@@ -223,15 +273,98 @@ def register(app):
             return redirect(url_for('user_detail', user_id=user.id))
 
         user_projects = user.owned_projects
+        user_projects_list = sorted(user_projects, key=lambda p: p.created_at or utc_now(), reverse=True)[:10]
+        # Recent comments by this user
+        user_comments = (
+            user.project_comments
+            if hasattr(user, 'project_comments')
+            else []
+        )
+        user_comments_list = sorted(user_comments, key=lambda c: c.created_at or utc_now(), reverse=True)[:10]
+        # Notification count
+        notification_count = Notification.query.filter_by(user_id=user.id).count()
+        # Recent audit log entries for this user
+        from sqlalchemy import desc
+        audit_entries = (
+            AuditLog.query.filter_by(user_email=user.email)
+            .order_by(desc(AuditLog.created_at))
+            .limit(10)
+            .all()
+        )
+        current_user = get_current_user()
+        can_delete = user.id != current_user.id
+        admin_count = User.query.filter_by(role='admin', is_active=True).count()
+        is_last_admin = (user.role == 'admin' and admin_count <= 1)
+
         return render_template(
             'user_detail.html',
             managed_user=user,
             managed_user_permissions=user_permissions(user),
             default_permissions=default_section_permissions(),
             user_projects_count=len(user_projects),
-            user_last_project_at=max((project.created_at for project in user_projects), default=None),
+            user_last_project_at=max((p.created_at for p in user_projects), default=None),
+            user_recent_projects=user_projects_list,
+            user_recent_comments=user_comments_list,
+            user_notification_count=notification_count,
+            user_audit_entries=audit_entries,
+            can_delete=can_delete and not is_last_admin,
             now=utc_now(),
         )
+
+    @bp.route('/invites/<int:invite_id>/delete', methods=['POST'])
+    @require_admin
+    def invite_delete(invite_id):
+        invite = db.get_or_404(UserInvite, invite_id)
+        if invite.is_used:
+            flash('users_invite_already_used', 'error')
+        else:
+            db.session.delete(invite)
+            db.session.commit()
+            flash('users_invite_deleted', 'success')
+        return redirect(url_for('users_index'))
+
+    def _users_bulk_action():
+        """Handle bulk actions on users (activate/deactivate/delete)."""
+        action = request.form.get('bulk_action', '')
+        selected = request.form.getlist('selected_users', type=int)
+        if not selected or action not in ('activate', 'deactivate', 'delete'):
+            flash('users_bulk_invalid', 'error')
+            return redirect(url_for('users_index'))
+
+        current_user = get_current_user()
+        if action == 'delete':
+            users_to_delete = User.query.filter(User.id.in_(selected)).all()
+            admin_count = User.query.filter_by(role='admin', is_active=True).count()
+            for target_user in users_to_delete:
+                if target_user.id == current_user.id:
+                    continue
+                remaining_admins = admin_count - (1 if target_user.role == 'admin' else 0)
+                if target_user.role == 'admin' and remaining_admins < 1:
+                    continue
+                # Reassign owned projects
+                for project in target_user.owned_projects:
+                    project.owner_user_id = current_user.id
+                for project in target_user.created_projects:
+                    project.created_by_user_id = current_user.id
+                db.session.delete(target_user)
+            db.session.commit()
+            flash('users_bulk_deleted', 'success')
+        elif action == 'activate':
+            User.query.filter(User.id.in_(selected), User.is_active.is_(False)).update(
+                {'is_active': True}, synchronize_session=False
+            )
+            db.session.commit()
+            flash('users_bulk_activated', 'success')
+        elif action == 'deactivate':
+            # Prevent deactivating self
+            safe_selected = [uid for uid in selected if uid != current_user.id]
+            if safe_selected:
+                User.query.filter(User.id.in_(safe_selected), User.is_active.is_(True)).update(
+                    {'is_active': False}, synchronize_session=False
+                )
+                db.session.commit()
+            flash('users_bulk_deactivated', 'success')
+        return redirect(url_for('users_index'))
 
     @bp.route('/account', methods=['GET', 'POST'])
     @require_login

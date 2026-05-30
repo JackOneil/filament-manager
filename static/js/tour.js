@@ -394,6 +394,61 @@
                     en: 'Set a recurrence frequency (weekly, monthly…). After marking as done the system automatically creates a new task with a shifted due date.'
                 }
             }
+        ],
+
+        users: [
+            {
+                selector: null,
+                title: { cs: 'Správa uživatelů', en: 'User Management' },
+                text: {
+                    cs: 'Tato stránka slouží k správě uživatelských účtů, rolí, pozvánek a přístupových práv. Máte zde přehled o všech registrovaných účtech.',
+                    en: 'This page is for managing user accounts, roles, invitations, and access permissions. Here you get an overview of all registered accounts.'
+                }
+            },
+            {
+                selector: '.ui-panel:first-of-type',
+                title: { cs: 'Vytvoření pozvánky', en: 'Create Invite' },
+                text: {
+                    cs: 'V levém panelu vytvořte pozvánku pro nového uživatele. Zadejte e-mail, vyberte roli (Admin / Uživatel) a nastavte přístupová práva k jednotlivým sekcím. Vygenerovaný odkaz lze zkopírovat do schránky.',
+                    en: 'In the left panel, create an invite for a new user. Enter an email, select a role (Admin / User) and configure section permissions. The generated link can be copied to clipboard.'
+                },
+                position: 'right'
+            },
+            {
+                selector: '.xl\\:grid-cols-\\[1fr_340px\\] .ui-panel, .xl\\:grid-cols-\\[340px_minmax\\(0\\,1fr\\)\\] .ui-panel:nth-child(2)',
+                title: { cs: 'Seznam a filtrování', en: 'Account List & Filtering' },
+                text: {
+                    cs: 'Pravá část zobrazuje všechny účty v přehledné tabulce. Použijte vyhledávání, filtrování podle role a stavu, nebo řazení — vše funguje bez obnovení stránky.',
+                    en: 'The right side shows all accounts in a clear table. Use search, role/status filtering, or sorting — all work without a page reload.'
+                },
+                position: 'left'
+            },
+            {
+                selector: '#users-table-container table',
+                title: { cs: 'Hromadné akce', en: 'Bulk Actions' },
+                text: {
+                    cs: 'Každý řádek má checkbox pro výběr. Po zaškrtnutí více účtů se nahoře zobrazí lišta s hromadnými akcemi: aktivovat, deaktivovat nebo smazat vybrané účty.',
+                    en: 'Each row has a checkbox for selection. After checking multiple accounts, a bulk action bar appears: activate, deactivate, or delete selected accounts.'
+                },
+                position: 'top'
+            },
+            {
+                selector: '#users-pagination',
+                title: { cs: 'Stránkování', en: 'Pagination' },
+                text: {
+                    cs: 'Tabulka je stránkovaná po 20 účtech. Při vyhledávání a filtrování se stránkování aktualizuje automaticky. Kliknutím na číslo stránky nebo šipky přecházíte mezi stránkami.',
+                    en: 'The table is paginated at 20 accounts per page. Pagination updates automatically during search and filtering. Click page numbers or arrows to navigate.'
+                },
+                position: 'top'
+            },
+            {
+                selector: null,
+                title: { cs: 'Detail uživatele', en: 'User Detail' },
+                text: {
+                    cs: 'Kliknutím na „Detail" u libovolného uživatele přejdete na stránku s úpravou profilu, nastavením práv, notifikací a přehledem jeho aktivity — projektů, komentářů a auditních záznamů.',
+                    en: 'Click "Detail" on any user to go to their profile page where you can edit the profile, set permissions and notifications, and view their recent projects, comments, and audit entries.'
+                }
+            }
         ]
     };
 
@@ -411,7 +466,8 @@
         prusa:       '/prusa',
         history:     '/history',
         waste:       '/waste',
-        maintenance: '/maintenance'
+        maintenance: '/maintenance',
+        users:       '/users'
     };
 
     // ── Tour Engine ─────────────────────────────────────────────────────────────

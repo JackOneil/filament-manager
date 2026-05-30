@@ -166,6 +166,7 @@ SECTION_BY_ENDPOINT = {
     'waste_delete_file': SECTION_FILAMENTS,
     'users_index': SECTION_USERS,
     'user_detail': SECTION_USERS,
+    'invite_delete': SECTION_USERS,
     'account_settings': SECTION_NOTIFICATIONS,
     'notifications_index': SECTION_NOTIFICATIONS,
     'notification_mark_read': SECTION_NOTIFICATIONS,
