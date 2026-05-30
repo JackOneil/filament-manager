@@ -213,6 +213,14 @@ class AppSetting(db.Model):
     # Auto filament mapping
     auto_filament_mapping_enabled = db.Column(db.Boolean, default=True)
 
+    # Automatic backup configuration
+    backup_auto_enabled = db.Column(db.Boolean, default=False)
+    backup_auto_frequency = db.Column(db.String(10), default='weekly')  # daily, weekly, monthly
+    backup_auto_time = db.Column(db.String(5), default='03:00')  # HH:MM in app timezone
+    backup_auto_day = db.Column(db.Integer, default=1)  # day of week (0=Mon) for weekly, day of month (1) for monthly
+    backup_auto_include_files = db.Column(db.Boolean, default=True)
+    backup_auto_last_run_at = db.Column(db.DateTime, nullable=True)
+
 
 class PrintHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)

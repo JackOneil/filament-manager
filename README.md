@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.97.0***
+*Current version: **v1.98.0***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -194,7 +194,9 @@ Schema migrations run automatically on startup via `_safe_alter()` — no manual
 
 ### Automatic (recommended)
 
-Use the built-in **Settings → Export** function to download a compressed `.tar.gz` backup of the entire application state, including uploaded project files stored directly in the archive.
+Configure scheduled automatic backups in **Settings → Data**: choose daily/weekly/monthly frequency, a time of day, and whether to include project files. Backups are saved as compressed `.tar.gz` archives to `./data/backup/` on the server. You can manage existing backup files (download/delete) and trigger a manual backup anytime from the same settings panel.
+
+For one-off exports, use **Settings → Export** to download a compressed `.tar.gz` backup of the entire application state.
 
 Restore via **Settings → Import** (accepts `.tar.gz`, older `.json.gz`, and legacy `.json` formats).
 

@@ -133,15 +133,11 @@ def _resolve_user_ref(ref):
     return None
 
 
-def register(app):
-    bp = Blueprint('backup', __name__)
+def _build_export_data(app, include_files=True):
+    """Build the full export data dict. Returns (data_dict, app_setting)."""
+    setting = AppSetting.query.first()
 
-    @bp.route('/export')
-    def export_data():
-        include_files = request.args.get('include_files', '1') != '0'
-        setting = AppSetting.query.first()
-
-        data = {
+    data = {
             'backup_meta': {
                 'format_version': 2,
                 'packaging': 'tar.gz',
@@ -188,6 +184,12 @@ def register(app):
                 'auto_filament_mapping_enabled': getattr(setting, 'auto_filament_mapping_enabled', True) if setting else True,
                 'backup_last_export_at': setting.backup_last_export_at.isoformat() if setting and setting.backup_last_export_at else None,
                 'backup_last_export_meta': setting.backup_last_export_meta if setting else None,
+                'backup_auto_enabled': getattr(setting, 'backup_auto_enabled', False) if setting else False,
+                'backup_auto_frequency': getattr(setting, 'backup_auto_frequency', 'weekly') if setting else 'weekly',
+                'backup_auto_time': getattr(setting, 'backup_auto_time', '03:00') if setting else '03:00',
+                'backup_auto_day': getattr(setting, 'backup_auto_day', 1) if setting else 1,
+                'backup_auto_include_files': getattr(setting, 'backup_auto_include_files', True) if setting else True,
+                'backup_auto_last_run_at': setting.backup_auto_last_run_at.isoformat() if setting and setting.backup_auto_last_run_at else None,
                 # bambu_token intentionally excluded for security
             } if setting else {},
 
@@ -507,67 +509,184 @@ def register(app):
                 'is_consumed': ul.is_consumed,
                 'consumed_at': ul.consumed_at.isoformat() if ul.consumed_at else None,
             } for ul in FilamentUndoLog.query.order_by(FilamentUndoLog.created_at).all()],
-        }
+    }
 
-        counts = {
-            'brands': len(data['brands']),
-            'materials': len(data['materials']),
-            'colors': len(data['colors']),
-            'filaments': len(data['filaments']),
-            'projects': len(data['projects']),
-            'users': len(data['users']),
-            'bambu_jobs': len(data['bambu_jobs']),
-            'prusa_jobs': len(data['prusa_jobs']),
-            'movement_history': len(data['movement_history']),
-            'waste_records': len(data['waste_records']),
-        }
-        data['backup_meta']['record_counts'] = counts
-        data['backup_meta']['total_records'] = sum(counts.values())
+    counts = {
+        'brands': len(data['brands']),
+        'materials': len(data['materials']),
+        'colors': len(data['colors']),
+        'filaments': len(data['filaments']),
+        'projects': len(data['projects']),
+        'users': len(data['users']),
+        'bambu_jobs': len(data['bambu_jobs']),
+        'prusa_jobs': len(data['prusa_jobs']),
+        'movement_history': len(data['movement_history']),
+        'waste_records': len(data['waste_records']),
+    }
+    data['backup_meta']['record_counts'] = counts
+    data['backup_meta']['total_records'] = sum(counts.values())
 
-        app.logger.debug(
-            f"Export: {len(data['filaments'])} filaments, "
-            f"{len(data['projects'])} projects, "
-            f"{len(data['bambu_jobs'])} Bambu jobs"
-        )
+    app.logger.debug(
+        f"Export: {len(data['filaments'])} filaments, "
+        f"{len(data['projects'])} projects, "
+        f"{len(data['bambu_jobs'])} Bambu jobs"
+    )
+
+    return data, setting
+
+
+def _build_backup_archive_bytes(app, include_files=True):
+    """Build backup tar.gz archive bytes from the full export data. Returns bytes."""
+    data, _setting = _build_export_data(app, include_files=include_files)
+
+    archive_buffer = io.BytesIO()
+    manifest_bytes = json.dumps(data, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+    with tarfile.open(fileobj=archive_buffer, mode='w:gz') as archive:
+        manifest_info = tarfile.TarInfo('manifest.json')
+        manifest_info.size = len(manifest_bytes)
+        archive.addfile(manifest_info, io.BytesIO(manifest_bytes))
+        if include_files:
+            for project in data.get('projects', []):
+                for file_data in project.get('files', []):
+                    archive_path = file_data.get('archive_path')
+                    source_path = file_data.get('filepath')
+                    if not archive_path or not source_path or not os.path.isfile(source_path):
+                        continue
+                    with open(source_path, 'rb') as handle:
+                        content = handle.read()
+                    file_info = tarfile.TarInfo(archive_path)
+                    file_info.size = len(content)
+                    archive.addfile(file_info, io.BytesIO(content))
+            for w_rec in data.get('waste_records', []):
+                for file_data in w_rec.get('files', []):
+                    archive_path = file_data.get('archive_path')
+                    source_path = file_data.get('filepath')
+                    if not archive_path or not source_path or not os.path.isfile(source_path):
+                        continue
+                    with open(source_path, 'rb') as handle:
+                        content = handle.read()
+                    file_info = tarfile.TarInfo(archive_path)
+                    file_info.size = len(content)
+                    archive.addfile(file_info, io.BytesIO(content))
+    return archive_buffer.getvalue()
+
+
+def register(app):
+    bp = Blueprint('backup', __name__)
+
+    @bp.route('/export')
+    def export_data():
+        include_files = request.args.get('include_files', '1') != '0'
+        data, setting = _build_export_data(app, include_files=include_files)
 
         if setting:
             setting.backup_last_export_at = utc_now()
             setting.backup_last_export_meta = json.dumps(data['backup_meta'], ensure_ascii=False)
             db.session.commit()
 
-        archive_buffer = io.BytesIO()
-        manifest_bytes = json.dumps(data, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
-        with tarfile.open(fileobj=archive_buffer, mode='w:gz') as archive:
-            manifest_info = tarfile.TarInfo('manifest.json')
-            manifest_info.size = len(manifest_bytes)
-            archive.addfile(manifest_info, io.BytesIO(manifest_bytes))
-            if include_files:
-                for project in data.get('projects', []):
-                    for file_data in project.get('files', []):
-                        archive_path = file_data.get('archive_path')
-                        source_path = file_data.get('filepath')
-                        if not archive_path or not source_path or not os.path.isfile(source_path):
-                            continue
-                        with open(source_path, 'rb') as handle:
-                            content = handle.read()
-                        file_info = tarfile.TarInfo(archive_path)
-                        file_info.size = len(content)
-                        archive.addfile(file_info, io.BytesIO(content))
-                for w_rec in data.get('waste_records', []):
-                    for file_data in w_rec.get('files', []):
-                        archive_path = file_data.get('archive_path')
-                        source_path = file_data.get('filepath')
-                        if not archive_path or not source_path or not os.path.isfile(source_path):
-                            continue
-                        with open(source_path, 'rb') as handle:
-                            content = handle.read()
-                        file_info = tarfile.TarInfo(archive_path)
-                        file_info.size = len(content)
-                        archive.addfile(file_info, io.BytesIO(content))
-        response = Response(archive_buffer.getvalue(), mimetype='application/gzip')
+        archive_bytes = _build_backup_archive_bytes(app, include_files=include_files)
+        response = Response(archive_bytes, mimetype='application/gzip')
         suffix = 'filament_backup.tar.gz' if include_files else 'filament_backup_db_only.tar.gz'
         response.headers['Content-Disposition'] = f'attachment; filename={suffix}'
         return response
+
+    @bp.route('/backup/trigger-now', methods=['POST'])
+    def backup_trigger_now():
+        """Manually trigger an automatic-style backup to disk."""
+        setting = AppSetting.query.first()
+        if not setting:
+            flash(translate('backup_auto_no_settings'), 'error')
+            return redirect(url_for('settings') + '?tab=data')
+
+        try:
+            archive_bytes = _build_backup_archive_bytes(
+                app, include_files=bool(setting.backup_auto_include_files)
+            )
+            backup_dir = os.path.join(
+                os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'backup'
+            )
+            os.makedirs(backup_dir, exist_ok=True)
+
+            now = utc_now()
+            ts = now.strftime('%Y%m%d_%H%M%S')
+            suffix = 'full' if setting.backup_auto_include_files else 'db'
+            filename = f'auto_backup_{suffix}_{ts}.tar.gz'
+            filepath = os.path.join(backup_dir, filename)
+            with open(filepath, 'wb') as fh:
+                fh.write(archive_bytes)
+
+            setting.backup_auto_last_run_at = now
+            setting.backup_last_export_at = now
+            data, _ = _build_export_data(app, include_files=bool(setting.backup_auto_include_files))
+            setting.backup_last_export_meta = json.dumps(data['backup_meta'], ensure_ascii=False)
+            db.session.commit()
+
+            app.logger.info(f"Manual auto-backup triggered: {filename} ({len(archive_bytes)} bytes)")
+            flash(translate('backup_auto_triggered').format(filename=filename), 'success')
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Manual auto-backup failed: {e}")
+            flash(translate('backup_auto_failed'), 'error')
+        return redirect(url_for('settings') + '?tab=data')
+
+    @bp.route('/backup/list-files')
+    def backup_list_files():
+        """Return JSON list of existing auto-backup files."""
+        backup_dir = os.path.join(
+            os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'backup'
+        )
+        files = []
+        if os.path.isdir(backup_dir):
+            for name in sorted(os.listdir(backup_dir), reverse=True):
+                fpath = os.path.join(backup_dir, name)
+                if os.path.isfile(fpath) and name.endswith('.tar.gz'):
+                    stat = os.stat(fpath)
+                    files.append({
+                        'filename': name,
+                        'size_bytes': stat.st_size,
+                        'modified_at': utc_now().replace(
+                            year=2020, month=1, day=1,
+                            hour=0, minute=0, second=0, microsecond=0
+                        ).isoformat() if not hasattr(stat, 'st_mtime') else None,
+                        # Use the file's actual mtime
+                        'modified_at_ts': int(stat.st_mtime) if hasattr(stat, 'st_mtime') else 0,
+                    })
+        from flask import jsonify
+        return jsonify({'files': files})
+
+    @bp.route('/backup/download/<filename>')
+    def backup_download_file(filename):
+        """Download a specific auto-backup file."""
+        from werkzeug.utils import secure_filename
+        safe_name = secure_filename(filename)
+        if not safe_name or not safe_name.endswith('.tar.gz'):
+            return 'Invalid filename', 400
+        backup_dir = os.path.join(
+            os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'backup'
+        )
+        filepath = os.path.join(backup_dir, safe_name)
+        if not os.path.isfile(filepath):
+            return 'File not found', 404
+        from flask import send_file
+        return send_file(filepath, mimetype='application/gzip', as_attachment=True,
+                         download_name=safe_name)
+
+    @bp.route('/backup/delete/<filename>', methods=['POST'])
+    def backup_delete_file(filename):
+        """Delete a specific auto-backup file."""
+        from werkzeug.utils import secure_filename
+        safe_name = secure_filename(filename)
+        if not safe_name or not safe_name.endswith('.tar.gz'):
+            return 'Invalid filename', 400
+        backup_dir = os.path.join(
+            os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'backup'
+        )
+        filepath = os.path.join(backup_dir, safe_name)
+        if os.path.isfile(filepath):
+            os.remove(filepath)
+            app.logger.info(f"Deleted backup file: {safe_name}")
+            flash(translate('backup_auto_file_deleted').format(filename=safe_name), 'success')
+        return redirect(url_for('settings') + '?tab=data')
 
     @bp.route('/import', methods=['POST'])
     def import_data():
@@ -671,6 +790,18 @@ def register(app):
                             setting.audit_logging_enabled = s['audit_logging_enabled']
                         if 'auto_filament_mapping_enabled' in s:
                             setting.auto_filament_mapping_enabled = s['auto_filament_mapping_enabled']
+                        if 'backup_auto_enabled' in s:
+                            setting.backup_auto_enabled = s['backup_auto_enabled']
+                        if 'backup_auto_frequency' in s:
+                            setting.backup_auto_frequency = s.get('backup_auto_frequency', 'weekly')
+                        if 'backup_auto_time' in s:
+                            setting.backup_auto_time = s.get('backup_auto_time', '03:00')
+                        if 'backup_auto_day' in s:
+                            setting.backup_auto_day = s.get('backup_auto_day', 1)
+                        if 'backup_auto_include_files' in s:
+                            setting.backup_auto_include_files = s['backup_auto_include_files']
+                        if 'backup_auto_last_run_at' in s:
+                            setting.backup_auto_last_run_at = datetime.fromisoformat(s['backup_auto_last_run_at']) if s.get('backup_auto_last_run_at') else setting.backup_auto_last_run_at
 
                 # ── 2b. Users, invites, notifications ────────────────
                 for user_data in data.get('users', []):

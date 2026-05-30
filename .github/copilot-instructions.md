@@ -30,7 +30,7 @@
 The project uses a **modular Flask app factory pattern with Flask Blueprints**. Each module inside the `routes/` directory defines its own Blueprint (e.g. `routes/inventory.py` registers a blueprint for inventory). To maintain backward compatibility with legacy templates and `url_for("endpoint")` usage, a custom `BuildError` fallback handler is registered in `app.py`. If a global endpoint lookup fails, the fallback handler automatically resolves it to the correct blueprint-prefixed endpoint (e.g., `inventory.index`).
 
 ```
-app.py                  # Entry point: create_app(), background workers
+app.py                  # Entry point: create_app(), background workers (bambu-sync, prusa-sync, auto-backup)
 database.py             # Shared db = SQLAlchemy() instance
 migrations.py           # Database migrations: run_migrations(), _safe_alter() schema updates and seeds
 models.py               # All ORM models (~25 tables): Brand, Color, Material, Filament,
@@ -183,12 +183,13 @@ Widget shells and search inputs remain stable — no flicker
 
 ### 3.4 Background Workers
 
-Two daemon threads start in `create_app()`:
+Three daemon threads start in `create_app()`:
 
 | Worker               | Interval                  | Function                                      |
 | -------------------- | ------------------------- | --------------------------------------------- |
 | `bambu-sync-worker`  | 60s (backoff → max 3600s) | `routes.bambu.do_sync()` — Bambu Cloud API    |
 | `prusa-sync-worker`  | 60s (backoff → max 900s)  | `routes.prusa.do_poll()` — PrusaLink local API|
+| `auto-backup-worker` | 60s (check only)           | Scheduled backup to `data/backup/` directory  |
 
 ### 3.5 DB Schema Migration Strategy
 

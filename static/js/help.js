@@ -443,7 +443,7 @@
             id: 'settings',
             icon: 'fa-sliders',
             hasTour: true,
-            endpoints: ['settings', 'settings_bambu_test', 'toggle_theme', 'export_data', 'import_data'],
+            endpoints: ['settings', 'settings_bambu_test', 'toggle_theme', 'export_data', 'import_data', 'backup_trigger_now', 'backup_list_files', 'backup_download_file', 'backup_delete_file'],
             title: { cs: 'Nastavení', en: 'Settings' },
             tips: [
                 {
@@ -493,6 +493,13 @@
                     text: {
                         cs: 'V Nastavení → Obecné nastavte časové pásmo aplikace. Všechna data a časy (historie pohybů, tiskové úlohy) se zobrazují v tomto pásmu.',
                         en: 'In Settings → General, set the application timezone. All dates and times (movement history, print jobs) are displayed in this timezone.'
+                    }
+                },
+                {
+                    title: { cs: 'Automatické zálohování', en: 'Automatic Backup' },
+                    text: {
+                        cs: 'Na záložce Data lze zapnout automatické zálohování. Vyberte frekvenci (denně / týdně / měsíčně), den a čas spuštění. Zálohy se ukládají do složky data/backup na serveru a jsou dostupné ke stažení nebo smazání přímo z nastavení. Tlačítkem „Spustit zálohu teď" lze vytvořit ruční zálohu kdykoliv.',
+                        en: 'On the Data tab, you can enable automatic backup. Choose frequency (daily / weekly / monthly), the day and time. Backups are saved to the data/backup folder on the server and are available for download or deletion directly from settings. Use "Run backup now" to trigger a manual backup at any time.'
                     }
                 }
             ]

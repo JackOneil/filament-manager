@@ -50,7 +50,7 @@ from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
 
-APP_VERSION = '1.97.0'
+APP_VERSION = '1.98.0'
 
 csrf = CSRFProtect()
 
@@ -258,6 +258,7 @@ def create_app(test_config=None) -> Flask:
     run_migrations(app)
     _start_bambu_sync_worker(app)
     _start_prusa_sync_worker(app)
+    _start_auto_backup_worker(app)
     return app
 
 
@@ -417,6 +418,129 @@ def _start_prusa_sync_worker(app: Flask) -> None:
             time.sleep(min(60 * (2 ** min(_consecutive_errors, 4)), 900))
 
     thread = threading.Thread(target=worker, name='prusa-sync-worker', daemon=True)
+    thread.start()
+
+
+def _start_auto_backup_worker(app: Flask) -> None:
+    """Background thread that runs automatic backups on a schedule."""
+    if app.config.get('TESTING'):
+        return
+    if app.debug and os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+        return
+    if app.extensions.get('auto_backup_worker_started'):
+        return
+    if not _acquire_worker_lock(app, 'auto-backup'):
+        return
+
+    app.extensions['auto_backup_worker_started'] = True
+
+    def worker():
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+        from datetime import datetime as _datetime, timedelta as _timedelta
+
+        while True:
+            try:
+                time.sleep(60)
+                with app.app_context():
+                    from models import AppSetting
+                    setting = AppSetting.query.first()
+                    if not setting or not getattr(setting, 'backup_auto_enabled', False):
+                        continue
+
+                    freq = getattr(setting, 'backup_auto_frequency', 'weekly') or 'weekly'
+                    time_str = getattr(setting, 'backup_auto_time', '03:00') or '03:00'
+                    day_val = getattr(setting, 'backup_auto_day', 1) or 1
+                    include_files = bool(getattr(setting, 'backup_auto_include_files', True))
+
+                    # Determine app timezone
+                    tz_name = getattr(setting, 'app_timezone', 'Europe/Prague') or 'Europe/Prague'
+                    try:
+                        tz = ZoneInfo(tz_name)
+                    except (ZoneInfoNotFoundError, KeyError):
+                        tz = ZoneInfo('Europe/Prague')
+
+                    # Get current time in app timezone
+                    now_utc = _datetime.now(ZoneInfo('UTC'))
+                    now_local = now_utc.astimezone(tz)
+
+                    # Parse target time
+                    try:
+                        hour, minute = map(int, time_str.split(':'))
+                    except (ValueError, Exception):
+                        app.logger.warning(f"Auto-backup: invalid time format '{time_str}'")
+                        continue
+
+                    # Check if we are due for a run
+                    should_run = False
+                    last_run = getattr(setting, 'backup_auto_last_run_at', None)
+                    last_run_dt = None
+
+                    # Build the target datetime for today in local TZ
+                    target_today = now_local.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                    if now_local < target_today:
+                        # Target time hasn't happened yet today — check yesterday's slot
+                        target_today -= _timedelta(days=1)
+
+                    # Check if the target is within the last 5 minutes and after last_run
+                    # Using a 5-minute window to catch the run
+                    diff_minutes = (now_local - target_today).total_seconds() / 60.0
+                    if 0 <= diff_minutes < 5:
+                        # The target time is right now (within 5 min window)
+                        if freq == 'daily':
+                            # Always run at the daily time
+                            should_run = True
+                        elif freq == 'weekly':
+                            # Monday=0, ..., Sunday=6
+                            target_weekday = target_today.weekday()
+                            if target_weekday == day_val:
+                                should_run = True
+                        elif freq == 'monthly':
+                            # Day of month
+                            if target_today.day == day_val:
+                                should_run = True
+
+                    # Safety: don't run if already ran today
+                    if should_run and last_run is not None:
+                        # Convert last_run (naive UTC) to local time for comparison
+                        if last_run.tzinfo is None:
+                            last_run_local = last_run.replace(tzinfo=ZoneInfo('UTC')).astimezone(tz)
+                        else:
+                            last_run_local = last_run.astimezone(tz)
+                        # If we already ran in the same calendar day (local), skip
+                        if last_run_local.date() >= now_local.date():
+                            should_run = False
+
+                    if not should_run:
+                        continue
+
+                    app.logger.info(
+                        f"Auto-backup triggered: freq={freq}, time={time_str}, "
+                        f"day={day_val}, files={include_files}"
+                    )
+
+                    from routes.backup import _build_backup_archive_bytes
+                    archive_bytes = _build_backup_archive_bytes(app, include_files=include_files)
+                    backup_dir = os.path.join(
+                        os.path.abspath(os.path.dirname(__file__)), 'data', 'backup'
+                    )
+                    os.makedirs(backup_dir, exist_ok=True)
+
+                    ts = now_utc.strftime('%Y%m%d_%H%M%S')
+                    suffix = 'full' if include_files else 'db'
+                    filename = f'auto_backup_{suffix}_{ts}.tar.gz'
+                    filepath = os.path.join(backup_dir, filename)
+                    with open(filepath, 'wb') as fh:
+                        fh.write(archive_bytes)
+
+                    setting.backup_auto_last_run_at = now_utc.replace(tzinfo=None)
+                    db.session.commit()
+                    app.logger.info(
+                        f"Auto-backup completed: {filename} ({len(archive_bytes)} bytes)"
+                    )
+            except Exception as exc:
+                app.logger.error("Background auto-backup failed: %s", exc)
+
+    thread = threading.Thread(target=worker, name='auto-backup-worker', daemon=True)
     thread.start()
 
 

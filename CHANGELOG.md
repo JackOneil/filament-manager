@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.98.0] - 2026-05-30
+### Added
+- **Automatic backups** — Configurable scheduled backups in Settings → Data tab. Supports daily, weekly, and monthly frequencies with a chosen time of day. Backups are saved as tar.gz archives to `data/backup/` on the server.
+- **Backup file management** — List, download, and delete existing auto-backup files directly from the settings UI.
+- **Manual trigger** — "Run backup now" button to immediately create an automatic-style backup on disk.
+- **Auto-backup background worker** — New daemon thread that evaluates the schedule every 60 seconds and creates backups using the app's configured timezone.
+
+### Changed
+- **`routes/backup.py`** — Refactored export logic into reusable `_build_export_data()` and `_build_backup_archive_bytes()` helpers. Added new endpoints: `backup_trigger_now`, `backup_list_files`, `backup_download_file`, `backup_delete_file`.
+- **`models.py`** — Added `AppSetting` columns: `backup_auto_enabled`, `backup_auto_frequency`, `backup_auto_time`, `backup_auto_day`, `backup_auto_include_files`, `backup_auto_last_run_at`.
+- **`migrations.py`** — Added `_safe_alter()` calls for all new backup columns.
+- **Export/Import** — New `AppSetting` columns are included in both export and import.
+- **Help system** — Added auto-backup tip to the Settings help section.
+
 ## [1.97.0] - 2026-05-30
 ### Added
 - **Users page pagination** — User list now uses server-side pagination (20 per page) instead of loading all users at once.

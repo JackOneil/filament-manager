@@ -48,6 +48,7 @@ def _tab_for_action(action):
         'delete_filament_tag', 'delete_project_tag',
     }
     company_actions = {'billing_settings'}
+    data_actions = {'backup_auto_settings'}  # auto-backup settings go to data tab
 
     if action in dict_actions:
         return 'dicts'
@@ -57,6 +58,8 @@ def _tab_for_action(action):
         return 'integrations'
     if action in company_actions:
         return 'company'
+    if action in data_actions:
+        return 'data'
     return 'general'
 
 
@@ -357,6 +360,35 @@ def register(app):
                     setting.company_vat_id = request.form.get('company_vat_id', '').strip() or None
                     setting.company_bank_account = request.form.get('company_bank_account', '').strip() or None
                     app.logger.debug('Billing settings updated.')
+
+                elif action == 'backup_auto_settings':
+                    setting.backup_auto_enabled = request.form.get('backup_auto_enabled') == 'on'
+                    freq = request.form.get('backup_auto_frequency', 'weekly').strip()
+                    if freq not in ('daily', 'weekly', 'monthly'):
+                        freq = 'weekly'
+                    setting.backup_auto_frequency = freq
+                    time_raw = request.form.get('backup_auto_time', '03:00').strip()
+                    # Validate HH:MM format
+                    import re as _re
+                    if _re.match(r'^\d{2}:\d{2}$', time_raw):
+                        setting.backup_auto_time = time_raw
+                    day_raw = request.form.get('backup_auto_day', 1, type=int)
+                    if freq == 'weekly':
+                        # Day of week: 0=Monday ... 6=Sunday
+                        setting.backup_auto_day = max(0, min(6, day_raw))
+                    elif freq == 'monthly':
+                        # Day of month: 1-28 (safe range)
+                        setting.backup_auto_day = max(1, min(28, day_raw))
+                    else:
+                        # daily — not used
+                        setting.backup_auto_day = 0
+                    setting.backup_auto_include_files = request.form.get('backup_auto_include_files') == 'on'
+                    app.logger.debug(
+                        f"Auto-backup settings: enabled={setting.backup_auto_enabled}, "
+                        f"freq={setting.backup_auto_frequency}, time={setting.backup_auto_time}, "
+                        f"day={setting.backup_auto_day}, files={setting.backup_auto_include_files}"
+                    )
+                    success_key = 'backup_auto_settings_saved'
 
                 else:
                     raise ValueError('settings_unknown_action')

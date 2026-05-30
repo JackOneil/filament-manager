@@ -1233,6 +1233,134 @@
                 {% endif %}
             </div>
             
+            <!-- Auto Backup Configuration -->
+            <form method="POST" action="{{ url_for('settings') }}" class="mt-4 bg-white rounded-lg border border-gray-200 p-5" x-data="{
+                autoEnabled: {{ 'true' if app_settings and app_settings.backup_auto_enabled else 'false' }},
+                autoFreq: '{{ app_settings.backup_auto_frequency if app_settings and app_settings.backup_auto_frequency else 'weekly' }}',
+                autoDay: {{ app_settings.backup_auto_day if app_settings else 1 }},
+                showDay: '{{ app_settings.backup_auto_frequency if app_settings and app_settings.backup_auto_frequency else 'weekly' }}' !== 'daily'
+            }">
+                <input type="hidden" name="action" value="backup_auto_settings">
+                <div class="flex items-center justify-between mb-4 border-b pb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-blue-600"></i>
+                        <h3 class="text-lg font-bold text-gray-800">{{ t('backup_auto_title') }}</h3>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" name="backup_auto_enabled" class="sr-only peer" x-model="autoEnabled">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                </div>
+                <p class="text-sm text-gray-500 mb-4">{{ t('backup_auto_desc') }}</p>
+                <div x-show="autoEnabled" x-cloak class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('backup_auto_frequency_label') }}</label>
+                            <select name="backup_auto_frequency" x-model="autoFreq" @change="showDay = autoFreq !== 'daily'" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                                <option value="daily">{{ t('backup_auto_freq_daily') }}</option>
+                                <option value="weekly">{{ t('backup_auto_freq_weekly') }}</option>
+                                <option value="monthly">{{ t('backup_auto_freq_monthly') }}</option>
+                            </select>
+                        </div>
+                        <div x-show="showDay" x-cloak>
+                            <label class="text-xs font-bold text-gray-600 block mb-1">
+                                <span x-text="autoFreq === 'weekly' ? '{{ t('backup_auto_day_of_week') }}' : '{{ t('backup_auto_day_of_month') }}'"></span>
+                            </label>
+                            <select name="backup_auto_day" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                                <template x-if="autoFreq === 'weekly'">
+                                    <template x-for="(day, idx) in [
+                                        '{{ t('day_monday') }}', '{{ t('day_tuesday') }}', '{{ t('day_wednesday') }}',
+                                        '{{ t('day_thursday') }}', '{{ t('day_friday') }}', '{{ t('day_saturday') }}',
+                                        '{{ t('day_sunday') }}'
+                                    ]" :key="idx">
+                                        <option :value="idx" :selected="idx === autoDay" x-text="day"></option>
+                                    </template>
+                                </template>
+                                <template x-if="autoFreq === 'monthly'">
+                                    <template x-for="d in 28" :key="d">
+                                        <option :value="d" :selected="d === autoDay" x-text="d + '.'"></option>
+                                    </template>
+                                </template>
+                                <!-- Fallback for initial render before Alpine updates -->
+                                {% if app_settings and app_settings.backup_auto_frequency == 'weekly' %}
+                                {% set days = [t('day_monday'), t('day_tuesday'), t('day_wednesday'), t('day_thursday'), t('day_friday'), t('day_saturday'), t('day_sunday')] %}
+                                {% for d in range(7) %}
+                                <option value="{{ d }}" {% if app_settings.backup_auto_day == d %}selected{% endif %}>{{ days[d] }}</option>
+                                {% endfor %}
+                                {% else %}
+                                {% for d in range(1, 29) %}
+                                <option value="{{ d }}" {% if app_settings and app_settings.backup_auto_day == d %}selected{% endif %}>{{ d }}.</option>
+                                {% endfor %}
+                                {% endif %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('backup_auto_time_label') }}</label>
+                            <input type="time" name="backup_auto_time" value="{{ app_settings.backup_auto_time if app_settings and app_settings.backup_auto_time else '03:00' }}" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="backup_auto_include_files" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" {% if app_settings and app_settings.backup_auto_include_files %}checked{% endif %}>
+                            {{ t('backup_auto_include_files_label') }}
+                        </label>
+                    </div>
+                    <div class="flex flex-wrap gap-3 items-center">
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 transition-colors text-white font-semibold py-2 px-5 rounded-lg text-sm shadow">
+                            <i class="fa-solid fa-save"></i> {{ t('save') }}
+                        </button>
+                        <button type="button" onclick="if(confirm('{{ t('backup_auto_trigger_confirm') }}')){ var f=document.createElement('form'); f.method='POST'; f.action='{{ url_for('backup.backup_trigger_now') }}'; var csrf=document.querySelector('input[name=csrf_token]'); if(csrf){ var c=document.createElement('input'); c.type='hidden'; c.name='csrf_token'; c.value=csrf.value; f.appendChild(c); } document.body.appendChild(f); f.submit(); }" class="bg-amber-600 hover:bg-amber-700 transition-colors text-white font-semibold py-2 px-5 rounded-lg text-sm shadow">
+                            <i class="fa-solid fa-play"></i> {{ t('backup_auto_trigger_now') }}
+                        </button>
+                    </div>
+                    {% if app_settings and app_settings.backup_auto_last_run_at %}
+                    <div class="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        {{ t('backup_auto_last_run') }}: {{ app_settings.backup_auto_last_run_at | fmt_dt('%d.%m.%Y %H:%M') }}
+                    </div>
+                    {% endif %}
+                    <!-- Existing backup files list -->
+                    <div class="mt-4" x-data="{files: [], loading: false, loaded: false}" x-init="
+                        if (!loaded) {
+                            loading = true;
+                            fetch('{{ url_for('backup.backup_list_files') }}')
+                                .then(r => r.json())
+                                .then(data => {
+                                    files = data.files || [];
+                                    loading = false;
+                                    loaded = true;
+                                })
+                                .catch(() => { loading = false; loaded = true; });
+                        }
+                    ">
+                        <div class="text-xs font-bold text-gray-600 mb-2">{{ t('backup_auto_existing_files') }}</div>
+                        <div x-show="loading" class="text-xs text-gray-400">{{ t('loading') }}...</div>
+                        <div x-show="!loading && files.length === 0" class="text-xs text-gray-400">{{ t('backup_auto_no_files') }}</div>
+                        <div x-show="!loading && files.length > 0" class="space-y-1 max-h-48 overflow-y-auto">
+                            <template x-for="f in files" :key="f.filename">
+                                <div class="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 text-xs">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <i class="fa-solid fa-file-zipper text-gray-400 shrink-0"></i>
+                                        <span class="truncate text-gray-700" x-text="f.filename"></span>
+                                        <span class="text-gray-400 shrink-0" x-text="(f.size_bytes / 1024).toFixed(1) + ' kB'"></span>
+                                    </div>
+                                    <div class="flex items-center gap-2 shrink-0 ml-2">
+                                        <a :href="'{{ url_for('backup.backup_download_file', filename='__NAME__') }}'.replace('__NAME__', f.filename)" class="text-blue-600 hover:text-blue-800" title="{{ t('download') }}">
+                                            <i class="fa-solid fa-download"></i>
+                                        </a>
+                                        <form method="POST" :action="'{{ url_for('backup.backup_delete_file', filename='__NAME__') }}'.replace('__NAME__', f.filename)" class="inline" onsubmit="return confirm('{{ t('backup_auto_delete_confirm') }}')">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="text-red-500 hover:text-red-700" title="{{ t('delete') }}">
+                                                <i class="fa-solid fa-trash-can"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </form>
+            
             <form action="{{ url_for('import_data') }}" method="POST" enctype="multipart/form-data" class="bg-gray-50 rounded-lg p-5 border border-dashed border-gray-200 text-center flex flex-col justify-center items-center mt-4">
                 <input type="file" name="file" accept=".tar.gz,.json,.json.gz,.gz" class="mb-4 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer" required title="{{ t('import_hint') }}">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 w-full mb-4 text-left">

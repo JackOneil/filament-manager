@@ -141,6 +141,14 @@ def run_migrations(app: Flask) -> None:
         # ── Auto filament mapping ─────────────────────────────────────────────
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN auto_filament_mapping_enabled BOOLEAN NOT NULL DEFAULT 1")
 
+        # ── Automatic backup configuration ─────────────────────────────────
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN backup_auto_enabled BOOLEAN NOT NULL DEFAULT 0")
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN backup_auto_frequency VARCHAR(10) NOT NULL DEFAULT 'weekly'")
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN backup_auto_time VARCHAR(5) NOT NULL DEFAULT '03:00'")
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN backup_auto_day INTEGER NOT NULL DEFAULT 1")
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN backup_auto_include_files BOOLEAN NOT NULL DEFAULT 1")
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN backup_auto_last_run_at DATETIME DEFAULT NULL")
+
         # ── Project file versioning ──────────────────────────────────────────
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN parent_file_id INTEGER DEFAULT NULL")
