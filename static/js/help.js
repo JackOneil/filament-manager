@@ -478,21 +478,28 @@
             id: 'maintenance',
             icon: 'fa-wrench',
             hasTour: true,
-            endpoints: ['maintenance_index', 'maintenance_add', 'maintenance_complete', 'maintenance_delete'],
+            endpoints: ['maintenance_index', 'maintenance_add', 'maintenance_edit', 'maintenance_delete', 'maintenance_ics', 'maintenance_duplicate', 'maintenance_schedule_30', 'maintenance_resolve_fault'],
             title: { cs: 'Údržba', en: 'Maintenance' },
             tips: [
                 {
-                    title: { cs: 'Plánování údržby', en: 'Maintenance Scheduling' },
+                    title: { cs: 'Prediktivní termíny', en: 'Predictive Due Dates' },
                     text: {
-                        cs: 'Naplánujte opakující se nebo jednorázové úkoly údržby tiskáren. Každý úkol může mít termín a přiřazenou tiskárnu. Prošlé úkoly jsou zvýrazněny v Akčním centru.',
-                        en: 'Schedule recurring or one-time maintenance tasks for printers. Each task can have a due date and assigned printer. Overdue tasks are highlighted in the Action Centre.'
+                        cs: 'U záznamu lze zapnout predikci podle reálného provozu: tiskové hodiny, počet jobů a spotřeba filamentu. Systém průběžně odhaduje další servisní termín podle dat z Bambu/Prusa historie.',
+                        en: 'You can enable prediction based on real operation: print-hours, number of jobs, and filament usage. The system continuously estimates the next service date from Bambu/Prusa history data.'
                     }
                 },
                 {
-                    title: { cs: 'Označení jako splněné', en: 'Mark as Completed' },
+                    title: { cs: 'Rychlé akce na kartě', en: 'Quick Actions on Card' },
                     text: {
-                        cs: 'Klikněte na tlačítko „Splněno" u úkolu. Pokud je úkol opakující se, systém automaticky vytvoří nový úkol s posunutým termínem podle nastavené frekvence.',
-                        en: 'Click the "Complete" button on a task. If the task is recurring, the system automatically creates a new task with the due date shifted by the configured frequency.'
+                        cs: 'Přímo u záznamu můžete jedním klikem: duplikovat záznam, posunout další servis o +30 dní, nebo u poruchy přepnout stav na „Resolved".',
+                        en: 'Directly on each record, you can one-click: duplicate the record, move next service by +30 days, or switch a fault to "Resolved".'
+                    }
+                },
+                {
+                    title: { cs: 'SOP šablony a Markdown poznámky', en: 'SOP Templates and Markdown Notes' },
+                    text: {
+                        cs: 'Při přidání záznamu můžete použít SOP šablonu a automaticky předvyplnit strukturovaný postup. Delší poznámky lze zapisovat v Markdownu a v seznamu je rozbalit/sbalit.',
+                        en: 'When adding a record, you can use an SOP template to prefill a structured procedure. Longer notes can be written in Markdown and expanded/collapsed in the list.'
                     }
                 }
             ]

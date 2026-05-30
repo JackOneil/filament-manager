@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.94.2***
+*Current version: **v1.95.0***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -43,7 +43,7 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 ### Printer Integrations
 - **Bambu Lab Cloud** — Sync print jobs from Bambu Cloud API. Assign filaments and projects, deduct stock per-AMS-slot, background auto-sync with configurable pre-job time offset. Intelligent project name suggestions from job titles with one-click project creation directly from the Bambu jobs page.
 - **PrusaLink** — Poll local Prusa printers via REST API (no cloud required). Automatic job capture, progress tracking, and filament mapping.
-- **Printer Maintenance Log** — Dedicated `/maintenance` module for logging nozzle changes, calibrations, services, and faults per printer, with overdue and due-soon badge indicators. Supports recurring schedules (hours/days/months) with auto-calculated next service dates and `.ics` calendar export for Google Calendar / Outlook.
+- **Printer Maintenance Log** — Dedicated `/maintenance` module for logging nozzle changes, calibrations, services, and faults per printer, with overdue and due-soon badge indicators. Supports recurring schedules (hours/days/months), predictive due dates from real operation metrics (print-hours/jobs/filament usage), SOP template prefills, quick card actions (duplicate/+30 days/resolve fault), optional Markdown maintenance notes, and `.ics` calendar export for Google Calendar / Outlook.
 - **Live Printer Dashboard** — Overview page shows active print jobs with real-time progress bars, ETA, material swatches, and brand badges.
 
 ### Analytics & Operations

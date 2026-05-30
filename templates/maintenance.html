@@ -80,24 +80,71 @@
                         <i class="fa-solid fa-bell mr-1"></i>{{ t('maintenance_due_soon') }}
                     </span>
                     {% endif %}
+                    {% if rec.maintenance_type == 'fault' and rec.fault_resolved %}
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                        <i class="fa-solid fa-circle-check mr-1"></i>{{ t('maintenance_fault_resolved') }}
+                    </span>
+                    {% endif %}
+                    {% if item.predictive.enabled %}
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-sky-100 text-sky-700">
+                        <i class="fa-solid fa-gauge-high mr-1"></i>{{ t('maintenance_predictive_badge') }}
+                    </span>
+                    {% endif %}
                 </div>
                 {% if rec.notes %}
-                <p class="text-sm text-gray-600 mt-1 truncate">{{ rec.notes }}</p>
+                <div class="mt-1" x-data="{ open: false }">
+                    <div class="text-sm text-gray-600" :class="open ? '' : 'max-h-10 overflow-hidden'">
+                        {% if rec.notes_is_markdown %}
+                        <div class="js-maint-note prose prose-sm max-w-none" data-note='{{ rec.notes | tojson }}' data-is-markdown="1"></div>
+                        {% else %}
+                        <p class="whitespace-pre-wrap">{{ rec.notes }}</p>
+                        {% endif %}
+                    </div>
+                    {% if rec.notes|length > 120 or rec.notes_is_markdown %}
+                    <button type="button" @click="open = !open" class="text-xs text-blue-600 hover:text-blue-700 mt-1">
+                        <span x-show="!open">{{ t('maintenance_notes_expand') }}</span>
+                        <span x-show="open">{{ t('maintenance_notes_collapse') }}</span>
+                    </button>
+                    {% endif %}
+                </div>
                 {% endif %}
                 <div class="text-xs text-gray-400 mt-1 flex flex-wrap gap-3">
                     <span><i class="fa-solid fa-calendar-day mr-1"></i>{{ rec.performed_at | fmt_dt('%d.%m.%Y %H:%M') }}</span>
-                    {% if rec.next_service_at %}
+                    {% if item.effective_next %}
                     <span class="{% if item.is_overdue %}text-red-500{% elif item.is_due_soon %}text-orange-500{% endif %}">
-                        <i class="fa-solid fa-calendar-clock mr-1"></i>{{ t('maintenance_next') }}: {{ rec.next_service_at | fmt_dt('%d.%m.%Y') }}
+                        <i class="fa-solid fa-calendar-clock mr-1"></i>{{ t('maintenance_next') }}: {{ item.effective_next | fmt_dt('%d.%m.%Y') }}
                     </span>
                     {% endif %}
                     {% if item.recurrence_text %}
                     <span class="text-purple-500"><i class="fa-solid fa-rotate mr-1"></i>{{ item.recurrence_text }}</span>
                     {% endif %}
+                    {% if item.predictive.predicted_next_at %}
+                    <span class="text-sky-600"><i class="fa-solid fa-chart-line mr-1"></i>{{ t('maintenance_predictive_next') }}: {{ item.predictive.predicted_next_at | fmt_dt('%d.%m.%Y') }}</span>
+                    {% endif %}
+                    {% if rec.maintenance_type == 'fault' and rec.fault_resolved_at %}
+                    <span class="text-green-600"><i class="fa-solid fa-check mr-1"></i>{{ t('maintenance_fault_resolved_at') }}: {{ rec.fault_resolved_at | fmt_dt('%d.%m.%Y %H:%M') }}</span>
+                    {% endif %}
                 </div>
             </div>
             <!-- Edit / Delete -->
             <div class="flex items-center gap-2 flex-shrink-0">
+                <form method="POST" action="{{ url_for('maintenance_duplicate', rec_id=rec.id) }}" class="inline">
+                    <button type="submit" class="text-gray-300 hover:text-indigo-500 transition" title="{{ t('maintenance_action_duplicate') }}">
+                        <i class="fa-solid fa-copy"></i>
+                    </button>
+                </form>
+                <form method="POST" action="{{ url_for('maintenance_schedule_30', rec_id=rec.id) }}" class="inline">
+                    <button type="submit" class="text-gray-300 hover:text-orange-500 transition" title="{{ t('maintenance_action_schedule_30') }}">
+                        <i class="fa-solid fa-calendar-plus"></i>
+                    </button>
+                </form>
+                {% if rec.maintenance_type == 'fault' and not rec.fault_resolved %}
+                <form method="POST" action="{{ url_for('maintenance_resolve_fault', rec_id=rec.id) }}" class="inline">
+                    <button type="submit" class="text-gray-300 hover:text-green-500 transition" title="{{ t('maintenance_action_resolve_fault') }}">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </button>
+                </form>
+                {% endif %}
                 <button type="button"
                         onclick="openEditModal({{ rec.id }})"
                         class="text-gray-300 hover:text-blue-500 transition" title="{{ t('maintenance_edit') }}">
@@ -169,7 +216,7 @@
             </div>
             <div>
                 <label class="ui-label">{{ t('maintenance_type_label') }}</label>
-                <select name="maintenance_type"
+                <select name="maintenance_type" id="mMaintenanceType"
                         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                     {% for mt in maintenance_types %}
                     <option value="{{ mt }}">{{ t('maintenance_type_' ~ mt) }}</option>
@@ -177,10 +224,29 @@
                 </select>
             </div>
             <div>
+                <label class="ui-label">{{ t('maintenance_sop_template') }}</label>
+                <div class="flex gap-2">
+                    <select id="mSopTemplate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="">{{ t('maintenance_sop_select') }}</option>
+                        {% for sop in sop_templates %}
+                        <option value="{{ sop.id }}">{{ sop.label }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" onclick="applySopTemplate('m')"
+                            class="px-3 py-2 rounded-lg text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 transition">
+                        {{ t('maintenance_sop_apply') }}
+                    </button>
+                </div>
+            </div>
+            <div>
                 <label class="ui-label">{{ t('maintenance_notes') }}</label>
-                <textarea name="notes" rows="2"
+                <textarea name="notes" id="mNotes" rows="2"
                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                           placeholder="{{ t('maintenance_notes_placeholder') }}"></textarea>
+                <label class="mt-2 inline-flex items-center gap-2 text-xs text-gray-600">
+                    <input type="checkbox" name="notes_is_markdown" id="mNotesMarkdown" value="1" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                    <span>{{ t('maintenance_notes_markdown') }}</span>
+                </label>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -213,6 +279,35 @@
                     <div>
                         <input type="number" name="recurrence_value" id="mRecurrenceValue" min="1" value="1"
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                </div>
+            </div>
+            <div class="bg-sky-50 rounded-xl p-4 space-y-3">
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" name="predictive_enabled" id="mPredictiveEnabled" value="1"
+                           class="w-4 h-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500">
+                    <label for="mPredictiveEnabled" class="ui-label mb-0">{{ t('maintenance_predictive_enable') }}</label>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="ui-label text-xs">{{ t('maintenance_predictive_runtime_hours') }}</label>
+                        <input type="number" step="0.1" min="0" name="predictive_runtime_hours" id="mPredictiveRuntime"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="ui-label text-xs">{{ t('maintenance_predictive_jobs_count') }}</label>
+                        <input type="number" min="0" name="predictive_jobs_count" id="mPredictiveJobs"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="ui-label text-xs">{{ t('maintenance_predictive_filament_grams') }}</label>
+                        <input type="number" step="1" min="0" name="predictive_filament_grams" id="mPredictiveGrams"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="ui-label text-xs">{{ t('maintenance_predictive_window_days') }}</label>
+                        <input type="number" min="1" max="365" name="predictive_window_days" id="mPredictiveWindow" value="30"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
                     </div>
                 </div>
             </div>
@@ -275,10 +370,29 @@
                 </select>
             </div>
             <div>
+                <label class="ui-label">{{ t('maintenance_sop_template') }}</label>
+                <div class="flex gap-2">
+                    <select id="eSopTemplate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="">{{ t('maintenance_sop_select') }}</option>
+                        {% for sop in sop_templates %}
+                        <option value="{{ sop.id }}">{{ sop.label }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" onclick="applySopTemplate('e')"
+                            class="px-3 py-2 rounded-lg text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 transition">
+                        {{ t('maintenance_sop_apply') }}
+                    </button>
+                </div>
+            </div>
+            <div>
                 <label class="ui-label">{{ t('maintenance_notes') }}</label>
                 <textarea name="notes" id="eNotes" rows="2"
                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                           placeholder="{{ t('maintenance_notes_placeholder') }}"></textarea>
+                <label class="mt-2 inline-flex items-center gap-2 text-xs text-gray-600">
+                    <input type="checkbox" name="notes_is_markdown" id="eNotesMarkdown" value="1" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                    <span>{{ t('maintenance_notes_markdown') }}</span>
+                </label>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -314,6 +428,35 @@
                     </div>
                 </div>
             </div>
+            <div class="bg-sky-50 rounded-xl p-4 space-y-3">
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" name="predictive_enabled" id="ePredictiveEnabled" value="1"
+                           class="w-4 h-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500">
+                    <label for="ePredictiveEnabled" class="ui-label mb-0">{{ t('maintenance_predictive_enable') }}</label>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="ui-label text-xs">{{ t('maintenance_predictive_runtime_hours') }}</label>
+                        <input type="number" step="0.1" min="0" name="predictive_runtime_hours" id="ePredictiveRuntime"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="ui-label text-xs">{{ t('maintenance_predictive_jobs_count') }}</label>
+                        <input type="number" min="0" name="predictive_jobs_count" id="ePredictiveJobs"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="ui-label text-xs">{{ t('maintenance_predictive_filament_grams') }}</label>
+                        <input type="number" step="1" min="0" name="predictive_filament_grams" id="ePredictiveGrams"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="ui-label text-xs">{{ t('maintenance_predictive_window_days') }}</label>
+                        <input type="number" min="1" max="365" name="predictive_window_days" id="ePredictiveWindow"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
+                    </div>
+                </div>
+            </div>
             <div class="flex justify-end gap-3 pt-2">
                 <button type="button"
                         onclick="document.getElementById('editMaintenanceModal').classList.add('hidden')"
@@ -332,6 +475,7 @@
 <script>
 const bambuPrinters = {{ bambu_printers | map(attribute='name') | list | tojson }};
 const prusaPrinters = {{ prusa_printers | map(attribute='name') | list | tojson }};
+const maintenanceSopTemplates = {{ sop_templates | tojson }};
 
 const maintenanceRecords = {
 {% for item in records %}{% set rec = item.rec %}
@@ -341,14 +485,54 @@ const maintenanceRecords = {
         printer_name: {{ rec.printer_name | tojson }},
         maintenance_type: {{ rec.maintenance_type | tojson }},
         notes: {{ rec.notes | tojson }},
+        notes_is_markdown: {{ rec.notes_is_markdown | tojson }},
         performed_at: {{ (rec.performed_at.strftime('%Y-%m-%dT%H:%M') if rec.performed_at else '') | tojson }},
         next_service_at: {{ (rec.next_service_at.strftime('%Y-%m-%d') if rec.next_service_at else '') | tojson }},
         recurrence_type: {{ rec.recurrence_type | tojson }},
         recurrence_value: {{ rec.recurrence_value | tojson }},
-        recurrence_enabled: {{ rec.recurrence_enabled | tojson }}
+        recurrence_enabled: {{ rec.recurrence_enabled | tojson }},
+        predictive_enabled: {{ rec.predictive_enabled | tojson }},
+        predictive_runtime_hours: {{ rec.predictive_runtime_hours | tojson }},
+        predictive_jobs_count: {{ rec.predictive_jobs_count | tojson }},
+        predictive_filament_grams: {{ rec.predictive_filament_grams | tojson }},
+        predictive_window_days: {{ rec.predictive_window_days | tojson }}
     }{% if not loop.last %},{% endif %}
 {% endfor %}
 };
+
+function renderMaintenanceMarkdown() {
+    if (typeof markdownEditor !== 'function') return;
+    const parser = markdownEditor({ defaultMode: 'markdown' });
+    document.querySelectorAll('.js-maint-note[data-is-markdown="1"]').forEach((el) => {
+        const raw = el.getAttribute('data-note') || '';
+        try {
+            const markdown = JSON.parse(raw);
+            el.innerHTML = parser.markdownToHtml(markdown || '');
+        } catch (e) {
+            el.textContent = raw;
+        }
+    });
+}
+
+function applySopTemplate(prefix) {
+    const select = document.getElementById(prefix + 'SopTemplate');
+    if (!select || !select.value) return;
+    const template = maintenanceSopTemplates.find((item) => item.id === select.value);
+    if (!template) return;
+
+    const notesEl = document.getElementById(prefix + 'Notes');
+    if (notesEl && !notesEl.value.trim()) {
+        notesEl.value = template.notes || '';
+    }
+    const notesMarkdownEl = document.getElementById(prefix + 'NotesMarkdown');
+    if (notesMarkdownEl) {
+        notesMarkdownEl.checked = true;
+    }
+    const typeEl = document.getElementById(prefix + 'MaintenanceType');
+    if (typeEl && template.maintenance_type) {
+        typeEl.value = template.maintenance_type;
+    }
+}
 
 function updatePrinterNames() {
     const type = document.getElementById('mPrinterType').value;
@@ -380,11 +564,17 @@ function openEditModal(id) {
     document.getElementById('ePrinterType').value = rec.printer_type;
     document.getElementById('eMaintenanceType').value = rec.maintenance_type;
     document.getElementById('eNotes').value = rec.notes || '';
+    document.getElementById('eNotesMarkdown').checked = rec.notes_is_markdown || false;
     document.getElementById('ePerformedAt').value = rec.performed_at || '';
     document.getElementById('eNextServiceAt').value = rec.next_service_at || '';
     document.getElementById('eRecurrenceType').value = rec.recurrence_type || 'none';
     document.getElementById('eRecurrenceValue').value = rec.recurrence_value || 1;
     document.getElementById('eRecurrenceEnabled').checked = rec.recurrence_enabled || false;
+    document.getElementById('ePredictiveEnabled').checked = rec.predictive_enabled || false;
+    document.getElementById('ePredictiveRuntime').value = rec.predictive_runtime_hours || '';
+    document.getElementById('ePredictiveJobs').value = rec.predictive_jobs_count || '';
+    document.getElementById('ePredictiveGrams').value = rec.predictive_filament_grams || '';
+    document.getElementById('ePredictiveWindow').value = rec.predictive_window_days || 30;
 
     eUpdatePrinterNames();
     if (rec.printer_id) {
@@ -425,6 +615,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('mPerformedAt').value = local;
     updatePrinterNames();
     setMPrinterName();
+    renderMaintenanceMarkdown();
 });
 </script>
 {% endblock %}

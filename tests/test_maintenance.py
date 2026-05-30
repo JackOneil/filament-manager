@@ -115,6 +115,30 @@ class MaintenanceRecordTests(unittest.TestCase):
             delta = (rec.next_service_at - rec.performed_at).days
             self.assertEqual(delta, 30)
 
+    def test_add_maintenance_supports_markdown_and_predictive_fields(self):
+        self._login_admin()
+        self.client.post('/maintenance/add', data={
+            'printer_type': 'bambu',
+            'printer_name': 'Test P1P',
+            'maintenance_type': 'service',
+            'performed_at': '2026-05-01T10:00',
+            'notes': '## SOP\n- [ ] Step',
+            'notes_is_markdown': '1',
+            'predictive_enabled': '1',
+            'predictive_runtime_hours': '25',
+            'predictive_jobs_count': '8',
+            'predictive_filament_grams': '1200',
+            'predictive_window_days': '21',
+        }, follow_redirects=False)
+
+        with self.app.app_context():
+            rec = PrinterMaintenance.query.first()
+            self.assertIsNotNone(rec)
+            self.assertTrue(rec.notes_is_markdown)
+            self.assertTrue(rec.predictive_enabled)
+            self.assertEqual(rec.predictive_jobs_count, 8)
+            self.assertEqual(rec.predictive_window_days, 21)
+
     # ── Edit ───────────────────────────────────────────────────────────────
 
     def test_edit_maintenance_record_updates_fields(self):
@@ -162,6 +186,72 @@ class MaintenanceRecordTests(unittest.TestCase):
 
         with self.app.app_context():
             self.assertIsNone(db.session.get(PrinterMaintenance, rec_id))
+
+    def test_duplicate_maintenance_record_creates_copy(self):
+        self._login_admin()
+        self.client.post('/maintenance/add', data={
+            'printer_type': 'bambu',
+            'printer_name': 'Test P1P',
+            'maintenance_type': 'service',
+            'performed_at': '2026-05-01T10:00',
+            'notes': 'Monthly service',
+            'notes_is_markdown': '1',
+        }, follow_redirects=False)
+
+        with self.app.app_context():
+            rec_id = PrinterMaintenance.query.first().id
+
+        resp = self.client.post(f'/maintenance/{rec_id}/duplicate', follow_redirects=False)
+        self.assertEqual(resp.status_code, 302)
+
+        with self.app.app_context():
+            rows = PrinterMaintenance.query.order_by(PrinterMaintenance.id.asc()).all()
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(rows[1].notes, 'Monthly service')
+            self.assertTrue(rows[1].notes_is_markdown)
+
+    def test_schedule_plus_30_days_updates_next_service(self):
+        self._login_admin()
+        self.client.post('/maintenance/add', data={
+            'printer_type': 'bambu',
+            'printer_name': 'Test P1P',
+            'maintenance_type': 'service',
+            'performed_at': '2026-05-01T10:00',
+            'next_service_at': '2026-06-01',
+        }, follow_redirects=False)
+
+        with self.app.app_context():
+            rec = PrinterMaintenance.query.first()
+            rec_id = rec.id
+            before = rec.next_service_at
+
+        resp = self.client.post(f'/maintenance/{rec_id}/schedule-30', follow_redirects=False)
+        self.assertEqual(resp.status_code, 302)
+
+        with self.app.app_context():
+            rec = db.session.get(PrinterMaintenance, rec_id)
+            self.assertEqual((rec.next_service_at - before).days, 30)
+
+    def test_resolve_fault_marks_fault_as_resolved(self):
+        self._login_admin()
+        self.client.post('/maintenance/add', data={
+            'printer_type': 'bambu',
+            'printer_name': 'Test P1P',
+            'maintenance_type': 'fault',
+            'performed_at': '2026-05-01T10:00',
+            'notes': 'Layer shift',
+        }, follow_redirects=False)
+
+        with self.app.app_context():
+            rec_id = PrinterMaintenance.query.first().id
+
+        resp = self.client.post(f'/maintenance/{rec_id}/resolve-fault', follow_redirects=False)
+        self.assertEqual(resp.status_code, 302)
+
+        with self.app.app_context():
+            rec = db.session.get(PrinterMaintenance, rec_id)
+            self.assertTrue(rec.fault_resolved)
+            self.assertIsNotNone(rec.fault_resolved_at)
 
     # ── ICS export ─────────────────────────────────────────────────────────
 

@@ -523,12 +523,20 @@ class PrinterMaintenance(db.Model):
     maintenance_type = db.Column(db.String(50), nullable=False, default='other')
     # nozzle_change, calibration, service, fault, other
     notes = db.Column(db.Text, nullable=True)
+    notes_is_markdown = db.Column(db.Boolean, nullable=False, default=False)
     performed_at = db.Column(db.DateTime, nullable=False, default=_utc_now)
     next_service_at = db.Column(db.DateTime, nullable=True)
     recurrence_type = db.Column(db.String(20), nullable=False, default='none')
     # none, hours, days, months
     recurrence_value = db.Column(db.Integer, nullable=False, default=0)
     recurrence_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    fault_resolved = db.Column(db.Boolean, nullable=False, default=False)
+    fault_resolved_at = db.Column(db.DateTime, nullable=True)
+    predictive_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    predictive_runtime_hours = db.Column(db.Float, nullable=False, default=0.0)
+    predictive_jobs_count = db.Column(db.Integer, nullable=False, default=0)
+    predictive_filament_grams = db.Column(db.Float, nullable=False, default=0.0)
+    predictive_window_days = db.Column(db.Integer, nullable=False, default=30)
     last_renewed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=_utc_now)
 

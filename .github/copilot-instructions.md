@@ -56,6 +56,8 @@ routes/
                         #   link management, filament planning, status workflow
   bambu.py              # /bambu, /bambu/sync, /bambu/job/<id>/*, Bambu Cloud API integration
   prusa.py              # /prusa, /prusa/printer/<id>/*, /prusa/job/<id>/*, PrusaLink local API
+  maintenance.py        # /maintenance, /maintenance/<id>/* — maintenance log, predictive due dates,
+                        #   SOP templates, quick actions, ICS export
   stats.py              # /stats — statistics dashboard (charts, forecast, stock health, color palette)
   storage.py            # /storage, /storage/shelf/*, /storage/slot/* — physical shelf management
   settings.py           # /settings — app config + dictionaries + integrations

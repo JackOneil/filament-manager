@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.95.0] - 2026-05-30
+### Added
+- **Maintenance predictive scheduling** — Maintenance records can now estimate next service dates from real printer operation metrics (print-hours, job count, filament usage) with configurable analysis window.
+- **Maintenance SOP templates** — Add/Edit maintenance forms include reusable SOP templates that prefill structured Markdown checklists for common workflows (nozzle change, calibration, monthly service, fault diagnosis).
+- **Maintenance quick actions** — New one-click card actions on `/maintenance`: duplicate record, schedule next service by +30 days, and convert fault records to resolved state.
+- **Maintenance notes UX** — Notes now support optional Markdown mode with client-side rendered formatting and expand/collapse controls for longer entries.
+
+### Changed
+- **Maintenance backup coverage** — Backup export/import now persists new maintenance fields: markdown flag, fault resolution state/timestamps, and predictive threshold settings.
+- **Maintenance help content** — Updated help section endpoint mapping and contextual tips for predictive planning, quick actions, and SOP/Markdown workflows.
+
 ## [1.94.2] - 2026-05-30
 ### Fixed
 - **Bambu job card detail cleanup** — The expanded Bambu job detail no longer renders a second model thumbnail. Thumbnail fetching and preview remain unchanged in the job card header, so each job now shows only one preview image.

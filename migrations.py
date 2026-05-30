@@ -149,6 +149,14 @@ def run_migrations(app: Flask) -> None:
         _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN recurrence_type VARCHAR(20) NOT NULL DEFAULT 'none'")
         _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN recurrence_value INTEGER NOT NULL DEFAULT 0")
         _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN recurrence_enabled BOOLEAN NOT NULL DEFAULT 0")
+        _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN notes_is_markdown BOOLEAN NOT NULL DEFAULT 0")
+        _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN fault_resolved BOOLEAN NOT NULL DEFAULT 0")
+        _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN fault_resolved_at DATETIME DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN predictive_enabled BOOLEAN NOT NULL DEFAULT 0")
+        _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN predictive_runtime_hours FLOAT NOT NULL DEFAULT 0")
+        _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN predictive_jobs_count INTEGER NOT NULL DEFAULT 0")
+        _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN predictive_filament_grams FLOAT NOT NULL DEFAULT 0")
+        _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN predictive_window_days INTEGER NOT NULL DEFAULT 30")
         _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN last_renewed_at DATETIME DEFAULT NULL")
 
         # ── Printer Specific Power Profile ───────────────────────────────────
