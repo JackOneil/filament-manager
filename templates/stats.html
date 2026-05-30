@@ -60,10 +60,26 @@ html.dark .widget-color-picker > div {
             <div class="flex flex-wrap gap-2 items-center">
                 {% for option in [7, 30, 90, 180] %}
                 <a href="{{ url_for('stats', days=option) }}"
-                   class="px-4 py-2 rounded-full text-sm font-semibold transition-colors {% if days == option %}bg-blue-600 text-white shadow{% else %}bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700{% endif %}">
+                   class="px-4 py-2 rounded-full text-sm font-semibold transition-colors {% if not is_custom_range and days == option %}bg-blue-600 text-white shadow{% else %}bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700{% endif %}">
                     {{ option }} {{ t('stats_days_suffix') }}
                 </a>
                 {% endfor %}
+                <span class="text-gray-300 dark:text-slate-600 select-none">|</span>
+                <form method="get" action="{{ url_for('stats') }}" class="flex items-center gap-1.5" id="statsDateRangeForm">
+                    <label class="text-xs font-medium text-gray-500 dark:text-slate-400">{{ t('stats_date_from') }}</label>
+                    <input type="date" name="date_from" value="{{ date_from_str }}"
+                           max="{{ today_str }}"
+                           class="text-sm border rounded-lg px-2 py-1.5 bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-600 text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <span class="text-gray-400 text-xs">—</span>
+                    <label class="text-xs font-medium text-gray-500 dark:text-slate-400">{{ t('stats_date_to') }}</label>
+                    <input type="date" name="date_to" value="{{ date_to_str }}"
+                           max="{{ today_str }}"
+                           class="text-sm border rounded-lg px-2 py-1.5 bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-600 text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <button type="submit"
+                            class="px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors {% if is_custom_range %}bg-blue-600 text-white{% else %}bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700{% endif %}">
+                        {{ t('stats_apply_range') }}
+                    </button>
+                </form>
                 <button id="editModeBtn" onclick="toggleEditMode()"
                         class="px-4 py-2 rounded-full text-sm font-semibold border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all flex items-center gap-2">
                     <i class="fa-solid fa-pen-to-square"></i>
@@ -340,6 +356,8 @@ html.dark .widget-color-picker > div {
                     <h2 class="text-lg font-bold text-gray-800">{{ t('stats_usage_chart') }}</h2>
                     <span class="text-xs text-gray-400">{{ t('stats_usage_chart_hint') }}</span>
                 </div>
+                <!-- Material toggle chips — rendered by JS from statsData.materialSeries -->
+                <div id="materialToggles" class="flex flex-wrap gap-1.5 mb-3 min-h-0"></div>
                 <div class="relative h-80">
                     <canvas id="usageChart"></canvas>
                 </div>
@@ -740,6 +758,8 @@ function statsDashboard() {
 }
 
 // ── Chart.js ─────────────────────────────────────────────────────────────────
+let usageChartInstance = null;
+
 function initCharts() {
     function baseChartOptions() {
         return {
@@ -775,7 +795,7 @@ function initCharts() {
         },
         options: baseChartOptions(),
     });
-    new Chart(document.getElementById('usageChart'), {
+    usageChartInstance = new Chart(document.getElementById('usageChart'), {
         type: 'line',
         data: {
             labels: statsData.labels,
@@ -786,6 +806,7 @@ function initCharts() {
         },
         options: baseChartOptions(),
     });
+    initMaterialToggles();
     new Chart(document.getElementById('purchaseChart'), {
         type: 'bar',
         data: { labels: statsData.labels, datasets: [{ label: '{{ t("stats_purchase_dataset") }}', data: statsData.purchaseDaily, backgroundColor: '#10b981', borderRadius: 8 }] },
@@ -808,6 +829,60 @@ function initCharts() {
         options: { ...baseChartOptions(), indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: { callback: (v) => `${v} g` } }, y: { ticks: { callback: (v, i) => statsData.projectLabels[i] || v } } } },
     });
     {% endif %}
+}
+
+// ── Material series toggles ────────────────────────────────────────────────
+function initMaterialToggles() {
+    const container = document.getElementById('materialToggles');
+    if (!container || !statsData.materialSeries.length) return;
+
+    const allBtn = document.createElement('button');
+    allBtn.type = 'button';
+    allBtn.dataset.matIdx = 'all';
+    allBtn.textContent = '{{ t("stats_material_toggle_all") }}';
+    allBtn.className = 'mat-toggle px-2.5 py-1 rounded-full text-xs font-semibold border border-blue-300 bg-blue-100 text-blue-700 transition-all';
+    allBtn.onclick = () => _matToggleAll();
+    container.appendChild(allBtn);
+
+    statsData.materialSeries.forEach((s, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.matIdx = String(idx + 1);
+        btn.textContent = s.label;
+        btn.style.cssText = `border-color:${s.borderColor};background-color:${s.borderColor}22;color:${s.borderColor}`;
+        btn.className = 'mat-toggle px-2.5 py-1 rounded-full text-xs font-semibold border transition-all';
+        btn.onclick = () => _matToggle(btn, idx + 1);
+        container.appendChild(btn);
+    });
+}
+
+function _matToggle(btn, dsIdx) {
+    if (!usageChartInstance) return;
+    const visible = usageChartInstance.isDatasetVisible(dsIdx);
+    usageChartInstance.setDatasetVisibility(dsIdx, !visible);
+    usageChartInstance.update('none');
+    btn.style.opacity = visible ? '0.38' : '1';
+    _matUpdateAllBtn();
+}
+
+function _matToggleAll() {
+    if (!usageChartInstance) return;
+    const anyHidden = statsData.materialSeries.some((_, i) => !usageChartInstance.isDatasetVisible(i + 1));
+    statsData.materialSeries.forEach((_, i) => {
+        usageChartInstance.setDatasetVisibility(i + 1, anyHidden);
+    });
+    usageChartInstance.update('none');
+    document.querySelectorAll('.mat-toggle[data-mat-idx]:not([data-mat-idx="all"])').forEach(b => {
+        b.style.opacity = anyHidden ? '1' : '0.38';
+    });
+    _matUpdateAllBtn();
+}
+
+function _matUpdateAllBtn() {
+    const allBtn = document.querySelector('.mat-toggle[data-mat-idx="all"]');
+    if (!allBtn || !usageChartInstance) return;
+    const allVis = statsData.materialSeries.every((_, i) => usageChartInstance.isDatasetVisible(i + 1));
+    allBtn.style.opacity = allVis ? '1' : '0.7';
 }
 
 // ── Copy reorder text to clipboard ───────────────────────────────────────────

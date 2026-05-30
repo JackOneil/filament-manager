@@ -154,11 +154,31 @@ def register(app):
 
     @bp.route('/stats')
     def stats():
-        days = request.args.get('days', 30, type=int)
-        if days not in (7, 30, 90, 180):
-            days = 30
+        today = utc_now().date()
+        date_from_str = request.args.get('date_from', '').strip()
+        date_to_str   = request.args.get('date_to', '').strip()
+        days_param    = request.args.get('days', 0, type=int)
 
-        labels = _date_labels(days)
+        is_custom_range = False
+        if date_from_str and date_to_str:
+            try:
+                df = datetime.strptime(date_from_str, '%Y-%m-%d').date()
+                dt = datetime.strptime(date_to_str, '%Y-%m-%d').date()
+                if df <= dt and dt <= today and (dt - df).days < 366:
+                    labels = [df + timedelta(days=i) for i in range((dt - df).days + 1)]
+                    days = len(labels)
+                    is_custom_range = True
+                else:
+                    date_from_str = date_to_str = ''
+            except ValueError:
+                date_from_str = date_to_str = ''
+
+        if not is_custom_range:
+            days = days_param if days_param in (7, 30, 90, 180) else 30
+            labels = _date_labels(days)
+            date_from_str = labels[0].isoformat()
+            date_to_str = today.isoformat()
+
         label_keys = [day.isoformat() for day in labels]
         since_dt = datetime.combine(labels[0], datetime.min.time())
         last_30_dt = utc_now() - timedelta(days=30)
@@ -184,9 +204,10 @@ def register(app):
             MovementHistory.created_at >= since_dt
         ).order_by(MovementHistory.created_at.asc()).all()
 
-        usage_daily = _empty_series(days)
-        purchase_daily = _empty_series(days)
-        material_daily = defaultdict(lambda: _empty_series(days))
+        usage_daily = {key: 0.0 for key in label_keys}
+        purchase_daily = {key: 0.0 for key in label_keys}
+        _label_keys_snapshot = list(label_keys)
+        material_daily = defaultdict(lambda: {key: 0.0 for key in _label_keys_snapshot})
         purchase_filament_rows = []
 
         for row in movement_rows:
@@ -404,6 +425,10 @@ def register(app):
         return render_template(
             'stats.html',
             days=days,
+            is_custom_range=is_custom_range,
+            date_from_str=date_from_str,
+            date_to_str=date_to_str,
+            today_str=today.isoformat(),
             summary=summary,
             chart_data=json.dumps(chart_data),
             top_materials=top_materials,
