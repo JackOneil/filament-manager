@@ -10,7 +10,7 @@
             </div>
             <div class="flex flex-wrap gap-2 items-center">
                 <div class="relative">
-                    <input type="search" x-model="nameQ" @input.debounce.400ms="fetchContent()" placeholder="{{ t('project_quick_filter') }}"
+                    <input type="search" x-model="searchQ" placeholder="{{ t('project_quick_filter') }}"
                         class="w-48 lg:w-64 border border-gray-300 rounded-xl pl-9 pr-4 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition">
                     <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none"></i>
                 </div>
@@ -75,7 +75,12 @@
     </section>
 
     <!-- Content wrapper for AJAX reload -->
-    <div id="projects-inner-wrapper" class="relative transition-opacity duration-300" :class="loading ? 'opacity-60 pointer-events-none' : 'opacity-100'">
+    <div id="projects-inner-wrapper" class="relative transition-all duration-200" :class="loading ? 'opacity-60 pointer-events-none' : 'opacity-100'">
+        <style>
+        #projects-content {
+            transition: opacity 0.12s ease-in-out;
+        }
+        </style>
         <div id="projects-loading-overlay" class="hidden absolute inset-0 z-20 pointer-events-none">
             <div class="absolute inset-0 rounded-2xl bg-white/65 dark:bg-slate-900/55 backdrop-blur-[1px]"></div>
             <div class="relative p-4 md:p-5 grid grid-cols-1 xl:grid-cols-4 gap-4 md:gap-6">
@@ -127,6 +132,7 @@ function resetProjectsLayout() {
 
 function projectsApp() {
     return {
+        searchQ: {{ fulltext_filter|default('')|tojson }},
         nameQ: {{ name_filter|default('')|tojson }},
         clientQ: {{ client_filter|default('')|tojson }},
         tagQ: {{ tag_filter|default('')|tojson }},
@@ -144,6 +150,8 @@ function projectsApp() {
         
         loading: false,
         editingLayout: false,
+        _fetchPending: false,
+        _fetchController: null,
         
         clientFocus: false,
         tagFocus: false,
@@ -155,6 +163,12 @@ function projectsApp() {
             window.__proj = this;
             
             // Re-fetch only when a filter changes
+            this.$watch('searchQ', () => {
+                // When fulltext search is used, don't clear table filters —
+                // they can refine the fulltext results further
+                this.page = 1;
+                this.fetchContent();
+            });
             this.$watch('nameQ', () => this.fetchContent());
             this.$watch('clientQ', () => this.fetchContent());
             this.$watch('tagQ', () => this.fetchContent());
@@ -165,7 +179,7 @@ function projectsApp() {
         },
         
         get hasFilters() {
-            return !!(this.nameQ || this.clientQ || this.tagQ);
+            return !!(this.searchQ || this.nameQ || this.clientQ || this.tagQ);
         },
         
         get filteredClients() {
@@ -191,6 +205,7 @@ function projectsApp() {
         },
         
         resetFilters() {
+            this.searchQ = '';
             this.nameQ = '';
             this.clientQ = '';
             this.tagQ = '';
@@ -219,17 +234,30 @@ function projectsApp() {
         },
         
         async fetchContent() {
+            // Deduplicate: if a fetch is already in-flight, skip this trigger.
+            // The next model change (via $watch) will pick up the latest filter state.
+            if (this._fetchPending) return;
+            this._fetchPending = true;
             this.loading = true;
+
+            // Abort any previous in-flight request
+            if (this._fetchController) {
+                this._fetchController.abort();
+            }
+            this._fetchController = new AbortController();
+            const signal = this._fetchController.signal;
+
             try {
                 let params = new URLSearchParams();
                 params.append('ajax', '1');
+                if (this.searchQ) params.append('fulltext', this.searchQ);
                 if (this.nameQ) params.append('name', this.nameQ);
                 if (this.clientQ) params.append('client', this.clientQ);
                 if (this.tagQ) params.append('tag', this.tagQ);
                 if (this.sortBy) params.append('sort_by', this.sortBy);
                 if (this.page) params.append('page', this.page);
                 if (this.hideCompleted) params.append('hide_done', '1');
-                
+
                 // Add Kanban pages
                 if (this.statusPages['PENDING_APPROVAL'] > 1) params.append('kanban_pending_page', this.statusPages['PENDING_APPROVAL']);
                 if (this.statusPages['APPROVED'] > 1) params.append('kanban_approved_page', this.statusPages['APPROVED']);
@@ -237,40 +265,77 @@ function projectsApp() {
                 if (this.statusPages['DONE'] > 1) params.append('kanban_done_page', this.statusPages['DONE']);
                 if (this.statusPages['REJECTED'] > 1) params.append('kanban_rejected_page', this.statusPages['REJECTED']);
 
-                const wrapper = document.getElementById('projects-content');
-                const overlay = document.getElementById('projects-loading-overlay');
-                if (overlay) overlay.classList.remove('hidden');
-
-                const res = await fetch(`{{ url_for('projects_index') }}?${params.toString()}`);
+                const res = await fetch(`{{ url_for('projects_index') }}?${params.toString()}`, { signal });
                 const data = await res.json();
-                
-                if (data.html && wrapper) {
-                    // Capture focus state before replacement
-                    let activeEl = document.activeElement;
-                    let focusedId = activeEl ? activeEl.id : null;
-                    let cursorPos = activeEl && ('selectionStart' in activeEl) ? activeEl.selectionStart : null;
-                    let currentVal = activeEl && ('value' in activeEl) ? activeEl.value : null;
 
-                    wrapper.innerHTML = data.html;
-                    
-                    // Restore focus and precise value after micro-delay to allow browser/Alpine hydration
-                    setTimeout(() => {
-                        if (focusedId) {
-                            let newEl = document.getElementById(focusedId);
-                            if (newEl) {
-                                if (currentVal !== null && newEl.value !== currentVal) {
-                                    newEl.value = currentVal;
-                                }
-                                newEl.focus();
-                                if (cursorPos !== null && 'setSelectionRange' in newEl) {
-                                    try { newEl.setSelectionRange(cursorPos, cursorPos); } catch(e){}
-                                }
-                            }
+                if (data.html) {
+                    const wrapper = document.getElementById('projects-content');
+                    if (!wrapper) return;
+
+                    // -------------------- Targeted DOM update --------------------
+                    // Use DOMParser to extract fragments from the server-rendered
+                    // HTML without touching the live DOM. Only the *inner* dynamic
+                    // containers are replaced — the widget shells, search inputs,
+                    // and layout manager stay intact (no flicker).
+
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(data.html, 'text/html');
+
+                    // 1) Calendar items
+                    const calEl = wrapper.querySelector('#projects-calendar-items');
+                    const newCal = doc.querySelector('#projects-calendar-items');
+                    if (calEl && newCal) {
+                        calEl.innerHTML = newCal.innerHTML;
+                    } else if (calEl && !newCal) {
+                        calEl.innerHTML = '';
+                    }
+
+                    // 2) Kanban columns
+                    for (const status of Object.keys(this.statusPages)) {
+                        const key = status.toLowerCase();
+                        const itemsId = `kanban-items-${key}`;
+                        const pagId   = `kanban-pagination-${key}`;
+
+                        // Items list
+                        const itemsEl = wrapper.querySelector(`#${itemsId}`);
+                        const newItems = doc.querySelector(`#${itemsId}`);
+                        if (itemsEl && newItems) {
+                            itemsEl.innerHTML = newItems.innerHTML;
+                        } else if (itemsEl && !newItems) {
+                            itemsEl.innerHTML = '';
                         }
-                    }, 10);
 
-                    // Push state
+                        // Pagination bar (outerHTML swap preserves the container)
+                        const pagEl = wrapper.querySelector(`#${pagId}`);
+                        const newPag = doc.querySelector(`#${pagId}`);
+                        if (pagEl && newPag) {
+                            pagEl.outerHTML = newPag.outerHTML;
+                        } else if (pagEl && !newPag) {
+                            pagEl.remove();
+                        }
+                    }
+
+                    // 3) Table body
+                    const tbodyEl = wrapper.querySelector('#project-table-body');
+                    const newTbody = doc.querySelector('#project-table-body');
+                    if (tbodyEl && newTbody) {
+                        tbodyEl.innerHTML = newTbody.innerHTML;
+                    } else if (tbodyEl && !newTbody) {
+                        tbodyEl.innerHTML = '';
+                    }
+
+                    // 4) Bottom pagination
+                    const pagEl = wrapper.querySelector('#project-bottom-pagination');
+                    const newPag = doc.querySelector('#project-bottom-pagination');
+                    if (pagEl && newPag) {
+                        pagEl.outerHTML = newPag.outerHTML;
+                    } else if (pagEl && !newPag) {
+                        pagEl.remove();
+                    }
+
+                    // -------------------- Push URL state --------------------
                     let urlParams = new URLSearchParams();
+                    if (this.searchQ) urlParams.append('fulltext', this.searchQ);
                     if (this.nameQ) urlParams.append('name', this.nameQ);
                     if (this.clientQ) urlParams.append('client', this.clientQ);
                     if (this.tagQ) urlParams.append('tag', this.tagQ);
@@ -278,15 +343,18 @@ function projectsApp() {
                     if (this.page > 1) urlParams.append('page', this.page);
                     const newUrl = `${window.location.pathname}${urlParams.toString() ? '?' + urlParams.toString() : ''}`;
                     window.history.replaceState({path: newUrl}, '', newUrl);
-                    
+
+                    // Re-init dashboard layout (only drag/resize state, no full DOM rebuild)
                     window.initProjectsLayout();
                 }
             } catch (err) {
-                console.error(err);
+                if (err.name !== 'AbortError') {
+                    console.error(err);
+                }
             } finally {
                 this.loading = false;
-                const overlay = document.getElementById('projects-loading-overlay');
-                if (overlay) overlay.classList.add('hidden');
+                this._fetchPending = false;
+                this._fetchController = null;
             }
         }
     }

@@ -114,6 +114,7 @@ SECTION_BY_ENDPOINT = {
     'project_increment_print_item': SECTION_PROJECTS,
     'project_decrement_print_item': SECTION_PROJECTS,
     'bambu_jobs': SECTION_PRINTERS,
+    'bambu_jobs_partial': SECTION_PRINTERS,
     'bambu_sync': SECTION_PRINTERS,
     'bambu_refetch_thumbnails': SECTION_PRINTERS,
     'bambu_job_map': SECTION_PRINTERS,

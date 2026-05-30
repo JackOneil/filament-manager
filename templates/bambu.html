@@ -90,604 +90,38 @@
         </a>
     </div>
 
+    {# ── Result count ─────────────────────────────────────────────────────── #}
+    {% if jobs.total > 0 %}
+    <div class="flex items-center justify-between text-sm text-gray-500">
+        <span id="bambu-result-info"
+              data-showing="{{ t('bambu_result_showing') }}"
+              data-of="{{ t('bambu_result_of') }}"
+              data-jobs-word="{{ t('bambu_result_jobs') }}">
+            {{ t('bambu_result_showing') }}
+            <span id="bambu-loaded-count">{{ [jobs.page * per_page, jobs.total]|min }}</span>
+            {{ t('bambu_result_of') }}
+            <span id="bambu-total-count">{{ jobs.total }}</span>
+            {{ t('bambu_result_jobs') }}
+        </span>
+    </div>
+    {% endif %}
+
     {# ── Job list ────────────────────────────────────────────────────────── #}
     {% if jobs.items %}
-    <div class="space-y-4">
-        {% for job in jobs.items %}
-        {% set status_upper = (job.status or 'UNKNOWN')|upper %}
-        {% if status_upper == 'FINISH' %}
-            {% set status_label = t('bambu_status_finish') %}
-            {% set status_cls = 'bg-green-100 text-green-700' %}
-            {% set status_icon = 'fa-check' %}
-        {% elif status_upper == 'RUNNING' %}
-            {% set status_label = t('bambu_status_running') %}
-            {% set status_cls = 'bg-blue-100 text-blue-700' %}
-            {% set status_icon = 'fa-spinner fa-spin' %}
-        {% elif status_upper == 'FAILED' %}
-            {% set status_label = t('bambu_status_failed') %}
-            {% set status_cls = 'bg-red-100 text-red-700' %}
-            {% set status_icon = 'fa-xmark' %}
-        {% elif status_upper == 'PAUSED' %}
-            {% set status_label = t('bambu_status_paused') %}
-            {% set status_cls = 'bg-yellow-100 text-yellow-700' %}
-            {% set status_icon = 'fa-pause' %}
-        {% elif status_upper in ('CANCELLED', 'CANCELED') %}
-            {% set status_label = t('bambu_status_cancelled') %}
-            {% set status_cls = 'bg-gray-100 text-gray-500' %}
-            {% set status_icon = 'fa-ban' %}
-        {% elif status_upper == 'SLICING' %}
-            {% set status_label = t('bambu_status_slicing') %}
-            {% set status_cls = 'bg-purple-100 text-purple-700' %}
-            {% set status_icon = 'fa-hourglass-half' %}
-        {% elif status_upper == 'PREPARE' %}
-            {% set status_label = t('bambu_status_prepare') %}
-            {% set status_cls = 'bg-purple-100 text-purple-700' %}
-            {% set status_icon = 'fa-hourglass-half' %}
-        {% elif status_upper == 'INIT' %}
-            {% set status_label = t('bambu_status_init') %}
-            {% set status_cls = 'bg-gray-100 text-gray-500' %}
-            {% set status_icon = 'fa-clock' %}
-        {% else %}
-            {% set status_label = job.status or t('bambu_status_init') %}
-            {% set status_cls = 'bg-gray-100 text-gray-500' %}
-            {% set status_icon = 'fa-clock' %}
-        {% endif %}
-
-        {# ── Per-job computed flags ── #}
-        {% set is_mm = job.materials|length > 1 %}
-        {% set single_slot = job.materials[0] if job.materials|length == 1 else none %}
-        {% set display_filament = job.filament if job.filament else (single_slot.filament if single_slot and single_slot.filament else none) %}
-        {% set job_meta = bambu_payload_meta.get(job.id) if bambu_payload_meta else none %}
-        {% if is_mm %}
-            {# If slot materials exist, assignment/deduction state is driven by slots #}
-            {% set ns_mm = namespace(unassigned=false, all_deducted=true) %}
-            {% for mat in job.materials %}
-                {% if not mat.filament_id %}{% set ns_mm.unassigned = true %}{% endif %}
-                {% if not mat.deducted %}{% set ns_mm.all_deducted = false %}{% endif %}
-            {% endfor %}
-            {% set show_unassigned = ns_mm.unassigned %}
-            {% set show_deducted = ns_mm.all_deducted and job.materials|length > 0 %}
-        {% else %}
-            {% set show_unassigned = not display_filament %}
-            {% set show_deducted = job.deducted or (single_slot and single_slot.deducted) %}
-        {% endif %}
-
-        <div data-job-card data-job-id="{{ job.id }}" class="bg-white rounded-xl shadow-sm border border-gray-100 {% if show_unassigned %}border-l-4 border-l-orange-400{% endif %}"
-             x-data="bambuMap({{ job.id }})">
-
-            {# ── Job main row ── #}
-            <div class="p-4 flex flex-col sm:flex-row sm:items-start gap-4">
-
-                {# Status badge + date #}
-                <div class="flex flex-col items-start gap-2 min-w-[110px]">
-                    <span class="inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full {{ status_cls }}">
-                        <i class="fa-solid {{ status_icon }}"></i> {{ status_label }}
-                    </span>
-                    {% if show_unassigned %}
-                    <span class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
-                        <i class="fa-solid fa-circle-exclamation"></i> {{ t('bambu_unassigned_badge') }}
-                    </span>
-                    {% endif %}
-                    {% if is_mm %}
-                    <span class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
-                        <i class="fa-solid fa-layer-group"></i> {{ t('bambu_multimaterial') }}
-                    </span>
-                    {% endif %}
-                    {% if show_deducted %}
-                    <span class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                        <i class="fa-solid fa-check-double"></i> {{ t('bambu_deducted') }}
-                    </span>
-                    {% endif %}
-                    {% if job.started_at %}
-                    <span class="text-xs text-gray-500">{{ job.started_at | fmt_dt('%d.%m.%Y') }}</span>
-                    <span class="text-xs text-gray-400">{{ job.started_at | fmt_dt('%H:%M') }}</span>
-                    {% endif %}
-                </div>
-
-                {# Model & printer info #}
-                <div class="flex-1 min-w-0">
-                    <p class="font-bold text-gray-800 text-base leading-tight">
-                        {{ job.model_name or '—' }}
-                    </p>
-                    <div class="flex flex-wrap items-center gap-x-4 gap-y-0.5 mt-1">
-                        {% if job.printer_name or job.printer_model %}
-                        <span class="text-sm text-gray-500">
-                            <i class="fa-solid fa-print text-gray-400 mr-0.5"></i>
-                            {{ job.printer_name or '—' }}
-                            {% if job.printer_model %}
-                            <span class="text-gray-400 text-xs">({{ job.printer_model }})</span>
-                            {% endif %}
-                        </span>
-                        {% endif %}
-                        {% if job.weight_grams %}
-                        <span class="text-sm text-gray-500">
-                            <i class="fa-solid fa-weight-scale text-gray-400 mr-0.5"></i>
-                            {{ '%.1f'|format(job.weight_grams) }} g
-                        </span>
-                        {% endif %}
-                        {% if job.cost_time %}
-                        <span class="text-sm text-gray-500">
-                            <i class="fa-regular fa-clock text-gray-400 mr-0.5"></i>
-                            {{ format_duration(job.cost_time) }}
-                        </span>
-                        {% endif %}
-                        {% if job.finished_at %}
-                        <span class="text-xs text-gray-400">
-                            <i class="fa-solid fa-flag-checkered mr-0.5"></i>
-                            {{ job.finished_at | fmt_dt('%d.%m.%Y %H:%M') }}
-                        </span>
-                        {% endif %}
-                    </div>
-                </div>
-
-                {# Linked project & filament pills #}
-                <div class="flex flex-col gap-1.5 min-w-[160px] max-w-[220px]">
-                    {% if job.project %}
-                    <a href="{{ url_for('project_detail', id=job.project.id) }}"
-                       class="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded-full font-medium truncate hover:bg-indigo-100 transition-colors">
-                        <i class="fa-solid fa-folder-open flex-shrink-0"></i> {{ job.project.name }}
-                    </a>
-                    {% endif %}
-                    {% if display_filament %}
-                    <span class="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full font-medium truncate">
-                        <i class="fa-solid fa-spool flex-shrink-0"></i> {{ display_filament.name }}
-                    </span>
-                    {% endif %}
-                </div>
-
-                {# Actions #}
-                <div class="flex flex-col gap-2 items-end min-w-[130px]">
-                    <button @click="open = !open"
-                        class="text-xs bg-gray-100 hover:bg-gray-200 transition-colors text-gray-700 font-semibold px-3 py-1.5 rounded-lg">
-                        <i class="fa-solid fa-link"></i> {{ t('bambu_map_filament') }}
-                    </button>
-                    <form method="POST" action="{{ url_for('bambu_job_delete', job_id=job.id) }}"
-                        onsubmit="return confirm('{{ t('bambu_delete_confirm') }}');">
-                        <button type="submit"
-                            class="text-xs text-red-400 hover:text-red-600 transition-colors px-3 py-1.5 rounded-lg">
-                            <i class="fa-solid fa-trash-can"></i> {{ t('delete') }}
-                        </button>
-                    </form>
-                    {% if status_upper in ('FAILED', 'CANCELLED', 'CANCELED') %}
-                    <button type="button"
-                        class="text-xs text-orange-500 hover:text-orange-700 transition-colors px-3 py-1.5 rounded-lg flex items-center gap-1"
-                        data-waste-btn
-                        data-filament-id="{{ display_filament.id if display_filament else '' }}"
-                        data-project-id="{{ job.project.id if job.project else '' }}"
-                        data-weight="{{ '%.1f'|format(job.weight_grams) if job.weight_grams else '' }}"
-                        data-notes="{{ (job.model_name or '') | e }}">
-                        <i class="fa-solid fa-triangle-exclamation"></i> {{ t('waste_log_from_job') }}
-                    </button>
-                    {% endif %}
-                </div>
-            </div>
-
-            {# ── Expandable mapping panel ── #}
-            <div x-show="open" x-cloak class="border-t border-gray-100 bg-gray-50 p-4">
-                <form method="POST" action="{{ url_for('bambu_job_map', job_id=job.id) }}" @submit.prevent="saveJob($event)">
-
-                    {# ── Editable job name ── #}
-                    <div class="mb-3">
-                        <label class="text-xs font-semibold text-gray-600 mb-1 block">{{ t('bambu_job_name') }}</label>
-                        <input type="text" name="model_name" value="{{ job.model_name or '' }}"
-                            class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                            placeholder="{{ t('bambu_job_name_placeholder') }}">
-                    </div>
-
-                    {% if is_mm %}
-                    {# ── Multi-material: project + save only (filament assigned per slot below) ── #}
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
-
-                    {# ── Project fulltext search dropdown ── #}
-                    <div class="relative" @click.outside="projectOpen = false">
-                        <label class="text-xs font-semibold text-gray-600 mb-1 block">{{ t('bambu_map_project') }}</label>
-                        {# ── Suggested projects ── #}
-                        <template x-if="!selectedProjectId && suggestedProjects.length > 0">
-                            <div class="mb-1">
-                                <p class="text-xs text-gray-400 mb-1"><i class="fa-solid fa-lightbulb text-amber-400 mr-1"></i>{{ t('bambu_suggested_projects') }}:</p>
-                                <div class="flex flex-wrap gap-1">
-                                    <template x-for="p in suggestedProjects" :key="p.id">
-                                        <button type="button" @click="selectProject(p.id, p.name)"
-                                            class="text-xs bg-amber-50 border border-amber-300 text-amber-800 hover:bg-amber-100 px-2 py-0.5 rounded-full transition-colors font-medium">
-                                            <i class="fa-solid fa-folder-open mr-1 text-amber-500"></i><span x-text="p.name"></span>
-                                        </button>
-                                    </template>
-                                </div>
-                            </div>
-                        </template>
-                        {# ── Create new project (when no suggestions) ── #}
-                        <template x-if="!selectedProjectId && suggestedProjects.length === 0 && cleanedTitle">
-                            <div class="mb-1">
-                                <template x-if="!createProjectOpen">
-                                    <button type="button" @click="openCreateProject()"
-                                        class="text-xs bg-emerald-50 border border-emerald-300 text-emerald-700 hover:bg-emerald-100 px-2 py-0.5 rounded-full transition-colors font-medium">
-                                        <i class="fa-solid fa-plus mr-1"></i>{{ t('bambu_create_project') }}
-                                    </button>
-                                </template>
-                                <template x-if="createProjectOpen">
-                                    <div class="flex gap-1 items-center">
-                                        <input type="text" x-model="createProjectName"
-                                            class="flex-1 border border-emerald-300 rounded px-2 py-1 text-xs focus:ring-2 focus:ring-emerald-400 outline-none"
-                                            @keydown.enter.prevent="createProject({{ job.id }})"
-                                            @keydown.escape="createProjectOpen = false"
-                                            placeholder="{{ t('bambu_new_project_name') }}">
-                                        <button type="button" @click="createProject({{ job.id }})"
-                                            class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded transition-colors">
-                                            <i class="fa-solid fa-check"></i>
-                                        </button>
-                                        <button type="button" @click="createProjectOpen = false"
-                                            class="text-xs text-gray-500 hover:text-gray-700 px-1 py-1 rounded transition-colors">
-                                            <i class="fa-solid fa-xmark"></i>
-                                        </button>
-                                    </div>
-                                </template>
-                            </div>
-                        </template>
-                        <input type="hidden" name="project_id" :value="selectedProjectId">
-                        <input type="text"
-                            x-model="projectQ"
-                            @focus="projectOpen = true"
-                            @input="projectOpen = true"
-                            class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                            placeholder="{{ t('filter_search') }}">
-                        <div x-show="projectOpen" x-cloak
-                            class="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
-                            <button type="button"
-                                @click="selectProject('', '')"
-                                class="w-full text-left px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 border-b border-gray-100">
-                                — {{ t('filter_reset') }} —
-                            </button>
-                            <template x-for="p in filteredProjects" :key="p.id">
-                                <button type="button"
-                                    @click="selectProject(p.id, p.name)"
-                                    class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0">
-                                    <span class="font-medium text-gray-800" x-text="p.name"></span>
-                                </button>
-                            </template>
-                        </div>
-                    </div>
-
-                    {# Save #}
-                    <div>
-                        <button type="submit"
-                            class="w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white font-semibold py-2 px-4 rounded-lg text-sm shadow">
-                            <i class="fa-solid fa-save"></i> {{ t('save') }}
-                        </button>
-                    </div>
-
-                    </div>{# end mm grid #}
-
-                    {% else %}
-                    {# ── Single-material: filament + project + deduct + save ── #}
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-
-                    {# ── Filament fulltext search dropdown ── #}
-                    <div class="relative" @click.outside="filamentOpen = false">
-                        <label class="text-xs font-semibold text-gray-600 mb-1 block">{{ t('bambu_map_filament') }}</label>
-                        <input type="hidden" name="filament_id" :value="selectedFilamentId">
-                        <input type="text"
-                            x-model="filamentQ"
-                            @focus="filamentOpen = true"
-                            @input="filamentOpen = true"
-                            class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                            placeholder="{{ t('filter_search') }}">
-                        <div x-show="filamentOpen" x-cloak
-                            class="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
-                            <button type="button"
-                                @click="selectFilament('', '')"
-                                class="w-full text-left px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 border-b border-gray-100">
-                                — {{ t('filter_reset') }} —
-                            </button>
-                            <template x-for="f in filteredFilaments" :key="f.id">
-                                <button type="button"
-                                    @click="selectFilament(f.id, f.label)"
-                                    class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0">
-                                    <span class="font-medium text-gray-800" x-text="f.label"></span>
-                                    <span class="text-xs text-gray-400 ml-1" x-text="f.mat"></span>
-                                </button>
-                            </template>
-                            <button type="button"
-                                x-show="canShowAllFilamentsButton"
-                                x-cloak
-                                @click="showAllChoices()"
-                                class="w-full text-left px-3 py-2 text-xs text-blue-600 hover:bg-blue-50 border-t border-blue-100 font-semibold">
-                                {{ t('bambu_other_filament') }}
-                            </button>
-                        </div>
-                    </div>
-
-                    {# ── Project fulltext search dropdown ── #}
-                    <div class="relative" @click.outside="projectOpen = false">
-                        <label class="text-xs font-semibold text-gray-600 mb-1 block">{{ t('bambu_map_project') }}</label>
-                        {# ── Suggested projects ── #}
-                        <template x-if="!selectedProjectId && suggestedProjects.length > 0">
-                            <div class="mb-1">
-                                <p class="text-xs text-gray-400 mb-1"><i class="fa-solid fa-lightbulb text-amber-400 mr-1"></i>{{ t('bambu_suggested_projects') }}:</p>
-                                <div class="flex flex-wrap gap-1">
-                                    <template x-for="p in suggestedProjects" :key="p.id">
-                                        <button type="button" @click="selectProject(p.id, p.name)"
-                                            class="text-xs bg-amber-50 border border-amber-300 text-amber-800 hover:bg-amber-100 px-2 py-0.5 rounded-full transition-colors font-medium">
-                                            <i class="fa-solid fa-folder-open mr-1 text-amber-500"></i><span x-text="p.name"></span>
-                                        </button>
-                                    </template>
-                                </div>
-                            </div>
-                        </template>
-                        {# ── Create new project (when no suggestions) ── #}
-                        <template x-if="!selectedProjectId && suggestedProjects.length === 0 && cleanedTitle">
-                            <div class="mb-1">
-                                <template x-if="!createProjectOpen">
-                                    <button type="button" @click="openCreateProject()"
-                                        class="text-xs bg-emerald-50 border border-emerald-300 text-emerald-700 hover:bg-emerald-100 px-2 py-0.5 rounded-full transition-colors font-medium">
-                                        <i class="fa-solid fa-plus mr-1"></i>{{ t('bambu_create_project') }}
-                                    </button>
-                                </template>
-                                <template x-if="createProjectOpen">
-                                    <div class="flex gap-1 items-center">
-                                        <input type="text" x-model="createProjectName"
-                                            class="flex-1 border border-emerald-300 rounded px-2 py-1 text-xs focus:ring-2 focus:ring-emerald-400 outline-none"
-                                            @keydown.enter.prevent="createProject({{ job.id }})"
-                                            @keydown.escape="createProjectOpen = false"
-                                            placeholder="{{ t('bambu_new_project_name') }}">
-                                        <button type="button" @click="createProject({{ job.id }})"
-                                            class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded transition-colors">
-                                            <i class="fa-solid fa-check"></i>
-                                        </button>
-                                        <button type="button" @click="createProjectOpen = false"
-                                            class="text-xs text-gray-500 hover:text-gray-700 px-1 py-1 rounded transition-colors">
-                                            <i class="fa-solid fa-xmark"></i>
-                                        </button>
-                                    </div>
-                                </template>
-                            </div>
-                        </template>
-                        <input type="hidden" name="project_id" :value="selectedProjectId">
-                        <input type="text"
-                            x-model="projectQ"
-                            @focus="projectOpen = true"
-                            @input="projectOpen = true"
-                            class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                            placeholder="{{ t('filter_search') }}">
-                        <div x-show="projectOpen" x-cloak
-                            class="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
-                            <button type="button"
-                                @click="selectProject('', '')"
-                                class="w-full text-left px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 border-b border-gray-100">
-                                — {{ t('filter_reset') }} —
-                            </button>
-                            <template x-for="p in filteredProjects" :key="p.id">
-                                <button type="button"
-                                    @click="selectProject(p.id, p.name)"
-                                    class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0">
-                                    <span class="font-medium text-gray-800" x-text="p.name"></span>
-                                </button>
-                            </template>
-                        </div>
-                    </div>
-
-                    {# Deduct checkbox #}
-                    <div class="flex items-end gap-2 pb-1">
-                        <label class="flex items-center gap-2 cursor-pointer select-none">
-                            <input type="checkbox" name="deduct" value="1" class="w-4 h-4 rounded accent-blue-600"
-                                {% if show_deducted %}disabled{% endif %}>
-                            <span class="text-xs font-semibold text-gray-600">
-                                {{ t('bambu_deduct_stock') }}
-                                {% if show_deducted %}
-                                <span class="text-emerald-600 ml-1"><i class="fa-solid fa-check"></i></span>
-                                {% endif %}
-                            </span>
-                        </label>
-                        {% if show_deducted %}
-                        <span class="text-xs text-gray-400 italic">{{ t('bambu_remap_no_stock') }}</span>
-                        {% endif %}
-                    </div>
-
-                    {# Save #}
-                    <div>
-                        <button type="submit"
-                            class="w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white font-semibold py-2 px-4 rounded-lg text-sm shadow">
-                            <i class="fa-solid fa-save"></i> {{ t('save') }}
-                        </button>
-                    </div>
-
-                    </div>{# end inner grid #}
-                    {% endif %}{# end is_mm #}
-                </form>
-
-                {# ── Per-slot AMS material breakdown ── #}
-                {% if job.materials %}
-                <div class="mt-4 pt-3 border-t border-gray-200">
-                    <p class="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">
-                        <i class="fa-solid fa-layer-group mr-1"></i> {{ t('bambu_materials') }}
-                    </p>
-                    <div class="space-y-2">
-                        {% for mat in job.materials %}
-                        {% set slot_meta = slot_meta_by_material.get(mat.id) if slot_meta_by_material else none %}
-                        {# Pass initial state to Alpine so it can manage the slot reactively #}
-                        {% set init_fid = mat.filament_id if mat.filament_id is not none else 'null' %}
-                        {% set init_flabel = mat.filament.name|tojson|forceescape if mat.filament else 'null' %}
-                        {% set slot_material = (slot_meta.material_type if slot_meta else (mat.material_name or ''))|tojson|forceescape %}
-                        {% set slot_color = (slot_meta.color_hex if slot_meta and slot_meta.color_hex else (mat.color_hex or ''))|tojson|forceescape %}
-                        <div class="flex flex-col sm:flex-row sm:items-center gap-2 bg-white rounded-lg border border-gray-100 px-3 py-2"
-                             x-data='bambuSlotMap({{ job.id }}, {{ mat.id }}, {{ init_fid }}, {{ init_flabel }}, {{ "true" if mat.deducted else "false" }}, {{ slot_material }}, {{ slot_color }})'>
-                            <div class="flex items-center gap-2 min-w-[180px]">
-                                {% if slot_meta and slot_meta.color_hex %}
-                                <span class="w-4 h-4 rounded-full border border-gray-200 flex-shrink-0"
-                                    style="background-color: {{ slot_meta.color_hex }};"></span>
-                                {% endif %}
-                                <span class="text-xs font-semibold text-gray-700">{{ slot_meta.material_type if slot_meta else (mat.material_name or '?') }}</span>
-                                <span class="text-xs text-gray-400">
-                                    AMS {{ slot_meta.ams if slot_meta and slot_meta.ams is not none else (mat.ams_id if mat.ams_id is not none else '?') }}/{{ slot_meta.tray if slot_meta and slot_meta.tray is not none else (mat.tray_id if mat.tray_id is not none else '?') }}
-                                </span>
-                                {% if mat.weight_grams %}
-                                <span class="text-xs text-gray-500">{{ '%.1f'|format(mat.weight_grams) }} g</span>
-                                {% endif %}
-                            </div>
-
-                            <div class="flex items-center gap-2 text-xs text-gray-500">
-                                <span>{{ t('material') }}: {{ slot_meta.material_type if slot_meta else (mat.material_name or '?') }}</span>
-                                {% if slot_meta and slot_meta.color_code %}
-                                <span>{{ t('bambu_color_code') }}: {{ slot_meta.color_code }}</span>
-                                {% endif %}
-                            </div>
-
-                            {# Assigned filament badge — shown when a filament is assigned #}
-                            <span x-show="assignedLabel && !remapping" x-cloak
-                                class="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium flex-shrink-0 inline-flex items-center gap-1">
-                                <i class="fa-solid fa-spool"></i>
-                                <span x-text="assignedLabel"></span>
-                                <i x-show="deducted" class="fa-solid fa-check text-emerald-500"></i>
-                            </span>
-
-                            {# Remap button (edit pencil) — shown when deducted and not in remap mode #}
-                            {% if is_mm %}
-                            <button type="button" x-show="deducted && !remapping" x-cloak
-                                @click="remapping = true; remapQ = assignedLabel; remapOpen = false"
-                                class="ml-auto text-xs text-gray-400 hover:text-blue-600 transition-colors px-2 py-1 rounded flex-shrink-0"
-                                title="{{ t('bambu_remap_filament') }}">
-                                <i class="fa-solid fa-pen-to-square"></i>
-                            </button>
-                            {# Remap panel — filament picker + confirm + cancel #}
-                            <div x-show="remapping" x-cloak class="ml-auto flex items-center gap-2 flex-wrap">
-                                <div class="relative" @click.outside="remapOpen = false">
-                                    <input type="text"
-                                        x-model="remapQ"
-                                        @focus="remapOpen = true"
-                                        @input="remapOpen = true"
-                                        class="border rounded px-2 py-1 text-xs focus:ring-blue-500 outline-none w-44"
-                                        placeholder="{{ t('filter_search') }}">
-                                    <div x-show="remapOpen" x-cloak
-                                        class="absolute z-40 mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                                        <template x-for="f in filteredRemapFilaments" :key="f.id">
-                                            <button type="button"
-                                                @click="selectRemap(f.id, f.label)"
-                                                class="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0">
-                                                <span x-text="f.label"></span>
-                                                <span class="text-gray-400 ml-1" x-text="f.mat"></span>
-                                            </button>
-                                        </template>
-                                        <button type="button"
-                                            x-show="canShowAllRemapFilamentsButton"
-                                            x-cloak
-                                            @click="showAllRemapChoices()"
-                                            class="w-full text-left px-2 py-1.5 text-xs text-blue-600 hover:bg-blue-50 border-t border-blue-100 font-semibold">
-                                            {{ t('bambu_other_filament') }}
-                                        </button>
-                                    </div>
-                                </div>
-                                <button type="button" @click="remapSlot()"
-                                    :disabled="!remapFilamentId || saving"
-                                    class="text-xs bg-blue-600 hover:bg-blue-700 transition-colors text-white font-semibold px-3 py-1 rounded-lg flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                                    :title="'{{ t('bambu_remap_no_stock') }}'">
-                                    <i x-show="!saving" class="fa-solid fa-check"></i>
-                                    <i x-show="saving" class="fa-solid fa-spinner fa-spin"></i>
-                                    {{ t('bambu_remap_filament') }}
-                                </button>
-                                <button type="button" @click="remapping = false"
-                                    class="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded flex-shrink-0">
-                                    <i class="fa-solid fa-xmark"></i>
-                                </button>
-                            </div>
-                            {% endif %}
-
-                            {# Assign + deduct action — only relevant for multimaterial slots #}
-                            <div {% if not is_mm %}class="hidden"{% else %}x-show="!deducted && !remapping" x-cloak class="flex items-center gap-2 ml-auto flex-wrap"{% endif %}>
-                                <div class="relative" @click.outside="slotOpen = false">
-                                    <input type="text"
-                                        x-model="slotQ"
-                                        @focus="slotOpen = true"
-                                        @input="slotOpen = true"
-                                        class="border rounded px-2 py-1 text-xs focus:ring-blue-500 outline-none w-44"
-                                        placeholder="{{ t('filter_search') }}">
-                                    <div x-show="slotOpen" x-cloak
-                                        class="absolute z-40 mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                                        <template x-for="f in filteredSlotFilaments" :key="f.id">
-                                            <button type="button"
-                                                @click="selectSlot(f.id, f.label)"
-                                                class="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0">
-                                                <span x-text="f.label"></span>
-                                                <span class="text-gray-400 ml-1" x-text="f.mat"></span>
-                                            </button>
-                                        </template>
-                                        <button type="button"
-                                            x-show="canShowAllSlotFilamentsButton"
-                                            x-cloak
-                                            @click="showAllSlotChoices()"
-                                            class="w-full text-left px-2 py-1.5 text-xs text-blue-600 hover:bg-blue-50 border-t border-blue-100 font-semibold">
-                                            {{ t('bambu_other_filament') }}
-                                        </button>
-                                    </div>
-                                </div>
-                                <button type="button" @click="assignSlot()"
-                                    :disabled="!slotFilamentId || saving"
-                                    class="text-xs bg-emerald-600 hover:bg-emerald-700 transition-colors text-white font-semibold px-3 py-1 rounded-lg flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1">
-                                    <i x-show="!saving" class="fa-solid fa-minus-circle"></i>
-                                    <i x-show="saving" class="fa-solid fa-spinner fa-spin"></i>
-                                    {{ t('bambu_deduct_stock') }}
-                                </button>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
-
-                {% if job_meta and (job_meta.cover_url or job_meta.nozzle_infos) %}
-                <div class="mt-4 pt-3 border-t border-gray-200 space-y-3">
-                    <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">
-                        <i class="fa-solid fa-circle-info mr-1"></i> {{ t('detail') }}
-                    </p>
-
-                    {% if job_meta.has_thumbnail %}
-                    <div class="bg-white rounded-lg border border-gray-100 p-2 w-fit">
-                        <a href="{{ url_for('bambu_job_thumbnail', job_id=job.id) }}" target="_blank" rel="noopener noreferrer" class="block shrink-0">
-                            <img src="{{ url_for('bambu_job_thumbnail', job_id=job.id) }}" alt="thumbnail" loading="lazy" decoding="async" fetchpriority="low" class="w-20 h-20 rounded-md object-cover border border-gray-200">
-                        </a>
-                    </div>
-                    {% endif %}
-
-                    {% if job_meta.nozzle_infos %}
-                    <div class="bg-white rounded-lg border border-gray-100 px-3 py-2">
-                        <p class="text-xs font-semibold text-gray-700 mb-2">{{ t('bambu_nozzle_infos') }}</p>
-                        <div class="flex flex-wrap gap-2">
-                            {% for nozzle in job_meta.nozzle_infos %}
-                            <span class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">
-                                #{{ nozzle.id if nozzle.id is not none else '?' }}
-                                {% if nozzle.diameter is not none %}· {{ nozzle.diameter }} mm{% endif %}
-                                {% if nozzle.flowSize %}· {{ nozzle.flowSize }}{% endif %}
-                            </span>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-                {% endif %}
-            </div>
-            {# ── end mapping panel ── #}
-
-        </div>
-        {# ── end job card ── #}
-        {% endfor %}
+    <div id="bambu-jobs-list" class="space-y-4">
+        {% include '_bambu_job_cards.html' %}
     </div>
 
-    {# ── Pagination ── #}
-    {% if jobs.pages > 1 %}
-    <nav class="flex items-center gap-1 bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-2 w-fit mx-auto mt-2">
-        {% if jobs.has_prev %}
-        <a href="{{ url_for('bambu_jobs', page=jobs.prev_num, filter=job_filter, filament_id=active_filament_id, hide_failed=1 if hide_failed else None) }}"
-           class="px-3 py-1 rounded hover:bg-gray-100 transition text-sm text-gray-700">
-            <i class="fa-solid fa-chevron-left"></i> {{ t('prev_page') }}
-        </a>
-        {% endif %}
-        <span class="px-3 py-1 text-sm text-gray-500">{{ jobs.page }} / {{ jobs.pages }}</span>
-        {% if jobs.has_next %}
-        <a href="{{ url_for('bambu_jobs', page=jobs.next_num, filter=job_filter, filament_id=active_filament_id, hide_failed=1 if hide_failed else None) }}"
-           class="px-3 py-1 rounded hover:bg-gray-100 transition text-sm text-gray-700">
-            {{ t('next_page') }} <i class="fa-solid fa-chevron-right"></i>
-        </a>
-        {% endif %}
-    </nav>
-    {% endif %}
+    {# ── Infinite scroll sentinel ── #}
+    <div id="bambu-scroll-sentinel" class="py-6 text-center">
+        <span id="bambu-loading-indicator" class="hidden text-gray-400 text-sm">
+            <i class="fa-solid fa-spinner fa-spin mr-2"></i>{{ t('bambu_loading_jobs') }}
+        </span>
+        <span id="bambu-all-loaded-msg" class="hidden text-gray-400 text-sm italic">
+            <i class="fa-solid fa-check-circle mr-1 text-green-400"></i>{{ t('bambu_all_loaded') }}
+        </span>
+    </div>
+
 
     {% else %}
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center text-gray-400">
@@ -695,6 +129,18 @@
         <p class="text-lg font-semibold text-gray-500">{{ t('bambu_no_jobs') }}</p>
     </div>
     {% endif %}
+</div>
+
+{# ── Lightbox modal ── #}
+<div id="bambu-lightbox" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="absolute inset-0 bg-black/80" onclick="closeBambuLightbox()"></div>
+    <div class="relative z-10 flex flex-col items-center max-w-3xl w-full">
+        <button onclick="closeBambuLightbox()" class="absolute -top-12 right-0 text-white hover:text-gray-300 text-3xl transition-colors" aria-label="Close">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        <img id="bambu-lightbox-img" src="" alt="" class="max-h-[80vh] max-w-full rounded-xl shadow-2xl object-contain bg-gray-900">
+        <p id="bambu-lightbox-title" class="text-white/70 text-sm mt-3 text-center"></p>
+    </div>
 </div>
 
 {# ── Waste from print modal ── #}
@@ -1260,6 +706,105 @@ async function doThumbRefetch() {
         localStorage.setItem(KEY, params.get('hide_failed') === '1' ? '1' : '0');
     } else {
         localStorage.setItem(KEY, hiddenNow ? '1' : '0');
+    }
+})();
+
+// ── Lightbox ─────────────────────────────────────────────────────────────────
+function openBambuLightbox(url, title) {
+    const lb = document.getElementById('bambu-lightbox');
+    const img = document.getElementById('bambu-lightbox-img');
+    const ttl = document.getElementById('bambu-lightbox-title');
+    img.src = url;
+    img.alt = title || '';
+    ttl.textContent = title || '';
+    lb.classList.remove('hidden');
+    document.addEventListener('keydown', _lbEsc);
+}
+function closeBambuLightbox() {
+    document.getElementById('bambu-lightbox').classList.add('hidden');
+    document.getElementById('bambu-lightbox-img').src = '';
+    document.removeEventListener('keydown', _lbEsc);
+}
+function _lbEsc(e) { if (e.key === 'Escape') closeBambuLightbox(); }
+
+// ── Infinite scroll ───────────────────────────────────────────────────────────
+(function () {
+    let _nextPage = {{ jobs.next_num if jobs.has_next else 'null' }};
+    let _hasNext = {{ 'true' if jobs.has_next else 'false' }};
+    let _loadedCount = {{ [jobs.page * per_page, jobs.total]|min }};
+    let _totalCount = {{ jobs.total }};
+    let _loading = false;
+
+    const loadedEl   = document.getElementById('bambu-loaded-count');
+    const loadingEl  = document.getElementById('bambu-loading-indicator');
+    const allDoneEl  = document.getElementById('bambu-all-loaded-msg');
+    const sentinel   = document.getElementById('bambu-scroll-sentinel');
+    const list       = document.getElementById('bambu-jobs-list');
+
+    function _updateCountBar() {
+        if (loadedEl) loadedEl.textContent = _loadedCount;
+    }
+
+    function _showAllLoaded() {
+        if (allDoneEl) allDoneEl.classList.remove('hidden');
+        if (loadingEl) loadingEl.classList.add('hidden');
+    }
+
+    async function _loadMore() {
+        if (_loading || !_hasNext) return;
+        _loading = true;
+        if (loadingEl) loadingEl.classList.remove('hidden');
+
+        const params = new URLSearchParams(window.location.search);
+        params.set('page', _nextPage);
+
+        try {
+            const resp = await fetch('{{ url_for("bambu_jobs_partial") }}?' + params.toString(), {
+                headers: {'X-Requested-With': 'XMLHttpRequest'}
+            });
+            if (!resp.ok) throw new Error('Network error ' + resp.status);
+            const data = await resp.json();
+
+            // Merge Alpine init data BEFORE inserting HTML
+            if (data.bi_data) {
+                Object.assign(_BI, data.bi_data);
+            }
+
+            // Append job cards
+            if (list && data.html) {
+                const tmp = document.createElement('div');
+                tmp.innerHTML = data.html;
+                while (tmp.firstChild) {
+                    list.appendChild(tmp.firstChild);
+                }
+            }
+
+            _loadedCount += data.count;
+            _hasNext = data.has_next;
+            _nextPage = data.next_page;
+            _updateCountBar();
+
+            if (!_hasNext) {
+                _showAllLoaded();
+                observer.disconnect();
+            }
+        } catch (err) {
+            console.error('Bambu infinite scroll error:', err);
+        } finally {
+            _loading = false;
+            if (_hasNext && loadingEl) loadingEl.classList.add('hidden');
+        }
+    }
+
+    if (!_hasNext) {
+        _showAllLoaded();
+    }
+
+    if (sentinel && _hasNext) {
+        const observer = new IntersectionObserver(function(entries) {
+            if (entries[0].isIntersecting) _loadMore();
+        }, {rootMargin: '200px'});
+        observer.observe(sentinel);
     }
 })();
 </script>

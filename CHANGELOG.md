@@ -5,7 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.92.0] - 2026-06-01
+## [1.93.1] - 2026-05-30
+### Fixed
+- **Projects search flicker** — Replaced destructive full-DOM replacement on every keystroke with targeted inner-content updates via DOMParser fragment extraction. The widget shells, search inputs, and layout manager remain stable during AJAX filtering, eliminating visual flicker. Added AbortController to cancel in-flight requests on new filter changes and deduplication guard (`_fetchPending`) to prevent concurrent fetches.
+
+## [1.93.0] - 2026-06-08
+### Added
+- **Bambu infinite scroll** — The Bambu Lab print history page replaces prev/next pagination with IntersectionObserver-based infinite scroll. New jobs are loaded automatically as the user scrolls, keeping Alpine.js component state in sync via a JSON AJAX endpoint (`/bambu/jobs-partial`).
+- **Bambu result count bar** — "Showing X of Y jobs" indicator appears above the job list and updates live as more jobs load.
+- **Bambu thumbnail lightbox** — Clicking a job thumbnail opens a full-screen lightbox overlay instead of navigating to a new tab. Thumbnail thumbnails also appear inline in the job card header row for quick visual scanning.
+
+
 ### Added
 - **Quick text search** — Search bar on the projects index page instantly filters projects by name; results are fetched via the existing AJAX endpoint and debounced.
 - **Project priority field** — Projects have a `priority` column (`low` / `medium` / `high` / `urgent`). Priority badges appear on Kanban cards and in the project detail header. Create and edit forms include a priority selector.

@@ -529,9 +529,19 @@ def register(app):
         client_filter = request.args.get('client', '').strip()
         name_filter = request.args.get('name', '').strip()
         tag_filter = request.args.get('tag', '').strip()
+        fulltext_filter = request.args.get('fulltext', '').strip()
         ajax_mode = request.args.get('ajax') == '1'
         hide_done = request.args.get('hide_done') == '1'
 
+        if fulltext_filter:
+            ft = f'%{escape_like(fulltext_filter)}%'
+            base_query = base_query.filter(
+                db.or_(
+                    Project.name.ilike(ft),
+                    Project.client_name.ilike(ft),
+                    Project.tag_text.ilike(ft),
+                )
+            )
         if client_filter:
             base_query = base_query.filter(Project.client_name.ilike(f'%{escape_like(client_filter)}%'))
         if name_filter:
@@ -573,6 +583,7 @@ def register(app):
                 'sort_by': sort_by,
                 'page': page,
                 'owner_id': request.args.get('owner_id', type=int),
+                'fulltext': fulltext_filter or None,
                 'client': client_filter or None,
                 'name': name_filter or None,
                 'tag': tag_filter or None,
@@ -654,6 +665,7 @@ def register(app):
             client_filter=client_filter,
             name_filter=name_filter,
             tag_filter=tag_filter,
+            fulltext_filter=fulltext_filter,
             hide_done=hide_done,
             per_page=per_page,
             project_metrics=project_metrics,

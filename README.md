@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.92.0***
+*Current version: **v1.93.1***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -19,11 +19,17 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 - **Storage Shelf Map** — Visual grid layout of physical shelf positions. Assign spools to named slots, drag-and-drop moves, and stock-level fill indicators.
 
 ### Projects & Client Workflow
-- **Project Management** — Track 3D print jobs as unified projects with client names, due dates, statuses (NEW → PRINTING → DONE), file attachments, and external links with rich preview cards.
+- **Project Management** — Track 3D print jobs as unified projects with client names, contact details (email, phone), due dates, priority levels (Low/Medium/High/Urgent), statuses (NEW → PRINTING → DONE), file attachments, and external links with rich preview cards.
 - **Project TODO Checklists** — Per-project task checklists with optional due dates. Overdue and near-deadline tasks are highlighted with colour-coded badges and surfaced automatically on the overview page in the Action Center hot list.
-- **Kanban Board** — Overview of all projects by status with paginated columns, due-date calendar strip, and estimate-vs-actual metrics.
+- **Kanban Board** — Overview of all projects by status with paginated columns, due-date calendar strip, and estimate-vs-actual metrics. Priority badges on each card and a quick text search filter.
+- **Quick Status Advance** — One-click button in the project detail header moves a project to the next step in the workflow without using the status dropdown.
+- **Clone Project** — Duplicate any project (filaments and print items included) with a single click. Useful for recurring client orders.
+- **Public Share Link** — Generate a token-based read-only share URL for a project. Clients can view status, description, and print-item progress without logging in. Links can be revoked at any time.
+- **Project Templates** — Save any project as a reusable template. When creating a new project, select a template to pre-fill the name, description, tags, and estimated print time.
+- **Emoji Reactions on Comments** — React to project comments with 👍 ✅ 🔄 🎉 ❤️. Counts update instantly via AJAX.
 - **Activity Timeline** — Dedicated project tab showing a chronological timeline of all project events (quotes, uploads, comments, tasks) with colour-coded icons.
 - **File Versioning** — Re-uploading a file with the same name automatically creates a versioned history grouped under the root file.
+- **Image Thumbnails** — Image attachments (JPG/PNG/GIF/WEBP) in the Files tab show a 40×40 clickable thumbnail that opens a full-screen lightbox.
 - **Print Cost Calculator** — Enter model weight and print time, see exact material + electricity cost. Save quotes to projects with margin and customer pricing, and export them using fully self-hosted invoice templates (simple, detailed, or pro-forma) with sequential invoice numbering.
 - **3D Model Viewer** — Interactive in-browser preview of `.stl` and `.3mf` files attached to projects.
 
@@ -237,11 +243,15 @@ Tests cover: authentication flows, Bambu sync idempotency, stock deduction logic
 - CSRF protection and security hardening
 - Fully self-hosted static assets (no CDN dependencies)
 - Bilingual UI (CS/EN)
+- Project priority levels, client contact fields (email/phone), quick text search on project list
+- One-click status advance, project cloning, and project templates
+- Public share links for client-facing read-only project views
+- Emoji reactions on project comments
+- Image thumbnails with lightbox in project file attachments
 
 ### 🔮 Potential Future Work
 - OctoPrint integration
 - Filament spool RFID/NFC pairing
-- Public project sharing / client portal
 - REST API for third-party integrations
 
 ---

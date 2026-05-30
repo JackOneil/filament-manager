@@ -770,6 +770,7 @@ def register(app):
         return render_template(
             'bambu.html',
             jobs=jobs,
+            per_page=per_page,
             filaments=filaments_json,
             projects=projects_json,
             waste_filaments=filaments_orm,
@@ -787,6 +788,71 @@ def register(app):
             bambu_payload_meta=bambu_payload_meta,
             slot_meta_by_material=slot_meta_by_material,
         )
+
+    @bp.route('/bambu/jobs-partial')
+    def bambu_jobs_partial():
+        page = request.args.get('page', 1, type=int)
+        job_filter = request.args.get('filter', '')
+        filament_id = request.args.get('filament_id', type=int)
+        hide_failed = request.args.get('hide_failed', '') == '1'
+        per_page = 20
+
+        base_q = BambuPrintJob.query
+        if filament_id:
+            base_q = base_q.filter(or_(
+                BambuPrintJob.filament_id == filament_id,
+                BambuPrintJob.materials.any(BambuJobMaterial.filament_id == filament_id),
+            ))
+        if hide_failed:
+            base_q = base_q.filter(BambuPrintJob.status.notin_(('FAILED', 'CANCELLED')))
+        if job_filter == 'unassigned':
+            base_q = base_q.filter(_job_unassigned_filter())
+        elif job_filter == 'not_deducted':
+            base_q = base_q.filter(_job_not_deducted_filter())
+
+        jobs = db.paginate(
+            base_q.order_by(BambuPrintJob.started_at.desc().nullslast(), BambuPrintJob.synced_at.desc()).statement,
+            page=page, per_page=per_page, error_out=False,
+        )
+
+        bambu_payload_meta = {}
+        slot_meta_by_material = {}
+        bi_data = {}
+        for job in jobs.items:
+            job_meta, slot_meta = _extract_job_meta(job)
+            job_meta['cleaned_title'] = _clean_title(job.model_name or '') if job.model_name else ''
+            bambu_payload_meta[job.id] = job_meta
+            slot_meta_by_material.update(slot_meta)
+            js_single_slot = job.materials[0] if len(job.materials) == 1 else None
+            js_slot_meta = slot_meta_by_material.get(js_single_slot.id) if js_single_slot else None
+            bi_data[str(job.id)] = {
+                'fId': job.filament_id,
+                'fLabel': job.filament.name if job.filament else None,
+                'pId': job.project_id,
+                'pLabel': job.project.name if job.project else None,
+                'prefMaterial': (js_slot_meta.get('material_type', '') if js_slot_meta else '') or
+                                (js_single_slot.material_name if js_single_slot else ''),
+                'prefColor': (js_slot_meta.get('color_hex', '') if js_slot_meta else '') or
+                             (js_single_slot.color_hex if js_single_slot else ''),
+                'cleanedTitle': job_meta.get('cleaned_title', ''),
+            }
+
+        html = render_template(
+            '_bambu_job_cards.html',
+            jobs=jobs,
+            bambu_payload_meta=bambu_payload_meta,
+            slot_meta_by_material=slot_meta_by_material,
+            job_filter=job_filter,
+        )
+        return jsonify({
+            'html': html,
+            'bi_data': bi_data,
+            'has_next': jobs.has_next,
+            'next_page': jobs.next_num,
+            'count': len(jobs.items),
+            'total': jobs.total,
+            'page': jobs.page,
+        })
 
     @bp.route('/bambu/sync', methods=['POST'])
     def bambu_sync():

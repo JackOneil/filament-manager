@@ -10,7 +10,7 @@
             </div>
             <div class="ui-panel">
                 <div class="ui-label">{{ t('projects_due_calendar_title') }}</div>
-                <div class="flex flex-col sm:flex-row gap-3 mt-4 sm:overflow-x-auto">
+                <div id="projects-calendar-items" class="flex flex-col sm:flex-row gap-3 mt-4 sm:overflow-x-auto">
                     {% for project in upcoming_due %}
                     <a href="{{ url_for('project_detail', id=project.id) }}" class="ui-card-soft p-3 hover:border-blue-300 transition sm:flex-1 sm:min-w-[200px] sm:max-w-xs min-w-0">
                         <div class="flex items-center justify-between gap-3">
@@ -56,7 +56,7 @@
                     <h2 class="text-xl font-bold">{{ t('status_' ~ status|lower) }}</h2>
                     <span class="ui-badge">{{ board['total'] }}</span>
                 </div>
-                <div class="space-y-2.5">
+                <div id="kanban-items-{{ status|lower }}" class="space-y-2.5">
                     {% for project in board['items'] %}
                     {% set metrics = project_metrics.get(project.id) %}
                     {% set pi_total = project.print_items | sum(attribute='quantity_total') %}
@@ -107,7 +107,7 @@
                     {% endfor %}
                 </div>
                 {% if board['pagination'].pages > 1 %}
-                <div class="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-gray-200 text-xs">
+                <div id="kanban-pagination-{{ status|lower }}" class="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-gray-200 text-xs">
                     <a href="#" @click.prevent="if (fetchStatusContent) fetchStatusContent('{{ status }}', {{ board['pagination'].prev_num if board['pagination'].has_prev else 1 }})"
                        class="{{ 'text-blue-600 hover:text-blue-800' if board['pagination'].has_prev else 'text-gray-300 cursor-not-allowed' }}">
                         <i class="fa-solid fa-chevron-left mr-1"></i>{{ t('prev_page') }}
@@ -176,10 +176,10 @@
                                 <th class="!py-2 !px-3 border-b border-gray-200 dark:border-gray-700">
                                     <div class="flex gap-2">
                                         <div class="w-full">
-                                            <input id="search-name" type="text" x-model.debounce.500ms="nameQ" value="{{ name_filter|default('') }}" placeholder="Hledat název..." class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none font-normal text-gray-800 bg-white shadow-sm dark:bg-gray-900 dark:border-gray-600 dark:text-gray-200" autocomplete="off">
+                                            <input id="search-name" type="text" x-model.debounce.500ms="nameQ" value="{{ name_filter|default('') }}" placeholder="{{ t('project_search_name') }}" class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none font-normal text-gray-800 bg-white shadow-sm dark:bg-gray-900 dark:border-gray-600 dark:text-gray-200" autocomplete="off">
                                         </div>
                                         <div class="w-24 relative" @click.outside="tagFocus = false">
-                                            <input id="search-tag" type="text" x-model.debounce.500ms="tagQ" value="{{ tag_filter|default('') }}" @focus="tagFocus = true" placeholder="Štítek..." class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none font-normal text-gray-800 bg-white shadow-sm dark:bg-gray-900 dark:border-gray-600 dark:text-gray-200" autocomplete="off">
+                                            <input id="search-tag" type="text" x-model.debounce.500ms="tagQ" value="{{ tag_filter|default('') }}" @focus="tagFocus = true" placeholder="{{ t('project_search_tag') }}" class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none font-normal text-gray-800 bg-white shadow-sm dark:bg-gray-900 dark:border-gray-600 dark:text-gray-200" autocomplete="off">
                                             
                                             <!-- Tag Dropdown -->
                                             <div x-show="tagFocus && tagOptions.length > 0" x-transition.opacity.duration.200ms class="ui-dropdown absolute w-36 left-0 top-full mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-[60] overflow-hidden" x-cloak style="display: none;">
@@ -189,7 +189,7 @@
                                                             <span x-text="tval"></span>
                                                         </button>
                                                     </template>
-                                                    <div x-show="filteredTags.length === 0" class="px-3 py-2 text-xs font-normal text-gray-400">Nic nenalezeno</div>
+                                                    <div x-show="filteredTags.length === 0" class="px-3 py-2 text-xs font-normal text-gray-400">{{ t('project_no_results') }}</div>
                                                 </div>
                                             </div>
                                         </div>
@@ -197,7 +197,7 @@
                                 </th>
                                 <th class="!py-2 !px-3 border-b border-gray-200 dark:border-gray-700">
                                     <div class="w-full relative" @click.outside="clientFocus = false">
-                                        <input id="search-client" type="text" x-model.debounce.500ms="clientQ" value="{{ client_filter|default('') }}" @focus="clientFocus = true" placeholder="Hledat klienta..." class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none font-normal text-gray-800 bg-white shadow-sm dark:bg-gray-900 dark:border-gray-600 dark:text-gray-200" autocomplete="off">
+                                        <input id="search-client" type="text" x-model.debounce.500ms="clientQ" value="{{ client_filter|default('') }}" @focus="clientFocus = true" placeholder="{{ t('project_search_client') }}" class="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none font-normal text-gray-800 bg-white shadow-sm dark:bg-gray-900 dark:border-gray-600 dark:text-gray-200" autocomplete="off">
                                         
                                         <!-- Client Dropdown -->
                                         <div x-show="clientFocus && clientOptions.length > 0" x-transition.opacity.duration.200ms class="ui-dropdown absolute w-full min-w-32 left-0 top-full mt-1 bg-white rounded-md shadow-lg border border-gray-200 z-[60] overflow-hidden" x-cloak style="display: none;">
@@ -207,7 +207,7 @@
                                                         <span x-text="item"></span>
                                                     </button>
                                                 </template>
-                                                <div x-show="filteredClients.length === 0" class="px-3 py-2 text-xs font-normal text-gray-400">Nenalezeno</div>
+                                                <div x-show="filteredClients.length === 0" class="px-3 py-2 text-xs font-normal text-gray-400">{{ t('project_no_results') }}</div>
                                             </div>
                                         </div>
                                     </div>
@@ -222,7 +222,7 @@
                                 </th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="project-table-body">
                             {% for p in projects.items %}
                             {% set metrics = project_metrics.get(p.id) %}
                             {% set days_due = ((p.due_date - now).days) if p.due_date else none %}
@@ -311,7 +311,7 @@
     </div>
 
     {% if projects.pages > 1 %}
-    <div class="flex justify-center mt-6">
+    <div id="project-bottom-pagination" class="flex justify-center mt-6">
         <nav class="flex items-center gap-1 bg-white rounded-lg shadow-sm border border-gray-200 px-2 py-1">
             <a href="#" @click.prevent="if (fetchPage) fetchPage({{ projects.prev_num if projects.has_prev else 1 }})"
                class="px-3 py-1 rounded {{ 'text-blue-600 hover:bg-blue-50' if projects.has_prev else 'text-gray-300 cursor-not-allowed' }}">

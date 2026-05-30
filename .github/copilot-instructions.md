@@ -125,7 +125,7 @@ Flask App (app.py → create_app())
    └── @app.after_request → add_security_headers()
 ```
 
-### 3.2 AJAX Flow (Inventory)
+### 3.2 AJAX Flow (Inventory — simple partial swap)
 
 ```
 Alpine.js inventoryApp() → fetchContent()
@@ -140,7 +140,45 @@ routes/api.py → returns HTML partial (_filament_cards.html / _filament_list_ro
 Alpine updates wrapper.innerHTML + synchronous classList update
 ```
 
-### 3.3 Background Workers
+### 3.3 AJAX Flow (Projects — targeted DOM update)
+
+For complex pages where the AJAX response contains multiple independently-updatable sections (e.g. Kanban columns, table body, pagination bar, calendar), the old pattern of `wrapper.innerHTML = data.html` causes full DOM destruction — flickering inputs, lost focus, re-created widget instances.
+
+**The fix** uses `DOMParser` to surgically update only dynamic inner containers:
+
+```
+User types in search input (stable, not replaced)
+   │
+   ▼
+Alpine $watch → fetchContent() (deduplicated + AbortController)
+   │
+   ▼
+Server returns full _projects_layout.html as JSON {html: "..."}
+   │
+   ▼
+Client parses HTML into off-DOM document via DOMParser
+   │
+   ├── doc.querySelector('#project-table-body').innerHTML     → wrapper#project-table-body
+   ├── doc.querySelector('#kanban-items-*').innerHTML          → wrapper#kanban-items-*
+   ├── doc.querySelector('#kanban-pagination-*').outerHTML     → wrapper#kanban-pagination-*
+   ├── doc.querySelector('#projects-calendar-items').innerHTML → wrapper#projects-calendar-items
+   ├── doc.querySelector('#project-bottom-pagination').outerHTML → wrapper#project-bottom-pagination
+   │
+   ▼
+Widget shells and search inputs remain stable — no flicker
+```
+
+**Key patterns:**
+- Every dynamic container in the template has a stable `id` attribute
+- `AbortController` cancels previous in-flight request on new filter change
+- `_fetchPending` boolean guard prevents concurrent fetches
+- `DOMParser.parseFromString()` works on an in-memory document, never touches live DOM until extraction
+- `.outerHTML` swap preserves the container element (for pagination wrappers); `.innerHTML` swap replaces only contents (for items lists)
+- Loading overlay (skeleton UI) is NOT used for search operations — the `opacity-60 pointer-events-none` transition on the wrapper is sufficient feedback
+- `initProjectsLayout()` is called after updates, but since widget shells are never replaced, the drag/resize layout manager is idempotent
+- This pattern is applicable to any AJAX-driven auto-filter page with multiple independently-updatable sections (Inventory, Bambu, Prusa, History)
+
+### 3.4 Background Workers
 
 Two daemon threads start in `create_app()`:
 
@@ -149,7 +187,7 @@ Two daemon threads start in `create_app()`:
 | `bambu-sync-worker`  | 60s (backoff → max 3600s) | `routes.bambu.do_sync()` — Bambu Cloud API    |
 | `prusa-sync-worker`  | 60s (backoff → max 900s)  | `routes.prusa.do_poll()` — PrusaLink local API|
 
-### 3.4 DB Schema Migration Strategy
+### 3.5 DB Schema Migration Strategy
 
 - **No Alembic.** Migrations are handled via `_safe_alter()` in `migrations.py`.
 - Every new column requires a `_safe_alter(app, 'ALTER TABLE ...')` line in `run_migrations()` inside `migrations.py`.
@@ -416,6 +454,17 @@ This is already applied to `projects_index.html` and overrides any stale localSt
 - **When adding a new page** (new route/blueprint with its own template), add a brand new section object to `HELP_SECTIONS` covering the main workflows of that page.
 - Tip text must be in both Czech (`cs`) and English (`en`).
 - Never hardcode only one language — both keys are always required.
+
+### Rule 31 — Targeted AJAX DOM Updates (DOMParser)
+- For AJAX-driven auto-filter pages with multiple independently-updatable sections (Kanban columns, table body, pagination, calendar), **never replace the entire wrapper via `innerHTML`** on filter changes.
+- Use `DOMParser.parseFromString(data.html, 'text/html')` to parse the server response in an off-DOM document, then surgically extract and assign `innerHTML` / `outerHTML` only on the specific dynamic containers identified by stable `id` attributes.
+- Always pair this with:
+  - `AbortController` to cancel previous in-flight requests on new filter changes
+  - A deduplication guard (`_fetchPending` boolean) to prevent concurrent fetches — subsequent calls during an in-flight request are skipped
+- Keep widget shells, search inputs, and layout manager instances stable (never replace them).
+- Avoid loading overlays (skeleton UI) for search operations — subtle `opacity-60 pointer-events-none` on the wrapper is sufficient feedback.
+- `.outerHTML` swap preserves the container element; `.innerHTML` replaces only contents. Use `.outerHTML` for pagination wrappers and `.innerHTML` for items lists.
+- This pattern is documented in section 3.3 (Projects AJAX flow) and already implemented on the Projects index page.
 
 ### Rule 29 — Architecture Documentation Updates
 - **After implementing new features, refactoring, or structural changes, always update architecture documentation:**
