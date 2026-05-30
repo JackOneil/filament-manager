@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.96.0] - 2026-05-30
+### Added
+- **History page filtering** — Movement history (`/history`) now supports fulltext search by filament name or note, action type filter dropdown, and date range (from/to) inputs with persistent URL parameters and a reset button.
+- **Granular action type badges** — Each movement record now shows a colour-coded badge specific to its action type (add, remove, Bambu print, bulk add, bulk delete, spool add/remove) instead of a generic add/remove label, with matching left-border row stripe on desktop.
+- **History help section** — New contextual help section covering filtering, action types, and the clear-history workflow (Rule 30).
+
+### Changed
+- **History per-page cookie** — The per-page preference now works correctly with active filters by preserving filter URL parameters across pagination clicks.
+
 ## [1.95.0] - 2026-05-30
 ### Added
 - **Maintenance predictive scheduling** — Maintenance records can now estimate next service dates from real printer operation metrics (print-hours, job count, filament usage) with configurable analysis window.

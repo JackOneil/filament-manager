@@ -1433,6 +1433,15 @@ TRANSLATIONS = {
         'backup_dry_run_ok': 'Dry-run kontrola byla úspěšná. Ověřeno záznamů: {total}.',
         'backup_import_success': 'Import zálohy byl dokončen.',
         'backup_import_failed': 'Import zálohy selhal.',
+        # ── History filters ───────────────────────────────────────────────────
+        'history_search_placeholder': 'Hledat filament nebo poznámku…',
+        'history_all_types': 'Všechny typy akcí',
+        'history_date_from': 'Od data',
+        'history_date_to': 'Do data',
+        'history_filter_btn': 'Filtrovat',
+        'history_reset_filters': 'Reset',
+        'history_no_results': 'Žádné záznamy neodpovídají zadaným filtrům.',
+        'history_results_count': 'Počet záznamů: {count}',
     },
     'en': {
         'title': 'Filament Manager',
@@ -2867,5 +2876,14 @@ TRANSLATIONS = {
         'backup_dry_run_ok': 'Dry-run check completed successfully. Records verified: {total}.',
         'backup_import_success': 'Backup import completed.',
         'backup_import_failed': 'Backup import failed.',
+        # ── History filters ───────────────────────────────────────────────────
+        'history_search_placeholder': 'Search filament or note…',
+        'history_all_types': 'All action types',
+        'history_date_from': 'From date',
+        'history_date_to': 'To date',
+        'history_filter_btn': 'Filter',
+        'history_reset_filters': 'Reset',
+        'history_no_results': 'No records match the given filters.',
+        'history_results_count': 'Records: {count}',
     }
 }

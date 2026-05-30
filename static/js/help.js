@@ -141,6 +141,36 @@
             ]
         },
         {
+            id: 'history',
+            icon: 'fa-clock-rotate-left',
+            hasTour: false,
+            endpoints: ['history', 'clear_history'],
+            title: { cs: 'Historie pohybů', en: 'Movement History' },
+            tips: [
+                {
+                    title: { cs: 'Filtrování historie', en: 'Filtering History' },
+                    text: {
+                        cs: 'Pomocí vyhledávacího pole můžete hledat v názvu filamentu nebo poznámce. Rozbalovací seznam Typ akce omezí záznamy na konkrétní operaci (přidání, odebrání, Bambu tisk atd.). Filtrováním podle data si zobrazíte pohyby pouze z určitého období.',
+                        en: 'Use the search field to find records by filament name or note. The Action type dropdown limits records to a specific operation (add, remove, Bambu print, etc.). Date range filters show movements from a specific period.'
+                    }
+                },
+                {
+                    title: { cs: 'Typy akcí', en: 'Action Types' },
+                    text: {
+                        cs: 'Každý záznam má barevný štítek podle typu akce: zelená = přidáno, červená = odebráno, fialová = Bambu tisk, tyrkysová = hromadné přidání, oranžová = hromadné smazání. Při najetí myší na řádek tabulky se zvýrazní odpovídající barvou i levá hrana.',
+                        en: 'Each record has a coloured badge according to action type: green = added, red = removed, purple = Bambu print, teal = bulk add, orange = bulk delete. Hovering over a table row also highlights the left border with the matching colour.'
+                    }
+                },
+                {
+                    title: { cs: 'Mazání historie', en: 'Clearing History' },
+                    text: {
+                        cs: 'Tlačítko „Smazat celou historii" vymaže všechny záznamy pohybů najednou. Tato akce je nevratná — po potvrzení dialogu nelze data obnovit.',
+                        en: 'The "Clear all history" button deletes every movement record at once. This action is irreversible — once confirmed, the data cannot be restored.'
+                    }
+                }
+            ]
+        },
+        {
             id: 'projects',
             icon: 'fa-folder-open',
             hasTour: true,
