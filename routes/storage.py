@@ -198,6 +198,17 @@ def register(app):
             db.session.commit()
         return redirect(url_for('storage'))
 
+    @bp.route('/storage/shelf/reorder', methods=['POST'])
+    def storage_reorder_shelves():
+        data = request.get_json(silent=True) or {}
+        ids = data.get('order', [])
+        for i, shelf_id in enumerate(ids):
+            shelf = db.session.get(StorageShelf, int(shelf_id))
+            if shelf:
+                shelf.sort_order = i
+        db.session.commit()
+        return jsonify({'ok': True})
+
     @bp.route('/storage/slot/assign', methods=['POST'])
     def storage_assign_slot():
         shelf = db.session.get(StorageShelf, request.form.get('shelf_id', type=int))

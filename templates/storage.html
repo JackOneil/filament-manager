@@ -11,8 +11,29 @@
     border-color: #93c5fd;
     background-color: #eff6ff;
 }
+/* Shelf drag-to-reorder */
+.shelf-section.shelf-drag-over {
+    outline: 2px dashed #3b82f6;
+    outline-offset: 2px;
+}
+.shelf-section.shelf-dragging-source {
+    opacity: 0.5;
+}
+/* Find highlight */
+.storage-slot.find-match,
+tr.find-match {
+    outline: 2px solid #f59e0b !important;
+    outline-offset: 1px;
+    background-color: #fffbeb !important;
+    animation: findPulse 1.5s ease-in-out;
+}
+@keyframes findPulse {
+    0%, 100% { outline-color: #f59e0b; }
+    50% { outline-color: #ef4444; }
+}
+/* Print styles — unused (export opens a clean window instead) */
 </style>
-<div class="page-shell" x-data="storageBoard(window.storageBoardConfig)">
+<div class="page-shell" x-data="storageBoard(window.storageBoardConfig)" :style="'--tile-px:' + tilePx + 'px'">
     <div class="page-hero">
         <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
             <div>
@@ -22,7 +43,7 @@
         </div>
     </div>
 
-    <div class="ui-filter-panel ui-panel-hover">
+    <div class="ui-filter-panel ui-panel-hover no-print">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
                 <div class="ui-label">{{ t('storage_saved_views_title') }}</div>
@@ -47,7 +68,7 @@
         </div>
     </div>
 
-    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 no-print">
         <div>
             <div class="ui-label">{{ t('storage_filters') }}</div>
             <p class="text-gray-500 mt-2">{{ t('storage_filters_desc') }}</p>
@@ -55,31 +76,66 @@
     </div>
 
     <div class="space-y-6">
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div class="flex items-center gap-1 p-1 bg-gray-100 rounded-lg">
-                <button type="button" @click="viewMode = 'grid'" :class="viewMode === 'grid' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'" class="px-3 py-1.5 rounded-md text-sm font-medium transition-all">
-                    <i class="fa-solid fa-grip text-xs mr-1.5"></i>{{ t('storage_view_grid') }}
-                </button>
-                <button type="button" @click="viewMode = 'list'" :class="viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'" class="px-3 py-1.5 rounded-md text-sm font-medium transition-all">
-                    <i class="fa-solid fa-list text-xs mr-1.5"></i>{{ t('storage_view_list') }}
-                </button>
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 no-print">
+            <div class="flex items-center gap-2 flex-wrap">
+                <!-- View mode -->
+                <div class="flex items-center gap-1 p-1 bg-gray-100 rounded-lg">
+                    <button type="button" @click="viewMode = 'grid'" :class="viewMode === 'grid' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'" class="px-3 py-1.5 rounded-md text-sm font-medium transition-all">
+                        <i class="fa-solid fa-grip text-xs mr-1.5"></i>{{ t('storage_view_grid') }}
+                    </button>
+                    <button type="button" @click="viewMode = 'list'" :class="viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'" class="px-3 py-1.5 rounded-md text-sm font-medium transition-all">
+                        <i class="fa-solid fa-list text-xs mr-1.5"></i>{{ t('storage_view_list') }}
+                    </button>
+                </div>
+                <!-- Tile size (grid only) -->
+                <div x-show="viewMode === 'grid'" x-cloak class="flex items-center gap-1 p-1 bg-gray-100 rounded-lg" title="{{ t('storage_reorder_shelf_label') }}">
+                    <button type="button" @click="tileSize = 'sm'" :class="tileSize === 'sm' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'" class="px-2.5 py-1.5 rounded-md text-sm font-medium transition-all">
+                        <i class="fa-solid fa-table-cells text-[10px] mr-1"></i>{{ t('storage_tile_sm') }}
+                    </button>
+                    <button type="button" @click="tileSize = 'md'" :class="tileSize === 'md' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'" class="px-2.5 py-1.5 rounded-md text-sm font-medium transition-all">
+                        <i class="fa-solid fa-table-cells-large text-[10px] mr-1"></i>{{ t('storage_tile_md') }}
+                    </button>
+                    <button type="button" @click="tileSize = 'lg'" :class="tileSize === 'lg' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'" class="px-2.5 py-1.5 rounded-md text-sm font-medium transition-all">
+                        <i class="fa-solid fa-expand text-[10px] mr-1"></i>{{ t('storage_tile_lg') }}
+                    </button>
+                </div>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 flex-wrap">
+                <!-- Find filament -->
+                <div class="relative">
+                    <input type="text" x-model="findQ" @input="runFind()" @keydown.escape="clearFind()"
+                           placeholder="{{ t('storage_find_placeholder') }}"
+                           class="rounded-lg border border-gray-300 pl-8 pr-8 py-1.5 text-sm focus:ring-amber-400 outline-none w-48"
+                           :class="findQ ? 'border-amber-400 bg-amber-50' : ''">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none"></i>
+                    <button x-show="findQ" x-cloak @click="clearFind()" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" :title="'{{ t('storage_find_clear') }}'">
+                        <i class="fa-solid fa-xmark text-xs"></i>
+                    </button>
+                </div>
+                <!-- Find match count badge -->
+                <span x-show="findQ" x-cloak class="text-xs font-semibold px-2 py-1 rounded-full" :class="findCount > 0 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-700'">
+                    <span x-text="findCount"></span> {{ t('storage_find_matches') }}
+                </span>
+                <!-- Slot search -->
                 <div class="relative">
                     <input type="text" x-model="searchQ" placeholder="{{ t('storage_search_slots') }}"
                            class="rounded-lg border border-gray-300 pl-8 pr-8 py-1.5 text-sm focus:ring-blue-500 outline-none w-48">
-                    <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none"></i>
+                    <i class="fa-solid fa-filter absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none"></i>
                     <button x-show="searchQ" x-cloak @click="searchQ = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                         <i class="fa-solid fa-xmark text-xs"></i>
                     </button>
                 </div>
+                <!-- Print -->
+                <button type="button" @click="exportPrintLayout()" class="ui-button-secondary text-sm" title="{{ t('storage_print_layout') }}">
+                    <i class="fa-solid fa-print"></i> {{ t('storage_print_layout') }}
+                </button>
                 <button type="button" class="ui-button-primary" @click="openShelfModal()">
                     <i class="fa-solid fa-plus"></i> {{ t('storage_add_shelf') }}
                 </button>
             </div>
         </div>
 
-        <div class="ui-panel ui-panel-hover relative z-30">
+        <div class="ui-panel ui-panel-hover relative z-30 no-print">
             <h2 class="text-lg font-bold text-gray-800 mb-4">{{ t('storage_filters') }}</h2>
             <form method="GET" action="{{ url_for('storage') }}" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
                 <div class="relative" @click.outside="shelfOpen = false">
@@ -269,12 +325,24 @@
         </div>
     </div>
 
-    <div class="space-y-6">
+    <div id="shelves-container" class="space-y-6">
         {% for row in shelves %}
-        <section class="ui-panel ui-panel-hover relative z-0 border-t-4 {% if row.occupancy_percent < 60 %}border-t-emerald-500/80{% elif row.occupancy_percent < 85 %}border-t-amber-500/80{% else %}border-t-rose-500/80{% endif %}">
+        <section class="shelf-section ui-panel ui-panel-hover relative z-0 border-t-4 {% if row.occupancy_percent < 60 %}border-t-emerald-500/80{% elif row.occupancy_percent < 85 %}border-t-amber-500/80{% else %}border-t-rose-500/80{% endif %}"
+                 data-shelf-id="{{ row.shelf.id }}"
+                 @dragover.prevent="shelfDragOverHandler($event, {{ row.shelf.id }})"
+                 @dragleave="shelfDragLeaveHandler($event)"
+                 @drop.prevent="dropShelf($event, {{ row.shelf.id }})">
             <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4 mb-5">
                 <div>
                     <div class="flex items-center gap-3 flex-wrap">
+                        <!-- Drag handle for shelf reordering -->
+                        <div draggable="true"
+                             @dragstart.stop="startShelfDrag($event, {{ row.shelf.id }})"
+                             @dragend.stop="endShelfDrag($event)"
+                             class="no-print cursor-grab active:cursor-grabbing text-gray-300 hover:text-blue-400 transition-colors p-1 -ml-1 rounded"
+                             title="{{ t('storage_drag_shelf_hint') }}">
+                            <i class="fa-solid fa-grip-vertical text-sm"></i>
+                        </div>
                         <h2 class="text-xl font-bold text-gray-800">{{ row.shelf.name }}</h2>
                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold {% if row.occupancy_percent < 60 %}bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800/40{% elif row.occupancy_percent < 85 %}bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/40{% else %}bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200/50 dark:border-rose-800/40{% endif %}">
                             <i class="fa-solid fa-chart-pie mr-1"></i>
@@ -289,7 +357,7 @@
                     <p class="text-sm text-gray-500 mt-1">{{ row.shelf.slots_count }} {{ t('storage_slots_count') }} · {{ row.shelf.columns }} {{ t('storage_columns') }}</p>
                 </div>
 
-                <details class="ui-card-soft p-4 xl:min-w-[360px]">
+                <details class="shelf-edit-panel ui-card-soft p-4 xl:min-w-[360px] no-print">
                     <summary class="cursor-pointer text-sm font-semibold text-gray-700">{{ t('storage_edit_shelf') }}</summary>
                     <form method="POST" action="{{ url_for('storage_update_shelf', shelf_id=row.shelf.id) }}" class="space-y-3 mt-4">
                         <div>
@@ -321,14 +389,15 @@
 
             <!-- GRID VIEW -->
             <div x-show="viewMode === 'grid'" x-cloak class="overflow-x-auto -mx-1 px-1 pb-2">
-            <div class="grid gap-2" style="grid-template-columns: repeat({{ row.shelf.columns }}, 88px); width: fit-content;">
+            <div class="grid gap-2" :style="'grid-template-columns: repeat({{ row.shelf.columns }}, var(--tile-px)); width: fit-content;'">
                 {% for slot_index in row.slots %}
                 {% set placement = row.slot_map.get(slot_index) %}
-                <div class="storage-slot relative w-[88px] h-[88px] rounded-lg border overflow-hidden
+                <div class="storage-slot relative rounded-lg border overflow-hidden
                      {% if placement %}bg-white border-gray-200
                      {% if has_active_filter and placement.matches_filter %}!border-red-500 ring-2 ring-red-200 animate-pulse
                      {% elif has_active_filter and not placement.matches_filter %}opacity-25{% endif %}
                      {% else %}bg-slate-50 border-dashed border-gray-300{% endif %}"
+                     style="width: var(--tile-px); height: var(--tile-px);"
                      data-search-text="{{ (placement.filament.name ~ ' ' ~ placement.filament.brand.name ~ ' ' ~ placement.filament.material.name)|lower if placement else '' }}"
                      data-slot-key="{{ row.shelf.id }}-{{ slot_index }}"
                      data-slot-shelf="{{ row.shelf.id }}"
@@ -358,7 +427,7 @@
                      @dragover.prevent
                      @dragenter="$el.classList.add('drag-over')"
                      @dragleave="if(!$el.contains($event.relatedTarget)) $el.classList.remove('drag-over')"
-                     @drop="$el.classList.remove('drag-over'); movePlacement($event, {{ row.shelf.id }}, {{ slot_index }})">
+                     @drop.stop="$el.classList.remove('drag-over'); movePlacement($event, {{ row.shelf.id }}, {{ slot_index }})">
                     {% if placement %}
                     <div class="h-1.5 w-full" style="background-color: {{ placement.filament.color.hex_value }}"></div>
                     <div class="p-1 h-[calc(100%-6px)] flex flex-col cursor-move"
@@ -651,7 +720,13 @@ function storageBoard(config) {
         assignFilamentQ: '',
         assignFilamentOpen: false,
         viewMode: localStorage.getItem('storage_view_mode') || 'grid',
+        tileSize: localStorage.getItem('storage_tile_size') || 'md',
+        get tilePx() { return this.tileSize === 'sm' ? 64 : this.tileSize === 'lg' ? 112 : 88; },
         searchQ: '',
+        findQ: '',
+        findCount: 0,
+        shelfDragId: null,
+        shelfDragOverId: null,
         shelf: config?.shelf || '',
         brand: config?.brand || '',
         material: config?.material || '',
@@ -684,7 +759,8 @@ function storageBoard(config) {
                 this.presets = [];
             }
             this.$watch('viewMode', (mode) => { localStorage.setItem('storage_view_mode', mode); });
-            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') this.slotCtxOpen = false; });
+            this.$watch('tileSize', (size) => { localStorage.setItem('storage_tile_size', size); });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { this.slotCtxOpen = false; if (this.findQ) this.clearFind(); } });
             this.$watch('searchQ', (q) => {
                 const q_lc = q.toLowerCase();
                 this.$el.querySelectorAll('[data-search-text]').forEach(function(el) {
@@ -850,6 +926,91 @@ function storageBoard(config) {
             this.slotCtxOpen = false;
             this.openAssignModal(parseInt(this.slotCtxShelfId), parseInt(this.slotCtxSlotIndex), this.slotCtxShelfName);
         },
+        // ── Find filament ───────────────────────────────────────────
+        runFind() {
+            const q = (this.findQ || '').toLowerCase().trim();
+            // Remove previous find highlights
+            document.querySelectorAll('.find-match').forEach(el => el.classList.remove('find-match'));
+            if (!q) { this.findCount = 0; return; }
+            const matches = [];
+            document.querySelectorAll('[data-search-text]').forEach(el => {
+                const text = (el.dataset.searchText || '').toLowerCase();
+                if (text.includes(q) && el.dataset.hName) {
+                    el.classList.add('find-match');
+                    matches.push(el);
+                }
+            });
+            this.findCount = matches.length;
+            if (matches.length > 0) {
+                matches[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        },
+        clearFind() {
+            this.findQ = '';
+            this.findCount = 0;
+            document.querySelectorAll('.find-match').forEach(el => el.classList.remove('find-match'));
+        },
+        // ── Shelf drag-to-reorder ───────────────────────────────────
+        startShelfDrag(event, shelfId) {
+            this.shelfDragId = shelfId;
+            event.dataTransfer.setData('shelf-id', String(shelfId));
+            event.dataTransfer.effectAllowed = 'move';
+            const section = event.currentTarget.closest('.shelf-section');
+            if (section) section.classList.add('shelf-dragging-source');
+        },
+        endShelfDrag(event) {
+            this.shelfDragId = null;
+            this.shelfDragOverId = null;
+            document.querySelectorAll('.shelf-dragging-source, .shelf-drag-over').forEach(el => {
+                el.classList.remove('shelf-dragging-source', 'shelf-drag-over');
+            });
+        },
+        shelfDragOverHandler(event, shelfId) {
+            if (!this.shelfDragId || this.shelfDragId === shelfId) return;
+            if (this.shelfDragOverId !== shelfId) {
+                document.querySelectorAll('.shelf-drag-over').forEach(el => el.classList.remove('shelf-drag-over'));
+                const el = document.querySelector(`.shelf-section[data-shelf-id="${shelfId}"]`);
+                if (el) el.classList.add('shelf-drag-over');
+                this.shelfDragOverId = shelfId;
+            }
+        },
+        shelfDragLeaveHandler(event) {
+            const related = event.relatedTarget;
+            const section = event.currentTarget;
+            if (!related || !section.contains(related)) {
+                section.classList.remove('shelf-drag-over');
+                if (this.shelfDragOverId == section.dataset.shelfId) this.shelfDragOverId = null;
+            }
+        },
+        async dropShelf(event, targetShelfId) {
+            const srcId = event.dataTransfer.getData('shelf-id');
+            if (!srcId || parseInt(srcId) === targetShelfId) {
+                this.endShelfDrag();
+                return;
+            }
+            const container = document.getElementById('shelves-container');
+            const srcSection = container.querySelector(`.shelf-section[data-shelf-id="${srcId}"]`);
+            const dstSection = container.querySelector(`.shelf-section[data-shelf-id="${targetShelfId}"]`);
+            if (!srcSection || !dstSection) { this.endShelfDrag(); return; }
+            // Insert srcSection before dstSection (simple heuristic: always insert before target)
+            const sections = Array.from(container.querySelectorAll('.shelf-section'));
+            const srcIdx = sections.indexOf(srcSection);
+            const dstIdx = sections.indexOf(dstSection);
+            if (srcIdx < dstIdx) {
+                dstSection.parentNode.insertBefore(srcSection, dstSection.nextSibling);
+            } else {
+                dstSection.parentNode.insertBefore(srcSection, dstSection);
+            }
+            this.endShelfDrag();
+            // Persist new order to backend
+            const newOrder = Array.from(container.querySelectorAll('.shelf-section[data-shelf-id]'))
+                                  .map(el => parseInt(el.dataset.shelfId));
+            await fetch('/storage/shelf/reorder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order: newOrder }),
+            });
+        },
         startDrag(event, placementId) {
             this.draggedPlacementId = placementId;
             // Store outside Alpine's reactive system so the raw DOM reference is preserved
@@ -902,6 +1063,8 @@ function storageBoard(config) {
         },
         async movePlacement(event, shelfId, slotIndex) {
             const dstEl = event.currentTarget;
+            // Ignore if a shelf reorder drag is active
+            if (this.shelfDragId) return;
             const placementId = this.draggedPlacementId || event.dataTransfer.getData('text/plain');
             if (!placementId) return;
             // Prefer window._storageDragSrc (set outside Alpine reactivity); fall back to a
@@ -999,6 +1162,137 @@ function storageBoard(config) {
                 srcPlacId ? dstRow.classList.remove('opacity-30') : dstRow.classList.add('opacity-30');
                 dstPlacId ? srcRow.classList.remove('opacity-30') : srcRow.classList.add('opacity-30');
             }
+        },
+        exportPrintLayout() {
+            // Collect shelf data from the live DOM so drag-reordered positions are respected
+            const tilePx = this.tilePx;
+            const sections = Array.from(document.querySelectorAll('#shelves-container .shelf-section'));
+
+            let shelvesHtml = '';
+            sections.forEach(function(section) {
+                const shelfId = section.dataset.shelfId;
+                const nameEl = section.querySelector('h2');
+                const shelfName = nameEl ? nameEl.textContent.trim() : ('Shelf ' + shelfId);
+
+                // Collect badge text (occupancy)
+                const badgeEl = section.querySelector('.shelf-section span.inline-flex');
+                const badge = badgeEl ? badgeEl.textContent.trim() : '';
+
+                // Collect all grid slots (grid view DOM is always rendered, only visibility toggled)
+                const gridWrap = section.querySelector('[x-show="viewMode === \'grid\'"]') || section.querySelector('.overflow-x-auto');
+                if (!gridWrap) return;
+
+                const slots = Array.from(gridWrap.querySelectorAll('.storage-slot'));
+                if (slots.length === 0) return;
+
+                // Determine column count from the inline grid style
+                const gridDiv = gridWrap.querySelector('.grid');
+                let cols = 4;
+                if (gridDiv && gridDiv.style.gridTemplateColumns) {
+                    const m = gridDiv.style.gridTemplateColumns.match(/repeat\((\d+)/);
+                    if (m) cols = parseInt(m[1]);
+                }
+
+                let slotsHtml = '';
+                slots.forEach(function(slot) {
+                    const idx = slot.dataset.slotIndex || '';
+                    const name = slot.dataset.hName || '';
+                    const brand = slot.dataset.hBrand || '';
+                    const mat = slot.dataset.hMat || '';
+                    const color = slot.dataset.hColor || '';
+                    const pct = parseInt(slot.dataset.hPct || '0');
+                    const rem = slot.dataset.hRem || '';
+                    const tot = slot.dataset.hTot || '';
+
+                    if (name) {
+                        const barColor = pct > 50 ? '#10b981' : pct > 20 ? '#f59e0b' : '#ef4444';
+                        slotsHtml += `
+                        <div class="slot occupied">
+                            <div class="slot-color-bar" style="background:${color}"></div>
+                            <div class="slot-body">
+                                <div class="slot-num">#${idx}</div>
+                                <div class="slot-dot" style="background:${color}"></div>
+                                <div class="slot-info">
+                                    <div class="slot-brand">${brand.substring(0, 3).toUpperCase()}</div>
+                                    <div class="slot-name">${name}</div>
+                                    <div class="slot-mat">${mat}</div>
+                                </div>
+                                <div class="slot-footer">
+                                    <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${barColor}"></div></div>
+                                    <span class="bar-pct">${pct}%</span>
+                                </div>
+                            </div>
+                        </div>`;
+                    } else {
+                        slotsHtml += `<div class="slot empty"><span class="slot-empty-num">#${idx}</span></div>`;
+                    }
+                });
+
+                shelvesHtml += `
+                <div class="shelf-wrap">
+                    <div class="shelf-header">
+                        <span class="shelf-name">${shelfName}</span>
+                        ${badge ? `<span class="shelf-badge">${badge}</span>` : ''}
+                    </div>
+                    <div class="shelf-grid" style="grid-template-columns: repeat(${cols}, ${tilePx}px);">
+                        ${slotsHtml}
+                    </div>
+                </div>`;
+            });
+
+            const appTitle = document.title || 'Filament Manager';
+            const now = new Date().toLocaleDateString();
+
+            const html = `<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<title>${appTitle} — {{ t('storage_title') }}</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, -apple-system, sans-serif; background: #fff; color: #111; padding: 16px; }
+h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+.meta { font-size: 11px; color: #6b7280; margin-bottom: 20px; }
+.shelf-wrap { margin-bottom: 28px; break-inside: avoid; page-break-inside: avoid; }
+.shelf-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.shelf-name { font-size: 15px; font-weight: 700; color: #1f2937; }
+.shelf-badge { font-size: 10px; background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; border-radius: 20px; padding: 2px 8px; }
+.shelf-grid { display: grid; gap: 5px; width: fit-content; }
+.slot { width: ${tilePx}px; height: ${tilePx}px; border-radius: 8px; border: 1px solid #e5e7eb; overflow: hidden; position: relative; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+.slot.occupied { background: #fff; border-color: #d1d5db; }
+.slot.empty { background: #f8fafc; border: 1px dashed #d1d5db; display: flex; align-items: center; justify-content: center; }
+.slot-empty-num { font-size: 8px; color: #d1d5db; font-family: monospace; }
+.slot-color-bar { height: 5px; width: 100%; }
+.slot-body { padding: 3px; height: calc(100% - 5px); display: flex; flex-direction: column; gap: 1px; }
+.slot-num { font-size: 7px; color: #9ca3af; font-family: monospace; line-height: 1; }
+.slot-dot { width: 9px; height: 9px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0; margin-top: 1px; }
+.slot-info { flex: 1; min-width: 0; }
+.slot-brand { font-size: 8px; font-weight: 700; color: #6b7280; line-height: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.slot-name { font-size: 8px; color: #374151; line-height: 1.2; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-top: 1px; }
+.slot-mat  { font-size: 7px; color: #9ca3af; line-height: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.slot-footer { margin-top: auto; }
+.bar-track { height: 3px; background: #e5e7eb; border-radius: 2px; overflow: hidden; }
+.bar-fill  { height: 3px; border-radius: 2px; }
+.bar-pct   { font-size: 7px; color: #9ca3af; }
+@media print {
+  body { padding: 8px; }
+  .shelf-wrap { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<h1>{{ t('storage_title') }}</h1>
+<p class="meta">${appTitle} · ${now}</p>
+${shelvesHtml}
+<script>window.onload = function() { window.print(); };<\/script>
+</body>
+</html>`;
+
+            const win = window.open('', '_blank');
+            if (!win) { alert('{{ t("storage_print_popup_blocked") }}'); return; }
+            win.document.open();
+            win.document.write(html);
+            win.document.close();
         },
     };
 }

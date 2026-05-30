@@ -223,7 +223,7 @@
             id: 'storage',
             icon: 'fa-warehouse',
             hasTour: true,
-            endpoints: ['storage_index', 'storage_add_shelf', 'storage_edit_shelf', 'storage_delete_shelf', 'storage_add_slot', 'storage_remove_slot'],
+            endpoints: ['storage_index', 'storage_add_shelf', 'storage_edit_shelf', 'storage_delete_shelf', 'storage_add_slot', 'storage_remove_slot', 'storage_reorder_shelves'],
             title: { cs: 'Úložiště', en: 'Storage' },
             tips: [
                 {
@@ -245,6 +245,27 @@
                     text: {
                         cs: 'Klikněte na prázdný slot a vyberte filament ze seznamu. Filament pak uvidíte i na stránce detailu filamentu v sekci „Umístění na polici". Na jeden slot lze umístit pouze jeden filament.',
                         en: 'Click an empty slot and select a filament from the list. The filament will then also appear on the filament detail page under "Shelf Location". Only one filament can be placed per slot.'
+                    }
+                },
+                {
+                    title: { cs: 'Přeuspořádání polic', en: 'Reordering Shelves' },
+                    text: {
+                        cs: 'Pořadí polic lze měnit přetažením — chytněte ikonu ⠿ vlevo od názvu police a přetáhněte ji na požadovanou pozici. Pořadí je automaticky uloženo.',
+                        en: 'Reorder shelves by drag-and-drop — grab the ⠿ handle to the left of the shelf name and drop it at the desired position. The order is saved automatically.'
+                    }
+                },
+                {
+                    title: { cs: 'Velikost dlaždic a hledání', en: 'Tile Size & Find' },
+                    text: {
+                        cs: 'V panelu nástrojů lze přepínat velikost dlaždic (Malé / Střední / Velké). Pole „Najít filament" okamžitě zvýrazní a přejde na slot s daným filamentem.',
+                        en: 'Use the toolbar to switch tile size (Small / Medium / Large). The "Find filament" field instantly highlights and scrolls to the slot containing the matching filament.'
+                    }
+                },
+                {
+                    title: { cs: 'Tisk rozložení', en: 'Print Layout' },
+                    text: {
+                        cs: 'Tlačítko „Tisk rozložení" otevře tiskový dialog prohlížeče. Veškeré ovládací prvky jsou v tisku skryty — vytiskne se pouze mřížka polic.',
+                        en: 'The "Print layout" button opens the browser print dialog. All controls are hidden during printing — only the shelf grid is printed.'
                     }
                 }
             ]

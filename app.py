@@ -49,7 +49,7 @@ from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
 
-APP_VERSION = '1.90.0'
+APP_VERSION = '1.91.0'
 
 csrf = CSRFProtect()
 

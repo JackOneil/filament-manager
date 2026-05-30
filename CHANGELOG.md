@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.91.0] - 2026-05-30
+### Added
+- **Drag-to-reorder shelves** — Each shelf panel now has a ⠿ drag handle. Shelves can be reordered by dragging them to a new position; the new order is persisted to the database via `POST /storage/shelf/reorder`. Shelf drag events are isolated from slot drag-and-drop so both can coexist without interference.
+- **Tile size selector** — A Small / Medium / Large toggle in the toolbar changes the grid slot size (64 / 88 / 112 px). The selection is persisted in `localStorage` per browser. Slots use a CSS custom property (`--tile-px`) for zero-rerender sizing.
+- **Find filament** — A dedicated amber "Find filament…" search field instantly highlights matching slots with an animated amber outline and auto-scrolls to the first match. A badge shows the total number of matching slots. Separate from the existing dim-based slot search filter.
+- **Print / PDF layout** — A "Print layout" toolbar button calls `window.print()`. `@media print` CSS rules hide the navigation, filter panels, modals, and all UI controls, leaving only the clean shelf grids for printing or saving as PDF.
+- New translation keys in `cs` and `en`: `storage_tile_sm`, `storage_tile_md`, `storage_tile_lg`, `storage_find_placeholder`, `storage_find_matches`, `storage_find_clear`, `storage_print_layout`, `storage_drag_shelf_hint`, `storage_reorder_shelf_label`, `storage_scroll_to_match`.
+
 ## [1.90.0] - 2026-06-18
 ### Added
 - **KPI trend arrows on overview cards** — Each selectable KPI card on the admin overview now shows a coloured trend indicator (arrow + delta value) for metrics that have 7-day movement data: `total_remaining` (net weight change), `total_spools` (net spool change), `active_projects` (new projects created this week). Trend arrows are green for up, red for down, gray for flat.

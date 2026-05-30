@@ -123,6 +123,7 @@ SECTION_BY_ENDPOINT = {
     'storage_delete_shelf': SECTION_STORAGE,
     'storage_assign_slot': SECTION_STORAGE,
     'storage_move_placement': SECTION_STORAGE,
+    'storage_reorder_shelves': SECTION_STORAGE,
     'storage_update_orientation': SECTION_STORAGE,
     'storage_delete_placement': SECTION_STORAGE,
     'settings': SECTION_SETTINGS,
