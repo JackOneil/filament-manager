@@ -113,6 +113,8 @@ def run_migrations(app: Flask) -> None:
         _safe_alter(app, 'ALTER TABLE user ADD COLUMN notify_project_status_changed BOOLEAN NOT NULL DEFAULT 1')
         _safe_alter(app, 'ALTER TABLE user ADD COLUMN notify_project_comment BOOLEAN NOT NULL DEFAULT 1')
         _safe_alter(app, 'ALTER TABLE user ADD COLUMN last_login_at DATETIME DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE user ADD COLUMN preferred_language VARCHAR(10) DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE user ADD COLUMN preferred_theme VARCHAR(10) DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE user_invite ADD COLUMN email VARCHAR(255) DEFAULT NULL')
         _safe_alter(app, "ALTER TABLE user_invite ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user'")
         _safe_alter(app, 'ALTER TABLE user_invite ADD COLUMN section_permissions TEXT DEFAULT NULL')

@@ -332,6 +332,8 @@ def _build_export_data(app, include_files=True):
                 'notify_project_created': user.notify_project_created,
                 'notify_project_status_changed': user.notify_project_status_changed,
                 'notify_project_comment': user.notify_project_comment,
+                'preferred_language': user.preferred_language,
+                'preferred_theme': user.preferred_theme,
                 'created_at': user.created_at.isoformat() if user.created_at else None,
             } for user in User.query.order_by(User.created_at).all()],
 
@@ -881,6 +883,8 @@ def register(app):
                             notify_project_created=user_data.get('notify_project_created', True),
                             notify_project_status_changed=user_data.get('notify_project_status_changed', True),
                             notify_project_comment=user_data.get('notify_project_comment', True),
+                            preferred_language=user_data.get('preferred_language'),
+                            preferred_theme=user_data.get('preferred_theme'),
                             created_at=datetime.fromisoformat(user_data['created_at']) if user_data.get('created_at') else utc_now(),
                         )
                         db.session.add(existing_user)

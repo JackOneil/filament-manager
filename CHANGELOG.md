@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.100.0] - 2026-05-31
+### Added
+- **Account page redesign** — Complete overhaul of the `/account` page with tabbed interface (Profile, Security, Appearance, Notifications), avatar with initials, project statistics sidebar, and password strength meter.
+- **Per-user language preference** — Users can now set their preferred language (cs/en) in the Account → Appearance tab. This overrides the app-wide default for their session only.
+- **Per-user theme preference** — Users can now set their preferred theme (light/dark/auto) in the Account → Appearance tab. This overrides the app-wide default for their session only.
+- **Active session tracking** — New `UserSession` model tracks every login session (IP address, user agent, last activity). The Security tab shows all active sessions with the current session highlighted.
+- **Sign out everywhere** — Users can now sign out all other devices/sessions from the Security tab, keeping only their current session active. Password changes also invalidate all other sessions.
+- **Project statistics** — The account page now shows per-user project counts broken down by status, plus the 5 most recent projects.
+- **Password strength meter** — Client-side visual indicator (Very weak → Very strong) when changing passwords in the Security tab.
+
+### Changed
+- **Session validation** — `ensure_endpoint_access()` now validates the Flask session against the `UserSession` table on every request. Invalidated sessions (from sign-out-everywhere or password change) force re-login.
+- **Context processor** — Language and theme now check user preferences first, falling back to `AppSetting` defaults when not set.
+
 ## [1.99.1] - 2026-05-31
 ### Changed
 - **Eliminated deferred cross-route imports (#8)** — Moved 5 shared helper functions out of route modules and into `utils.py`, removing all deferred `from routes.X import` statements inside function bodies:

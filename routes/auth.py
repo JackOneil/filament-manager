@@ -1,7 +1,7 @@
 from datetime import datetime
 from utils import utc_now
 
-from flask import abort, flash, jsonify, redirect, render_template, request, url_for, Blueprint
+from flask import abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for, Blueprint
 from sqlalchemy import or_
 
 from auth import (
@@ -9,7 +9,9 @@ from auth import (
     create_notification,
     default_section_permissions,
     get_current_user,
+    get_user_sessions,
     hash_password,
+    invalidate_all_other_sessions,
     invite_is_valid,
     is_admin,
     login_user,
@@ -23,7 +25,8 @@ from auth import (
     verify_password,
 )
 from database import db
-from models import AuditLog, Notification, User, UserInvite
+from models import AuditLog, Notification, Project, User, UserInvite, UserSession
+from sqlalchemy import func
 
 
 def _bool_field(name):
@@ -372,24 +375,87 @@ def register(app):
         user = get_current_user()
         if request.method == 'POST':
             action = request.form.get('action', '')
-            if action == 'profile':
-                user.name = request.form.get('name', '').strip() or user.name
-                user.notify_project_created = _bool_field('notify_project_created')
-                user.notify_project_status_changed = _bool_field('notify_project_status_changed')
-                user.notify_project_comment = _bool_field('notify_project_comment')
-                db.session.commit()
-                flash('account_updated', 'success')
-            elif action == 'password':
-                current_password = request.form.get('current_password', '')
-                new_password = request.form.get('new_password', '')
-                if not verify_password(user, current_password) or len(new_password) < 8:
-                    flash('account_password_invalid', 'error')
-                else:
-                    user.password_hash = hash_password(new_password)
+            try:
+                if action == 'profile':
+                    user.name = request.form.get('name', '').strip() or user.name
+                    user.notify_project_created = _bool_field('notify_project_created')
+                    user.notify_project_status_changed = _bool_field('notify_project_status_changed')
+                    user.notify_project_comment = _bool_field('notify_project_comment')
                     db.session.commit()
-                    flash('account_password_updated', 'success')
+                    flash('account_updated', 'success')
+                elif action == 'preferences':
+                    lang = request.form.get('preferred_language', '')
+                    user.preferred_language = lang if lang in ('cs', 'en') else None
+                    theme = request.form.get('preferred_theme', '')
+                    user.preferred_theme = theme if theme in ('light', 'dark', 'auto') else None
+                    db.session.commit()
+                    flash('account_preferences_updated', 'success')
+                elif action == 'password':
+                    current_password = request.form.get('current_password', '')
+                    new_password = request.form.get('new_password', '')
+                    if not verify_password(user, current_password) or len(new_password) < 8:
+                        flash('account_password_invalid', 'error')
+                    else:
+                        user.password_hash = hash_password(new_password)
+                        db.session.commit()
+                        # Invalidate all other sessions so old passwords are unusable
+                        session_key = session.get('_session_key', '')
+                        if session_key:
+                            invalidate_all_other_sessions(user, session_key)
+                        flash('account_password_updated', 'success')
+                elif action == 'sign_out_everywhere':
+                    session_key = session.get('_session_key', '')
+                    if session_key:
+                        invalidate_all_other_sessions(user, session_key)
+                    flash('account_sessions_invalidated', 'success')
+                else:
+                    flash('account_unknown_action', 'error')
+            except Exception as e:
+                db.session.rollback()
+                current_app.logger.exception('Account settings update failed')
+                flash('account_update_failed', 'error')
             return redirect(url_for('account_settings'))
-        return render_template('account.html', user=user, permissions=user_permissions(user))
+
+        # GET: compute stats and load sessions
+        from flask import session as flask_session
+
+        # Project stats for this user
+        if is_admin(user):
+            project_query = Project.query
+        else:
+            from sqlalchemy import or_
+            project_query = Project.query.filter(
+                or_(Project.owner_user_id == user.id, Project.created_by_user_id == user.id)
+            )
+
+        status_counts = dict(
+            db.session.query(Project.status, func.count(Project.id))
+            .filter(project_query.whereclause)
+            .group_by(Project.status)
+            .all()
+        )
+        total_projects = project_query.count()
+        recent_projects = (
+            project_query
+            .order_by(Project.created_at.desc())
+            .limit(5)
+            .all()
+        )
+
+        # Active sessions
+        sessions = get_user_sessions(user)
+        current_session_key = flask_session.get('_session_key', '')
+
+        return render_template(
+            'account.html',
+            user=user,
+            permissions=user_permissions(user),
+            sessions=sessions,
+            current_session_key=current_session_key,
+            status_counts=status_counts,
+            total_projects=total_projects,
+            recent_projects=recent_projects,
+        )
 
     _VALID_NOTIFICATION_KINDS = {'project_new', 'project_status', 'project_comment', 'info', 'project'}
 

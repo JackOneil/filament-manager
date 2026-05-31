@@ -549,6 +549,50 @@
             ]
         },
         {
+            id: 'account',
+            icon: 'fa-user-gear',
+            hasTour: false,
+            endpoints: ['account_settings', 'notifications_index', 'notification_mark_read', 'notification_mark_all_read', 'notification_delete', 'notification_delete_read'],
+            title: { cs: 'Účet', en: 'Account' },
+            tips: [
+                {
+                    title: { cs: 'Přehled účtu', en: 'Account Overview' },
+                    text: {
+                        cs: 'Stránka účtu zobrazuje vaše jméno, e-mail, roli a datum posledního přihlášení. V levém sloupci najdete statistiky projektů a poslední projekty.',
+                        en: 'The account page shows your name, email, role, and last login date. The left column displays project statistics and recent projects.'
+                    }
+                },
+                {
+                    title: { cs: 'Záložky nastavení', en: 'Settings Tabs' },
+                    text: {
+                        cs: 'Nastavení účtu je rozděleno do záložek: Profil (jméno), Zabezpečení (změna hesla, aktivní relace), Vzhled (jazyk a motiv) a Notifikace (co vás má upozornit).',
+                        en: 'Account settings are organised into tabs: Profile (name), Security (password change, active sessions), Appearance (language and theme), and Notifications (what to alert you about).'
+                    }
+                },
+                {
+                    title: { cs: 'Aktivní relace a odhlášení zařízení', en: 'Active Sessions and Sign Out Everywhere' },
+                    text: {
+                        cs: 'V záložce Zabezpečení vidíte všechna zařízení, na kterých jste přihlášeni. Tlačítkem „Odhlásit všechna ostatní zařízení" můžete všechny ostatní relace ukončit — vaše aktuální zůstane aktivní.',
+                        en: 'The Security tab shows all devices where you are logged in. Use "Sign out all other devices" to end all other sessions — your current one stays active.'
+                    }
+                },
+                {
+                    title: { cs: 'Síla hesla', en: 'Password Strength' },
+                    text: {
+                        cs: 'Při změně hesla se zobrazí ukazatel síly — od „Velmi slabé" po „Velmi silné". Silné heslo by mělo mít alespoň 12 znaků, kombinaci velkých a malých písmen, číslic a speciálních znaků.',
+                        en: 'When changing your password, a strength indicator appears — from "Very weak" to "Very strong". A strong password should have at least 12 characters, a mix of upper/lower case, digits, and special characters.'
+                    }
+                },
+                {
+                    title: { cs: 'Osobní nastavení jazyka a motivu', en: 'Personal Language and Theme' },
+                    text: {
+                        cs: 'V záložce Vzhled si můžete nastavit preferovaný jazyk (čeština / English) a motiv (světlý / tmavý / auto). Toto nastavení přepíše výchozí hodnoty aplikace jen pro váš účet.',
+                        en: 'In the Appearance tab you can set your preferred language (Čeština / English) and theme (light / dark / auto). These override the app defaults for your account only.'
+                    }
+                }
+            ]
+        },
+        {
             id: 'maintenance',
             icon: 'fa-wrench',
             hasTour: true,

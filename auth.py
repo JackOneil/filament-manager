@@ -10,7 +10,7 @@ from sqlalchemy import inspect as sa_inspect
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from database import db
-from models import AuditLog, Notification, User, UserInvite
+from models import AuditLog, Notification, User, UserInvite, UserSession
 
 SECTION_OVERVIEW = 'overview'
 SECTION_FILAMENTS = 'filaments'
@@ -291,12 +291,27 @@ def login_user(user, plain_password=None):
     user.last_login_at = utc_now()
     if plain_password and password_needs_rehash(user.password_hash):
         user.password_hash = hash_password(plain_password)
+    session_key = secrets.token_hex(20)
+    user_session = UserSession(
+        user_id=user.id,
+        session_key=session_key,
+        ip_address=_audit_client_ip(),
+        user_agent=(request.headers.get('User-Agent') or '')[:255] or None,
+    )
+    db.session.add(user_session)
     db.session.commit()
     session['user_id'] = user.id
+    session['_session_key'] = session_key
     session.permanent = True
 
 
 def logout_user():
+    session_key = session.get('_session_key')
+    if session_key:
+        user_session = UserSession.query.filter_by(session_key=session_key).first()
+        if user_session:
+            db.session.delete(user_session)
+            db.session.commit()
     session.clear()
 
 
@@ -335,6 +350,24 @@ def ensure_endpoint_access():
         logout_user()
         flash('auth_account_disabled', 'error')
         return redirect(url_for('login'))
+
+    # Validate active session (supports sign-out-everywhere)
+    session_key = session.get('_session_key')
+    if session_key:
+        user_session = UserSession.query.filter_by(session_key=session_key).first()
+        if user_session:
+            # Update last activity (throttle to once per minute to reduce DB writes)
+            now_ts = utc_now()
+            if not user_session.last_activity_at or (now_ts - user_session.last_activity_at).total_seconds() > 60:
+                user_session.last_activity_at = now_ts
+                try:
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+        else:
+            # Session was invalidated (sign-out-everywhere) — force re-login
+            session.clear()
+            return redirect(url_for('login', next=request.url))
 
     section = SECTION_BY_ENDPOINT.get(endpoint)
     if section == SECTION_NOTIFICATIONS:
@@ -592,6 +625,28 @@ def _audit_finish_request(response):
         db.session.rollback()
         current_app.logger.warning('Audit log write failed: %s', exc)
     return response
+
+
+def get_user_sessions(user):
+    """Return all active sessions for a user, newest first."""
+    return (
+        UserSession.query
+        .filter_by(user_id=user.id)
+        .order_by(UserSession.last_activity_at.desc())
+        .all()
+    )
+
+
+def invalidate_all_other_sessions(user, keep_session_key):
+    """Delete all sessions for the user except the one with keep_session_key.
+    Returns the number of sessions deleted."""
+    deleted = (
+        UserSession.query
+        .filter(UserSession.user_id == user.id, UserSession.session_key != keep_session_key)
+        .delete(synchronize_session='fetch')
+    )
+    db.session.commit()
+    return deleted
 
 
 def init_app(app):

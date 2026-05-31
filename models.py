@@ -13,6 +13,8 @@ class User(db.Model):
     notify_project_created = db.Column(db.Boolean, nullable=False, default=True)
     notify_project_status_changed = db.Column(db.Boolean, nullable=False, default=True)
     notify_project_comment = db.Column(db.Boolean, nullable=False, default=True)
+    preferred_language = db.Column(db.String(10), nullable=True)  # cs, en, or NULL (app default)
+    preferred_theme = db.Column(db.String(10), nullable=True)  # light, dark, auto, or NULL (app default)
     created_at = db.Column(db.DateTime, default=_utc_now)
     last_login_at = db.Column(db.DateTime, nullable=True, index=True)
 
@@ -48,6 +50,22 @@ class Notification(db.Model):
 
     def __repr__(self):
         return f'<Notification {self.id} user={self.user_id} {self.kind!r}>'
+
+
+class UserSession(db.Model):
+    """Tracks active user sessions for security overview and sign-out-everywhere."""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False, index=True)
+    session_key = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    ip_address = db.Column(db.String(64), nullable=True)
+    user_agent = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime, default=_utc_now)
+    last_activity_at = db.Column(db.DateTime, default=_utc_now, index=True)
+
+    user = db.relationship('User', backref=db.backref('sessions', lazy=True, cascade='all, delete-orphan'))
+
+    def __repr__(self):
+        return f'<UserSession {self.id} user={self.user_id} key={self.session_key[:8]}...>'
 
 
 class AuditLog(db.Model):

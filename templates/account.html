@@ -1,22 +1,237 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto space-y-6">
+<div x-data="accountApp()" class="max-w-4xl mx-auto space-y-6">
     <div class="page-hero">
         <h1 class="page-title"><span class="page-title-icon"><i class="fa-solid fa-user-gear"></i></span><span>{{ t('auth_account') }}</span></h1>
         <p>{{ t('account_desc') }}</p>
     </div>
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <form method="POST" class="ui-panel space-y-4">
-            <input type="hidden" name="action" value="profile">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('auth_name') }}</label>
-                <input type="text" name="name" value="{{ user.name }}" class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <!-- Left sidebar: avatar + stats -->
+        <div class="space-y-4">
+            <!-- Avatar card -->
+            <div class="ui-panel text-center space-y-3">
+                <div class="mx-auto w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg"
+                     style="background: linear-gradient(135deg, var(--ui-brand), {{ user.email|hue_from }});">
+                    {{ user.name[0].upper() if user.name else '?' }}
+                </div>
+                <div>
+                    <div class="font-semibold text-lg">{{ user.name }}</div>
+                    <div class="text-sm text-gray-500">{{ user.email }}</div>
+                    {% if user.role == 'admin' %}
+                    <span class="inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">{{ t('users_role_admin') }}</span>
+                    {% else %}
+                    <span class="inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">{{ t('users_role_user') }}</span>
+                    {% endif %}
+                </div>
+                {% if user.last_login_at %}
+                <div class="text-xs text-gray-400 pt-1 border-t border-gray-100 dark:border-gray-700">
+                    {{ t('account_last_login') }}: {{ user.last_login_at|fmt_dt }}
+                </div>
+                {% endif %}
             </div>
-            <div class="text-sm text-gray-500">{{ user.email }}</div>
-            <div>
-                <div class="ui-label mb-2">{{ t('notifications_prefs_heading') }}</div>
-                <p class="text-xs text-gray-400 mb-3">{{ t('notifications_prefs_desc') }}</p>
+
+            <!-- Project stats card -->
+            <div class="ui-panel space-y-3">
+                <div class="ui-label">{{ t('account_my_projects') }}</div>
+                {% if total_projects > 0 %}
+                <div class="text-3xl font-bold" style="color: var(--ui-brand);">{{ total_projects }}</div>
+                <div class="grid grid-cols-2 gap-2 text-sm">
+                    {% set status_labels = {
+                        'NEW': ('account_status_new', 'text-blue-500', 'bg-blue-50 dark:bg-blue-950'),
+                        'PENDING_APPROVAL': ('account_status_pending', 'text-amber-500', 'bg-amber-50 dark:bg-amber-950'),
+                        'APPROVED': ('account_status_approved', 'text-emerald-500', 'bg-emerald-50 dark:bg-emerald-950'),
+                        'PRINTING': ('account_status_printing', 'text-violet-500', 'bg-violet-50 dark:bg-violet-950'),
+                        'DONE': ('account_status_done', 'text-gray-500', 'bg-gray-50 dark:bg-gray-800'),
+                        'REJECTED': ('account_status_rejected', 'text-red-500', 'bg-red-50 dark:bg-red-950'),
+                    } %}
+                    {% for status, count in status_counts|dictsort %}
+                    {% set info = status_labels.get(status, (None, 'text-gray-400', 'bg-gray-50')) %}
+                    <div class="px-2 py-1.5 rounded-lg flex items-center gap-2 {{ info[2] }}">
+                        <span class="w-2 h-2 rounded-full {{ info[1] }}"></span>
+                        <span class="flex-1 text-xs">{{ t(info[0]) if info[0] else status }}</span>
+                        <span class="font-semibold text-xs">{{ count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-sm text-gray-400 italic">{{ t('account_no_projects') }}</div>
+                {% endif %}
+                {% if recent_projects %}
+                <div class="pt-2 border-t border-gray-100 dark:border-gray-700">
+                    <div class="text-xs font-medium text-gray-500 mb-2">{{ t('account_recent_projects') }}</div>
+                    {% for proj in recent_projects %}
+                    <a href="{{ url_for('project_detail', id=proj.id) }}" class="block text-sm py-1 text-gray-700 dark:text-gray-300 hover:text-[var(--ui-brand)] truncate transition">
+                        <span class="text-xs text-gray-400">{{ proj.created_at|fmt_dt }}</span> — {{ proj.name }}
+                    </a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Right content: tabs -->
+        <div class="xl:col-span-2">
+            <!-- Tab bar -->
+            <nav class="flex gap-0 border-b border-gray-200 dark:border-gray-700 mb-4">
+                <button @click="activeTab = 'profile'"
+                        :class="activeTab === 'profile' ? 'border-[var(--ui-brand)] text-[var(--ui-brand)]' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+                        class="px-4 py-2.5 text-sm font-medium border-b-2 transition">
+                    <i class="fa-solid fa-user mr-1.5"></i>{{ t('account_tab_profile') }}
+                </button>
+                <button @click="activeTab = 'security'"
+                        :class="activeTab === 'security' ? 'border-[var(--ui-brand)] text-[var(--ui-brand)]' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+                        class="px-4 py-2.5 text-sm font-medium border-b-2 transition">
+                    <i class="fa-solid fa-shield-halved mr-1.5"></i>{{ t('account_tab_security') }}
+                </button>
+                <button @click="activeTab = 'appearance'"
+                        :class="activeTab === 'appearance' ? 'border-[var(--ui-brand)] text-[var(--ui-brand)]' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+                        class="px-4 py-2.5 text-sm font-medium border-b-2 transition">
+                    <i class="fa-solid fa-palette mr-1.5"></i>{{ t('account_tab_appearance') }}
+                </button>
+                <button @click="activeTab = 'notifications'"
+                        :class="activeTab === 'notifications' ? 'border-[var(--ui-brand)] text-[var(--ui-brand)]' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+                        class="px-4 py-2.5 text-sm font-medium border-b-2 transition">
+                    <i class="fa-solid fa-bell mr-1.5"></i>{{ t('account_tab_notifications') }}
+                </button>
+            </nav>
+
+            <!-- Tab: Profile -->
+            <form method="POST" x-show="activeTab === 'profile'" class="space-y-4">
+                <input type="hidden" name="action" value="profile">
+                <div class="ui-panel space-y-4">
+                    <div class="ui-label">{{ t('account_profile_heading') }}</div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ t('auth_name') }}</label>
+                        <input type="text" name="name" value="{{ user.name }}" class="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-2.5 bg-white dark:bg-gray-800 dark:text-white">
+                    </div>
+                    <div class="text-sm text-gray-500">{{ user.email }}</div>
+                    <div class="flex items-center gap-2 text-xs text-gray-400">
+                        <i class="fa-solid fa-calendar"></i>
+                        {{ t('account_member_since') }}: {{ user.created_at|fmt_dt if user.created_at else '—' }}
+                    </div>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-semibold transition">{{ t('save_changes') }}</button>
+                </div>
+            </form>
+
+            <!-- Tab: Security -->
+            <div x-show="activeTab === 'security'" class="space-y-6">
+                <!-- Password change -->
+                <form method="POST" class="ui-panel space-y-4">
+                    <input type="hidden" name="action" value="password">
+                    <div class="ui-label">{{ t('auth_password_change') }}</div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ t('auth_current_password') }}</label>
+                        <input type="password" name="current_password" x-model="currentPassword" class="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-2.5 bg-white dark:bg-gray-800 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{{ t('auth_new_password') }}</label>
+                        <input type="password" name="new_password" minlength="8" x-model="newPassword" @input="checkStrength()" class="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-2.5 bg-white dark:bg-gray-800 dark:text-white">
+                        <!-- Password strength meter -->
+                        <div class="mt-2 space-y-1" x-show="newPassword.length > 0">
+                            <div class="flex gap-1">
+                                <div class="h-1.5 flex-1 rounded-full transition-colors"
+                                     :class="strengthScore >= 1 ? strengthColor : 'bg-gray-200 dark:bg-gray-700'"></div>
+                                <div class="h-1.5 flex-1 rounded-full transition-colors"
+                                     :class="strengthScore >= 2 ? strengthColor : 'bg-gray-200 dark:bg-gray-700'"></div>
+                                <div class="h-1.5 flex-1 rounded-full transition-colors"
+                                     :class="strengthScore >= 3 ? strengthColor : 'bg-gray-200 dark:bg-gray-700'"></div>
+                                <div class="h-1.5 flex-1 rounded-full transition-colors"
+                                     :class="strengthScore >= 4 ? strengthColor : 'bg-gray-200 dark:bg-gray-700'"></div>
+                            </div>
+                            <div class="text-xs" :class="strengthLabelColor" x-text="strengthLabel"></div>
+                        </div>
+                    </div>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-semibold transition">{{ t('account_password_update') }}</button>
+                </form>
+
+                <!-- Active Sessions -->
+                <div class="ui-panel space-y-4">
+                    <div class="ui-label">{{ t('account_active_sessions') }}</div>
+                    {% if sessions %}
+                    <div class="space-y-2">
+                        {% for s in sessions %}
+                        <div class="flex items-center gap-3 p-3 rounded-lg {% if s.session_key == current_session_key %}bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800{% else %}bg-gray-50 dark:bg-gray-800{% endif %}">
+                            <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                                 style="background: linear-gradient(135deg, var(--ui-brand), {{ s.session_key|hue_from }});">
+                                {{ user.name[0].upper() if user.name else '?' }}
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-sm font-medium truncate">
+                                    {{ s.user_agent|truncate(60) if s.user_agent else t('account_session_unknown') }}
+                                    {% if s.session_key == current_session_key %}
+                                    <span class="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">{{ t('account_session_current') }}</span>
+                                    {% endif %}
+                                </div>
+                                <div class="text-xs text-gray-400">
+                                    {{ s.ip_address or '—' }} &middot; {{ t('account_session_last_active') }}: {% if s.last_activity_at %}{{ s.last_activity_at|fmt_dt }}{% else %}{{ s.created_at|fmt_dt }}{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-sm text-gray-400 italic">{{ t('account_no_sessions') }}</div>
+                    {% endif %}
+                    {% if sessions|length > 1 %}
+                    <form method="POST" class="pt-2 border-t border-gray-100 dark:border-gray-700">
+                        <input type="hidden" name="action" value="sign_out_everywhere">
+                        <button type="submit" class="text-sm text-red-600 hover:text-red-700 font-medium transition">
+                            <i class="fa-solid fa-right-from-bracket mr-1"></i>{{ t('account_sign_out_everywhere') }}
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Tab: Appearance -->
+            <form method="POST" x-show="activeTab === 'appearance'" class="ui-panel space-y-4">
+                <input type="hidden" name="action" value="preferences">
+                <div class="ui-label">{{ t('account_appearance_heading') }}</div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{ t('account_preferred_language') }}</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="ui-card-soft px-4 py-3 flex items-center gap-3 cursor-pointer rounded-xl">
+                            <input type="radio" name="preferred_language" value="cs" {% if not user.preferred_language or user.preferred_language == 'cs' %}checked{% endif %} class="accent-[var(--ui-brand)]">
+                            <span>{{ t('account_lang_cs') }}</span>
+                        </label>
+                        <label class="ui-card-soft px-4 py-3 flex items-center gap-3 cursor-pointer rounded-xl">
+                            <input type="radio" name="preferred_language" value="en" {% if user.preferred_language == 'en' %}checked{% endif %} class="accent-[var(--ui-brand)]">
+                            <span>{{ t('account_lang_en') }}</span>
+                        </label>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1">{{ t('account_lang_default_hint') }}</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{ t('account_preferred_theme') }}</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <label class="ui-card-soft px-4 py-3 flex items-center gap-3 cursor-pointer rounded-xl">
+                            <input type="radio" name="preferred_theme" value="light" {% if not user.preferred_theme or user.preferred_theme == 'light' %}checked{% endif %} class="accent-[var(--ui-brand)]">
+                            <i class="fa-solid fa-sun text-amber-500"></i>
+                            <span>{{ t('account_theme_light') }}</span>
+                        </label>
+                        <label class="ui-card-soft px-4 py-3 flex items-center gap-3 cursor-pointer rounded-xl">
+                            <input type="radio" name="preferred_theme" value="dark" {% if user.preferred_theme == 'dark' %}checked{% endif %} class="accent-[var(--ui-brand)]">
+                            <i class="fa-solid fa-moon text-indigo-400"></i>
+                            <span>{{ t('account_theme_dark') }}</span>
+                        </label>
+                        <label class="ui-card-soft px-4 py-3 flex items-center gap-3 cursor-pointer rounded-xl">
+                            <input type="radio" name="preferred_theme" value="auto" {% if user.preferred_theme == 'auto' %}checked{% endif %} class="accent-[var(--ui-brand)]">
+                            <i class="fa-solid fa-circle-half-stroke text-gray-500"></i>
+                            <span>{{ t('account_theme_auto') }}</span>
+                        </label>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1">{{ t('account_theme_default_hint') }}</p>
+                </div>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-semibold transition">{{ t('save_changes') }}</button>
+            </form>
+
+            <!-- Tab: Notifications -->
+            <form method="POST" x-show="activeTab === 'notifications'" class="ui-panel space-y-4">
+                <input type="hidden" name="action" value="profile">
+                <div class="ui-label">{{ t('notifications_prefs_heading') }}</div>
+                <p class="text-xs text-gray-400">{{ t('notifications_prefs_desc') }}</p>
                 <div class="grid grid-cols-1 gap-2 text-sm">
                     <label class="ui-card-soft px-3 py-2 flex items-center gap-3 cursor-pointer">
                         <input type="checkbox" name="notify_project_created" {% if user.notify_project_created %}checked{% endif %} class="accent-[var(--ui-brand)]">
@@ -34,22 +249,56 @@
                         <span>{{ t('notify_project_comment') }}</span>
                     </label>
                 </div>
-            </div>
-            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-semibold transition">{{ t('save_changes') }}</button>
-        </form>
-        <form method="POST" class="ui-panel space-y-4">
-            <input type="hidden" name="action" value="password">
-            <div class="ui-label">{{ t('auth_password_change') }}</div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('auth_current_password') }}</label>
-                <input type="password" name="current_password" class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('auth_new_password') }}</label>
-                <input type="password" name="new_password" minlength="8" class="w-full border border-gray-300 rounded-xl px-4 py-2.5">
-            </div>
-            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-semibold transition">{{ t('account_password_update') }}</button>
-        </form>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-semibold transition">{{ t('save_changes') }}</button>
+            </form>
+        </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('alpine:init', function() {
+    Alpine.data('accountApp', function() {
+        return {
+            activeTab: 'profile',
+            currentPassword: '',
+            newPassword: '',
+            strengthScore: 0,
+            strengthLabel: '',
+            strengthColor: 'bg-gray-300',
+            strengthLabelColor: 'text-gray-400',
+
+            checkStrength() {
+                const pwd = this.newPassword || '';
+                if (pwd.length === 0) {
+                    this.strengthScore = 0;
+                    this.strengthLabel = '';
+                    return;
+                }
+                let score = 0;
+                if (pwd.length >= 8) score++;
+                if (pwd.length >= 12) score++;
+                if (/[a-z]/.test(pwd) && /[A-Z]/.test(pwd)) score++;
+                if (/\d/.test(pwd)) score++;
+                if (/[^a-zA-Z0-9]/.test(pwd)) score++;
+
+                this.strengthScore = Math.min(score, 4);
+
+                const labels = [
+                    '{{ t("account_pw_very_weak") }}',
+                    '{{ t("account_pw_weak") }}',
+                    '{{ t("account_pw_medium") }}',
+                    '{{ t("account_pw_strong") }}',
+                    '{{ t("account_pw_very_strong") }}'
+                ];
+                const colors = ['bg-red-500', 'bg-orange-500', 'bg-amber-500', 'bg-emerald-500', 'bg-emerald-600'];
+                const labelColors = ['text-red-500', 'text-orange-500', 'text-amber-500', 'text-emerald-500', 'text-emerald-600'];
+
+                this.strengthLabel = labels[score] || '';
+                this.strengthColor = colors[score] || 'bg-gray-300';
+                this.strengthLabelColor = labelColors[score] || 'text-gray-400';
+            }
+        };
+    });
+});
+</script>
 {% endblock %}

@@ -6,9 +6,10 @@ from datetime import timedelta
 import requests
 from flask import render_template, request, redirect, url_for, Blueprint, flash, jsonify
 from database import db
+from auth import get_current_user
 from models import (
     Brand, Color, Material, AppSetting, Filament, Project,
-    BambuPrinter, PrusaPrinter,
+    BambuPrinter, PrusaPrinter, User,
 )
 from utils import (
     bambu_api_base,
@@ -525,12 +526,23 @@ def register(app):
 
     @bp.route('/toggle-theme', methods=['POST'])
     def toggle_theme():
-        setting = AppSetting.query.first()
-        if setting:
-            new_theme = 'light' if setting.theme == 'dark' else 'dark'
-            setting.theme = new_theme
+        user = get_current_user()
+        # If the user has a personal theme preference, cycle that instead
+        if user and user.preferred_theme:
+            user.preferred_theme = {
+                'light': 'dark',
+                'dark': 'light',
+                'auto': 'light',
+            }.get(user.preferred_theme, 'light')
             db.session.commit()
-            app.logger.debug(f"Theme changed to: {new_theme}")
+            app.logger.debug(f"User theme changed to: {user.preferred_theme}")
+        else:
+            setting = AppSetting.query.first()
+            if setting:
+                new_theme = 'light' if setting.theme == 'dark' else 'dark'
+                setting.theme = new_theme
+                db.session.commit()
+                app.logger.debug(f"Global theme changed to: {new_theme}")
         return redirect(request.referrer or url_for('index'))
 
     @bp.route('/onboarding/dismiss', methods=['POST'])

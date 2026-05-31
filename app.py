@@ -50,7 +50,7 @@ from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
 
-APP_VERSION = '1.99.1'
+APP_VERSION = '1.100.0'
 
 csrf = CSRFProtect()
 
@@ -165,14 +165,28 @@ def create_app(test_config=None) -> Flask:
         except (ZoneInfoNotFoundError, Exception):
             return value.strftime(fmt)
 
+    @app.template_filter('hue_from')
+    def _filter_hue_from(value):
+        """Derive a deterministic HSL hue (0-360) from a string."""
+        if not value:
+            return 'hsl(200, 60%, 50%)'
+        h = hash(str(value)) % 360
+        return f'hsl({h}, 60%, 50%)'
+
     @app.context_processor
     def inject_globals():
         setting = get_settings()
+        current_user = get_current_user()
         lang = setting.lang if setting else 'cs'
+        # Per-user language override
+        if current_user and current_user.preferred_language:
+            lang = current_user.preferred_language
         currency = setting.currency if setting and setting.currency else 'CZK'
         theme = setting.theme if setting and setting.theme else 'light'
+        # Per-user theme override
+        if current_user and current_user.preferred_theme:
+            theme = current_user.preferred_theme
         nav_palette = setting.nav_palette if setting and setting.nav_palette else 'teal'
-        current_user = get_current_user()
 
         def t(key):
             return TRANSLATIONS.get(lang, TRANSLATIONS['cs']).get(key, key)
