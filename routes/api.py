@@ -5,7 +5,7 @@ from sqlalchemy.orm import joinedload
 from auth import get_current_user, is_admin
 from database import db
 from models import Filament, Brand, Project, PrusaPrinter, BambuPrinter
-from utils import collect_usage_windows, collect_sparkline_data, compute_stock_status, escape_like, generate_sparkline_svg_path, get_filament_tags, get_settings
+from utils import collect_usage_windows, collect_sparkline_data, compute_stock_status, escape_like, generate_sparkline_svg_path, get_filament_tags, get_live_printers, get_settings
 
 
 def register(app):
@@ -237,8 +237,7 @@ def register(app):
         if not user or not is_admin(user):
             from flask import abort
             abort(403)
-        from routes.inventory import _live_printers
-        live = _live_printers()
+        live = get_live_printers()
         html = render_template('_live_printers_partial.html', live_printers=live)
         return jsonify({'html': html})
 

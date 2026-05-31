@@ -11,14 +11,17 @@ from models import (
     BambuPrinter, PrusaPrinter,
 )
 from utils import (
+    bambu_api_base,
     build_action_center,
     decrypt_token,
     encrypt_token,
     format_tags,
     parse_sync_status,
+    prusa_test_connection,
     remove_tag,
     top_tags,
     utc_now,
+    validate_printer_host,
 )
 
 
@@ -267,9 +270,8 @@ def register(app):
                     app.logger.debug(f"Printer/energy settings updated: kwh={setting.kwh_price}, power={setting.printer_power}W")
 
                 elif action == 'add_prusa_printer':
-                    from routes.prusa import _validate_host, do_test_connection
                     host_raw = request.form.get('host', '').strip()
-                    host = _validate_host(host_raw)
+                    host = validate_printer_host(host_raw)
                     alias = request.form.get('name', '').strip()
                     api_key_raw = request.form.get('api_key', '').strip()
                     if not host or not alias or not api_key_raw:
@@ -288,7 +290,7 @@ def register(app):
                             host=host,
                             api_key=encrypt_token(api_key_raw),
                         )
-                        test_result = do_test_connection(test_probe)
+                        test_result = prusa_test_connection(test_probe)
                         if not test_result.get('ok'):
                             raise ValueError('settings_prusa_test_failed')
 
@@ -303,11 +305,10 @@ def register(app):
                     success_key = 'settings_prusa_test_passed_saved'
 
                 elif action == 'edit_prusa_printer':
-                    from routes.prusa import _validate_host
                     printer = db.session.get(PrusaPrinter, request.form.get('id', type=int))
                     if printer:
                         new_name = request.form.get('name', '').strip()
-                        new_host = _validate_host(request.form.get('host', '').strip())
+                        new_host = validate_printer_host(request.form.get('host', '').strip())
                         new_key = request.form.get('api_key', '').strip()
                         if new_name:
                             printer.name = new_name
@@ -481,7 +482,6 @@ def register(app):
 
     @bp.route('/settings/bambu/test', methods=['POST'])
     def settings_bambu_test():
-        from routes.bambu import _api_base
 
         setting = _get_or_create_settings()
         token_raw = request.form.get('bambu_token', '').strip()
@@ -496,7 +496,7 @@ def register(app):
             db.session.commit()
             return jsonify({'ok': False, 'error': 'token_missing'}), 400
 
-        base_url = _api_base(region)
+        base_url = bambu_api_base(region)
         try:
             resp = requests.get(
                 f'{base_url}/v1/user-service/my/tasks',

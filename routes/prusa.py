@@ -26,17 +26,12 @@ from models import (
     Filament, Project, PrintHistory, ProjectFilament,
 )
 from utils import deduct_filament_stock, encrypt_token, decrypt_token, log_movement, utc_now, format_duration
+from utils import validate_printer_host, prusa_request, prusa_test_connection
 
 _LOG = logging.getLogger(__name__)
 
-_PRUSA_TIMEOUT = 10  # seconds per HTTP request to printer
-
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
-
-def _prusa_headers(api_key: str) -> dict:
-    return {'X-Api-Key': api_key}
-
 
 def _clean_filename(raw: str) -> str:
     """Strip extension and underscores from a g-code filename for display."""
@@ -49,47 +44,6 @@ def _clean_filename(raw: str) -> str:
     return name or raw
 
 
-def _validate_host(host: str) -> str | None:
-    """Normalise and validate a printer host URL.
-
-    Returns the cleaned URL or None if the value is clearly invalid.
-    Only http:// and https:// are allowed. Empty string is treated as invalid.
-    """
-    host = (host or '').strip().rstrip('/')
-    if not host:
-        return None
-    if not re.match(r'^https?://', host, re.IGNORECASE):
-        host = 'http://' + host
-    # Basic sanity check — must contain at least one dot or be a valid IP-like
-    parsed = re.sub(r'^https?://', '', host, flags=re.IGNORECASE)
-    if not parsed:
-        return None
-    return host
-
-
-def _prusa_request(printer: PrusaPrinter, path: str) -> dict | None:
-    """GET request to a PrusaLink endpoint.  Returns parsed JSON or None on error."""
-    api_key = decrypt_token(printer.api_key)
-    url = f'{printer.host.rstrip("/")}/{path.lstrip("/")}'
-    try:
-        resp = requests.get(
-            url,
-            headers=_prusa_headers(api_key),
-            timeout=_PRUSA_TIMEOUT,
-        )
-        if resp.status_code == 204:
-            return {}  # No content — no current job
-        resp.raise_for_status()
-        return resp.json()
-    except requests.exceptions.Timeout:
-        _LOG.warning('PrusaLink timeout for printer %s (%s)', printer.name, url)
-    except requests.exceptions.ConnectionError:
-        _LOG.warning('PrusaLink connection error for printer %s (%s)', printer.name, url)
-    except Exception as exc:
-        _LOG.exception('PrusaLink request error for printer %s: %s', printer.name, exc)
-    return None
-
-
 def do_poll(printer: PrusaPrinter) -> dict:
     """Poll a single PrusaLink printer and store any new/updated print jobs.
 
@@ -100,7 +54,7 @@ def do_poll(printer: PrusaPrinter) -> dict:
     now = utc_now()
 
     # ── 1. Fetch current status ───────────────────────────────────────────
-    status_data = _prusa_request(printer, '/api/v1/status')
+    status_data = prusa_request(printer, '/api/v1/status')
     if status_data is None:
         printer.last_sync_at = now
         printer.last_sync_status = f'error: Cannot reach {printer.host}'
@@ -111,7 +65,7 @@ def do_poll(printer: PrusaPrinter) -> dict:
     printer_status = status_data.get('printer') or {}
 
     # ── 2. Fetch detailed job info ────────────────────────────────────────
-    job_data = _prusa_request(printer, '/api/v1/job')
+    job_data = prusa_request(printer, '/api/v1/job')
     if job_data is None:
         job_data = {}
 
@@ -231,30 +185,6 @@ def do_poll(printer: PrusaPrinter) -> dict:
     return {'added': added, 'updated': updated, 'error': None}
 
 
-def do_test_connection(printer: PrusaPrinter) -> dict:
-    """Test connectivity to a PrusaLink printer.
-
-    Returns dict with 'ok', 'model', 'firmware', 'error'.
-    """
-    data = _prusa_request(printer, '/api/version')
-    if data is None:
-        return {'ok': False, 'model': None, 'firmware': None, 'error': f'Cannot reach {printer.host}'}
-    version_text = data.get('text') or data.get('version', '')
-    firmware = data.get('firmware') or data.get('printer') or ''
-
-    # Try to get model from /api/v1/info
-    info = _prusa_request(printer, '/api/v1/info') or {}
-    model = info.get('type') or info.get('name') or None
-
-    return {
-        'ok': True,
-        'model': model,
-        'firmware': firmware,
-        'version_text': version_text,
-        'error': None,
-    }
-
-
 # ─── Route registration ──────────────────────────────────────────────────────
 
 def register(app):
@@ -354,7 +284,7 @@ def register(app):
         printer = db.session.get(PrusaPrinter, printer_id)
         if not printer:
             return jsonify({'ok': False, 'error': 'Printer not found'}), 404
-        result = do_test_connection(printer)
+        result = prusa_test_connection(printer)
         # Backfill model if discovered
         if result.get('ok') and result.get('model') and not printer.printer_model:
             printer.printer_model = result['model']

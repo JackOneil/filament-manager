@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.99.1] - 2026-05-31
+### Changed
+- **Eliminated deferred cross-route imports (#8)** — Moved 5 shared helper functions out of route modules and into `utils.py`, removing all deferred `from routes.X import` statements inside function bodies:
+  - `validate_printer_host()` (was `_validate_host` in `routes/prusa.py`)
+  - `prusa_request_headers()` / `prusa_request()` / `prusa_test_connection()` (was `_prusa_headers` / `_prusa_request` / `do_test_connection` in `routes/prusa.py`)
+  - `bambu_api_base()` (was `_api_base` in `routes/bambu.py`)
+  - `clean_bambu_title()` (was `_clean_title` in `routes/bambu.py`)
+  - `get_live_printers()` (was `_live_printers` in `routes/inventory.py`)
+- **Promoted deferred model imports in `utils.py`** — `BambuPrinter`, `AppSetting`, `Filament` moved to module-level imports; `build_project_metrics` and `build_action_center` no longer use deferred imports.
+- **Removed `do_test_connection` from `routes/prusa.py`** — now imported from `utils` as `prusa_test_connection` in both `prusa.py` and `settings.py`.
+- **Removed `_api_base` and `_clean_title` from `routes/bambu.py`** — now imported from `utils` as `bambu_api_base` and `clean_bambu_title`.
+
 ## [1.99.0] - 2026-05-31
 ### Fixed
 - **Eliminated self-imports** — Extracted `utc_now()` to new `time_utils.py` leaf module, removing 5 self-imports in `utils.py` and 2 deferred imports in `routes/calculator.py`. Consolidated `_utc_now()` duplicate in `models.py`. (#3, #11)

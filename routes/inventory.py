@@ -30,6 +30,7 @@ from utils import (
     format_tags,
     generate_sparkline_svg_path,
     get_filament_tags,
+    get_live_printers,
     log_movement,
     movement_action_label,
     parse_tags,
@@ -122,100 +123,6 @@ def _inventory_stats(f_brand='', f_material='', f_color='', f_tag=''):
         'remaining': agg_result.remaining or 0,
         'value': agg_result.value or 0,
     }
-
-
-def _live_printers():
-    live = []
-    now_dt = utc_now()
-    freshness_cutoff = now_dt - timedelta(minutes=15)
-
-    # Prusa — real-time local-network printers with progress
-    # Pre-load all enabled printers and their latest jobs in a single query
-    enabled_printers = PrusaPrinter.query.filter_by(enabled=True).all()
-    printer_ids = [p.id for p in enabled_printers]
-    printer_by_id = {p.id: p for p in enabled_printers}
-    if printer_ids:
-        latest_jobs = (
-            PrusaPrintJob.query
-            .filter(PrusaPrintJob.printer_id.in_(printer_ids))
-            .order_by(PrusaPrintJob.started_at.desc().nullslast())
-            .all()
-        )
-        latest_job_by_printer = {}
-        for job in latest_jobs:
-            if job.printer_id not in latest_job_by_printer:
-                latest_job_by_printer[job.printer_id] = job
-        for printer in enabled_printers:
-            job = latest_job_by_printer.get(printer.id)
-            if (
-                job
-                and job.status == 'PRINTING'
-                and job.progress is not None
-                and job.progress > 0
-                and printer.last_success_at
-                and printer.last_success_at >= freshness_cutoff
-                and job.synced_at
-                and job.synced_at >= freshness_cutoff
-            ):
-                prusa_progress_pct = int(job.progress * 100)
-                prusa_eta_at = (job.started_at + timedelta(seconds=job.cost_time)) if (job.started_at and job.cost_time) else None
-                live.append({'printer': printer, 'job': job, 'type': 'prusa',
-                             'progress_pct': prusa_progress_pct, 'eta_at': prusa_eta_at})
-
-    # Bambu Cloud — jobs with RUNNING or PAUSED status fetched from Cloud API.
-    # NOTE: Bambu Cloud API sometimes reports actively printing jobs as PAUSED
-    # (raw status=4) instead of RUNNING (raw status=1). This is a known firmware
-    # quirk — PAUSED from the task API does NOT mean the print is actually paused
-    # by the user; it means the job is in an intermediate active-printing state.
-    # Both statuses are therefore treated as "currently printing" for the overview.
-    running_bambu = (
-        BambuPrintJob.query
-        .options(joinedload(BambuPrintJob.materials))
-        .filter(BambuPrintJob.status.in_(['RUNNING', 'PAUSED']))
-        .order_by(BambuPrintJob.synced_at.desc())
-        .all()
-    )
-    bambu_printers_by_device = {p.device_id: p for p in BambuPrinter.query.all()} if running_bambu else {}
-    for job in running_bambu:
-        fake_printer = SimpleNamespace(
-            name=job.printer_name or 'Bambu Lab',
-            host=job.printer_name or 'Bambu Lab',
-            printer_model=job.printer_model or None,
-        )
-        # Collect material swatches from BambuJobMaterial rows
-        material_swatches = [
-            SimpleNamespace(
-                color_hex=m.color_hex or '#888888',
-                material_name=m.material_name or '?',
-                weight_grams=m.weight_grams,
-            )
-            for m in sorted((job.materials or []), key=lambda m: (m.ams_id or 0, m.tray_id or 0))
-        ]
-        fake_job = SimpleNamespace(
-            display_name=job.model_name,
-            file_name=None,
-            id=job.id,
-            finished_at=None,
-            weight_grams=job.weight_grams,
-            cost_time=job.cost_time,        # seconds
-            started_at=job.started_at,
-            material_swatches=material_swatches,
-        )
-        # Compute time-based progress estimate for Bambu (no real-time progress from Cloud API)
-        bambu_progress_pct = None
-        bambu_eta_at = None
-        if job.started_at and job.cost_time and job.cost_time > 0:
-            # Look up per-printer pre-job calibration offset (pre-loaded dict)
-            bambu_printer = bambu_printers_by_device.get(job.device_id) if job.device_id else None
-            pre_job_secs = (bambu_printer.pre_job_time_minutes or 0) * 60 if bambu_printer else 0
-            total_secs = job.cost_time + pre_job_secs
-            elapsed = (now_dt - job.started_at).total_seconds()
-            bambu_progress_pct = min(99, int(elapsed / total_secs * 100))
-            bambu_eta_at = job.started_at + timedelta(seconds=total_secs)
-        live.append({'printer': fake_printer, 'job': fake_job, 'type': 'bambu',
-                     'progress_pct': bambu_progress_pct, 'eta_at': bambu_eta_at})
-
-    return live
 
 
 def _low_stock_filaments(app_settings, limit=20):
@@ -783,7 +690,7 @@ def register(app):
                 user_dashboard=_user_dashboard_context(user),
             )
         action_center = build_action_center()
-        live_printers = _live_printers()
+        live_printers = get_live_printers()
         from models import AppSetting, PrusaPrinter, BambuPrinter
         app_settings = AppSetting.query.first()
         has_filament = Filament.query.first() is not None

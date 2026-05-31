@@ -9,14 +9,16 @@ import threading
 import time
 from collections import Counter
 from datetime import date, datetime, timedelta
+from types import SimpleNamespace
 from urllib.parse import urljoin, urlparse, urlunparse
 
 import requests
 from bs4 import BeautifulSoup
+from sqlalchemy.orm import joinedload
 
 from database import db
 from models import (
-    AppSetting, BambuJobMaterial, BambuPrintJob, MovementHistory,
+    AppSetting, BambuJobMaterial, BambuPrintJob, BambuPrinter, MovementHistory,
     Project, ProjectTodo, PrusaPrintJob, PrusaPrinter, FilamentUndoLog, ProjectFilament,
     Filament, Material, Color,
 )
@@ -62,10 +64,8 @@ from flask import g, has_app_context
 def get_settings():
     if has_app_context():
         if 'app_setting' not in g:
-            from models import AppSetting
             g.app_setting = AppSetting.query.first()
         return g.app_setting
-    from models import AppSetting
     return AppSetting.query.first()
 
 
@@ -639,10 +639,8 @@ def build_project_metrics(project, setting=None, bambu_powers=None, prusa_powers
     printer_power = setting.printer_power if setting else 150
 
     if bambu_powers is None:
-        from models import BambuPrinter
         bambu_powers = {p.device_id: p.power_draw_watts for p in BambuPrinter.query.all() if p.device_id}
     if prusa_powers is None:
-        from models import PrusaPrinter
         prusa_powers = {p.id: p.power_draw_watts for p in PrusaPrinter.query.all()}
 
     estimated_material_cost = 0.0
@@ -742,7 +740,6 @@ def build_action_center(now=None):
     setting = get_settings()
 
     low_stock_rows = []
-    from models import Filament
 
     all_filaments = Filament.query.all()
     usage_windows = collect_usage_windows(all_filaments, now=now)
@@ -1770,3 +1767,202 @@ def fetch_link_metadata(url):
         meta['og_image'] = meta['og_image'][:490] + '...'
 
     return meta
+
+
+# ─── Printer & Bambu shared helpers ──────────────────────────────────────────
+# Functions shared across multiple route modules.  Moved here to eliminate
+# deferred cross-route imports (CODE_IMPROVEMENTS.md #8).
+
+_PRUSA_TIMEOUT = 10  # seconds per HTTP request to printer
+
+
+def prusa_request_headers(api_key):
+    """Build PrusaLink API request headers."""
+    return {'X-Api-Key': api_key}
+
+
+def validate_printer_host(host):
+    """Normalise and validate a printer host URL.
+
+    Returns the cleaned URL or None if the value is clearly invalid.
+    Only http:// and https:// are allowed. Empty string is treated as invalid.
+    """
+    host = (host or '').strip().rstrip('/')
+    if not host:
+        return None
+    if not re.match(r'^https?://', host, re.IGNORECASE):
+        host = 'http://' + host
+    parsed = re.sub(r'^https?://', '', host, flags=re.IGNORECASE)
+    if not parsed:
+        return None
+    return host
+
+
+def prusa_request(printer, path):
+    """GET request to a PrusaLink endpoint.  Returns parsed JSON or None on error."""
+    api_key = decrypt_token(printer.api_key)
+    url = f'{printer.host.rstrip("/")}/{path.lstrip("/")}'
+    try:
+        resp = requests.get(
+            url,
+            headers=prusa_request_headers(api_key),
+            timeout=_PRUSA_TIMEOUT,
+        )
+        if resp.status_code == 204:
+            return {}  # No content — no current job
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.Timeout:
+        pass
+    except requests.exceptions.ConnectionError:
+        pass
+    except Exception:
+        pass
+    return None
+
+
+def prusa_test_connection(printer):
+    """Test connectivity to a PrusaLink printer.
+
+    Returns dict with 'ok', 'model', 'firmware', 'error'.
+    """
+    data = prusa_request(printer, '/api/version')
+    if data is None:
+        return {'ok': False, 'model': None, 'firmware': None, 'error': f'Cannot reach {printer.host}'}
+    version_text = data.get('text') or data.get('version', '')
+    firmware = data.get('firmware') or data.get('printer') or ''
+
+    # Try to get model from /api/v1/info
+    info = prusa_request(printer, '/api/v1/info') or {}
+    model = info.get('type') or info.get('name') or None
+
+    return {
+        'ok': True,
+        'model': model,
+        'firmware': firmware,
+        'version_text': version_text,
+        'error': None,
+    }
+
+
+# ─── Bambu helpers ───────────────────────────────────────────────────────────
+
+
+def bambu_api_base(region):
+    """Return the Bambu Cloud API base URL for the given region."""
+    return 'https://api.bambulab.cn' if region == 'china' else 'https://api.bambulab.com'
+
+
+def clean_bambu_title(title):
+    """Clean up slicer-generated plate names into a readable model name.
+
+    Bambu Studio creates titles like 'Model.stl_1 + Model.stl_2' (one entry
+    per plate).  Strip the extension and trailing plate index, then deduplicate.
+    Also strips bare slicer profile strings like '0.20mm Standard @BBL X1C'.
+    """
+    if not title:
+        return title
+    # Slicer profile strings start with a layer-height pattern — skip cleanup
+    if re.match(r'^\d+\.\d+\s*mm', title.strip()):
+        return title
+    parts = [p.strip() for p in title.split('+')]
+    cleaned = []
+    for part in parts:
+        part = re.sub(r'\.(stl|3mf|obj|step|amf)$', '', part, flags=re.IGNORECASE).strip()
+        part = re.sub(r'_\d+$', '', part).strip()
+        if part and part not in cleaned:
+            cleaned.append(part)
+    return ' + '.join(cleaned) if cleaned else title
+
+
+# ─── Dashboard helpers ───────────────────────────────────────────────────────
+
+
+def get_live_printers():
+    """Collect data about currently-active printers for the overview dashboard.
+
+    Returns a list of dicts, each with keys: printer, job, type,
+    progress_pct, eta_at.
+    """
+    live = []
+    now_dt = utc_now()
+    freshness_cutoff = now_dt - timedelta(minutes=15)
+
+    # Prusa — real-time local-network printers with progress
+    enabled_printers = PrusaPrinter.query.filter_by(enabled=True).all()
+    printer_ids = [p.id for p in enabled_printers]
+    printer_by_id = {p.id: p for p in enabled_printers}
+    if printer_ids:
+        latest_jobs = (
+            PrusaPrintJob.query
+            .filter(PrusaPrintJob.printer_id.in_(printer_ids))
+            .order_by(PrusaPrintJob.started_at.desc().nullslast())
+            .all()
+        )
+        latest_job_by_printer = {}
+        for job in latest_jobs:
+            if job.printer_id not in latest_job_by_printer:
+                latest_job_by_printer[job.printer_id] = job
+        for printer in enabled_printers:
+            job = latest_job_by_printer.get(printer.id)
+            if (
+                job
+                and job.status == 'PRINTING'
+                and job.progress is not None
+                and job.progress > 0
+                and printer.last_success_at
+                and printer.last_success_at >= freshness_cutoff
+                and job.synced_at
+                and job.synced_at >= freshness_cutoff
+            ):
+                prusa_progress_pct = int(job.progress * 100)
+                prusa_eta_at = (job.started_at + timedelta(seconds=job.cost_time)) if (job.started_at and job.cost_time) else None
+                live.append({'printer': printer, 'job': job, 'type': 'prusa',
+                             'progress_pct': prusa_progress_pct, 'eta_at': prusa_eta_at})
+
+    # Bambu Cloud — jobs with RUNNING or PAUSED status
+    running_bambu = (
+        BambuPrintJob.query
+        .options(joinedload(BambuPrintJob.materials))
+        .filter(BambuPrintJob.status.in_(['RUNNING', 'PAUSED']))
+        .order_by(BambuPrintJob.synced_at.desc())
+        .all()
+    )
+    bambu_printers_by_device = {p.device_id: p for p in BambuPrinter.query.all()} if running_bambu else {}
+    for job in running_bambu:
+        fake_printer = SimpleNamespace(
+            name=job.printer_name or 'Bambu Lab',
+            host=job.printer_name or 'Bambu Lab',
+            printer_model=job.printer_model or None,
+        )
+        material_swatches = [
+            SimpleNamespace(
+                color_hex=m.color_hex or '#888888',
+                material_name=m.material_name or '?',
+                weight_grams=m.weight_grams,
+            )
+            for m in sorted((job.materials or []), key=lambda m: (m.ams_id or 0, m.tray_id or 0))
+        ]
+        fake_job = SimpleNamespace(
+            display_name=job.model_name,
+            file_name=None,
+            id=job.id,
+            finished_at=None,
+            weight_grams=job.weight_grams,
+            cost_time=job.cost_time,
+            started_at=job.started_at,
+            material_swatches=material_swatches,
+        )
+        bambu_progress_pct = None
+        bambu_eta_at = None
+        if job.started_at and job.cost_time and job.cost_time > 0:
+            bambu_printer = bambu_printers_by_device.get(job.device_id) if job.device_id else None
+            pre_job_secs = (bambu_printer.pre_job_time_minutes or 0) * 60 if bambu_printer else 0
+            total_secs = job.cost_time + pre_job_secs
+            elapsed = (now_dt - job.started_at).total_seconds()
+            bambu_progress_pct = min(99, int(elapsed / total_secs * 100))
+            bambu_eta_at = job.started_at + timedelta(seconds=total_secs)
+        live.append({'printer': fake_printer, 'job': fake_job, 'type': 'bambu',
+                     'progress_pct': bambu_progress_pct, 'eta_at': bambu_eta_at})
+
+    return live

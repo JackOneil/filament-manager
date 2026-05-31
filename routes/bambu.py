@@ -23,7 +23,7 @@ from models import (
 )
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import joinedload
-from utils import deduct_filament_stock, decrypt_token, get_settings, log_movement, utc_now, try_auto_map_filament, invalidate_kpi_cache, format_duration, normalize_hex
+from utils import bambu_api_base, clean_bambu_title, deduct_filament_stock, decrypt_token, get_settings, log_movement, utc_now, try_auto_map_filament, invalidate_kpi_cache, format_duration, normalize_hex
 
 _LOG = logging.getLogger(__name__)
 
@@ -63,10 +63,6 @@ _FINISHED_STATUSES = {'FINISH'}
 
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
-
-def _api_base(region: str) -> str:
-    return 'https://api.bambulab.cn' if region == 'china' else 'https://api.bambulab.com'
-
 
 def _parse_ts(value):
     """Parse Bambu Cloud timestamp (epoch ms/s int or ISO-8601 string) →
@@ -193,7 +189,7 @@ def _fetch_fresh_cover_url_from_api(external_id: str, token: str, region: str) -
     Tries the single-task endpoint first; falls back to scanning the list.
     Returns the cover URL string or None.
     """
-    base = _api_base(region)
+    base = bambu_api_base(region)
     # Single-task endpoint (may not exist on all regions — tolerate 404)
     try:
         resp = requests.get(
@@ -328,29 +324,6 @@ def _extract_job_meta(job: BambuPrintJob) -> tuple[dict, dict]:
     return job_meta, slot_meta
 
 
-def _clean_title(title: str) -> str:
-    """Clean up slicer-generated plate names into a readable model name.
-
-    Bambu Studio creates titles like 'Model.stl_1 + Model.stl_2' (one entry
-    per plate).  Strip the extension and trailing plate index, then deduplicate.
-    Also strips bare slicer profile strings like '0.20mm Standard @BBL X1C'.
-    """
-    if not title:
-        return title
-    # Slicer profile strings start with a layer-height pattern — skip cleanup
-    # for these; they are profile names, not model names (user must edit manually)
-    if re.match(r'^\d+\.\d+\s*mm', title.strip()):
-        return title
-    parts = [p.strip() for p in title.split('+')]
-    cleaned = []
-    for part in parts:
-        part = re.sub(r'\.(stl|3mf|obj|step|amf)$', '', part, flags=re.IGNORECASE).strip()
-        part = re.sub(r'_\d+$', '', part).strip()
-        if part and part not in cleaned:
-            cleaned.append(part)
-    return ' + '.join(cleaned) if cleaned else title
-
-
 def _job_unassigned_filter():
     material_count = (
         select(func.count(BambuJobMaterial.id))
@@ -429,7 +402,7 @@ def do_sync(token: str, region: str) -> dict:
     added = updated = skipped = 0
     new_job_ids: list = []  # IDs of newly inserted jobs (for auto-mapping)
 
-    base = _api_base(region)
+    base = bambu_api_base(region)
     url = f'{base}/v1/user-service/my/tasks'
     try:
         resp = requests.get(
@@ -522,7 +495,7 @@ def do_sync(token: str, region: str) -> dict:
         # back to title cleaned of STL plate indices.
         raw_design = (task.get('designTitle') or '').strip()
         raw_title = (task.get('title') or '').strip()
-        model_name = raw_design or _clean_title(raw_title) or None
+        model_name = raw_design or clean_bambu_title(raw_title) or None
         cost_time = task.get('costTime')  # seconds
 
         # ── Gather material slots (Bambu uses amsDetailMappings or amsDetail)
@@ -765,7 +738,7 @@ def register(app):
         slot_meta_by_material = {}
         for job in jobs.items:
             job_meta, slot_meta = _extract_job_meta(job)
-            job_meta['cleaned_title'] = _clean_title(job.model_name or '') if job.model_name else ''
+            job_meta['cleaned_title'] = clean_bambu_title(job.model_name or '') if job.model_name else ''
             bambu_payload_meta[job.id] = job_meta
             slot_meta_by_material.update(slot_meta)
 
@@ -822,7 +795,7 @@ def register(app):
         bi_data = {}
         for job in jobs.items:
             job_meta, slot_meta = _extract_job_meta(job)
-            job_meta['cleaned_title'] = _clean_title(job.model_name or '') if job.model_name else ''
+            job_meta['cleaned_title'] = clean_bambu_title(job.model_name or '') if job.model_name else ''
             bambu_payload_meta[job.id] = job_meta
             slot_meta_by_material.update(slot_meta)
             js_single_slot = job.materials[0] if len(job.materials) == 1 else None

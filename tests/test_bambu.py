@@ -14,7 +14,8 @@ from models import (
     AppSetting, BambuPrintJob, BambuJobMaterial, BambuPrinter,
     Brand, Color, Material, Filament, MovementHistory, PrintHistory,
 )
-from routes.bambu import do_sync, _parse_ts, _resolve_status, _clean_title, _cache_cover_image
+from routes.bambu import do_sync, _parse_ts, _resolve_status, _cache_cover_image
+from utils import clean_bambu_title as _clean_title
 
 
 # ─── Unit tests: helpers ────────────────────────────────────────────────────

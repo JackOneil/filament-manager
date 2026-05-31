@@ -32,7 +32,7 @@ from models import (
     PrusaPrinter,
     User,
 )
-from utils import build_project_metrics, escape_like, format_tags, parse_tags, render_markdown, translate, utc_now, _toggle_markdown_checkbox
+from utils import build_project_metrics, clean_bambu_title, escape_like, format_tags, parse_tags, render_markdown, translate, utc_now, _toggle_markdown_checkbox
 
 
 ALLOWED_PROJECT_FILE_EXTENSIONS = {
@@ -744,12 +744,11 @@ def register(app):
 
         # Query unmapped Bambu print jobs for naming suggestion
         unmapped_jobs = BambuPrintJob.query.filter_by(project_id=None).order_by(BambuPrintJob.started_at.desc()).limit(15).all()
-        from routes.bambu import _clean_title
         suggestions = []
         seen_names = set()
         for job in unmapped_jobs:
             if job.model_name:
-                cleaned = _clean_title(job.model_name)
+                cleaned = clean_bambu_title(job.model_name)
                 if cleaned and cleaned not in seen_names:
                     seen_names.add(cleaned)
                     suggestions.append(cleaned)
