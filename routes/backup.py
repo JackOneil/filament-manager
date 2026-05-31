@@ -192,6 +192,7 @@ def _build_export_data(app, include_files=True):
                 'backup_auto_last_run_at': setting.backup_auto_last_run_at.isoformat() if setting and setting.backup_auto_last_run_at else None,
                 'backup_auto_keep_count': getattr(setting, 'backup_auto_keep_count', 10) if setting else 10,
                 'backup_auto_keep_days': getattr(setting, 'backup_auto_keep_days', 0) if setting else 0,
+                'waste_reasons_json': getattr(setting, 'waste_reasons_json', '') if setting else '',
                 # bambu_token intentionally excluded for security
             } if setting else {},
 
@@ -677,9 +678,9 @@ def register(app):
 
             app.logger.info(f"Manual auto-backup triggered: {filename} ({len(archive_bytes)} bytes)")
             flash(translate('backup_auto_triggered').format(filename=filename), 'success')
-        except Exception as e:
+        except Exception:
             db.session.rollback()
-            app.logger.error(f"Manual auto-backup failed: {e}")
+            app.logger.exception("Manual auto-backup failed")
             flash(translate('backup_auto_failed'), 'error')
         return redirect(url_for('settings') + '?tab=data')
 
@@ -860,6 +861,8 @@ def register(app):
                             setting.backup_auto_keep_count = s.get('backup_auto_keep_count', 10)
                         if 'backup_auto_keep_days' in s:
                             setting.backup_auto_keep_days = s.get('backup_auto_keep_days', 0)
+                        if 'waste_reasons_json' in s:
+                            setting.waste_reasons_json = s.get('waste_reasons_json', '')
 
                 # ── 2b. Users, invites, notifications ────────────────
                 for user_data in data.get('users', []):
@@ -1461,9 +1464,9 @@ def register(app):
 
             app.logger.debug(f"Import finished: {imported_filaments} filaments, projects and Bambu jobs processed.")
             flash(translate('backup_import_success'), 'success')
-        except Exception as e:
+        except Exception:
             db.session.rollback()
-            app.logger.error(f"Import failed: {str(e)}")
+            app.logger.exception("Import failed")
             flash(translate('backup_import_failed'), 'error')
 
         return redirect(url_for('settings') + '?tab=data')

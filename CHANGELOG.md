@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.99.0] - 2026-05-31
+### Fixed
+- **Eliminated self-imports** — Extracted `utc_now()` to new `time_utils.py` leaf module, removing 5 self-imports in `utils.py` and 2 deferred imports in `routes/calculator.py`. Consolidated `_utc_now()` duplicate in `models.py`. (#3, #11)
+- **All 23 bare `except Exception` handlers now log properly** — Replaced silent `pass`/unlogged handlers in `projects.py`, `settings.py`, `prusa.py`, `bambu.py`, `inventory.py`, `history.py`, and `backup.py` with `app.logger.exception()` / `_LOG.exception()` / `_LOG.warning()` calls. Fixes the "silent failure" problem across 7 route files. (#6)
+- **Community DB import no longer flashes success on failure** — Commit failure now shows error message and redirects properly. Added new i18n key `community_db_import_failed` in both `cs` and `en`.
+- **Settings Bambu test commit safety** — Added `db.session.rollback()` before re-committing in the except handler, preventing dirty-session errors. (#12)
+
+### Changed
+- **`routes/waste.py`** — `WASTE_REASONS` replaced with configurable `_get_waste_reasons()` helper that reads from `AppSetting.waste_reasons_json` (JSON array), falling back to the hardcoded default list. New DB column `waste_reasons_json` with migration + export/import coverage. (#10)
+- **Exception handlers upgraded** — `app.logger.error()` → `app.logger.exception()` in `backup.py`, `settings.py`, `history.py` for full tracebacks in logs.
+
+### Added
+- **23 new tests** for storage, history, and PWA routes (`tests/test_storage_history_pwa.py`) — covering shelf CRUD, slot assignment, placement movement, orientation, history filtering/pagination/clearing, PWA manifest, and service worker. (#14)
+
 ## [1.98.3] - 2026-05-31
 ### Added
 - **Public share file download** — New endpoint `project_share_download_file(token, file_id)` lets share-link visitors download project files without authentication.

@@ -86,7 +86,7 @@ def _prusa_request(printer: PrusaPrinter, path: str) -> dict | None:
     except requests.exceptions.ConnectionError:
         _LOG.warning('PrusaLink connection error for printer %s (%s)', printer.name, url)
     except Exception as exc:
-        _LOG.warning('PrusaLink request error for printer %s: %s', printer.name, exc)
+        _LOG.exception('PrusaLink request error for printer %s: %s', printer.name, exc)
     return None
 
 
@@ -224,7 +224,8 @@ def do_poll(printer: PrusaPrinter) -> dict:
             db.session.commit()
         except Exception:
             db.session.rollback()
-        _LOG.error('PrusaLink commit error: %s', exc)
+            _LOG.exception('PrusaLink nested error-status commit failed for printer %s', printer.name)
+        _LOG.exception('PrusaLink commit error for printer %s: %s', printer.name, exc)
         return {'added': 0, 'updated': 0, 'error': str(exc)}
 
     return {'added': added, 'updated': updated, 'error': None}

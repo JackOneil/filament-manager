@@ -1,13 +1,5 @@
-from datetime import datetime, timezone
 from database import db
-
-
-def _utc_now():
-    """Return current UTC time as a naive datetime (no tzinfo).
-
-    Local helper to avoid circular import with utils.utc_now.
-    """
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+from time_utils import utc_now as _utc_now
 
 
 class User(db.Model):
@@ -222,6 +214,9 @@ class AppSetting(db.Model):
     backup_auto_last_run_at = db.Column(db.DateTime, nullable=True)
     backup_auto_keep_count = db.Column(db.Integer, default=10)  # max backup files to retain (0 = unlimited)
     backup_auto_keep_days = db.Column(db.Integer, default=0)    # max age in days to retain (0 = unlimited)
+
+    # Customizable waste reasons (JSON array; defaults to hardcoded list if empty)
+    waste_reasons_json = db.Column(db.Text, default='')
 
 
 class PrintHistory(db.Model):

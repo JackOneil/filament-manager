@@ -137,6 +137,7 @@ def _cache_cover_image(external_id: str, cover_url: str | None) -> str | None:
         resp = requests.get(cover_url, timeout=15)
         resp.raise_for_status()
     except Exception:
+        _LOG.warning('Bambu cover image download failed: %s', cover_url)
         return None
 
     ctype = (resp.headers.get('Content-Type') or '').split(';', 1)[0].strip().lower()
@@ -205,7 +206,7 @@ def _fetch_fresh_cover_url_from_api(external_id: str, token: str, region: str) -
             if cover:
                 return cover
     except Exception:
-        pass
+        _LOG.warning('Bambu single-task cover fetch failed for ext_id=%s', external_id)
 
     # Fallback: scan the first page of tasks
     try:
@@ -223,7 +224,7 @@ def _fetch_fresh_cover_url_from_api(external_id: str, token: str, region: str) -
                     if cover:
                         return cover
     except Exception:
-        pass
+        _LOG.warning('Bambu fallback cover scan failed for ext_id=%s', external_id)
 
     return None
 
@@ -440,7 +441,7 @@ def do_sync(token: str, region: str) -> dict:
         resp.raise_for_status()
         data = resp.json()
     except Exception as exc:
-        _LOG.error('Bambu sync error: %s', exc)
+        _LOG.exception('Bambu sync API fetch error: %s', exc)
         return {'added': 0, 'updated': 0, 'skipped': 0, 'error': str(exc)}
 
     hits = data.get('hits') or data.get('tasks') or []
@@ -588,7 +589,7 @@ def do_sync(token: str, region: str) -> dict:
         db.session.commit()
     except Exception as exc:
         db.session.rollback()
-        _LOG.error('Bambu sync commit error: %s', exc)
+        _LOG.exception('Bambu sync commit error: %s', exc)
         return {'added': 0, 'updated': 0, 'skipped': skipped, 'error': str(exc)}
 
     # ── Auto-mapping (runs after commit so job IDs are stable) ───────────────
@@ -643,9 +644,9 @@ def _auto_map_new_jobs(job_ids: list) -> int:
         try:
             db.session.commit()
             invalidate_kpi_cache()
-        except Exception as exc:
+        except Exception:
             db.session.rollback()
-            _LOG.error('Auto-mapping commit error: %s', exc)
+            _LOG.exception('Auto-mapping commit error')
             return 0
 
     return mapped_count
@@ -922,9 +923,10 @@ def register(app):
                             db.session.commit()
                         except Exception:
                             db.session.rollback()
+                            _LOG.warning('Failed to persist fresh cover URL for job %d', job_id)
                         return _send_inline_thumbnail(recached)
             except Exception:
-                pass
+                _LOG.warning('Bambu thumbnail fresh-fetch failed for job %d', job_id)
 
         return _thumbnail_placeholder_response()
 

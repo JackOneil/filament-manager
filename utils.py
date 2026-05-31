@@ -85,15 +85,7 @@ def translate(key):
     return TRANSLATIONS.get(lang, TRANSLATIONS['cs']).get(key, key)
 
 
-def utc_now():
-    """Return the current UTC time as a naive datetime.
-
-    Replacement for the deprecated naive UTC helper removed in Python 3.14.
-    Returns a naive (tzinfo-free) datetime to keep compatibility with the existing
-    SQLite schema which stores all timestamps without timezone info.
-    """
-    from datetime import timezone
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+from time_utils import utc_now  # noqa: F811 — re-exported from leaf module to avoid circular imports
 
 
 def get_current_currency():
@@ -1128,7 +1120,6 @@ def create_undo_snapshot(user_id, action_type, filament, project_filaments=None,
     Returns:
         FilamentUndoLog object
     """
-    from utils import utc_now
 
     snapshot_data = {
         'filament': {
@@ -1190,7 +1181,6 @@ def create_bulk_undo_snapshot(user_id, entries):
     Returns:
         FilamentUndoLog object
     """
-    from utils import utc_now
 
     snapshot_data = {
         'type': 'bulk_delete',
@@ -1256,7 +1246,6 @@ def get_pending_undo(user_id):
     Returns:
         FilamentUndoLog object or None
     """
-    from utils import utc_now
 
     undo_log = FilamentUndoLog.query.filter(
         FilamentUndoLog.user_id == user_id,
@@ -1277,7 +1266,6 @@ def consume_undo_log(undo_log_id, user_id):
     Returns:
         dict snapshot_data or None if invalid/expired
     """
-    from utils import utc_now
 
     undo_log = FilamentUndoLog.query.filter_by(id=undo_log_id, user_id=user_id).first()
     if not undo_log:
@@ -1298,7 +1286,6 @@ def consume_undo_log(undo_log_id, user_id):
 
 def purge_expired_undo_logs():
     """Delete expired undo log entries (cleanup)."""
-    from utils import utc_now
 
     expired = FilamentUndoLog.query.filter(
         FilamentUndoLog.expires_at < utc_now()

@@ -13,8 +13,26 @@ from models import Filament, Project, WasteFile, WasteRecord, AppSetting
 from utils import utc_now
 
 
-WASTE_REASONS = ['stringing', 'warping', 'bed_adhesion', 'clogging', 'layer_shift', 'spaghetti', 'broken_support', 'other']
+_DEFAULT_WASTE_REASONS = ['stringing', 'warping', 'bed_adhesion', 'clogging', 'layer_shift', 'spaghetti', 'broken_support', 'other']
 WASTE_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
+
+
+def _get_waste_reasons():
+    """Return the current list of waste reasons from AppSetting or default.
+
+    Reasons are stored as a JSON array in AppSetting.waste_reasons_json.
+    Falls back to the hardcoded default if unset or unparseable.
+    """
+    import json as _json
+    setting = AppSetting.query.first()
+    if setting and setting.waste_reasons_json:
+        try:
+            reasons = _json.loads(setting.waste_reasons_json)
+            if isinstance(reasons, list) and all(isinstance(r, str) for r in reasons):
+                return reasons
+        except (TypeError, ValueError, _json.JSONDecodeError):
+            pass
+    return list(_DEFAULT_WASTE_REASONS)
 
 
 def _get_extension(filename):
@@ -52,7 +70,7 @@ def register(app):
         page = request.args.get('page', 1, type=int)
 
         query = WasteRecord.query.order_by(WasteRecord.created_at.desc())
-        if filter_reason and filter_reason in WASTE_REASONS:
+        if filter_reason and filter_reason in _get_waste_reasons():
             query = query.filter(WasteRecord.reason == filter_reason)
         if filter_filament:
             query = query.filter(WasteRecord.filament_id == filter_filament)
@@ -84,7 +102,7 @@ def register(app):
             projects=projects,
             filaments_json=filaments_json,
             projects_json=projects_json,
-            waste_reasons=WASTE_REASONS,
+            waste_reasons=_get_waste_reasons(),
             filter_reason=filter_reason,
             filter_filament=filter_filament,
             filter_project=filter_project,
@@ -101,7 +119,7 @@ def register(app):
         filament_id = request.form.get('filament_id', type=int)
         project_id = request.form.get('project_id', type=int) or None
         reason = request.form.get('reason', 'other')
-        if reason not in WASTE_REASONS:
+        if reason not in _get_waste_reasons():
             reason = 'other'
         notes = request.form.get('notes', '').strip() or None
 
@@ -142,7 +160,7 @@ def register(app):
         rec.project_id = project_id
 
         reason = request.form.get('reason', 'other')
-        if reason not in WASTE_REASONS:
+        if reason not in _get_waste_reasons():
             reason = 'other'
         rec.reason = reason
 

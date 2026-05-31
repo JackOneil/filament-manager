@@ -504,7 +504,10 @@ def _schedule_link_preview_refresh(flask_app, link_id, url, max_attempts=3, retr
                         db.session.commit()
                     return  # success
             except Exception:
-                pass  # keep retrying
+                flask_app.logger.exception(
+                    "Link preview fetch attempt %d/%d failed for link_id=%d url=%s",
+                    attempt + 1, max_attempts, link_id, url,
+                )
 
     t = threading.Thread(target=_fetch, daemon=True)
     t.start()

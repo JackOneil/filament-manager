@@ -407,9 +407,9 @@ def register(app):
             except ValueError as e:
                 db.session.rollback()
                 flash(str(e), 'error')
-            except Exception as e:
+            except Exception:
                 db.session.rollback()
-                app.logger.error(f"Settings action error: {str(e)}")
+                app.logger.exception("Settings action error (action=%s)", action)
                 flash('settings_save_failed', 'error')
             tab = _tab_for_action(action)
             return redirect(url_for('settings') + f'?tab={tab}')
@@ -514,6 +514,8 @@ def register(app):
             db.session.commit()
             return jsonify({'ok': False, 'error': f'http_{resp.status_code}'}), 400
         except Exception:
+            app.logger.exception("Bambu connection test failed for token %s", token[:8] + "..." if token else "None")
+            db.session.rollback()  # clear failed transaction from the try block
             setting.bambu_last_test_at = utc_now()
             setting.bambu_last_test_status = 'error: request failed'
             db.session.commit()

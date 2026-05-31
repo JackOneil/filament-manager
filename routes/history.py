@@ -113,8 +113,8 @@ def register(app):
             db.session.query(MovementHistory).delete()
             db.session.commit()
             app.logger.info("All movement history was cleared.")
-        except Exception as e:
+        except Exception:
             db.session.rollback()
-            app.logger.error(f"Error clearing movement history: {e}")
+            app.logger.exception("Error clearing movement history")
         return redirect(url_for('history'))
     app.register_blueprint(bp)

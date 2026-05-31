@@ -1230,6 +1230,7 @@ def register(app):
             flash('undo_toast_applied', 'success')
         except Exception:
             db.session.rollback()
+            app.logger.exception("Undo action failed")
             flash('undo_toast_failed', 'error')
 
         return redirect(request.referrer or url_for('filaments_index'))
@@ -1319,6 +1320,7 @@ def register(app):
                 reader = csv.reader(io.StringIO(content), delimiter=separator)
                 rows = list(reader)
             except Exception:
+                app.logger.exception("CSV import: failed to read uploaded file")
                 return render_template('filament_import_csv.html', step='upload',
                                        error=translate('import_csv_error_bad_format'))
             if len(rows) < 2:
@@ -1371,6 +1373,7 @@ def register(app):
                 payload = _json.loads(request.form.get('csv_payload', '{}'))
                 rows = payload.get('rows', [])
             except Exception:
+                app.logger.exception("CSV import: failed to parse payload JSON")
                 return redirect(url_for('filament_import_csv'))
             imported = 0
             for row in rows:
@@ -1509,6 +1512,7 @@ def register(app):
                 community = json.load(f)
             profiles = community.get('profiles', [])
         except Exception:
+            app.logger.exception("Failed to load community filament database")
             profiles = []
 
         brands = sorted({p['brand'] for p in profiles})
@@ -1533,6 +1537,7 @@ def register(app):
                 for p in community.get('profiles', [])
             }
         except Exception:
+            app.logger.exception("Failed to load community filament database for import")
             all_profiles = {}
 
         selected_keys = request.form.getlist('profile_key')
@@ -1587,7 +1592,10 @@ def register(app):
             db.session.commit()
         except Exception:
             db.session.rollback()
+            app.logger.exception("Community DB import commit failed")
             imported = 0
+            flash(translate('community_db_import_failed'), 'error')
+            return redirect(url_for('filament_community_db'))
 
         flash(translate('community_db_imported_n').format(count=imported), 'success')
         return redirect(url_for('filament_community_db'))

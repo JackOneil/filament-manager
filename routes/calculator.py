@@ -2,7 +2,7 @@
 from flask import render_template, request, redirect, url_for, abort, Blueprint
 from database import db
 from models import Filament, AppSetting, PrintHistory, Project, ProjectQuote
-from utils import get_current_currency
+from utils import get_current_currency, utc_now
 
 
 def _build_filament_label(filament):
@@ -351,7 +351,6 @@ def register(app):
         if not quote.invoice_number:
             prefix = (settings.invoice_prefix or 'FV') if settings else 'FV'
             counter = ((settings.invoice_counter or 0) + 1) if settings else 1
-            from utils import utc_now
             quote.invoice_number = f'{prefix}-{utc_now().year}{counter:04d}'
             if settings:
                 settings.invoice_counter = counter
@@ -360,7 +359,6 @@ def register(app):
         # Provide the next suggested number for display (not yet claimed)
         prefix = (settings.invoice_prefix or 'FV') if settings else 'FV'
         counter = (settings.invoice_counter or 0) if settings else 0
-        from utils import utc_now
         suggested_invoice_number = f'{prefix}-{utc_now().year}{counter + 1:04d}'
 
         return render_template(
