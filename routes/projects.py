@@ -1004,6 +1004,51 @@ def register(app):
             return 'Forbidden', 403
         return send_from_directory(os.path.dirname(project_file.filepath), os.path.basename(project_file.filepath), as_attachment=False)
 
+    # ── Public share endpoints for files ─────────────────────────────────────
+
+    @bp.route('/projects/share/<token>/download/<int:file_id>')
+    def project_share_download_file(token, file_id):
+        project = Project.query.filter_by(share_token=token).first_or_404()
+        project_file = db.get_or_404(ProjectFile, file_id)
+        if project_file.project_id != project.id:
+            return 'Unauthorized', 401
+        real_path = os.path.realpath(project_file.filepath)
+        real_folder = os.path.realpath(upload_folder)
+        if not real_path.startswith(real_folder + os.sep):
+            return 'Forbidden', 403
+        return send_from_directory(
+            os.path.dirname(project_file.filepath),
+            os.path.basename(project_file.filepath),
+            as_attachment=True,
+            download_name=project_file.filename,
+        )
+
+    @bp.route('/projects/share/<token>/view/<int:file_id>/<filename>')
+    def project_share_view_file(token, file_id, filename):
+        project = Project.query.filter_by(share_token=token).first_or_404()
+        project_file = db.get_or_404(ProjectFile, file_id)
+        if project_file.project_id != project.id:
+            return 'Unauthorized', 401
+        real_path = os.path.realpath(project_file.filepath)
+        real_folder = os.path.realpath(upload_folder)
+        if not real_path.startswith(real_folder + os.sep):
+            return 'Forbidden', 403
+        return send_from_directory(os.path.dirname(project_file.filepath), os.path.basename(project_file.filepath), as_attachment=False)
+
+    @bp.route('/projects/share/<token>/image/<int:file_id>')
+    def project_share_image_file(token, file_id):
+        project = Project.query.filter_by(share_token=token).first_or_404()
+        project_file = db.get_or_404(ProjectFile, file_id)
+        if project_file.project_id != project.id or _get_extension(project_file.filename) not in IMAGE_EXTENSIONS:
+            return 'Unauthorized', 401
+        real_path = os.path.realpath(project_file.filepath)
+        real_folder = os.path.realpath(upload_folder)
+        if not real_path.startswith(real_folder + os.sep):
+            return 'Forbidden', 403
+        return send_from_directory(os.path.dirname(project_file.filepath), os.path.basename(project_file.filepath), as_attachment=False)
+
+    # ── End of public share file endpoints ───────────────────────────────────
+
     @bp.route('/projects/<int:id>/delete_file/<int:file_id>', methods=['POST'])
     def project_delete_file(id, file_id):
         project = _project_or_404(id)
@@ -1204,7 +1249,15 @@ def register(app):
     def project_share(token):
         project = Project.query.filter_by(share_token=token).first_or_404()
         description_html = Markup(render_markdown(project.description or ''))
-        return render_template('project_share.html', project=project, description_html=description_html)
+        images, model_files, other_files = _get_project_files_by_category(project)
+        return render_template(
+            'project_share.html',
+            project=project,
+            description_html=description_html,
+            images=images,
+            model_files=model_files,
+            other_files=other_files,
+        )
 
     @bp.route('/projects/templates')
     def project_templates_index():

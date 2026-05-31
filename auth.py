@@ -46,6 +46,9 @@ PUBLIC_ENDPOINTS = {
     'service_worker',
     'static',
     'project_share',
+    'project_share_download_file',
+    'project_share_view_file',
+    'project_share_image_file',
 }
 
 SECTION_BY_ENDPOINT = {

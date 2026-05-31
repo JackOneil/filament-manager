@@ -1,7 +1,18 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto space-y-6">
+<div class="max-w-4xl mx-auto space-y-6"
+     x-data="{
+         lightboxOpen: false,
+         lightboxImg: '',
+         lightboxTitle: '',
+         lightboxDownload: '',
+         modelViewerOpen: false,
+         modelViewerTitle: '',
+         modelViewerDownload: '',
+         modelViewerUrl: '',
+         modelViewerColor: '#3b82f6',
+     }">
     <div class="page-hero">
         <div class="flex items-start gap-3">
             <div>
@@ -57,10 +68,11 @@
         <div class="ui-label">{{ t('project_print_items_title') }}</div>
         <div class="mt-3 space-y-2">
             {% for item in print_items %}
+            {% set is_done = item.quantity_done >= item.quantity_total %}
             <div class="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-gray-50 border border-gray-100">
                 <div class="flex items-center gap-3 min-w-0">
-                    <i class="fa-solid {% if item.done %}fa-circle-check text-emerald-500{% else %}fa-circle text-gray-300{% endif %} text-lg flex-shrink-0"></i>
-                    <span class="font-medium {% if item.done %}line-through text-gray-400{% else %}text-gray-800{% endif %} truncate">{{ item.item_name }}</span>
+                    <i class="fa-solid {% if is_done %}fa-circle-check text-emerald-500{% else %}fa-circle text-gray-300{% endif %} text-lg flex-shrink-0"></i>
+                    <span class="font-medium {% if is_done %}line-through text-gray-400{% else %}text-gray-800{% endif %} truncate">{{ item.name }}</span>
                 </div>
                 <span class="text-sm font-semibold text-gray-500 flex-shrink-0">{{ item.quantity_done }}/{{ item.quantity_total }}</span>
             </div>
@@ -78,6 +90,171 @@
     </div>
     {% endif %}
 
+    {% if model_files or other_files or images %}
+    <div class="ui-panel">
+        <div class="ui-label">{{ t('project_files_title') }}</div>
+        <h2 class="text-2xl font-bold mt-1 mb-4">{{ t('project_files_heading') }}</h2>
 
-</div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {% if model_files %}
+            <div class="ui-card-soft p-4">
+                <div class="ui-label">{{ t('project_files') }}</div>
+                <div class="space-y-3 mt-3">
+                    {% for file in model_files %}
+                    <div class="border border-gray-100 rounded-xl bg-white overflow-hidden">
+                        <div class="flex items-center justify-between gap-3 px-4 py-3">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="font-semibold text-gray-800 truncate">{{ file.filename }}</span>
+                                    <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">v{{ file.version }}</span>
+                                    {% if file._older_versions %}
+                                    <span class="text-xs text-gray-400">+{{ file._older_versions|length }} {{ t('file_version_older') }}</span>
+                                    {% endif %}
+                                </div>
+                                <div class="text-xs text-gray-500">{{ file.filename.rsplit('.', 1)[-1].upper() if '.' in file.filename else 'FILE' }}</div>
+                            </div>
+                            <div class="flex gap-2 flex-shrink-0">
+                                <a href="{{ url_for('project_share_download_file', token=project.share_token, file_id=file.id) }}" class="ui-badge"><i class="fa-solid fa-download"></i> {{ t('download') }}</a>
+                            </div>
+                        </div>
+                        {% if file._older_versions %}
+                        <details class="border-t border-gray-100">
+                            <summary class="px-4 py-2 text-xs text-gray-500 cursor-pointer hover:bg-gray-50 transition list-none flex items-center gap-1">
+                                <i class="fa-solid fa-clock-rotate-left text-gray-400"></i> {{ t('file_version_history') }} ({{ file._older_versions|length }})
+                            </summary>
+                            <div class="divide-y divide-gray-50">
+                                {% for ver in file._older_versions %}
+                                <div class="flex items-center justify-between gap-3 px-4 py-2 bg-gray-50">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <span class="text-xs font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">v{{ ver.version }}</span>
+                                        <span class="text-sm text-gray-700 truncate">{{ ver.filename }}</span>
+                                        <span class="text-xs text-gray-400">{{ ver.uploaded_at | fmt_dt('%d.%m.%Y %H:%M') }}</span>
+                                    </div>
+                                    <div class="flex gap-2 flex-shrink-0">
+                                        <a href="{{ url_for('project_share_download_file', token=project.share_token, file_id=ver.id) }}" class="ui-badge text-xs"><i class="fa-solid fa-download"></i></a>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </details>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if other_files %}
+            <div class="ui-card-soft p-4">
+                <div class="ui-label">{{ t('project_attachments_title') }}</div>
+                <div class="space-y-3 mt-3">
+                    {% for file in other_files %}
+                    {% set ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else '' %}
+                    {% set is_img = ext in ('jpg', 'jpeg', 'png', 'gif', 'webp') %}
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3 min-w-0">
+                            {% if is_img %}
+                            <img src="{{ url_for('project_share_image_file', token=project.share_token, file_id=file.id) }}"
+                                 alt="{{ file.filename }}"
+                                 class="w-10 h-10 rounded-lg object-cover border border-gray-200 cursor-pointer flex-shrink-0"
+                                 @click="lightboxOpen = true; lightboxImg = '{{ url_for('project_share_image_file', token=project.share_token, file_id=file.id) }}'; lightboxTitle = '{{ file.filename|escape }}'; lightboxDownload = '{{ url_for('project_share_download_file', token=project.share_token, file_id=file.id) }}'">
+                            {% else %}
+                            <div class="w-10 h-10 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center flex-shrink-0">
+                                <i class="fa-solid fa-file text-gray-400 text-sm"></i>
+                            </div>
+                            {% endif %}
+                            <div class="min-w-0">
+                                <div class="font-semibold text-gray-800 truncate">{{ file.filename }}</div>
+                                <div class="text-xs text-gray-500">{{ ext.upper() if ext else 'FILE' }}</div>
+                            </div>
+                        </div>
+                        <div class="flex gap-2 flex-shrink-0">
+                            <a href="{{ url_for('project_share_download_file', token=project.share_token, file_id=file.id) }}" class="ui-badge"><i class="fa-solid fa-download"></i> {{ t('download') }}</a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if images %}
+        <div class="mt-5">
+            <div class="ui-label mb-3">{{ t('image_gallery') }}</div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {% for img in images %}
+                <div class="relative group aspect-square rounded-xl border border-gray-200 overflow-hidden bg-gray-100 flex items-center justify-center cursor-pointer"
+                     @click="lightboxOpen = true; lightboxImg = '{{ url_for('project_share_image_file', token=project.share_token, file_id=img.id) }}'; lightboxTitle = '{{ img.filename | escape }}'; lightboxDownload = '{{ url_for('project_share_download_file', token=project.share_token, file_id=img.id) }}'">
+                    <img src="{{ url_for('project_share_image_file', token=project.share_token, file_id=img.id) }}" alt="{{ img.filename }}" class="object-cover w-full h-full">
+                    <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
+                        <div class="text-white hover:text-blue-300 transition"><i class="fa-solid fa-expand text-2xl"></i></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if project.links %}
+    <div class="ui-panel">
+        <div class="ui-label">{{ t('project_links') }}</div>
+        <h2 class="text-2xl font-bold mt-1 mb-4">{{ t('project_links_heading') }}</h2>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {% for link in project.links %}
+                {% if link.og_title or link.og_image %}
+                <div class="relative group ui-card-soft overflow-hidden flex flex-col sm:flex-row">
+                    {% if link.og_image %}
+                    <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer" class="sm:w-32 h-28 sm:h-auto flex-shrink-0 bg-gray-200 block overflow-hidden border-b sm:border-b-0 sm:border-r border-gray-200">
+                        <img src="{{ link.og_image }}" alt="" class="w-full h-full object-cover">
+                    </a>
+                    {% endif %}
+                    <div class="p-4 flex-grow flex flex-col justify-center max-w-full overflow-hidden">
+                        <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer" class="text-sm font-bold text-blue-700 hover:underline truncate mb-1" title="{{ link.og_title }}">{{ link.og_title or link.name or link.url }}</a>
+                        {% if link.og_description %}
+                        <p class="text-xs text-gray-500 mb-2">{{ link.og_description }}</p>
+                        {% endif %}
+                        <div class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider flex items-center gap-1">
+                            <i class="fa-solid fa-earth-americas"></i> {{ link.domain or link.url }}
+                            {% if link.name %} · {{ link.name }}{% endif %}
+                        </div>
+                    </div>
+                    <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex gap-1">
+                        <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer" class="bg-white p-1.5 rounded-full text-blue-500 hover:text-blue-700 hover:bg-blue-50 shadow border border-gray-200 transition">
+                            <i class="fa-solid fa-arrow-up-right-from-square text-sm"></i>
+                        </a>
+                    </div>
+                </div>
+                {% else %}
+                <div class="ui-card-soft p-4 flex justify-between items-center gap-3">
+                    <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline text-sm truncate flex flex-col justify-center min-w-0">
+                        <div class="font-medium"><i class="fa-solid fa-link mr-1"></i> {{ link.name or link.url }}</div>
+                        {% if link.name and link.url != link.name %}
+                        <div class="text-xs text-gray-400 truncate mt-0.5">{{ link.url }}</div>
+                        {% endif %}
+                    </a>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Lightbox for image preview -->
+    <div x-show="lightboxOpen" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4" @keydown.escape.window="lightboxOpen = false" x-cloak>
+        <button @click="lightboxOpen = false" class="absolute top-4 right-4 z-50 text-white hover:text-gray-300 text-3xl transition p-2 bg-black/50 rounded-full w-12 h-12 flex items-center justify-center border border-white/20 shadow-lg backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-white/50">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        <div class="flex flex-col items-center justify-center max-w-full max-h-full w-full h-full">
+            <div class="text-white/80 text-sm sm:text-lg mb-4 text-center max-w-md truncate px-4" x-text="lightboxTitle"></div>
+            <img :src="lightboxImg" :alt="lightboxTitle" class="max-h-[70vh] max-w-full object-contain rounded-xl shadow-2xl">
+            <div class="flex gap-3 mt-6">
+                <a :href="lightboxDownload" download class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold transition text-sm">
+                    <i class="fa-solid fa-download"></i> {{ t('download') }}
+                </a>
+            </div>
+        </div>
+    </div>
+    </div>
 {% endblock %}

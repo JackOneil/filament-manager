@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.98.3] - 2026-05-31
+### Added
+- **Public share file download** — New endpoint `project_share_download_file(token, file_id)` lets share-link visitors download project files without authentication.
+- **Public share image viewing** — New endpoint `project_share_image_file(token, file_id)` serves image thumbnails and full-resolution images on the public share page.
+- **Public share file inline view** — New endpoint `project_share_view_file(token, file_id, filename)` serves files inline for 3D preview or browser viewing on the public share page.
+- **Public share file categorization** — The share page now mirrors the project detail file layout: model files with version history folding, attachments with image thumbnails, and an image gallery grid, all read-only.
+
+### Changed
+- **`routes/projects.py`** — `project_share` route now calls `_get_project_files_by_category()` to categorize files by model/other/image with version grouping. Added three public share file endpoints with token-based authorization (no login required).
+- **`auth.py`** — Added `project_share_download_file`, `project_share_view_file`, `project_share_image_file` to `PUBLIC_ENDPOINTS`.
+- **`templates/project_share.html`** — Complete rewrite of file sections to mirror `_project_files.html` layout: model files column with version history fold, attachments column with image thumbnails, image gallery grid, inline Alpine.js lightbox. Links section preserved with OG preview cards.
+
+## [1.98.2] - 2026-05-31
+### Fixed
+- **Public share view** — Fixed print items section showing empty item names and broken done-state detection. Template was referencing non-existent model attributes (`item_name`, `done`) instead of the correct `name` and `quantity_done >= quantity_total` check.
+
+### Added
+- **Public share view** — Read-only files section showing uploaded project files (filename, extension, version, upload date).
+- **Public share view** — Read-only links section showing project external links as clickable cards with domain info.
+
+### Changed
+- **`templates/project_share.html`** — Refactored print items loop to use correct model attributes. Added files and links read-only panels.
+
 ## [1.98.1] - 2026-05-31
 ### Added
 - **Backup rotation (retention)** — Configurable in Settings → Data tab under automatic backups. Set maximum number of backups to keep (`backup_auto_keep_count`) and/or maximum age in days (`backup_auto_keep_days`). Both limits apply simultaneously — oldest backups exceeding either limit are automatically deleted after each new backup is created.
