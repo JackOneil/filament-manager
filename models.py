@@ -220,6 +220,8 @@ class AppSetting(db.Model):
     backup_auto_day = db.Column(db.Integer, default=1)  # day of week (0=Mon) for weekly, day of month (1) for monthly
     backup_auto_include_files = db.Column(db.Boolean, default=True)
     backup_auto_last_run_at = db.Column(db.DateTime, nullable=True)
+    backup_auto_keep_count = db.Column(db.Integer, default=10)  # max backup files to retain (0 = unlimited)
+    backup_auto_keep_days = db.Column(db.Integer, default=0)    # max age in days to retain (0 = unlimited)
 
 
 class PrintHistory(db.Model):

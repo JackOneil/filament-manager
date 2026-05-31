@@ -190,6 +190,8 @@ def _build_export_data(app, include_files=True):
                 'backup_auto_day': getattr(setting, 'backup_auto_day', 1) if setting else 1,
                 'backup_auto_include_files': getattr(setting, 'backup_auto_include_files', True) if setting else True,
                 'backup_auto_last_run_at': setting.backup_auto_last_run_at.isoformat() if setting and setting.backup_auto_last_run_at else None,
+                'backup_auto_keep_count': getattr(setting, 'backup_auto_keep_count', 10) if setting else 10,
+                'backup_auto_keep_days': getattr(setting, 'backup_auto_keep_days', 0) if setting else 0,
                 # bambu_token intentionally excluded for security
             } if setting else {},
 
@@ -571,6 +573,51 @@ def _build_backup_archive_bytes(app, include_files=True):
     return archive_buffer.getvalue()
 
 
+def _cleanup_old_backups(backup_dir, keep_count=10, keep_days=0):
+    """Remove backup files exceeding retention limits.
+
+    - *keep_count*: maximum number of newest files to keep (0 = unlimited)
+    - *keep_days*: maximum age in days to keep (0 = unlimited)
+    Both limits are applied independently — files older than *keep_days* are
+    removed even if the count is under *keep_count*, and excess files beyond
+    *keep_count* are removed even if they're recent.
+    """
+    if not os.path.isdir(backup_dir):
+        return 0
+
+    import time as _time
+
+    files = []
+    for name in os.listdir(backup_dir):
+        fpath = os.path.join(backup_dir, name)
+        if os.path.isfile(fpath) and name.startswith('auto_backup_') and name.endswith('.tar.gz'):
+            files.append((fpath, os.path.getmtime(fpath)))
+    if not files:
+        return 0
+
+    # Sort by mtime descending (newest first)
+    files.sort(key=lambda x: x[1], reverse=True)
+
+    now = _time.time()
+    deleted = 0
+
+    for idx, (fpath, mtime) in enumerate(files):
+        remove = False
+        # Count-based: remove if we have more than keep_count (0 = unlimited)
+        if keep_count > 0 and idx >= keep_count:
+            remove = True
+        # Age-based: remove if older than keep_days (0 = unlimited)
+        if keep_days > 0 and (now - mtime) > (keep_days * 86400):
+            remove = True
+        if remove:
+            try:
+                os.remove(fpath)
+                deleted += 1
+            except OSError:
+                pass
+    return deleted
+
+
 def register(app):
     bp = Blueprint('backup', __name__)
 
@@ -620,6 +667,13 @@ def register(app):
             data, _ = _build_export_data(app, include_files=bool(setting.backup_auto_include_files))
             setting.backup_last_export_meta = json.dumps(data['backup_meta'], ensure_ascii=False)
             db.session.commit()
+
+            # Clean up old backups according to retention settings
+            keep_count = getattr(setting, 'backup_auto_keep_count', 10) or 10
+            keep_days = getattr(setting, 'backup_auto_keep_days', 0) or 0
+            removed = _cleanup_old_backups(backup_dir, keep_count=keep_count, keep_days=keep_days)
+            if removed:
+                app.logger.info(f"Cleaned up {removed} old backup(s) (keep_count={keep_count}, keep_days={keep_days})")
 
             app.logger.info(f"Manual auto-backup triggered: {filename} ({len(archive_bytes)} bytes)")
             flash(translate('backup_auto_triggered').format(filename=filename), 'success')
@@ -802,6 +856,10 @@ def register(app):
                             setting.backup_auto_include_files = s['backup_auto_include_files']
                         if 'backup_auto_last_run_at' in s:
                             setting.backup_auto_last_run_at = datetime.fromisoformat(s['backup_auto_last_run_at']) if s.get('backup_auto_last_run_at') else setting.backup_auto_last_run_at
+                        if 'backup_auto_keep_count' in s:
+                            setting.backup_auto_keep_count = s.get('backup_auto_keep_count', 10)
+                        if 'backup_auto_keep_days' in s:
+                            setting.backup_auto_keep_days = s.get('backup_auto_keep_days', 0)
 
                 # ── 2b. Users, invites, notifications ────────────────
                 for user_data in data.get('users', []):

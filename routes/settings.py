@@ -383,10 +383,19 @@ def register(app):
                         # daily — not used
                         setting.backup_auto_day = 0
                     setting.backup_auto_include_files = request.form.get('backup_auto_include_files') == 'on'
+                    try:
+                        setting.backup_auto_keep_count = max(0, int(request.form.get('backup_auto_keep_count', 10)))
+                    except (ValueError, TypeError):
+                        setting.backup_auto_keep_count = 10
+                    try:
+                        setting.backup_auto_keep_days = max(0, int(request.form.get('backup_auto_keep_days', 0)))
+                    except (ValueError, TypeError):
+                        setting.backup_auto_keep_days = 0
                     app.logger.debug(
                         f"Auto-backup settings: enabled={setting.backup_auto_enabled}, "
                         f"freq={setting.backup_auto_frequency}, time={setting.backup_auto_time}, "
-                        f"day={setting.backup_auto_day}, files={setting.backup_auto_include_files}"
+                        f"day={setting.backup_auto_day}, files={setting.backup_auto_include_files}, "
+                        f"keep_count={setting.backup_auto_keep_count}, keep_days={setting.backup_auto_keep_days}"
                     )
                     success_key = 'backup_auto_settings_saved'
 

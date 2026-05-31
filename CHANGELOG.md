@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.98.1] - 2026-05-31
+### Added
+- **Backup rotation (retention)** — Configurable in Settings → Data tab under automatic backups. Set maximum number of backups to keep (`backup_auto_keep_count`) and/or maximum age in days (`backup_auto_keep_days`). Both limits apply simultaneously — oldest backups exceeding either limit are automatically deleted after each new backup is created.
+
+### Changed
+- **`models.py`** — Added `AppSetting` columns: `backup_auto_keep_count` (default 10), `backup_auto_keep_days` (default 0 = unlimited).
+- **`routes/backup.py`** — Added `_cleanup_old_backups()` module-level helper; manual trigger endpoint now runs cleanup after creating a backup.
+- **`app.py`** — Auto-backup worker now runs cleanup after each scheduled backup.
+- **Export/Import** — New columns included in export/import.
+
 ## [1.98.0] - 2026-05-30
 ### Added
 - **Automatic backups** — Configurable scheduled backups in Settings → Data tab. Supports daily, weekly, and monthly frequencies with a chosen time of day. Backups are saved as tar.gz archives to `data/backup/` on the server.

@@ -1305,6 +1305,31 @@
                             {{ t('backup_auto_include_files_label') }}
                         </label>
                     </div>
+                    <!-- Rotation (retention) settings -->
+                    <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                        <div class="flex items-center gap-2 mb-3">
+                            <i class="fa-solid fa-recycle text-gray-400"></i>
+                            <span class="text-sm font-semibold text-gray-700">{{ t('backup_auto_rotation_title') }}</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mb-3">{{ t('backup_auto_rotation_desc') }}</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('backup_auto_keep_count_label') }}</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" name="backup_auto_keep_count" min="0" max="999" value="{{ app_settings.backup_auto_keep_count if app_settings else 10 }}" class="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                                    <span class="text-xs text-gray-400">{{ t('backup_auto_keep_count_hint') }}</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-xs font-bold text-gray-600 block mb-1">{{ t('backup_auto_keep_days_label') }}</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" name="backup_auto_keep_days" min="0" max="9999" value="{{ app_settings.backup_auto_keep_days if app_settings else 0 }}" class="w-20 border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                                    <span class="text-xs text-gray-400">{{ t('backup_auto_keep_days_hint') }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-2">{{ t('backup_auto_rotation_note') }}</p>
+                    </div>
                     <div class="flex flex-wrap gap-3 items-center">
                         <button type="submit" class="bg-blue-600 hover:bg-blue-700 transition-colors text-white font-semibold py-2 px-5 rounded-lg text-sm shadow">
                             <i class="fa-solid fa-save"></i> {{ t('save') }}

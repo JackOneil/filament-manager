@@ -50,7 +50,7 @@ from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
 
-APP_VERSION = '1.98.0'
+APP_VERSION = '1.98.1'
 
 csrf = CSRFProtect()
 
@@ -534,6 +534,18 @@ def _start_auto_backup_worker(app: Flask) -> None:
 
                     setting.backup_auto_last_run_at = now_utc.replace(tzinfo=None)
                     db.session.commit()
+
+                    # Clean up old backups according to retention settings
+                    from routes.backup import _cleanup_old_backups
+                    keep_count = getattr(setting, 'backup_auto_keep_count', 10) or 10
+                    keep_days = getattr(setting, 'backup_auto_keep_days', 0) or 0
+                    removed = _cleanup_old_backups(backup_dir, keep_count=keep_count, keep_days=keep_days)
+                    if removed:
+                        app.logger.info(
+                            f"Auto-backup cleanup: removed {removed} old backup(s) "
+                            f"(keep_count={keep_count}, keep_days={keep_days})"
+                        )
+
                     app.logger.info(
                         f"Auto-backup completed: {filename} ({len(archive_bytes)} bytes)"
                     )

@@ -148,6 +148,8 @@ def run_migrations(app: Flask) -> None:
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN backup_auto_day INTEGER NOT NULL DEFAULT 1")
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN backup_auto_include_files BOOLEAN NOT NULL DEFAULT 1")
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN backup_auto_last_run_at DATETIME DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN backup_auto_keep_count INTEGER NOT NULL DEFAULT 10")
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN backup_auto_keep_days INTEGER NOT NULL DEFAULT 0")
 
         # ── Project file versioning ──────────────────────────────────────────
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
