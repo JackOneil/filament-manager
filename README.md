@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.100.0***
+*Current version: **v1.101.0***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -100,17 +100,21 @@ filament/
 ├── routes/                 # Flask Blueprints modular routing structure
 │   ├── __init__.py         #   Central registration and fallback url_for builder
 │   ├── inventory.py        #   Inventory CRUD, CSV import, overview
+│   ├── inventory_helpers.py#   Inventory helpers (query builders, stats, undo)
 │   ├── api.py              #   AJAX filament list / search endpoints
 │   ├── calculator.py       #   Print cost calculator
 │   ├── history.py          #   Movement history
 │   ├── projects.py         #   Projects CRUD, uploads, versioning, comments
+│   ├── projects_helpers.py #   Project helpers (job feed, notifications, files)
 │   ├── bambu.py            #   Bambu Lab Cloud integration
+│   ├── bambu_helpers.py    #   Bambu helpers (sync engine, thumbnails, mapping)
 │   ├── prusa.py            #   PrusaLink integration
 │   ├── maintenance.py      #   Printer maintenance log, recurring intervals, ICS export
 │   ├── stats.py            #   Statistics dashboard
 │   ├── storage.py          #   Physical shelf management
 │   ├── settings.py         #   App settings, timezone, tabs
 │   ├── backup.py           #   Full export / import (backup & restore)
+│   ├── backup_helpers.py   #   Backup helpers (export/import serialization)
 │   ├── waste.py            #   Waste/scrap tracking
 │   ├── auth.py             #   Auth routes (login, register, users)
 │   └── pwa.py              #   PWA manifest and service worker

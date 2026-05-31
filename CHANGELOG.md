@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.101.0] - 2026-05-31
+### Changed
+- **Route file modularization (#7)** — Split 4 large monolith route files (>1000 lines) into route modules + helper modules:
+  - `bambu.py` → `bambu.py` (570 lines) + `bambu_helpers.py` (sync engine, thumbnails, mapping logic)
+  - `inventory.py` → `inventory.py` (890 lines) + `inventory_helpers.py` (query builders, stock stats, undo helpers)
+  - `projects.py` → `projects.py` (1166 lines) + `projects_helpers.py` (job feed, notifications, pagination)
+  - `backup.py` → `backup.py` (888 lines) + `backup_helpers.py` (export/import serialization logic)
+- **CSP nonce support (#15)** — Added per-request CSP nonce generation in `app.py` with nonce attributes on all inline `<script>` tags in `base.html`. The nonce is passed to templates via `csp_nonce` context variable for progressive CSP hardening.
+- **Fernet missing-key warning (#16)** — `encrypt_token()` in `utils.py` now logs a one-time startup warning when `FERNET_KEY` environment variable is not set, alerting administrators that Bambu tokens and Prusa API keys are stored as plaintext.
+- **Timezone-aware datetime storage (#17)** — Added `utc_now_aware()` to `time_utils.py` returning timezone-aware UTC datetimes. Model defaults in `models.py` now use timezone-aware datetimes for new records. Updated `fmt_dt` template filter in `app.py` to handle both aware and naive datetimes. Backup worker now stores timezone-aware timestamps.
+- **SESSION_COOKIE_SECURE warning (#18)** — Added startup warning log when `BEHIND_PROXY` environment variable is not set, advising administrators to enable it for production deployments behind TLS-terminating reverse proxies.
+
 ## [1.100.0] - 2026-05-31
 ### Added
 - **Account page redesign** — Complete overhaul of the `/account` page with tabbed interface (Profile, Security, Appearance, Notifications), avatar with initials, project statistics sidebar, and password strength meter.

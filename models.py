@@ -1,5 +1,5 @@
 from database import db
-from time_utils import utc_now as _utc_now
+from time_utils import utc_now as _utc_now  # naive UTC — switching to utc_now_aware requires updating all comparison sites first
 
 
 class User(db.Model):

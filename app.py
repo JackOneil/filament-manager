@@ -50,7 +50,7 @@ from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
 
-APP_VERSION = '1.100.0'
+APP_VERSION = '1.101.0'
 
 csrf = CSRFProtect()
 
@@ -75,7 +75,18 @@ def create_app(test_config=None) -> Flask:
     app.config['PROJECT_UPLOAD_FOLDER'] = os.path.join(db_dir, 'uploads')
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-    app.config['SESSION_COOKIE_SECURE'] = bool(os.environ.get('BEHIND_PROXY'))
+    # SESSION_COOKIE_SECURE: only send cookies over HTTPS.
+    # Set BEHIND_PROXY=1 when running behind a TLS-terminating reverse proxy
+    # (e.g. nginx, Traefik) that handles HTTPS and forwards plain HTTP to the app.
+    # Without this flag, session cookies may be exposed over unencrypted connections.
+    _behind_proxy = bool(os.environ.get('BEHIND_PROXY'))
+    app.config['SESSION_COOKIE_SECURE'] = _behind_proxy
+    if not _behind_proxy:
+        app.logger.warning(
+            'SESSION_COOKIE_SECURE is disabled (BEHIND_PROXY not set). '
+            'Session cookies will be transmitted over HTTP — enable BEHIND_PROXY '
+            'when running behind a TLS-terminating reverse proxy in production.'
+        )
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=14)
     # Increase SQLite busy-timeout to reduce 'database is locked' errors under load.
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
@@ -104,6 +115,14 @@ def create_app(test_config=None) -> Flask:
     csrf.init_app(app)
     init_auth(app)
     register_all(app)
+
+    # ── CSP nonce generation (per request) ───────────────────────────────────
+    import secrets as _secrets
+
+    @app.before_request
+    def _set_csp_nonce():
+        from flask import g as _g_csp
+        _g_csp.csp_nonce = _secrets.token_hex(32)
 
     # ── url_for fallback for decomposed Blueprints ─────────────────────────────
     from flask import url_for
@@ -145,22 +164,32 @@ def create_app(test_config=None) -> Flask:
 
     @app.template_filter('fmt_dt')
     def _fmt_dt_filter(value, fmt='%d.%m.%Y %H:%M'):
-        """Format a naive-UTC datetime into the configured app timezone.
+        """Format a UTC datetime into the configured app timezone.
 
         Returns an empty string for None/falsy values.
         Pure ``date`` objects (no time component) are formatted without
         timezone conversion since they carry no time-of-day information.
+
+        Handles both timezone-aware and naive datetimes:
+          - Aware datetimes are converted directly to the target timezone.
+          - Naive datetimes are assumed to be UTC and converted accordingly
+            (backward compatibility with old database records).
         """
         if not value:
             return ''
         if type(value) is _date:
-            # Pure date — no conversion, just format.
             return value.strftime(fmt)
         try:
             from utils import get_settings as _get_settings
             setting = _get_settings()
             tz_name = (setting.app_timezone if setting and setting.app_timezone else 'Europe/Prague')
-            local = value.replace(tzinfo=ZoneInfo('UTC')).astimezone(ZoneInfo(tz_name))
+            target_tz = ZoneInfo(tz_name)
+            if value.tzinfo is not None:
+                # Timezone-aware — convert directly.
+                local = value.astimezone(target_tz)
+            else:
+                # Legacy naive UTC — assume UTC, then convert.
+                local = value.replace(tzinfo=ZoneInfo('UTC')).astimezone(target_tz)
             return local.strftime(fmt)
         except (ZoneInfoNotFoundError, Exception):
             return value.strftime(fmt)
@@ -235,6 +264,7 @@ def create_app(test_config=None) -> Flask:
             auth_is_admin=is_admin,
             ui_mode=ui_mode,
             pending_inventory_undo=pending_inventory_undo,
+            csp_nonce=getattr(g, 'csp_nonce', ''),
         )
 
     @app.errorhandler(403)
@@ -243,6 +273,7 @@ def create_app(test_config=None) -> Flask:
 
     @app.after_request
     def add_security_headers(response):
+        from flask import g as _g_sec
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['X-Frame-Options'] = 'SAMEORIGIN'
         response.headers['X-XSS-Protection'] = '1; mode=block'
@@ -250,7 +281,7 @@ def create_app(test_config=None) -> Flask:
         response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
         response.headers['Content-Security-Policy'] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; "
+            "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
             "img-src 'self' data: https:; "
             "font-src 'self' https://fonts.gstatic.com; "
@@ -546,7 +577,7 @@ def _start_auto_backup_worker(app: Flask) -> None:
                     with open(filepath, 'wb') as fh:
                         fh.write(archive_bytes)
 
-                    setting.backup_auto_last_run_at = now_utc.replace(tzinfo=None)
+                    setting.backup_auto_last_run_at = now_utc
                     db.session.commit()
 
                     # Clean up old backups according to retention settings

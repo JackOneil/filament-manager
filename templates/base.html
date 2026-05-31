@@ -61,12 +61,12 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>
 <body x-data="appShell()" x-init="init()" class="flex h-[100dvh] overflow-hidden bg-[var(--ui-bg)] antialiased">
-    <script id="swipe-routes-data" type="application/json">{{ {"index": {"next": url_for("filaments_index"), "prev": none}, "filaments_index": {"next": url_for("projects_index"), "prev": url_for("index")}, "projects_index": {"next": none, "prev": url_for("filaments_index")}} | tojson }}</script>
+    <script id="swipe-routes-data" type="application/json"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>{{ {"index": {"next": url_for("filaments_index"), "prev": none}, "filaments_index": {"next": url_for("projects_index"), "prev": url_for("index")}, "projects_index": {"next": none, "prev": url_for("filaments_index")}} | tojson }}</script>
     {% set endpoint = (request.endpoint or '').split('.')[-1] %}
     
     <!--Sidebar-->
     <aside id="main-sidebar" :class="{'w-64 pinned': $store.appState.sidebarPinned, 'w-16': !$store.appState.sidebarPinned, 'transition-all duration-300': mounted}" class="hidden md:flex flex-col border-r border-[var(--ui-border)] bg-[var(--ui-surface)] group relative z-40 overflow-hidden flex-shrink-0 shadow-xl shadow-[var(--ui-border)]/50">
-        <script>
+        <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
             if (localStorage.getItem('sidebarPinned') === 'true') {
                 document.getElementById('main-sidebar').className += ' w-64 pinned';
             } else {
@@ -362,7 +362,7 @@
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <script src="{{ url_for('static', filename='js/tour.js') }}"></script>
     <script src="{{ url_for('static', filename='js/help.js') }}"></script>
-    <script>
+    <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
         window.__helpLang = {{ current_lang | tojson }};
         window.__helpEndpoint = {{ (request.endpoint or '') | tojson }};
     </script>
@@ -544,7 +544,7 @@
     </main>
     </div> <!--endflexwrapper-->
     <!-- PWA Service Worker Registration -->
-    <script>
+    <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('{{ url_for("service_worker") }}')

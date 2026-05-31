@@ -85,7 +85,7 @@ def translate(key):
     return TRANSLATIONS.get(lang, TRANSLATIONS['cs']).get(key, key)
 
 
-from time_utils import utc_now  # noqa: F811 — re-exported from leaf module to avoid circular imports
+from time_utils import utc_now, utc_now_aware  # noqa: F811 — re-exported from leaf module to avoid circular imports
 
 
 def get_current_currency():
@@ -387,16 +387,32 @@ def compute_stock_status(filament, usage_30=0.0, usage_90=0.0):
     }
 
 
+_fernet_warned = False
+
+def _warn_fernet_missing_once():
+    global _fernet_warned
+    if not _fernet_warned:
+        _fernet_warned = True
+        import logging
+        logging.getLogger(__name__).warning(
+            'FERNET_KEY environment variable is not set — Bambu tokens and '
+            'Prusa API keys will be stored as plaintext in the database. '
+            'Set FERNET_KEY to enable encryption at rest.'
+        )
+
+
 def encrypt_token(plaintext: str) -> str:
     """Encrypt a sensitive token using FERNET_KEY env var.
 
     Returns the plaintext unchanged when FERNET_KEY is not configured
     (preserves backward compatibility for existing installations).
+    Logs a one-time warning on first call when the key is missing.
     """
     if not plaintext:
         return plaintext
     raw_key = os.environ.get('FERNET_KEY', '').strip().encode()
     if not raw_key:
+        _warn_fernet_missing_once()
         return plaintext
     try:
         from cryptography.fernet import Fernet

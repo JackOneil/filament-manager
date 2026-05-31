@@ -8,16 +8,34 @@ Extracted to a leaf module to avoid circular imports:
 By putting utc_now() in its own leaf module (with only stdlib deps),
 we eliminate the self-imports in utils.py and the duplicate _utc_now()
 definition in models.py.
+
+Two flavours are provided:
+  - utc_now()          → timezone-aware UTC datetime (recommended for new code)
+  - utc_now_naive()    → naive UTC datetime (legacy compatibility; for comparisons
+                          against old database records that lack timezone info)
 """
 from datetime import datetime, timezone
+
+# Cache the UTC zone to avoid repeated allocations
+_UTC = timezone.utc
+
+
+def utc_now_aware():
+    """Return the current UTC time as a timezone-aware datetime.
+
+    This is the recommended form for all new code, column defaults in
+    models.py, and any arithmetic involving time deltas.  SQLAlchemy
+    serialises aware datetimes with their timezone offset into SQLite,
+    so the information is preserved round-trip.
+    """
+    return datetime.now(_UTC)
 
 
 def utc_now():
     """Return the current UTC time as a naive datetime (no tzinfo).
 
-    Replacement for datetime.utcnow() which is deprecated in Python 3.12
-    and will be removed in Python 3.14.
-    Returns a naive (tzinfo-free) datetime to keep compatibility with the existing
-    SQLite schema which stores all timestamps without timezone info.
+    **Deprecated:** kept for backward compatibility with existing database
+    records that were stored without timezone information.  Prefer
+    ``utc_now_aware()`` for new code and column defaults.
     """
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(_UTC).replace(tzinfo=None)
