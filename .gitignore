@@ -30,6 +30,8 @@ venv.bak/
 # Data (runtime directory — DB, uploads, backups, thumbnails)
 data/
 
+/node_modules/
+
 # IDEs
 .vscode/
 .idea/
