@@ -6,3 +6,4 @@ gunicorn==21.2.0
 requests>=2.31,<3
 beautifulsoup4>=4.12,<5
 cryptography>=42
+Flask-Compress==1.14

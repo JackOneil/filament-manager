@@ -175,8 +175,8 @@ class DoSyncTests(unittest.TestCase):
         self.assertEqual(job.status, 'FINISH')
         self.assertEqual(BambuPrintJob.query.count(), 1)
 
-    @patch('routes.bambu._cache_cover_image', return_value='/tmp/thumb.png')
-    @patch('routes.bambu._find_cached_thumb_path', return_value=None)
+    @patch('routes.bambu_helpers._cache_cover_image', return_value='/tmp/thumb.png')
+    @patch('routes.bambu_helpers._find_cached_thumb_path', return_value=None)
     @patch('routes.bambu.requests.get')
     def test_refreshes_existing_job_payload_and_missing_thumbnail(self, mock_get, mock_find_thumb, mock_cache):
         task = _make_task(3101, cover='https://example.com/new-cover.png')

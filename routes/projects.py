@@ -488,6 +488,23 @@ def register(app):
             stored_filename = _build_storage_name(project.id, original_filename)
             filepath = os.path.join(upload_folder, stored_filename)
             file.save(filepath)
+            # ── Extract Metadata ──
+            import mimetypes
+            import hashlib
+            try:
+                size = os.path.getsize(filepath)
+                sha = hashlib.sha256()
+                with open(filepath, 'rb') as fh:
+                    while chunk := fh.read(8192):
+                        sha.update(chunk)
+                checksum = sha.hexdigest()
+            except Exception:
+                size = 0
+                checksum = None
+            mime = mimetypes.guess_type(original_filename)[0] or 'application/octet-stream'
+            display = original_filename.rsplit('.', 1)[0] if '.' in original_filename else original_filename
+            user = get_current_user()
+
             # ── Versioning: check if a file with the same name already exists ──
             existing = ProjectFile.query.filter_by(
                 project_id=project.id, filename=original_filename, parent_file_id=None
@@ -505,6 +522,11 @@ def register(app):
                     filepath=filepath,
                     version=new_version,
                     parent_file_id=existing.id,
+                    display_name=display,
+                    file_size_bytes=size,
+                    mime_type=mime,
+                    checksum_sha256=checksum,
+                    uploaded_by_user_id=user.id if user else None
                 ))
             else:
                 db.session.add(ProjectFile(
@@ -512,6 +534,11 @@ def register(app):
                     filename=original_filename,
                     filepath=filepath,
                     version=1,
+                    display_name=display,
+                    file_size_bytes=size,
+                    mime_type=mime,
+                    checksum_sha256=checksum,
+                    uploaded_by_user_id=user.id if user else None
                 ))
             uploaded_any = True
         if uploaded_any:

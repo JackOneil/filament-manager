@@ -112,6 +112,10 @@
                 <i class="fa-solid fa-diagram-project text-lg w-8 text-center flex-shrink-0"></i>
                 <span class="ml-2 font-semibold opacity-0 group-[.pinned]:opacity-100 transition-opacity">{{ t('projects') }}</span>
             </a>
+            <a href="{{ url_for('models.models_index') }}" class="flex items-center px-4 py-3 text-[var(--ui-text)] hover:bg-[var(--ui-brand-soft)] hover:text-[var(--ui-brand-strong)] transition-colors whitespace-nowrap {% if endpoint in ['models_index', 'model_detail'] %}bg-[var(--ui-brand-soft)] text-[var(--ui-brand-strong)] border-r-2 border-[var(--ui-brand-strong)]{% endif %}" title="{{ t('models_nav') }}">
+                <i class="fa-solid fa-cube text-lg w-8 text-center flex-shrink-0"></i>
+                <span class="ml-2 font-semibold opacity-0 group-[.pinned]:opacity-100 transition-opacity">{{ t('models_nav') }}</span>
+            </a>
             {% endif %}
 
             {% if auth_has_section_access('calculator') or auth_is_admin(current_user) %}
@@ -251,6 +255,9 @@
                 <a href="{{ url_for('calculator') }}" class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
                     <i class="fa-solid fa-calculator text-emerald-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('calculator') }}</span>
                 </a>
+                <a href="{{ url_for('models.models_index') }}" class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
+                    <i class="fa-solid fa-cube text-purple-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('models_nav') }}</span>
+                </a>
                 {% endif %}
                 <a href="{{ url_for('stats') }}" class="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800">
                     <i class="fa-solid fa-chart-column text-indigo-500 text-2xl"></i> <span class="font-semibold text-sm">{{ t('stats_nav') }}</span>
@@ -326,6 +333,8 @@
                         <span>{{ t('filaments_nav') }}</span>
                     {% elif endpoint in ['projects_index', 'project_create', 'project_detail'] %}
                         <span>{{ t('projects') }}</span>
+                    {% elif endpoint in ['models_index', 'model_detail'] %}
+                        <span>{{ t('models_nav') }}</span>
                     {% elif endpoint in ['stats'] %}
                         <span>{{ t('stats_nav') }}</span>
                     {% elif endpoint in ['settings'] %}
@@ -385,6 +394,7 @@
         {% if auth_has_section_access('projects') or auth_is_admin(current_user) %}
         {{ comma() }}{{ {'label': t('projects'), 'note': t('nav_projects_note'), 'href': url_for('projects_index'), 'icon': 'fa-diagram-project', 'section': t('projects')}|tojson }}
         {{ comma() }}{{ {'label': t('project_create'), 'note': t('nav_project_create_note'), 'href': url_for('project_create'), 'icon': 'fa-plus', 'section': t('projects')}|tojson }}
+        {{ comma() }}{{ {'label': t('models_nav'), 'note': t('models_desc'), 'href': url_for('models.models_index'), 'icon': 'fa-cube', 'section': t('projects')}|tojson }}
         {% endif %}
         {% if auth_has_section_access('calculator') or auth_is_admin(current_user) %}
         {{ comma() }}{{ {'label': t('calculator'), 'note': t('nav_calculator_note'), 'href': url_for('calculator'), 'icon': 'fa-calculator', 'section': t('projects')}|tojson }}

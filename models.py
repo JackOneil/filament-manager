@@ -341,8 +341,18 @@ class ProjectFile(db.Model):
     uploaded_at = db.Column(db.DateTime, default=_utc_now)
     version = db.Column(db.Integer, nullable=False, default=1)
     parent_file_id = db.Column(db.Integer, db.ForeignKey('project_file.id', ondelete='SET NULL'), nullable=True)
+    display_name = db.Column(db.String(255), nullable=True)
+    file_size_bytes = db.Column(db.Integer, nullable=True)
+    mime_type = db.Column(db.String(120), nullable=True)
+    checksum_sha256 = db.Column(db.String(64), nullable=True)
+    thumbnail_path = db.Column(db.String(255), nullable=True)
+    version_note = db.Column(db.Text, nullable=True)
+    uploaded_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
+
     project = db.relationship('Project', backref=db.backref('files', lazy=True, cascade="all, delete-orphan"))
     versions = db.relationship('ProjectFile', backref=db.backref('parent', remote_side='ProjectFile.id'), lazy=True, cascade='all, delete-orphan')
+    uploaded_by = db.relationship('User', backref=db.backref('uploaded_files', lazy=True))
+
 
 
 class ProjectLink(db.Model):

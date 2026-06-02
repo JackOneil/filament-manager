@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.101.0***
+*Current version: **v1.102.4***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -31,7 +31,7 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 - **File Versioning** — Re-uploading a file with the same name automatically creates a versioned history grouped under the root file.
 - **Image Thumbnails** — Image attachments (JPG/PNG/GIF/WEBP) in the Files tab show a 40×40 clickable thumbnail that opens a full-screen lightbox.
 - **Print Cost Calculator** — Enter model weight and print time, see exact material + electricity cost. Save quotes to projects with margin and customer pricing, and export them using fully self-hosted invoice templates (simple, detailed, or pro-forma) with sequential invoice numbering.
-- **3D Model Viewer** — Interactive in-browser preview of `.stl` and `.3mf` files attached to projects.
+- **Central 3D Model Browser** — Central model browser featuring interactive 3D mesh rendering, material colors, timeline history, and WebGL canvas snapshots.
 
 ### Multi-User Workspace
 - **Role-Based Access** — Administrators have full read/write access; regular users see only permitted sections and their own projects.
@@ -116,6 +116,7 @@ filament/
 │   ├── backup.py           #   Full export / import (backup & restore)
 │   ├── backup_helpers.py   #   Backup helpers (export/import serialization)
 │   ├── waste.py            #   Waste/scrap tracking
+│   ├── models.py           #   Central 3D model browser, details, timeline, and thumbnails
 │   ├── auth.py             #   Auth routes (login, register, users)
 │   └── pwa.py              #   PWA manifest and service worker
 │
@@ -258,6 +259,7 @@ Tests cover: authentication flows, Bambu sync idempotency, stock deduction logic
 - Public share links for client-facing read-only project views
 - Emoji reactions on project comments
 - Image thumbnails with lightbox in project file attachments
+- Central 3D Model Browser with interactive previewer, material colors, timeline versioning, and canvas-to-thumbnail snapshots
 
 ### 🔮 Potential Future Work
 - OctoPrint integration

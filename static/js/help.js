@@ -674,6 +674,43 @@
             ]
         },
         {
+            id: 'models',
+            icon: 'fa-cube',
+            hasTour: false,
+            endpoints: ['models_index', 'model_detail'],
+            title: { cs: 'Modely', en: 'Models' },
+            tips: [
+                {
+                    title: { cs: 'Prohlížeč 3D modelů', en: '3D Model Browser' },
+                    text: {
+                        cs: 'Stránka Modely slouží jako centralizovaný katalog všech 3D modelů (soubory formátů STL, 3MF, OBJ, atd.) nahraných napříč všemi vašimi projekty. Můžete je prohledávat, filtrovat podle projektu či přípony, a řadit podle názvu, velikosti či data nahrání.',
+                        en: 'The Models page serves as a centralized catalog of all 3D models (STL, 3MF, OBJ, etc. file formats) uploaded across all your projects. You can search them, filter by project or file extension, and sort by name, size, or upload date.'
+                    }
+                },
+                {
+                    title: { cs: 'Verzování a historie', en: 'Versioning and History' },
+                    text: {
+                        cs: 'Každý model podporuje více verzí. Při nahrání nového souboru se automaticky navýší verze. V detailu modelu vidíte přehlednou osu historie, kde lze stáhnout libovolnou historickou verzi nebo si ji načíst přímo do interaktivního náhledu.',
+                        en: 'Each model supports multiple versions. When you upload a new file, the version number automatically increments. In the model details page, you see a complete history timeline where you can download any older version or load it directly into the interactive preview.'
+                    }
+                },
+                {
+                    title: { cs: '3D interaktivní prohlížeč', en: '3D Interactive Viewer' },
+                    text: {
+                        cs: 'Detail modelu obsahuje plně interaktivní 3D prohlížeč. Můžete s modelem otáčet, přibližovat a měnit barvu materiálu (podle barev filamentů), abyste viděli, jak bude model vypadat po vytištění.',
+                        en: 'Model details include a fully interactive 3D viewer. You can rotate, zoom, and adjust the material color (matching your filament inventory) to see how the model will look when printed.'
+                    }
+                },
+                {
+                    title: { cs: 'Uložení náhledu (Snapshot)', en: 'Save Thumbnail Snapshot' },
+                    text: {
+                        cs: 'Tlačítkem „Save Thumbnail" v prohlížeči můžete pořídit snímek aktuálního pohledu 3D kamery. Tento snímek se uloží na server jako hlavní ikona modelu a zobrazí se v přehledu modelů.',
+                        en: 'Using the "Save Thumbnail" button in the viewer, you can take a screenshot of the current 3D camera viewpoint. This screenshot is saved to the server as the model\'s primary icon and displayed in the catalog.'
+                    }
+                }
+            ]
+        },
+        {
             id: 'general',
             icon: 'fa-circle-info',
             endpoints: [],

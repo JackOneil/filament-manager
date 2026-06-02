@@ -941,37 +941,82 @@ function projectFilamentPicker() {
 </script>
 
 <script>
-let viewerInstance = null;
+/**
+ * 3D Viewer — iframe-isolated bridge (project detail page)
+ *
+ * The heavy O3DV model parsing runs inside an <iframe> so it cannot block
+ * the parent page's event loop.  Communication uses window.postMessage
+ * with strict same-origin validation.
+ */
+let viewerInstance = null;      // kept for API compat (unused but referenced)
+let _viewerIframe = null;
+let _viewerReady  = false;
+let _pendingCmd   = null;
 let _viewerCurrentUrl = null;
 let _viewerColorDebounce = null;
 
-function hexToRgb(hex) {
-    const normalized = (hex || '#3b82f6').replace('#', '');
-    const value = normalized.length === 3 ? normalized.split('').map(ch => ch + ch).join('') : normalized;
-    const intValue = parseInt(value, 16);
-    return {
-        r: (intValue >> 16) & 255,
-        g: (intValue >> 8) & 255,
-        b: intValue & 255,
-    };
+function _getViewerContainer() {
+    return document.getElementById('3d-viewer-container');
 }
 
+function _ensureIframe() {
+    if (_viewerIframe) return _viewerIframe;
+
+    const container = _getViewerContainer();
+    if (!container) return null;
+
+    _viewerReady = false;
+
+    const iframe = document.createElement('iframe');
+    iframe.src = "{{ url_for('static', filename='viewer.html') }}";
+    iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;';
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+    iframe.setAttribute('loading', 'eager');
+    iframe.setAttribute('title', '3D Model Viewer');
+    container.appendChild(iframe);
+
+    _viewerIframe = iframe;
+    return iframe;
+}
+
+function _postToViewer(msg) {
+    if (!_viewerIframe || !_viewerIframe.contentWindow) return;
+    // TODO(security): origin is restricted to same-origin (self)
+    _viewerIframe.contentWindow.postMessage(msg, window.location.origin);
+}
+
+/* Message handler from iframe */
+window.addEventListener('message', function(event) {
+    // TODO(security): strict same-origin check
+    if (event.origin !== window.location.origin) return;
+
+    var msg = event.data;
+    if (!msg || msg.source !== 'o3d-viewer') return;
+
+    switch (msg.type) {
+        case 'ready':
+            _viewerReady = true;
+            if (_pendingCmd) {
+                _postToViewer(_pendingCmd);
+                _pendingCmd = null;
+            }
+            break;
+
+        // 'loading', 'loaded', 'failed' — no action needed for modal viewer
+        default:
+            break;
+    }
+});
+
 function _doInitViewer(url, colorHex) {
-    window.loadScript("{{ url_for('static', filename='js/o3dv.min.js') }}")
-        .then(() => {
-            const container = document.getElementById('3d-viewer-container');
-            if (!container) return;
-            container.innerHTML = '';
-            const color = hexToRgb(colorHex);
-            viewerInstance = new OV.EmbeddedViewer(container, {
-                backgroundColor: new OV.RGBAColor(15, 23, 42, 255),
-                defaultColor: new OV.RGBColor(color.r, color.g, color.b)
-            });
-            viewerInstance.LoadModelFromUrlList([url]);
-        })
-        .catch(err => {
-            console.error("Failed to load Online3DViewer library", err);
-        });
+    _ensureIframe();
+
+    var cmd = { type: 'loadModel', url: url, color: colorHex || '#3b82f6' };
+    if (_viewerReady) {
+        _postToViewer(cmd);
+    } else {
+        _pendingCmd = cmd;
+    }
 }
 
 function open3DViewer(url, colorHex) {
@@ -982,15 +1027,21 @@ function open3DViewer(url, colorHex) {
         _doInitViewer(url, colorHex);
     } else {
         // Same model, color changed — debounce to avoid reload spam while dragging picker
-        _viewerColorDebounce = setTimeout(() => _doInitViewer(url, colorHex), 350);
+        _viewerColorDebounce = setTimeout(function() { _doInitViewer(url, colorHex); }, 350);
     }
 }
 
 function close3DViewer() {
     clearTimeout(_viewerColorDebounce);
+    if (_viewerIframe) {
+        _postToViewer({ type: 'destroy' });
+        _viewerIframe.remove();
+        _viewerIframe = null;
+        _viewerReady = false;
+    }
     _viewerCurrentUrl = null;
-    viewerInstance = null;
 }
+
 
 // Interactive markdown checkboxes — toggle without entering edit mode
 document.addEventListener('click', function (e) {

@@ -1,0 +1,716 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div x-data="modelDetailApp()" x-init="init()" class="space-y-6">
+    <!-- Top Bar / Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div class="flex items-center gap-3 min-w-0">
+            <a href="{{ url_for('models.models_index') }}" class="ui-badge h-10 w-10 justify-center flex-shrink-0" title="{{ t('back') }}">
+                <i class="fa-solid fa-arrow-left text-sm"></i>
+            </a>
+            <div class="min-w-0">
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-[var(--ui-text)] truncate" title="{{ root.display_name }}">
+                    {{ root.display_name }}
+                </h1>
+                <div class="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-slate-400">
+                    <span class="font-bold uppercase tracking-wider text-gray-400">{{ t('project_client') }}:</span>
+                    {% if root.project %}
+                    <a href="{{ url_for('project_detail', id=root.project.id) }}" class="hover:underline font-semibold text-blue-600 dark:text-blue-400 truncate">
+                        {{ root.project.name }}
+                    </a>
+                    {% else %}
+                    <span class="italic">—</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Actions -->
+        <div class="flex flex-wrap items-center gap-2 flex-shrink-0">
+            <button type="button" @click="openEditModal()" class="ui-badge h-10 px-4 justify-center gap-1.5 font-bold">
+                <i class="fa-solid fa-pen-to-square"></i> {{ t('models_edit_metadata') }}
+            </button>
+            <button type="button" @click="openUploadModal()" class="ui-badge ui-badge-brand h-10 px-4 justify-center gap-1.5 font-bold">
+                <i class="fa-solid fa-cloud-arrow-up"></i> {{ t('models_add_version') }}
+            </button>
+            <a href="{{ url_for('models.model_download_latest', root_id=root.id) }}" class="ui-badge ui-badge-success h-10 px-4 justify-center gap-1.5 font-bold">
+                <i class="fa-solid fa-download"></i> {{ t('models_download_latest') }}
+            </a>
+        </div>
+    </div>
+
+    <!-- Warnings (e.g. Same checksum uploaded) -->
+    {% if same_checksum %}
+    <!-- same_checksum=1 -->
+    <div class="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 p-4 rounded-2xl flex gap-3 text-amber-800 dark:text-amber-300">
+        <i class="fa-solid fa-triangle-exclamation text-xl flex-shrink-0 mt-0.5"></i>
+        <div class="text-sm font-medium">
+            {{ t('models_same_checksum_warn') }}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Main Workspace Layout: 3D Viewer & Metadata Split -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- Left Container: 3D Viewer -->
+        <div class="lg:col-span-8 space-y-4">
+            <div class="ui-panel overflow-hidden p-0 flex flex-col relative aspect-[16/10] bg-slate-950 border border-[var(--ui-border)] rounded-2xl group shadow-inner">
+                <!-- Viewer Canvas Container -->
+                <div id="3d-viewer-container" class="w-full h-full flex items-center justify-center relative">
+                    <!-- Activation placeholder (shown before user clicks to load the viewer) -->
+                    <div x-show="!viewerActivated && supportedFormat" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 text-gray-400 p-6 text-center z-20">
+                        <i class="fa-solid fa-cube text-5xl mb-4 opacity-40"></i>
+                        <div class="font-bold text-lg mb-2 text-white">{{ t('models_load_3d_preview') }}</div>
+                        <p class="text-xs text-gray-500 max-w-sm mb-6">{{ t('models_load_3d_preview_desc') }}</p>
+                        <button type="button" @click="activateViewer()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-xl transition shadow-lg flex items-center gap-2">
+                            <i class="fa-solid fa-play"></i> {{ t('models_load_3d_preview_btn') }}
+                        </button>
+                    </div>
+
+                    <!-- Placeholder/Loading state -->
+                    <div x-show="viewerLoading" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 text-gray-400 z-10 transition-opacity">
+                        <i class="fa-solid fa-spinner fa-spin text-4xl text-blue-500 mb-3" style="will-change: transform; transform: translate3d(0,0,0); backface-visibility: hidden;"></i>
+                        <span class="text-sm font-semibold tracking-wide" x-text="viewerStatus"></span>
+                    </div>
+
+                    <!-- Non-supported extension fallback -->
+                    <div x-show="!supportedFormat" style="display: none;" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 text-gray-400 p-6 text-center">
+                        <i class="fa-solid fa-cube text-5xl mb-4 opacity-40"></i>
+                        <div class="font-bold text-lg mb-2 text-white">{{ t('models_fallback_preview') }}</div>
+                        <p class="text-xs text-gray-500 max-w-sm">{{ t('models_model_file') }}: <span class="font-mono text-gray-300" x-text="activeFilename"></span></p>
+                    </div>
+                </div>
+
+                <!-- Floating Canvas overlay controls (only shown when viewer is active) -->
+                <div x-show="viewerActivated && supportedFormat" class="absolute bottom-4 left-4 right-4 flex justify-between items-center pointer-events-none z-20">
+                    <div class="bg-black/60 backdrop-blur-md border border-white/10 px-4 py-2 rounded-xl shadow-lg flex items-center gap-3 pointer-events-auto">
+                        <span class="text-xs font-bold text-white uppercase tracking-wider" x-text="activeVersionLabel"></span>
+                        <div class="h-4 w-px bg-white/20"></div>
+                        <span class="text-xs font-semibold text-gray-300 truncate max-w-[200px]" x-text="activeFilename"></span>
+                    </div>
+
+                    <div class="flex gap-2 pointer-events-auto">
+                        <button type="button" @click="captureThumbnail()" class="bg-white/90 hover:bg-white text-slate-900 h-9 px-3 rounded-xl transition font-bold text-xs flex items-center gap-1.5 shadow" title="Save this camera viewpoint as the main thumbnail">
+                            <i class="fa-solid fa-camera"></i> Save Thumbnail
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Container: Metadata & Selection Controls -->
+        <div class="lg:col-span-4 space-y-6">
+            <div class="ui-panel space-y-5">
+                <h3 class="text-lg font-bold text-[var(--ui-text)] border-b border-[var(--ui-border)] pb-2">
+                    {{ t('models_preview') }}
+                </h3>
+
+                <!-- Model Color Selector -->
+                <div x-show="supportedFormat" class="space-y-2">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">
+                        {{ t('models_select_material_color') }}
+                    </label>
+                    <div class="flex items-center gap-3">
+                        <input type="color" x-model="viewerColor" @input="updateViewerColor()" class="h-9 w-12 rounded-xl border border-[var(--ui-border)] bg-transparent p-0.5 cursor-pointer flex-shrink-0">
+                        <div class="text-xs text-gray-500 dark:text-slate-400 leading-tight">
+                            <span>Adjust the preview material tint. Drag the picker to dynamically paint the 3D canvas mesh.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed metadata grid -->
+                <div class="space-y-4">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">
+                        {{ t('models_filename') }}
+                    </label>
+                    <div class="text-sm font-semibold text-[var(--ui-text)] truncate font-mono" x-text="activeFilename" :title="activeFilename"></div>
+
+                    <div class="grid grid-cols-2 gap-4 pt-2 border-t border-[var(--ui-border)]">
+                        <div>
+                            <span class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">{{ t('models_model_size') }}</span>
+                            <span class="text-sm font-bold text-[var(--ui-text)]" x-text="activeSizeFormatted"></span>
+                        </div>
+                        <div>
+                            <span class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">{{ t('models_version') }}</span>
+                            <span class="text-sm font-bold text-[var(--ui-text)]" x-text="activeVersionNumber"></span>
+                        </div>
+                    </div>
+
+                    <div class="pt-2 border-t border-[var(--ui-border)] space-y-1">
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">{{ t('models_model_checksum') }}</span>
+                        <span class="text-xs font-semibold text-gray-500 dark:text-slate-400 block font-mono break-all leading-relaxed" x-text="activeChecksum || '—'"></span>
+                    </div>
+
+                    <div class="pt-2 border-t border-[var(--ui-border)] space-y-1">
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">{{ t('models_model_mime') }}</span>
+                        <span class="text-xs font-semibold text-gray-500 dark:text-slate-400 block font-mono" x-text="activeMime || '—'"></span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 pt-2 border-t border-[var(--ui-border)]">
+                        <div>
+                            <span class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">{{ t('models_uploaded_by') }}</span>
+                            <span class="text-xs font-bold text-[var(--ui-text)]" x-text="activeUploadedBy || '—'"></span>
+                        </div>
+                        <div>
+                            <span class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">{{ t('models_uploaded_at') }}</span>
+                            <span class="text-xs font-bold text-[var(--ui-text)]" x-text="activeUploadedAt || '—'"></span>
+                        </div>
+                    </div>
+
+                    <!-- Version Note / Changelog -->
+                    <div class="pt-2 border-t border-[var(--ui-border)] space-y-1">
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">{{ t('models_note') }}</span>
+                        <p class="text-xs text-gray-500 dark:text-slate-400 leading-relaxed italic" x-text="activeVersionNote || 'No description provided for this version.'"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Container: Version History Timeline -->
+    <div class="ui-panel">
+        <h3 class="text-lg font-bold text-[var(--ui-text)] border-b border-[var(--ui-border)] pb-3 mb-6">
+            <i class="fa-solid fa-clock-rotate-left text-gray-400 mr-1.5"></i> {{ t('models_version_history') }}
+        </h3>
+
+        <div class="relative pl-6 border-l-2 border-gray-200 dark:border-slate-800 space-y-8">
+            {% for ver in history %}
+            {% set is_latest = (ver.id == latest.id) %}
+            <div class="relative">
+                <!-- Timeline dot indicator -->
+                <div class="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full border-2 bg-white dark:bg-slate-900 shadow-sm transition duration-200
+                            {% if is_latest %}border-emerald-500 bg-emerald-500{% else %}border-gray-300 dark:border-slate-700{% endif %}">
+                </div>
+
+                <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 bg-gray-50/40 dark:bg-slate-900/10 border border-[var(--ui-border)] p-4 rounded-2xl transition duration-150 hover:bg-gray-50/70 dark:hover:bg-slate-900/20">
+                    <div class="space-y-1.5 min-w-0">
+                        <div class="flex items-center flex-wrap gap-2">
+                            <span class="font-bold text-[var(--ui-text)] text-sm">
+                                {{ t('models_version') }} {{ ver.version }}
+                            </span>
+                            {% if is_latest %}
+                            <span class="ui-badge ui-badge-success text-[10px] font-extrabold px-2 py-0">
+                                {{ t('models_latest_badge') }}
+                            </span>
+                            {% endif %}
+                            <span class="text-xs text-gray-400 dark:text-slate-500 font-mono truncate max-w-xs" title="{{ ver.filename }}">
+                                ({{ ver.filename }})
+                            </span>
+                        </div>
+
+                        <!-- Date & User details -->
+                        <div class="text-[11px] text-gray-400 dark:text-slate-500 flex items-center flex-wrap gap-x-3 gap-y-1">
+                            <span>
+                                <i class="fa-regular fa-calendar mr-1"></i> {{ ver.uploaded_at | fmt_dt('%d.%m.%Y %H:%M') }}
+                            </span>
+                            <span>
+                                <i class="fa-regular fa-user mr-1"></i> 
+                                {% if ver.uploaded_by %}
+                                    {{ ver.uploaded_by.name or ver.uploaded_by.email }}
+                                {% else %}
+                                    System
+                                {% endif %}
+                            </span>
+                            <span>
+                                <i class="fa-regular fa-hard-drive mr-1"></i> 
+                                {% if ver.file_size_bytes %}
+                                    {% if ver.file_size_bytes >= 1048576 %}
+                                        {{ (ver.file_size_bytes / 1048576) | round(1) }} MB
+                                    {% elif ver.file_size_bytes >= 1024 %}
+                                        {{ (ver.file_size_bytes / 1024) | round(1) }} KB
+                                    {% else %}
+                                        {{ ver.file_size_bytes }} B
+                                    {% endif %}
+                                {% else %}
+                                    0 B
+                                {% endif %}
+                            </span>
+                        </div>
+
+                        <!-- Changelog text -->
+                        {% if ver.version_note %}
+                        <p class="text-xs text-gray-600 dark:text-slate-400 mt-2 leading-relaxed bg-white/50 dark:bg-slate-900/30 p-2.5 rounded-xl border border-[var(--ui-border)]/50">
+                            {{ ver.version_note }}
+                        </p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Version Timeline Action Buttons -->
+                    <div class="flex items-center gap-1.5 flex-shrink-0 self-end md:self-start">
+                        <!-- Preview specific version inline -->
+                        {% set file_ext = ver.filename.rsplit('.', 1)[-1].lower() if '.' in ver.filename else '' %}
+                        {% if file_ext in ['3mf', 'stl', 'obj', 'amf', 'step', 'stp', 'gcode', 'gc', 'bgcode'] %}
+                        <button type="button" @click="loadModelVersion({{ ver.id }}, '{{ ver.filename }}', '{{ url_for('models.model_view_version', file_id=ver.id, filename=ver.filename) }}', {{ ver.version }}, '{{ ver.file_size_bytes }}', '{{ ver.checksum_sha256 or '' }}', '{{ ver.mime_type or '' }}', '{{ ver.uploaded_by.name or ver.uploaded_by.email if ver.uploaded_by else 'System' }}', '{{ ver.uploaded_at | fmt_dt('%d.%m.%Y %H:%M') }}', '{{ (ver.version_note or '') | replace("'", "\\'") | replace('"', '\\"') }}')" 
+                                :class="activeFileId === {{ ver.id }} ? 'ui-badge-brand' : ''" class="ui-badge h-8 px-3 gap-1" title="Interactive preview in viewer">
+                            <i class="fa-solid fa-eye text-[10px]"></i> {{ t('preview') }}
+                        </button>
+                        {% endif %}
+                        <a href="{{ url_for('models.model_download_version', file_id=ver.id) }}" class="ui-badge h-8 w-8 justify-center" title="Download version file">
+                            <i class="fa-solid fa-download text-xs"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- MODAL 1: Edit Metadata -->
+    <div x-show="editModalOpen" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs" @keydown.escape.window="editModalOpen = false">
+        <div class="ui-panel w-full max-w-lg shadow-2xl relative" @click.away="editModalOpen = false">
+            <button type="button" @click="editModalOpen = false" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-xl font-bold text-[var(--ui-text)] mb-4">
+                {{ t('models_edit_metadata') }}
+            </h3>
+            <form action="{{ url_for('models.model_edit', root_id=root.id) }}" method="POST" class="space-y-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">
+                        {{ t('models_edit_display_name') }} <span class="text-red-500">*</span>
+                    </label>
+                    <input type="text" name="display_name" value="{{ root.display_name }}" required class="ui-input">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">
+                        {{ t('models_edit_version_note') }} (v{{ latest.version }})
+                    </label>
+                    <textarea name="version_note" rows="3" class="ui-input">{{ latest.version_note or '' }}</textarea>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" @click="editModalOpen = false" class="ui-badge h-10 px-4">
+                        {{ t('cancel') }}
+                    </button>
+                    <button type="submit" class="ui-badge ui-badge-brand h-10 px-4 font-bold">
+                        {{ t('save') }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Upload Version -->
+    <div x-show="uploadModalOpen" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs" @keydown.escape.window="uploadModalOpen = false">
+        <div class="ui-panel w-full max-w-lg shadow-2xl relative" @click.away="uploadModalOpen = false">
+            <button type="button" @click="uploadModalOpen = false" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-xl font-bold text-[var(--ui-text)] mb-4">
+                {{ t('models_upload_new_version') }}
+            </h3>
+            <form action="{{ url_for('models.model_upload_version', root_id=root.id) }}" method="POST" enctype="multipart/form-data" class="space-y-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">
+                        {{ t('models_model_file') }} <span class="text-red-500">*</span>
+                    </label>
+                    <input type="file" name="file" required class="ui-input" accept=".3mf,.stl,.obj,.amf,.step,.stp,.gcode,.gc,.bgcode">
+                    <div class="text-[10px] text-gray-400 mt-1">
+                        Allowed formats: 3MF, STL, OBJ, AMF, STEP, STP, GCODE, GC, BGCODE
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">
+                        {{ t('models_edit_version_note') }}
+                    </label>
+                    <textarea name="version_note" rows="3" placeholder="Describe what changed in this version..." class="ui-input"></textarea>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" @click="uploadModalOpen = false" class="ui-badge h-10 px-4">
+                        {{ t('cancel') }}
+                    </button>
+                    <button type="submit" class="ui-badge ui-badge-brand h-10 px-4 font-bold">
+                        {{ t('models_upload_btn') }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
+/**
+ * 3D Viewer — iframe-isolated bridge
+ *
+ * The heavy O3DV model parsing runs inside an <iframe> so it cannot block
+ * the parent page's event loop.  Communication uses window.postMessage
+ * with strict same-origin validation.
+ */
+let _viewerIframe = null;
+let _viewerReady  = false;
+let _pendingCmd   = null;          // queued command while iframe boots
+let _viewerCurrentUrl = null;
+let _viewerColorDebounce = null;
+let _thumbnailResolver = null;     // resolve callback for screenshot promise
+
+/* ---------- Toast helper (local, no deps) ---------- */
+function showToast(message, type) {
+    type = type || 'success';
+    let container = document.getElementById('local-toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'local-toast-container';
+        container.className = 'fixed top-20 right-4 z-50 flex flex-col gap-3 w-full max-w-sm px-4 sm:px-0 pointer-events-none';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    const cls = type === 'error'
+        ? 'bg-red-50/95 border-red-200 text-red-800 dark:bg-red-900/95 dark:border-red-700 dark:text-red-100'
+        : 'bg-green-50/95 border-green-200 text-green-800 dark:bg-green-900/95 dark:border-green-700 dark:text-green-100';
+    toast.className = 'rounded-lg border px-4 py-3 shadow-xl flex items-start gap-3 backdrop-blur-md pointer-events-auto transition duration-300 transform translate-x-8 opacity-0 ' + cls;
+
+    const iconCls = type === 'error'
+        ? 'fa-solid fa-circle-exclamation text-red-500 dark:text-red-300'
+        : 'fa-solid fa-circle-check text-green-500 dark:text-green-300';
+
+    // Build DOM safely (no innerHTML with user data)
+    const iconWrap = document.createElement('div');
+    iconWrap.className = 'mt-0.5';
+    const icon = document.createElement('i');
+    icon.className = iconCls;
+    iconWrap.appendChild(icon);
+
+    const body = document.createElement('div');
+    body.className = 'flex-grow font-medium text-sm';
+    body.textContent = message;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'opacity-50 hover:opacity-100 focus:outline-none transition-opacity';
+    const closeIcon = document.createElement('i');
+    closeIcon.className = 'fa-solid fa-xmark';
+    closeBtn.appendChild(closeIcon);
+    closeBtn.addEventListener('click', function() {
+        toast.classList.add('opacity-0', 'translate-x-8');
+        setTimeout(function() { toast.remove(); }, 300);
+    });
+
+    toast.appendChild(iconWrap);
+    toast.appendChild(body);
+    toast.appendChild(closeBtn);
+    container.appendChild(toast);
+
+    requestAnimationFrame(function() {
+        setTimeout(function() {
+            toast.classList.remove('opacity-0', 'translate-x-8');
+            toast.classList.add('opacity-100', 'translate-x-0');
+        }, 10);
+    });
+
+    setTimeout(function() {
+        if (toast.parentNode) {
+            toast.classList.add('opacity-0', 'translate-x-8');
+            setTimeout(function() { toast.remove(); }, 300);
+        }
+    }, 5000);
+}
+
+/* ---------- iframe lifecycle ---------- */
+function _getViewerContainer() {
+    return document.getElementById('3d-viewer-container');
+}
+
+function _ensureIframe() {
+    if (_viewerIframe) return _viewerIframe;
+
+    const container = _getViewerContainer();
+    if (!container) return null;
+
+    _viewerReady = false;
+
+    const iframe = document.createElement('iframe');
+    iframe.src = "{{ url_for('static', filename='viewer.html') }}";
+    iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;';
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+    iframe.setAttribute('loading', 'eager');
+    iframe.setAttribute('title', '3D Model Viewer');
+    container.appendChild(iframe);
+
+    _viewerIframe = iframe;
+    return iframe;
+}
+
+function _postToViewer(msg) {
+    if (!_viewerIframe || !_viewerIframe.contentWindow) return;
+    _viewerIframe.contentWindow.postMessage(msg, window.location.origin);
+}
+
+/* ---------- Message handler from iframe ---------- */
+window.addEventListener('message', function(event) {
+    if (event.origin !== window.location.origin) return;
+
+    const msg = event.data;
+    if (!msg || msg.source !== 'o3d-viewer') return;
+
+    switch (msg.type) {
+        case 'ready':
+            _viewerReady = true;
+            if (_pendingCmd) {
+                _postToViewer(_pendingCmd);
+                _pendingCmd = null;
+            }
+            break;
+
+        case 'loading':
+            break;
+
+        case 'loaded': {
+            const el = _getViewerContainer();
+            if (el) el.dispatchEvent(new CustomEvent('viewer:loaded'));
+            break;
+        }
+
+        case 'failed': {
+            const el2 = _getViewerContainer();
+            if (el2) el2.dispatchEvent(new CustomEvent('viewer:failed'));
+            break;
+        }
+
+        case 'thumbnail':
+            if (_thumbnailResolver) {
+                _thumbnailResolver(msg.data);
+                _thumbnailResolver = null;
+            }
+            break;
+    }
+});
+
+/* ---------- Public API used by Alpine ---------- */
+function open3DViewer(url, colorHex, onLoadCallback) {
+    clearTimeout(_viewerColorDebounce);
+
+    if (_viewerCurrentUrl !== url) {
+        _viewerCurrentUrl = url;
+        _loadInIframe(url, colorHex, onLoadCallback);
+    } else {
+        _viewerColorDebounce = setTimeout(function() {
+            _loadInIframe(url, colorHex, onLoadCallback);
+        }, 350);
+    }
+}
+
+function _loadInIframe(url, colorHex, onLoadCallback) {
+    _ensureIframe();
+
+    const container = _getViewerContainer();
+    if (container && onLoadCallback) {
+        const handler = function() {
+            container.removeEventListener('viewer:loaded', handler);
+            container.removeEventListener('viewer:failed', failHandler);
+            onLoadCallback();
+        };
+        const failHandler = function() {
+            container.removeEventListener('viewer:loaded', handler);
+            container.removeEventListener('viewer:failed', failHandler);
+            onLoadCallback();
+        };
+        container.addEventListener('viewer:loaded', handler);
+        container.addEventListener('viewer:failed', failHandler);
+    }
+
+    const cmd = { type: 'loadModel', url: url, color: colorHex || '#3b82f6' };
+    if (_viewerReady) {
+        _postToViewer(cmd);
+    } else {
+        _pendingCmd = cmd;
+    }
+}
+
+function close3DViewer() {
+    clearTimeout(_viewerColorDebounce);
+    if (_viewerIframe) {
+        _postToViewer({ type: 'destroy' });
+        _viewerIframe.remove();
+        _viewerIframe = null;
+        _viewerReady = false;
+    }
+    _viewerCurrentUrl = null;
+}
+
+function requestScreenshot() {
+    return new Promise(function(resolve) {
+        _thumbnailResolver = resolve;
+        _postToViewer({ type: 'captureScreenshot' });
+        // Timeout safety — resolve with error after 5 s
+        setTimeout(function() {
+            if (_thumbnailResolver === resolve) {
+                _thumbnailResolver = null;
+                resolve({ success: false, error: 'Screenshot timeout' });
+            }
+        }, 5000);
+    });
+}
+
+/* ---------- Alpine component ---------- */
+function modelDetailApp() {
+    return {
+        editModalOpen: false,
+        uploadModalOpen: false,
+        viewerLoading: false,
+        viewerActivated: false,
+        viewerStatus: '{{ t("loading") }}...',
+        supportedFormat: true,
+
+        // Active Version metadata state
+        activeFileId: {{ latest.id }},
+        activeFilename: "{{ latest.filename }}",
+        activeVersionNumber: {{ latest.version }},
+        activeVersionLabel: "{{ t('models_version').lower() }} {{ latest.version }}",
+        activeSizeRaw: {{ latest.file_size_bytes or 0 }},
+        activeChecksum: "{{ latest.checksum_sha256 or '' }}",
+        activeMime: "{{ latest.mime_type or '' }}",
+        activeUploadedBy: "{% if latest.uploaded_by %}{{ latest.uploaded_by.name or latest.uploaded_by.email }}{% else %}System{% endif %}",
+        activeUploadedAt: "{{ latest.uploaded_at | fmt_dt('%d.%m.%Y %H:%M') }}",
+        activeVersionNote: "{{ (latest.version_note or '') | replace("'", "\\'") | replace('"', '\\"') }}",
+
+        viewerColor: '#3b82f6',
+        modelViewerUrl: null,
+
+        init() {
+            const ext = this.activeFilename.split('.').pop().toLowerCase();
+            const allowed = ['3mf', 'stl', 'obj', 'amf', 'step', 'stp', 'gcode', 'gc', 'bgcode'];
+
+            if (allowed.includes(ext)) {
+                this.supportedFormat = true;
+                this.modelViewerUrl = "{{ url_for('models.model_view_version', file_id=latest.id, filename=latest.filename) }}";
+                // Defer heavy O3DV loading — user must click "Load Preview" first
+                this.viewerLoading = false;
+            } else {
+                this.supportedFormat = false;
+                this.viewerLoading = false;
+            }
+        },
+
+        activateViewer() {
+            this.viewerActivated = true;
+            if (!this.modelViewerUrl) return;
+            // Pass the server URL directly to the iframe — it fetches the model
+            // with gzip compression via Flask-Compress.
+            this.loadViewer(this.modelViewerUrl);
+        },
+
+        get activeSizeFormatted() {
+            const size = this.activeSizeRaw;
+            if (size >= 1048576) {
+                return (size / 1048576).toFixed(1) + ' MB';
+            } else if (size >= 1024) {
+                return (size / 1024).toFixed(1) + ' KB';
+            }
+            return size + ' B';
+        },
+
+        loadViewer(url) {
+            this.viewerLoading = true;
+            this.viewerStatus = '{{ t("loading") }}...';
+            open3DViewer(url, this.viewerColor, () => {
+                this.viewerLoading = false;
+                {% if not latest.thumbnail_path %}
+                this.autoGenerateThumbnail();
+                {% endif %}
+            });
+        },
+
+        updateViewerColor() {
+            if (this.supportedFormat && this.viewerActivated && this.modelViewerUrl) {
+                open3DViewer(this.modelViewerUrl, this.viewerColor);
+            }
+        },
+
+        loadModelVersion(id, filename, url, version, sizeBytes, checksum, mime, uploadedBy, uploadedAt, note) {
+            this.activeFileId = id;
+            this.activeFilename = filename;
+            this.activeVersionNumber = version;
+            this.activeVersionLabel = "{{ t('models_version').lower() }} " + version;
+            this.activeSizeRaw = parseInt(sizeBytes, 10) || 0;
+            this.activeChecksum = checksum;
+            this.activeMime = mime;
+            this.activeUploadedBy = uploadedBy;
+            this.activeUploadedAt = uploadedAt;
+            this.activeVersionNote = note;
+
+            const ext = filename.split('.').pop().toLowerCase();
+            const allowed = ['3mf', 'stl', 'obj', 'amf', 'step', 'stp', 'gcode', 'gc', 'bgcode'];
+
+            if (allowed.includes(ext)) {
+                this.supportedFormat = true;
+                this.modelViewerUrl = url;
+                this.viewerActivated = true;
+                this.loadViewer(url);
+            } else {
+                this.supportedFormat = false;
+                this.viewerLoading = false;
+                close3DViewer();
+            }
+        },
+
+        openEditModal() {
+            this.editModalOpen = true;
+        },
+
+        openUploadModal() {
+            this.uploadModalOpen = true;
+        },
+
+        // Manual canvas snapshot capture
+        captureThumbnail() {
+            const self = this;
+            requestScreenshot().then(function(result) {
+                if (!result || !result.success) {
+                    showToast(result && result.error ? result.error : 'Could not capture screenshot.', 'error');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('image', result.imageData);
+
+                const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                if (csrfMeta) {
+                    formData.append('csrf_token', csrfMeta.content);
+                }
+
+                fetch('/models/version/' + self.activeFileId + '/thumbnail', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        showToast('Model thumbnail successfully captured!', 'success');
+                    } else {
+                        showToast('Failed to save captured thumbnail.', 'error');
+                    }
+                })
+                .catch(function(err) {
+                    showToast('Error sending thumbnail to server.', 'error');
+                });
+            });
+        },
+
+        // Automatic background canvas snapshot capture (silent, no toast)
+        autoGenerateThumbnail() {
+            const self = this;
+            requestScreenshot().then(function(result) {
+                if (!result || !result.success) return;
+
+                const formData = new FormData();
+                formData.append('image', result.imageData);
+
+                const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                if (csrfMeta) {
+                    formData.append('csrf_token', csrfMeta.content);
+                }
+
+                fetch('/models/version/' + self.activeFileId + '/thumbnail', {
+                    method: 'POST',
+                    body: formData
+                });
+            });
+        }
+    };
+}
+</script>
+{% endblock %}
+

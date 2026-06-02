@@ -1,0 +1,365 @@
+import os
+import math
+import hashlib
+import mimetypes
+from datetime import datetime
+from types import SimpleNamespace
+
+from flask import (
+    Blueprint, render_template, request, redirect, url_for,
+    jsonify, send_from_directory, abort, flash, current_app
+)
+from werkzeug.utils import secure_filename
+
+from database import db
+from auth import get_current_user, is_admin
+from models import Project, ProjectFile, AppSetting, User
+from utils import escape_like, utc_now, translate
+
+bp = Blueprint('models', __name__)
+
+MODEL_EXTENSIONS = {'3mf', 'stl', 'obj', 'amf', 'step', 'stp', 'gcode', 'gc', 'bgcode'}
+
+def _get_projects():
+    user = get_current_user()
+    if is_admin(user):
+        return Project.query.order_by(Project.name.asc()).all()
+    if not user:
+        return []
+    return Project.query.filter_by(owner_user_id=user.id).order_by(Project.name.asc()).all()
+
+def _get_latest_version(root_file):
+    if not root_file.versions:
+        return root_file
+    all_versions = [root_file] + root_file.versions
+    all_versions.sort(key=lambda f: f.version, reverse=True)
+    return all_versions[0]
+
+def _check_project_access(project_id):
+    project = Project.query.get_or_404(project_id)
+    user = get_current_user()
+    if is_admin(user):
+        return project
+    if user and project.owner_user_id == user.id:
+        return project
+    abort(404)
+
+def _check_file_access(file_id):
+    f = ProjectFile.query.get_or_404(file_id)
+    _check_project_access(f.project_id)
+    return f
+
+def _is_allowed_model_file(filename):
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+    return ext in MODEL_EXTENSIONS
+
+def _get_file_size_and_checksum(filepath):
+    try:
+        size = os.path.getsize(filepath)
+        sha = hashlib.sha256()
+        with open(filepath, 'rb') as fh:
+            while chunk := fh.read(8192):
+                sha.update(chunk)
+        return size, sha.hexdigest()
+    except OSError:
+        return 0, None
+
+@bp.route('/models')
+def models_index():
+    projects = _get_projects()
+    setting = AppSetting.query.first()
+    return render_template(
+        'models_index.html',
+        projects=projects,
+        setting=setting,
+        model_extensions=sorted(list(MODEL_EXTENSIONS))
+    )
+
+@bp.route('/api/models-list')
+def api_models_list():
+    query = ProjectFile.query.join(Project).filter(ProjectFile.parent_file_id.is_(None))
+    
+    if not is_admin():
+        query = query.filter(Project.owner_user_id == get_current_user().id)
+        
+    conditions = []
+    for ext in MODEL_EXTENSIONS:
+        conditions.append(ProjectFile.filename.like(f'%.{ext}'))
+    query = query.filter(db.or_(*conditions))
+
+    # Search & filters
+    fulltext = request.args.get('fulltext', '').strip()
+    if fulltext:
+        ft = f"%{escape_like(fulltext)}%"
+        query = query.filter(db.or_(
+            ProjectFile.display_name.ilike(ft),
+            ProjectFile.filename.ilike(ft),
+            Project.name.ilike(ft)
+        ))
+        
+    project_id = request.args.get('project_id', type=int)
+    if project_id:
+        query = query.filter(ProjectFile.project_id == project_id)
+        
+    file_type = request.args.get('file_type', '').strip().lower()
+    if file_type:
+        query = query.filter(ProjectFile.filename.like(f'%.{file_type}'))
+
+    models_list = query.all()
+
+    # Enrich models for sorting
+    enriched = []
+    for root in models_list:
+        latest = _get_latest_version(root)
+        enriched.append({
+            'root': root,
+            'latest': latest,
+            'display_name': root.display_name or root.filename.rsplit('.', 1)[0],
+            'project_name': root.project.name if root.project else '',
+            'size': latest.file_size_bytes or 0,
+            'uploaded_at': latest.uploaded_at or datetime.min
+        })
+
+    # Sort
+    sort_by = request.args.get('sort_by', 'uploaded')
+    if sort_by == 'name_asc':
+        enriched.sort(key=lambda x: x['display_name'].lower())
+    elif sort_by == 'name_desc':
+        enriched.sort(key=lambda x: x['display_name'].lower(), reverse=True)
+    elif sort_by == 'project':
+        enriched.sort(key=lambda x: x['project_name'].lower())
+    elif sort_by == 'size_desc':
+        enriched.sort(key=lambda x: x['size'], reverse=True)
+    else:  # uploaded
+        enriched.sort(key=lambda x: x['uploaded_at'], reverse=True)
+
+    # Paginate
+    page = request.args.get('page', 1, type=int)
+    setting = AppSetting.query.first()
+    per_page = setting.items_per_page if setting and setting.items_per_page in [12, 24, 48, 96] else 12
+    
+    total = len(enriched)
+    pages = max(1, math.ceil(total / per_page))
+    page = min(max(page, 1), pages)
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    
+    paginated_items = enriched[start_idx:end_idx]
+    
+    # Custom pagination pages generator for safety
+    page_list = list(range(1, pages + 1))
+    
+    pagination = SimpleNamespace(
+        page=page,
+        pages=pages,
+        total=total,
+        has_prev=page > 1,
+        has_next=page < pages,
+        prev_num=page - 1 if page > 1 else 1,
+        next_num=page + 1 if page < pages else pages,
+        page_list=page_list
+    )
+
+    view_mode = request.args.get('view', 'card')
+    template_name = '_models_cards.html' if view_mode == 'card' else '_models_rows.html'
+    
+    html = render_template(
+        template_name,
+        models=paginated_items,
+        pagination=pagination
+    )
+    return jsonify({'html': html})
+
+@bp.route('/models/<int:root_id>')
+def model_detail(root_id):
+    root_file = _check_file_access(root_id)
+    if root_file.parent_file_id is not None:
+        # Must always open details of the root file
+        return redirect(url_for('models.model_detail', root_id=root_file.parent_file_id))
+        
+    latest = _get_latest_version(root_file)
+    
+    # Compile history: root file first, then subsequent versions sorted by version number
+    history = [root_file] + root_file.versions
+    history.sort(key=lambda f: f.version, reverse=True)
+    
+    # Check for same checksum warning flag in request
+    same_checksum = request.args.get('same_checksum') == '1'
+    
+    return render_template(
+        'models_detail.html',
+        root=root_file,
+        latest=latest,
+        history=history,
+        same_checksum=same_checksum
+    )
+
+@bp.route('/models/<int:root_id>/edit', methods=['POST'])
+def model_edit(root_id):
+    root_file = _check_file_access(root_id)
+    display_name = request.form.get('display_name', '').strip()
+    version_note = request.form.get('version_note', '').strip()
+    
+    if not display_name:
+        flash(translate('models_error_edit_name_required'), 'error')
+        return redirect(url_for('models.model_detail', root_id=root_file.id))
+        
+    latest = _get_latest_version(root_file)
+    
+    # Update display name on the root file (which propagates as the master title)
+    root_file.display_name = display_name
+    # Update note specifically on the latest version
+    latest.version_note = version_note
+    
+    db.session.commit()
+    flash(translate('models_success_edit'), 'success')
+    return redirect(url_for('models.model_detail', root_id=root_file.id))
+
+@bp.route('/models/<int:root_id>/upload-version', methods=['POST'])
+def model_upload_version(root_id):
+    root_file = _check_file_access(root_id)
+    if 'file' not in request.files:
+        flash(translate('models_error_upload'), 'error')
+        return redirect(url_for('models.model_detail', root_id=root_file.id))
+        
+    file = request.files['file']
+    if file.filename == '':
+        flash(translate('models_error_upload'), 'error')
+        return redirect(url_for('models.model_detail', root_id=root_file.id))
+        
+    if not _is_allowed_model_file(file.filename):
+        flash(translate('models_error_type'), 'error')
+        return redirect(url_for('models.model_detail', root_id=root_file.id))
+        
+    original_filename = secure_filename(file.filename)
+    if not original_filename:
+        flash(translate('models_error_type'), 'error')
+        return redirect(url_for('models.model_detail', root_id=root_file.id))
+        
+    upload_folder = current_app.config.get(
+        'PROJECT_UPLOAD_FOLDER',
+        os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'uploads')
+    )
+    
+    # Stored with unique secure format: {project_id}_{uuid.uuid4().hex[:12]}_{filename}
+    import uuid
+    unique_id = uuid.uuid4().hex[:12]
+    stored_filename = f'{root_file.project_id}_{unique_id}_{original_filename}'
+    filepath = os.path.join(upload_folder, stored_filename)
+    file.save(filepath)
+    
+    # Get metadata
+    size, checksum = _get_file_size_and_checksum(filepath)
+    mime = mimetypes.guess_type(original_filename)[0] or 'application/octet-stream'
+    
+    latest = _get_latest_version(root_file)
+    new_version = latest.version + 1
+    
+    # Check for same checksum warning
+    same_checksum = (checksum is not None and latest.checksum_sha256 == checksum)
+    
+    user = get_current_user()
+    
+    new_file = ProjectFile(
+        project_id=root_file.project_id,
+        filename=original_filename,
+        filepath=filepath,
+        version=new_version,
+        parent_file_id=root_file.id,
+        display_name=root_file.display_name,
+        file_size_bytes=size,
+        mime_type=mime,
+        checksum_sha256=checksum,
+        version_note=request.form.get('version_note', '').strip() or None,
+        uploaded_by_user_id=user.id if user else None
+    )
+    
+    db.session.add(new_file)
+    db.session.commit()
+    
+    flash(translate('models_success_upload'), 'success')
+    return redirect(url_for('models.model_detail', root_id=root_file.id, same_checksum='1' if same_checksum else None))
+
+@bp.route('/models/<int:root_id>/download')
+def model_download_latest(root_id):
+    root_file = _check_file_access(root_id)
+    latest = _get_latest_version(root_file)
+    return _send_file_safely(latest, as_attachment=True)
+
+@bp.route('/models/version/<int:file_id>/download')
+def model_download_version(file_id):
+    f = _check_file_access(file_id)
+    return _send_file_safely(f, as_attachment=True)
+
+@bp.route('/models/version/<int:file_id>/view/<filename>')
+def model_view_version(file_id, filename):
+    f = _check_file_access(file_id)
+    return _send_file_safely(f, as_attachment=False)
+
+@bp.route('/models/version/<int:file_id>/thumbnail', methods=['POST'])
+def model_upload_thumbnail(file_id):
+    f = _check_file_access(file_id)
+    
+    img_data = request.form.get('image')
+    if not img_data:
+        return jsonify({'error': 'invalid data'}), 400
+        
+    is_jpeg = img_data.startswith('data:image/jpeg;base64,')
+    is_png = img_data.startswith('data:image/png;base64,')
+    
+    if not (is_jpeg or is_png):
+        return jsonify({'error': 'invalid data'}), 400
+        
+    import base64
+    raw_data = base64.b64decode(img_data.split(',')[1])
+    
+    upload_folder = current_app.config.get(
+        'PROJECT_UPLOAD_FOLDER',
+        os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'uploads')
+    )
+    thumb_dir = os.path.join(upload_folder, 'thumbnails')
+    os.makedirs(thumb_dir, exist_ok=True)
+    
+    ext = 'png' if is_png else 'jpg'
+    thumb_name = f'thumb_{f.id}.{ext}'
+    thumb_path = os.path.join(thumb_dir, thumb_name)
+    
+    with open(thumb_path, 'wb') as handle:
+        handle.write(raw_data)
+        
+    f.thumbnail_path = f'thumbnails/{thumb_name}'
+    db.session.commit()
+    
+    return jsonify({'success': True, 'path': f.thumbnail_path})
+
+@bp.route('/models/thumbnail/<int:file_id>')
+def serve_thumbnail(file_id):
+    f = _check_file_access(file_id)
+    if not f.thumbnail_path:
+        abort(404)
+    upload_folder = current_app.config.get(
+        'PROJECT_UPLOAD_FOLDER',
+        os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'uploads')
+    )
+    return send_from_directory(upload_folder, f.thumbnail_path, as_attachment=False)
+
+def _send_file_safely(project_file, as_attachment=True):
+    upload_folder = current_app.config.get(
+        'PROJECT_UPLOAD_FOLDER',
+        os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'uploads')
+    )
+    real_path = os.path.realpath(project_file.filepath)
+    real_folder = os.path.realpath(upload_folder)
+    if not real_path.startswith(real_folder + os.sep):
+        abort(403)
+        
+    return send_from_directory(
+        os.path.dirname(project_file.filepath),
+        os.path.basename(project_file.filepath),
+        as_attachment=as_attachment,
+        download_name=project_file.filename
+    )
+
+def register(app):
+    app.register_blueprint(bp)
+

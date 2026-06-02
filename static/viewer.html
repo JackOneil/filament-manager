@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Viewer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #0f172a;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  #viewer-container {
+    width: 100%; height: 100%;
+    position: relative;
+  }
+  #status-overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: #0f172a;
+    color: #94a3b8;
+    z-index: 10;
+    transition: opacity 0.3s ease;
+  }
+  #status-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid rgba(59, 130, 246, 0.2);
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    /* Force onto GPU compositor layer so animation stays smooth even if main thread blocks */
+    will-change: transform;
+    transform: translate3d(0, 0, 0);
+    backface-visibility: hidden;
+    margin-bottom: 12px;
+  }
+  @keyframes spin { to { transform: translate3d(0, 0, 0) rotate(360deg); } }
+  #status-text {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+</style>
+</head>
+<body>
+<div id="viewer-container">
+  <div id="status-overlay">
+    <div class="spinner"></div>
+    <div id="status-text">Preparing viewer…</div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  var viewerInstance = null;
+  var currentModelUrl = null;
+  var currentColor = '#3b82f6';
+  var o3dvLoaded = false;
+  var o3dvLoading = false;
+  // TODO(security): Origin validation — parentOrigin is validated against window.location.origin
+  // to ensure only same-origin parent frames can control this viewer.
+  var parentOrigin = window.location.origin;
+
+  var container = document.getElementById('viewer-container');
+  var statusOverlay = document.getElementById('status-overlay');
+  var statusText = document.getElementById('status-text');
+
+  /**
+   * Safe monkeypatch for removeChild to prevent O3DV's asynchronous
+   * internal exceptions when it tries to remove nodes that have already
+   * been removed during viewer reinitialization.
+   */
+  function patchRemoveChild(el) {
+    if (el._removeChildPatched) return;
+    var original = el.removeChild;
+    el.removeChild = function(child) {
+      if (child && child.parentNode === this) {
+        return original.call(this, child);
+      }
+      return child;
+    };
+    el._removeChildPatched = true;
+  }
+
+  function hexToRgb(hex) {
+    var normalized = (hex || '#3b82f6').replace('#', '');
+    if (normalized.length === 3) {
+      normalized = normalized.split('').map(function(c) { return c + c; }).join('');
+    }
+    var intVal = parseInt(normalized, 16);
+    return {
+      r: (intVal >> 16) & 255,
+      g: (intVal >> 8) & 255,
+      b: intVal & 255
+    };
+  }
+
+  function showStatus(msg) {
+    statusText.textContent = msg;
+    statusOverlay.classList.remove('hidden');
+  }
+
+  function hideStatus() {
+    statusOverlay.classList.add('hidden');
+  }
+
+  function sendMessage(type, data) {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ source: 'o3d-viewer', type: type, data: data || {} }, parentOrigin);
+    }
+  }
+
+  function loadO3DV(callback) {
+    if (o3dvLoaded) {
+      callback();
+      return;
+    }
+    if (o3dvLoading) {
+      // Wait for existing load
+      var interval = setInterval(function() {
+        if (o3dvLoaded) {
+          clearInterval(interval);
+          callback();
+        }
+      }, 50);
+      return;
+    }
+    o3dvLoading = true;
+    // Resolve the o3dv.min.js path relative to this viewer.html (both in /static/)
+    var script = document.createElement('script');
+    script.src = 'js/o3dv.min.js';
+    script.onload = function() {
+      o3dvLoaded = true;
+      o3dvLoading = false;
+      callback();
+    };
+    script.onerror = function() {
+      o3dvLoading = false;
+      showStatus('Failed to load 3D engine');
+      sendMessage('failed', { error: 'Failed to load o3dv.min.js' });
+    };
+    document.head.appendChild(script);
+  }
+
+  function destroyViewer() {
+    if (viewerInstance) {
+      try {
+        viewerInstance.Destroy();
+      } catch (e) {
+        // Ignore destruction errors
+      }
+      viewerInstance = null;
+    }
+    currentModelUrl = null;
+  }
+
+  function initViewer(url, colorHex) {
+    showStatus('Loading model…');
+    sendMessage('loading');
+
+    loadO3DV(function() {
+      patchRemoveChild(container);
+
+      // Destroy previous instance
+      if (viewerInstance) {
+        try { viewerInstance.Destroy(); } catch (e) { /* ignore */ }
+        viewerInstance = null;
+      }
+
+      // Clear container of any leftover DOM (canvas, progress divs)
+      while (container.firstChild) {
+        if (container.firstChild === statusOverlay) {
+          // Keep our overlay — move it out temporarily
+          break;
+        }
+        container.removeChild(container.firstChild);
+      }
+      // Remove all children except statusOverlay
+      var children = Array.prototype.slice.call(container.children);
+      for (var i = 0; i < children.length; i++) {
+        if (children[i] !== statusOverlay) {
+          container.removeChild(children[i]);
+        }
+      }
+
+      var color = hexToRgb(colorHex || currentColor);
+      currentModelUrl = url;
+      currentColor = colorHex || currentColor;
+
+      viewerInstance = new OV.EmbeddedViewer(container, {
+        backgroundColor: new OV.RGBAColor(15, 23, 42, 255),
+        defaultColor: new OV.RGBColor(color.r, color.g, color.b),
+        onModelLoaded: function() {
+          hideStatus();
+          sendMessage('loaded');
+        },
+        onModelLoadFailed: function() {
+          showStatus('Failed to load model');
+          sendMessage('failed', { error: 'Model load failed' });
+        }
+      });
+      viewerInstance.LoadModelFromUrlList([url]);
+    });
+  }
+
+  function captureScreenshot() {
+    if (!viewerInstance) {
+      sendMessage('thumbnail', { success: false, error: 'Viewer not initialized' });
+      return;
+    }
+    var viewer = viewerInstance.GetViewer();
+    if (!viewer) {
+      sendMessage('thumbnail', { success: false, error: 'Viewer engine not ready' });
+      return;
+    }
+
+    var canvas = container.querySelector('canvas');
+    if (!canvas) {
+      sendMessage('thumbnail', { success: false, error: 'No canvas element found' });
+      return;
+    }
+
+    try {
+      if (typeof viewer.Render === 'function') {
+        viewer.Render();
+      }
+      var imgData = canvas.toDataURL('image/jpeg', 0.85);
+      if (!imgData || imgData === 'data:,' || imgData.length < 100) {
+        sendMessage('thumbnail', { success: false, error: 'Empty canvas buffer' });
+        return;
+      }
+      sendMessage('thumbnail', { success: true, imageData: imgData });
+    } catch (ex) {
+      sendMessage('thumbnail', { success: false, error: ex.message || 'Canvas capture error' });
+    }
+  }
+
+  // Listen for commands from the parent frame
+  window.addEventListener('message', function(event) {
+    // TODO(security): Validate origin to prevent cross-origin control
+    if (event.origin !== parentOrigin) {
+      return;
+    }
+
+    var msg = event.data;
+    if (!msg || !msg.type) return;
+
+    switch (msg.type) {
+      case 'loadModel':
+        if (msg.url) {
+          initViewer(msg.url, msg.color);
+        }
+        break;
+
+      case 'setColor':
+        if (msg.color && currentModelUrl) {
+          initViewer(currentModelUrl, msg.color);
+        }
+        break;
+
+      case 'captureScreenshot':
+        captureScreenshot();
+        break;
+
+      case 'destroy':
+        destroyViewer();
+        showStatus('Viewer closed');
+        break;
+
+      default:
+        break;
+    }
+  });
+
+  // Signal readiness to parent
+  sendMessage('ready');
+})();
+</script>
+</body>
+</html>

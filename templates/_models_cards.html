@@ -1,0 +1,118 @@
+<div id="models-list-wrapper">
+    {% if models %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {% for item in models %}
+        {% set root_file = item.root %}
+        {% set latest_file = item.latest %}
+        <div class="ui-card flex flex-col h-full bg-[var(--ui-surface)] border border-[var(--ui-border)] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition duration-200">
+            <!-- Thumbnail wrapper -->
+            <div class="aspect-[16/10] relative bg-gray-100 dark:bg-slate-800 border-b border-[var(--ui-border)] flex items-center justify-center overflow-hidden flex-shrink-0 group">
+                {% if latest_file.thumbnail_path %}
+                <img src="{{ url_for('models.serve_thumbnail', file_id=latest_file.id) }}" alt="{{ item.display_name }}" class="w-full h-full object-cover">
+                {% else %}
+                <div class="flex flex-col items-center justify-center text-gray-400 dark:text-slate-500">
+                    <i class="fa-solid fa-cube text-4xl mb-2 group-hover:scale-110 transition duration-200"></i>
+                    <span class="text-[10px] font-bold uppercase tracking-widest">{{ latest_file.filename.rsplit('.', 1)[-1] }}</span>
+                </div>
+                {% endif %}
+                <!-- Version badge -->
+                <div class="absolute top-3 left-3 flex gap-1.5">
+                    <span class="ui-badge ui-badge-brand text-xs font-extrabold px-2.5 py-0.5 leading-5">
+                        {{ t('models_version').lower() }} {{ latest_file.version }}
+                    </span>
+                    <span class="ui-badge ui-badge-success text-xs font-extrabold px-2.5 py-0.5 leading-5">
+                        {{ t('models_latest_badge') }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card Body -->
+            <div class="p-4 flex-grow flex flex-col justify-between">
+                <div class="space-y-2 min-w-0">
+                    <!-- Title / display_name -->
+                    <a href="{{ url_for('models.model_detail', root_id=root_file.id) }}" class="block font-bold text-gray-800 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 text-base truncate" title="{{ item.display_name }}">
+                        {{ item.display_name }}
+                    </a>
+                    <!-- Original filename -->
+                    <div class="text-xs text-gray-400 dark:text-slate-500 truncate" title="{{ latest_file.filename }}">
+                        {{ latest_file.filename }}
+                    </div>
+
+                    <!-- Project Link -->
+                    <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-slate-400 mt-2">
+                        <i class="fa-solid fa-diagram-project text-[var(--ui-brand)]"></i>
+                        {% if root_file.project %}
+                        <a href="{{ url_for('project_detail', id=root_file.project.id) }}" class="hover:underline font-medium text-blue-600 dark:text-blue-400 truncate">
+                            {{ root_file.project.name }}
+                        </a>
+                        {% else %}
+                        <span class="italic">—</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Footer Stats & Actions -->
+                <div class="mt-4 pt-3 border-t border-[var(--ui-border)] flex items-center justify-between">
+                    <!-- Size & Upload Date -->
+                    <div class="text-[10px] text-gray-400 dark:text-slate-500 leading-tight">
+                        <div class="font-semibold text-gray-600 dark:text-slate-400">
+                            {% if item.size >= 1048576 %}
+                                {{ (item.size / 1048576) | round(1) }} MB
+                            {% elif item.size >= 1024 %}
+                                {{ (item.size / 1024) | round(1) }} KB
+                            {% else %}
+                                {{ item.size }} B
+                            {% endif %}
+                        </div>
+                        <div class="mt-0.5">{{ latest_file.uploaded_at | fmt_dt('%d.%m.%Y') }}</div>
+                    </div>
+
+                    <!-- Action buttons -->
+                    <div class="flex items-center gap-1.5 flex-shrink-0">
+                        <a href="{{ url_for('models.model_detail', root_id=root_file.id) }}" class="ui-badge h-8 w-8 justify-center" title="{{ t('edit') }}">
+                            <i class="fa-solid fa-expand"></i>
+                        </a>
+                        <a href="{{ url_for('models.model_download_latest', root_id=root_file.id) }}" class="ui-badge ui-badge-brand h-8 w-8 justify-center" title="{{ t('download') }}">
+                            <i class="fa-solid fa-download"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="ui-empty-state py-20 bg-[var(--ui-surface)] border border-[var(--ui-border)] rounded-2xl">
+        <i class="fa-solid fa-cubes text-4xl opacity-30"></i>
+        <div class="font-bold text-lg mt-3">{{ t('models_no_models') }}</div>
+    </div>
+    {% endif %}
+</div>
+
+<div id="models-pagination-wrapper">
+    {% if pagination and pagination.pages > 1 %}
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-[var(--ui-border)]">
+        <div class="text-xs text-gray-400 dark:text-slate-500">
+            {{ t('bambu_result_showing') }} {{ models|length }} {{ t('bambu_result_of') }} {{ pagination.total }} {{ t('models').lower() }}
+        </div>
+        <div class="flex items-center gap-1">
+            <!-- Prev Page -->
+            <button type="button" @click="setPage({{ pagination.prev_num }})" :disabled="!{{ pagination.has_prev | tojson }}" class="ui-badge h-9 px-3 justify-center disabled:opacity-40 disabled:cursor-not-allowed">
+                <i class="fa-solid fa-chevron-left text-[10px]"></i>
+            </button>
+            
+            <!-- Page numbers -->
+            {% for p in pagination.page_list %}
+            <button type="button" @click="setPage({{ p }})" class="ui-badge h-9 w-9 justify-center font-bold {% if p == pagination.page %}ui-badge-brand{% endif %}">
+                {{ p }}
+            </button>
+            {% endfor %}
+            
+            <!-- Next Page -->
+            <button type="button" @click="setPage({{ pagination.next_num }})" :disabled="!{{ pagination.has_next | tojson }}" class="ui-badge h-9 px-3 justify-center disabled:opacity-40 disabled:cursor-not-allowed">
+                <i class="fa-solid fa-chevron-right text-[10px]"></i>
+            </button>
+        </div>
+    </div>
+    {% endif %}
+</div>

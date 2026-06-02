@@ -415,6 +415,9 @@ def register(app):
                         if 'owner_name' in proj_data:
                             proj.owner_name = (proj_data.get('owner_name') or '').strip() or None
 
+                    imported_files_map = {}
+                    files_to_resolve = []
+
                     for file_data in proj_data.get('files', []):
                         uploaded_at = datetime.fromisoformat(file_data['uploaded_at']) if file_data.get('uploaded_at') else utc_now()
                         exists_file = ProjectFile.query.filter_by(
@@ -434,12 +437,44 @@ def register(app):
                                 filepath = _build_import_file_path(upload_folder, proj.id, file_data.get('filename', ''), file_data.get('uploaded_at'))
                                 with open(filepath, 'wb') as handle:
                                     handle.write(base64.b64decode(content_b64))
-                            db.session.add(ProjectFile(
+                            
+                            uploaded_by_id = None
+                            user_ref = file_data.get('uploaded_by')
+                            if user_ref:
+                                resolved_user = _resolve_user_ref(user_ref)
+                                if resolved_user:
+                                    uploaded_by_id = resolved_user.id
+
+                            new_file = ProjectFile(
                                 project_id=proj.id,
                                 filename=file_data.get('filename', ''),
                                 filepath=filepath,
                                 uploaded_at=uploaded_at,
-                            ))
+                                version=file_data.get('version', 1),
+                                display_name=file_data.get('display_name'),
+                                file_size_bytes=file_data.get('file_size_bytes'),
+                                mime_type=file_data.get('mime_type'),
+                                checksum_sha256=file_data.get('checksum_sha256'),
+                                thumbnail_path=file_data.get('thumbnail_path'),
+                                version_note=file_data.get('version_note'),
+                                uploaded_by_user_id=uploaded_by_id,
+                            )
+                            db.session.add(new_file)
+                            imported_files_map[(proj.id, file_data.get('filename', ''), file_data.get('version', 1))] = new_file
+                            if file_data.get('parent_file_id') is not None or file_data.get('version', 1) > 1:
+                                files_to_resolve.append((new_file, file_data.get('filename', ''), file_data.get('version', 1)))
+
+                    db.session.flush()
+
+                    for new_file, filename, version in files_to_resolve:
+                        root_file = imported_files_map.get((proj.id, filename, 1))
+                        if root_file:
+                            new_file.parent_file_id = root_file.id
+                        else:
+                            db_root = ProjectFile.query.filter_by(project_id=proj.id, filename=filename, version=1).first()
+                            if db_root:
+                                new_file.parent_file_id = db_root.id
+
 
                     for link in proj_data.get('links', []):
                         exists_link = ProjectLink.query.filter_by(

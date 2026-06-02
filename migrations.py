@@ -185,6 +185,16 @@ def run_migrations(app: Flask) -> None:
         _safe_alter(app, "ALTER TABLE project ADD COLUMN client_phone VARCHAR(50) DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE project ADD COLUMN share_token VARCHAR(64) DEFAULT NULL")
 
+        # ── Project File central model browser fields ─────────────────────────
+        _safe_alter(app, "ALTER TABLE project_file ADD COLUMN display_name VARCHAR(255) DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE project_file ADD COLUMN file_size_bytes INTEGER DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE project_file ADD COLUMN mime_type VARCHAR(120) DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE project_file ADD COLUMN checksum_sha256 VARCHAR(64) DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE project_file ADD COLUMN thumbnail_path VARCHAR(255) DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE project_file ADD COLUMN version_note TEXT DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE project_file ADD COLUMN uploaded_by_user_id INTEGER DEFAULT NULL")
+
+
         # ── Seed data (only runs once on fresh database) ─────────────────────
         if not Brand.query.first():
             for name in ['Prusament', 'Hatchbox', 'eSUN', 'Sunlu', 'Polymaker', 'Overture', 'Spectrum', 'Fiberlogy']:
@@ -208,6 +218,51 @@ def run_migrations(app: Flask) -> None:
             app.logger.setLevel(logging.DEBUG)
         else:
             app.logger.setLevel(logging.INFO)
+
+        # ── Backfill missing metadata for project files ──────────────────────
+        from models import ProjectFile
+        import os
+        import hashlib
+        import mimetypes
+        try:
+            files_to_backfill = ProjectFile.query.filter(
+                (ProjectFile.file_size_bytes.is_(None)) | 
+                (ProjectFile.file_size_bytes == 0) | 
+                (ProjectFile.checksum_sha256.is_(None)) |
+                (ProjectFile.display_name.is_(None))
+            ).all()
+            if files_to_backfill:
+                app.logger.info(f"Backfilling metadata for {len(files_to_backfill)} project files...")
+                updated_count = 0
+                for f in files_to_backfill:
+                    if not f.filepath:
+                        continue
+                    if os.path.exists(f.filepath):
+                        try:
+                            size = os.path.getsize(f.filepath)
+                            sha = hashlib.sha256()
+                            with open(f.filepath, 'rb') as fh:
+                                while chunk := fh.read(8192):
+                                    sha.update(chunk)
+                            checksum = sha.hexdigest()
+                            
+                            f.file_size_bytes = size
+                            if not f.checksum_sha256:
+                                f.checksum_sha256 = checksum
+                            if not f.display_name:
+                                f.display_name = f.filename.rsplit('.', 1)[0] if '.' in f.filename else f.filename
+                            if not f.mime_type:
+                                f.mime_type = mimetypes.guess_type(f.filename)[0] or 'application/octet-stream'
+                            updated_count += 1
+                        except Exception as e:
+                            app.logger.error(f"Failed to backfill metadata for file {f.id}: {e}")
+                if updated_count > 0:
+                    db.session.commit()
+                    app.logger.info(f"Successfully backfilled metadata for {updated_count} files.")
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error during project files metadata backfill: {e}")
+
 
 
 def _safe_alter(app: Flask, sql: str) -> None:

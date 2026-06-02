@@ -31,6 +31,7 @@ import time
 from datetime import datetime, timedelta
 from flask import Flask, render_template
 from flask_wtf.csrf import CSRFProtect
+from flask_compress import Compress
 from sqlalchemy import text
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -50,7 +51,7 @@ from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
 
-APP_VERSION = '1.101.0'
+APP_VERSION = '1.102.4'
 
 csrf = CSRFProtect()
 
@@ -113,6 +114,7 @@ def create_app(test_config=None) -> Flask:
                 cursor.close()
 
     csrf.init_app(app)
+    Compress(app)
     init_auth(app)
     register_all(app)
 
@@ -285,7 +287,10 @@ def create_app(test_config=None) -> Flask:
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
             "img-src 'self' data: https:; "
             "font-src 'self' https://fonts.gstatic.com; "
-            "connect-src 'self' ws: wss: blob:;"
+            "connect-src 'self' ws: wss: blob: https://cdn.jsdelivr.net; "
+            "worker-src 'self' blob: https://cdn.jsdelivr.net; "
+            "child-src 'self' blob: https://cdn.jsdelivr.net; "
+            "frame-src 'self';"
         )
         if request_is_secure(response):
             response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'

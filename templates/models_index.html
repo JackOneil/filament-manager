@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div x-data="modelsApp()" x-init="init()" class="space-y-6">
+    <!-- Upper panel with title and view mode toggle -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-extrabold tracking-tight text-[var(--ui-text)]">{{ t('models') }}</h1>
+            <p class="text-sm text-gray-500 dark:text-slate-400 mt-1">{{ t('models_desc') }}</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <!-- View Mode selector -->
+            <div class="inline-flex rounded-xl p-0.5 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700">
+                <button type="button" @click="viewMode = 'card'" :class="viewMode === 'card' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5">
+                    <i class="fa-solid fa-grid-2"></i> {{ t('view_cards') }}
+                </button>
+                <button type="button" @click="viewMode = 'list'" :class="viewMode === 'list' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5">
+                    <i class="fa-solid fa-list"></i> {{ t('view_list') }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters & Sorting Panel -->
+    <div class="ui-panel">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <!-- Search -->
+            <div class="relative">
+                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">{{ t('search_filament') }}</label>
+                <div class="relative">
+                    <input type="text" x-model.debounce.300ms="fulltext" placeholder="{{ t('models_search_placeholder') }}" class="ui-input pr-10">
+                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 pointer-events-none">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Project filter -->
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">{{ t('project_client') }}</label>
+                <select x-model="projectId" class="ui-input">
+                    <option value="">{{ t('models_project_filter') }}</option>
+                    {% for p in projects %}
+                    <option value="{{ p.id }}">{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- File Type filter -->
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">{{ t('models_model_file') }}</label>
+                <select x-model="fileType" class="ui-input">
+                    <option value="">{{ t('models_type_filter') }}</option>
+                    {% for ext in model_extensions %}
+                    <option value="{{ ext }}">{{ ext | upper }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Sort & Reset -->
+            <div class="flex gap-2">
+                <div class="flex-1">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">{{ t('sort_by') }}</label>
+                    <select x-model="sortBy" class="ui-input">
+                        <option value="uploaded">{{ t('models_sort_uploaded') }}</option>
+                        <option value="name_asc">{{ t('models_sort_name_asc') }}</option>
+                        <option value="name_desc">{{ t('models_sort_name_desc') }}</option>
+                        <option value="project">{{ t('models_sort_project') }}</option>
+                        <option value="size_desc">{{ t('models_sort_size_desc') }}</option>
+                    </select>
+                </div>
+                <button type="button" @click="resetFilters()" class="ui-badge ui-badge-critical h-11 px-4 self-end flex items-center justify-center gap-1.5" title="{{ t('filter_reset') }}">
+                    <i class="fa-solid fa-filter-circle-xmark"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Models List Container -->
+    <div :class="_fetchPending ? 'opacity-60 pointer-events-none' : ''" class="transition-opacity duration-200">
+        <div id="models-list-container">
+            <!-- Partials are swapped here -->
+            <div class="ui-empty-state py-20">
+                <i class="fa-solid fa-spinner fa-spin text-3xl text-blue-500"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pagination Container -->
+    <div id="models-pagination-container">
+        <!-- Rendered in partials -->
+    </div>
+</div>
+
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
+function modelsApp() {
+    return {
+        viewMode: localStorage.getItem('models_view_mode') || 'card',
+        sortBy: 'uploaded',
+        projectId: '',
+        fileType: '',
+        fulltext: '',
+        page: 1,
+        _fetchPending: false,
+        _abortController: null,
+
+        init() {
+            this.$watch('viewMode', val => {
+                localStorage.setItem('models_view_mode', val);
+                this.fetchContent();
+            });
+            this.$watch('sortBy', () => { this.page = 1; this.fetchContent(); });
+            this.$watch('projectId', () => { this.page = 1; this.fetchContent(); });
+            this.$watch('fileType', () => { this.page = 1; this.fetchContent(); });
+            this.$watch('fulltext', () => { this.page = 1; this.fetchContent(); });
+            this.fetchContent();
+        },
+
+        async fetchContent() {
+            if (this._fetchPending) {
+                if (this._abortController) {
+                    this._abortController.abort();
+                }
+            }
+            this._fetchPending = true;
+            this._abortController = new AbortController();
+
+            try {
+                const params = new URLSearchParams({
+                    view: this.viewMode,
+                    sort_by: this.sortBy,
+                    project_id: this.projectId,
+                    file_type: this.fileType,
+                    fulltext: this.fulltext,
+                    page: this.page
+                });
+
+                const res = await fetch(`/api/models-list?${params.toString()}`, {
+                    signal: this._abortController.signal
+                });
+                const data = await res.json();
+
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(data.html, 'text/html');
+
+                // Update list wrapper surgically
+                const newList = doc.querySelector('#models-list-wrapper');
+                const oldList = document.querySelector('#models-list-container');
+                if (newList && oldList) {
+                    oldList.innerHTML = newList.innerHTML;
+                    
+                    // Alpine.js timing: update classList synchronously
+                    if (this.viewMode === 'list') {
+                        oldList.className = "";
+                    } else {
+                        oldList.className = "";
+                    }
+                }
+
+                // Update pagination wrapper surgically
+                const newPag = doc.querySelector('#models-pagination-wrapper');
+                const oldPag = document.querySelector('#models-pagination-container');
+                if (newPag && oldPag) {
+                    oldPag.innerHTML = newPag.innerHTML;
+                }
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error('Fetch models failed:', err);
+                }
+            } finally {
+                this._fetchPending = false;
+            }
+        },
+
+        setPage(p) {
+            this.page = p;
+            this.fetchContent();
+        },
+
+        resetFilters() {
+            this.projectId = '';
+            this.fileType = '';
+            this.fulltext = '';
+            this.sortBy = 'uploaded';
+            this.page = 1;
+            this.fetchContent();
+        }
+    }
+}
+</script>
+{% endblock %}
