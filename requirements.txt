@@ -7,3 +7,4 @@ requests>=2.31,<3
 beautifulsoup4>=4.12,<5
 cryptography>=42
 Flask-Compress==1.14
+Pillow>=10.0,<12

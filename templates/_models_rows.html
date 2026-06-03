@@ -19,15 +19,21 @@
                     {% set root_file = item.root %}
                     {% set latest_file = item.latest %}
                     <tr class="hover:bg-gray-50/40 dark:hover:bg-slate-800/20 transition duration-150">
-                        <!-- Thumbnail Column -->
+                        <!-- Thumbnail Column (clickable → model detail) -->
                         <td class="py-3 px-4">
-                            <div class="w-10 h-10 rounded-lg bg-gray-100 dark:bg-slate-800 border border-[var(--ui-border)] overflow-hidden flex items-center justify-center relative flex-shrink-0">
+                            <a href="{{ url_for('models.model_detail', root_id=root_file.id) }}" class="block w-10 h-10 rounded-lg bg-gray-100 dark:bg-slate-800 border border-[var(--ui-border)] overflow-hidden flex items-center justify-center relative flex-shrink-0 hover:ring-2 hover:ring-blue-400/50 transition cursor-pointer">
                                 {% if latest_file.thumbnail_path %}
                                 <img src="{{ url_for('models.serve_thumbnail', file_id=latest_file.id) }}" alt="" class="w-full h-full object-cover">
                                 {% else %}
-                                <i class="fa-solid fa-cube text-gray-400 text-lg"></i>
+                                {% set ext = latest_file.filename.rsplit('.', 1)[-1].lower() if '.' in latest_file.filename else 'file' %}
+                                {% set ext_colors = {'stl': '#3b82f6', '3mf': '#8b5cf6', 'obj': '#10b981', 'amf': '#f59e0b', 'step': '#14b8a6', 'stp': '#14b8a6', 'gcode': '#ef4444', 'gc': '#ef4444', 'bgcode': '#6366f1'} %}
+                                {% set bg = ext_colors.get(ext, '#6b7280') %}
+                                <svg viewBox="0 0 40 40" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                                    <rect width="40" height="40" fill="{{ bg }}" rx="0"/>
+                                    <text x="20" y="27" text-anchor="middle" dominant-baseline="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="white" opacity="0.95">{{ ext.upper() }}</text>
+                                </svg>
                                 {% endif %}
-                            </div>
+                            </a>
                         </td>
 
                         <!-- Name Column -->

@@ -51,7 +51,7 @@ from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
 
-APP_VERSION = '1.102.4'
+APP_VERSION = '1.104.0'
 
 csrf = CSRFProtect()
 
@@ -309,6 +309,7 @@ def create_app(test_config=None) -> Flask:
     _start_bambu_sync_worker(app)
     _start_prusa_sync_worker(app)
     _start_auto_backup_worker(app)
+    _start_model_thumbnail_worker(app)
     return app
 
 
@@ -603,6 +604,79 @@ def _start_auto_backup_worker(app: Flask) -> None:
                 app.logger.error("Background auto-backup failed: %s", exc)
 
     thread = threading.Thread(target=worker, name='auto-backup-worker', daemon=True)
+    thread.start()
+
+
+def _start_model_thumbnail_worker(app: Flask) -> None:
+    """Background thread that auto-renders STL thumbnails for uploaded models.
+
+    Scans for ProjectFile records that are STL files without a thumbnail_path
+    set and renders a server-side preview.  Runs every 60 seconds; only
+    processes a few records per tick to avoid CPU spikes.
+    """
+    if app.config.get('TESTING'):
+        return
+    if app.debug and os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+        return
+    if app.extensions.get('model_thumbnail_worker_started'):
+        return
+    if not _acquire_worker_lock(app, 'model_thumbnail'):
+        return
+
+    app.extensions['model_thumbnail_worker_started'] = True
+
+    def worker():
+        while True:
+            try:
+                time.sleep(60)
+                with app.app_context():
+                    from models import ProjectFile
+                    from routes.models import render_stl_thumbnail_for_file
+                    import os as _os
+
+                    def _ext(name):
+                        return name.rsplit('.', 1)[-1].lower() if '.' in name else ''
+
+                    # Find STL files missing thumbnails.  Limit 3 per tick.
+                    pending = (
+                        ProjectFile.query
+                        .filter(ProjectFile.filename.isnot(None))
+                        .order_by(ProjectFile.id.asc())
+                        .limit(40)
+                        .all()
+                    )
+                    targets = []
+                    for pf in pending:
+                        if not (pf.filepath and _os.path.isfile(pf.filepath)):
+                            continue
+                        ext = _ext(pf.filename or '')
+                        if ext != 'stl':
+                            continue
+                        if pf.thumbnail_path:
+                            continue
+                        targets.append(pf)
+                    targets = targets[:3]
+                    if not targets:
+                        continue
+
+                    rendered = 0
+                    for pf in targets:
+                        try:
+                            if render_stl_thumbnail_for_file(pf, commit=True):
+                                rendered += 1
+                        except Exception as exc:
+                            app.logger.warning(
+                                'Background STL render failed for id=%s: %s',
+                                pf.id, exc,
+                            )
+                    if rendered:
+                        app.logger.info(
+                            'Model-thumbnail worker: %d rendered', rendered,
+                        )
+            except Exception as exc:
+                app.logger.error('Background model-thumbnail worker failed: %s', exc)
+
+    thread = threading.Thread(target=worker, name='model-thumbnail-worker', daemon=True)
     thread.start()
 
 

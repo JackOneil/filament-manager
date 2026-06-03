@@ -475,6 +475,7 @@ def register(app):
             return _project_detail_redirect(id, 'files')
         files = request.files.getlist('file')
         uploaded_any = False
+        newly_added_files = []
         for file in files:
             if file.filename == '':
                 continue
@@ -516,7 +517,7 @@ def register(app):
                 ).order_by(ProjectFile.version.desc()).first()
                 new_version = (latest.version or 1) + 1
                 # Mark the old "current" file by linking it: set its parent to itself (self-link as root)
-                db.session.add(ProjectFile(
+                new_pf = ProjectFile(
                     project_id=project.id,
                     filename=original_filename,
                     filepath=filepath,
@@ -527,9 +528,11 @@ def register(app):
                     mime_type=mime,
                     checksum_sha256=checksum,
                     uploaded_by_user_id=user.id if user else None
-                ))
+                )
+                db.session.add(new_pf)
+                newly_added_files.append(new_pf)
             else:
-                db.session.add(ProjectFile(
+                new_pf = ProjectFile(
                     project_id=project.id,
                     filename=original_filename,
                     filepath=filepath,
@@ -539,10 +542,21 @@ def register(app):
                     mime_type=mime,
                     checksum_sha256=checksum,
                     uploaded_by_user_id=user.id if user else None
-                ))
+                )
+                db.session.add(new_pf)
+                newly_added_files.append(new_pf)
             uploaded_any = True
         if uploaded_any:
             db.session.commit()
+            # Auto-render STL thumbnails for newly uploaded model files
+            # (non-blocking).
+            try:
+                from routes.models import render_stl_thumbnail_for_file
+                for pf in newly_added_files:
+                    if pf.filename and pf.filename.rsplit('.', 1)[-1].lower() == 'stl':
+                        render_stl_thumbnail_for_file(pf, commit=True)
+            except Exception as exc:
+                current_app.logger.warning('Auto STL processing failed: %s', exc)
         else:
             db.session.rollback()
         return _project_detail_redirect(id, 'files')

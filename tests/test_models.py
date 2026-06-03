@@ -371,3 +371,4 @@ class ModelsFeatureTests(unittest.TestCase):
         html = res.get_json()['html']
         self.assertIn('User1 Owned', html)
         self.assertIn('User2 Owned', html)
+

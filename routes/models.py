@@ -2,6 +2,7 @@ import os
 import math
 import hashlib
 import mimetypes
+import logging
 from datetime import datetime
 from types import SimpleNamespace
 
@@ -16,9 +17,12 @@ from auth import get_current_user, is_admin
 from models import Project, ProjectFile, AppSetting, User
 from utils import escape_like, utc_now, translate
 
+logger = logging.getLogger(__name__)
+
 bp = Blueprint('models', __name__)
 
 MODEL_EXTENSIONS = {'3mf', 'stl', 'obj', 'amf', 'step', 'stp', 'gcode', 'gc', 'bgcode'}
+STL_EXTENSIONS = {'stl'}
 
 def _get_projects():
     user = get_current_user()
@@ -52,6 +56,53 @@ def _check_file_access(file_id):
 def _is_allowed_model_file(filename):
     ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
     return ext in MODEL_EXTENSIONS
+
+def _get_stl_thumbnail_paths():
+    """Return (upload_folder, thumb_dir) for STL thumbnail storage."""
+    upload_folder = current_app.config.get(
+        'PROJECT_UPLOAD_FOLDER',
+        os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'uploads')
+    )
+    thumb_dir = os.path.join(upload_folder, 'thumbnails')
+    os.makedirs(thumb_dir, exist_ok=True)
+    return upload_folder, thumb_dir
+
+
+def render_stl_thumbnail_for_file(project_file, commit=True):
+    """Auto-render an STL thumbnail for a ProjectFile.
+
+    Skips silently if:
+    - the file extension is not STL
+    - the file is missing on disk
+    - the file already has a thumbnail_path set
+    - the on-disk file does not exist
+    Returns True on success, False otherwise.
+    """
+    if not project_file or not project_file.filename:
+        return False
+    ext = project_file.filename.rsplit('.', 1)[-1].lower() if '.' in project_file.filename else ''
+    if ext not in STL_EXTENSIONS:
+        return False
+    if project_file.thumbnail_path:
+        return True  # already rendered
+    if not project_file.filepath or not os.path.isfile(project_file.filepath):
+        return False
+
+    try:
+        from routes.model_renderer import render_stl_thumbnail
+        upload_folder, thumb_dir = _get_stl_thumbnail_paths()
+        thumb_name = f'thumb_{project_file.id}.png'
+        thumb_path = os.path.join(thumb_dir, thumb_name)
+        ok = render_stl_thumbnail(project_file.filepath, thumb_path)
+        if ok:
+            project_file.thumbnail_path = f'thumbnails/{thumb_name}'
+            if commit:
+                db.session.commit()
+            logger.info('Auto-rendered STL thumbnail for ProjectFile id=%s', project_file.id)
+            return True
+    except Exception as exc:
+        logger.warning('STL thumbnail render failed for ProjectFile id=%s: %s', project_file.id, exc)
+    return False
 
 def _get_file_size_and_checksum(filepath):
     try:
@@ -176,22 +227,22 @@ def model_detail(root_id):
     if root_file.parent_file_id is not None:
         # Must always open details of the root file
         return redirect(url_for('models.model_detail', root_id=root_file.parent_file_id))
-        
+
     latest = _get_latest_version(root_file)
-    
+
     # Compile history: root file first, then subsequent versions sorted by version number
     history = [root_file] + root_file.versions
     history.sort(key=lambda f: f.version, reverse=True)
-    
+
     # Check for same checksum warning flag in request
     same_checksum = request.args.get('same_checksum') == '1'
-    
+
     return render_template(
         'models_detail.html',
         root=root_file,
         latest=latest,
         history=history,
-        same_checksum=same_checksum
+        same_checksum=same_checksum,
     )
 
 @bp.route('/models/<int:root_id>/edit', methods=['POST'])
@@ -276,7 +327,13 @@ def model_upload_version(root_id):
     
     db.session.add(new_file)
     db.session.commit()
-    
+
+    # Auto-render STL thumbnail (non-blocking for the user)
+    try:
+        render_stl_thumbnail_for_file(new_file, commit=True)
+    except Exception as exc:
+        logger.warning('Auto-thumbnail trigger failed for new version id=%s: %s', new_file.id, exc)
+
     flash(translate('models_success_upload'), 'success')
     return redirect(url_for('models.model_detail', root_id=root_file.id, same_checksum='1' if same_checksum else None))
 
@@ -362,4 +419,3 @@ def _send_file_safely(project_file, as_attachment=True):
 
 def register(app):
     app.register_blueprint(bp)
-

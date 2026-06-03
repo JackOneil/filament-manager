@@ -5,6 +5,71 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.104.0] - 2026-06-03
+### Removed
+- **Entire viewer-optimized file feature removed.** All simplified/decimated mesh generation, the `/models/version/<id>/optimized` endpoint, the `model_view_optimized` route, and all related functions (`simplify_stl`, `simplify_3mf`, `simplify_obj`, `simplify_amf`, `simplify_mesh_file`, `_decimate_indexed_mesh`, `generate_optimized_stl_for_file`, `get_optimized_stl_path`, etc.) have been removed. All viewer-optimized UI indicators (badges, right-panel status row, floating overlay chip, history preview icons) are also removed. The 3D viewer now always loads the original file via `model_view_version`. STL thumbnail rendering remains intact.
+- Background worker no longer generates optimized files — only renders STL thumbnails.
+- Removed ~40 tests covering mesh simplification, indexed decimation, and optimized endpoint behavior.
+- Cleaned up `routes/model_renderer.py` to ~260 lines (was ~1,100+), keeping only the STL parser and isometric thumbnail renderer.
+
+## [1.103.7] - 2026-06-03
+### Changed
+- **Decimation quality improved** — The grid-based vertex clustering now uses **iterative refinement**: if the output is too sparse (less than 75% of the target triangle count), the grid resolution is doubled and clustering is retried (up to 4 passes, grid_n max 512). This prevents thin/curved models from collapsing to far fewer triangles than intended. Example: the Norse Bracelet (612K triangles) previously collapsed to 6,980 triangles (98.9% reduction) — now produces exactly 50,000 (81.7% file-size reduction, preserving visible detail).
+
+## [1.103.6] - 2026-06-03
+### Fixed
+- **Bambu Studio 3MF files now actually get optimized** — All 7 user 3MF files were previously marked "complex" and skipped by the optimizer because of three over-aggressive checks: (1) `<metadata>` tags were flagged as unsupported, (2) `<components>` tags (used by Bambu to reference external object files) were flagged, and (3) any build `<item>` with `objectid != 0` was rejected. Since ALL Bambu Studio exports use these three features, the optimizer silently refused every single real-world 3MF. Fixed by removing metadata/components/build-ref from the complexity check and adding `_resolve_external_object()` which follows the Bambu component chain (`build → item → resource-object → component → external-object-file`) to find the actual mesh in `3D/Objects/object_N.model` files. The decimated mesh is written back into the external object file, preserving all other ZIP entries (metadata images, slice info, auxiliaries).
+- **3MF/AMF/OBJ viewer now loads correctly on first open** (from v1.103.5) — The `model_view_optimized` URL now includes the file extension so O3DV can detect the format.
+
+### Changed
+- `_detect_3mf_complexity()` now only flags: multiple `<object>` elements OR unsupported visual features (`colorgroup`, `texture2d`, `texture3d`, `basematerials`, `compositematerials`).
+- `simplify_3mf()` has a two-phase strategy: first try inline `<mesh>` in `3dmodel.model`, then fall back to `_resolve_external_object()` for Bambu Studio's external-file pattern.
+- Updated 2 tests in `test_model_renderer.py`: `test_3mf_with_metadata_can_be_simplified` and `test_3mf_with_non_zero_build_ref_is_simplified` now verify simplification succeeds (was expected to fail).
+
+## [1.103.5] - 2026-06-03
+### Fixed
+- **3MF/AMF/OBJ viewer now loads correctly on first open** — The `model_view_optimized` endpoint URL (`/models/version/<id>/optimized`) had no file extension. Online3DViewer uses the URL extension to detect which importer to use (e.g. `CanImportExtension("3mf")`), so 3MF/AMF/OBJ files failed with "Failed to load model". The fix adds an optional `<path:filename>` suffix to the route (e.g. `/models/version/<id>/optimized/my_model.3mf`) so O3DV can detect the format from the `.3mf` extension in the URL. The original extensionless URL continues to work for backward compatibility. Also updated the history-version preview links to use `model_view_optimized` (with filename) for ALL mesh formats, not just STL.
+
+## [1.103.4] - 2026-06-02
+### Fixed
+- **Complex 3MF files no longer break the 3D viewer** — The v1.103.3 3MF simplifier rewrote the entire `3dmodel.model` XML with a minimal single-object template, which **broke complex 3MFs** (multi-object files, files with build references to non-zero objects, files with materials, textures, or metadata). The viewer then failed to load the resulting malformed file with "Failed to load model". The simplifier now detects complex 3MF structure and **refuses to optimize it**, returning `None` so the route falls back to serving the original file (correct behavior, no speedup). For simple 3MFs (single object, no extra features), the simplifier now replaces only the `<vertices>` and `<triangles>` children of the first `<mesh>` in-place, preserving the original namespace, build refs, and all other structure. Added 4 unit tests in `tests/test_model_renderer.py` (multi-object / metadata / build-ref-to-other-object / archive-entries-preserved) and 1 integration test in `tests/test_models.py` (route serves original for complex 3MF, with both objects and the original build reference intact).
+
+## [1.103.3] - 2026-06-02
+### Added
+- **Multi-Format Viewer Optimization (3MF, OBJ, AMF + STL)** — The same server-side mesh decimation that shipped in v1.103.1 for STL is now available for **all mesh formats the browser viewer can load**: STL, 3MF, OBJ, AMF. The interactive 3D viewer always loads a decimated version (default target ~50K triangles) via the existing `/models/version/<id>/optimized` endpoint, dramatically reducing load time for large models regardless of source format. Background worker now sweeps all mesh formats, not just STL.
+- **Indexed-Mesh Decimation Algorithm** — STL stores 3 vertices per triangle (no sharing), but 3MF/OBJ/AMF share vertices via indices. New `_decimate_indexed_mesh()` function in `routes/model_renderer.py` clusters vertices to a 3D grid cell, picks one representative per cell, remaps every triangle's 3 indices, and drops degenerate (zero-area) triangles. Same shape-preservation guarantee as the STL grid-clustering decimation.
+- **Per-Format Diagnostic in the Detail Page UI** — The "Not required for this format" message that was misleading users is replaced. The activation-placeholder badge and the right-side metadata panel now show the **actual format of the latest version** (e.g. `STL`, `3MF`, `STEP`, `GCODE`) alongside the optimization status. The label is rendered as a small chip so users can immediately see whether the latest version is the one they expect, and why the viewer is loading the original vs. optimized file. Non-mesh formats (STEP, GCODE, BGCODE) get a clear "this format cannot be optimized for the 3D viewer — the original file will be loaded as-is" note instead of the old generic message.
+- **New translation keys** (`cs` + `en`): `models_viewer_optimized_format_label` ("Current format" / "Aktuální formát") and `models_viewer_optimized_non_mesh` ("This format ({ext}) cannot be optimized for the 3D viewer — the original file will be loaded as-is." / "Tento formát ({ext}) nelze optimalizovat pro 3D náhled — bude načten originální soubor.").
+- **Tests** — 23 new tests in `tests/test_model_renderer.py` covering the new indexed-mesh decimation, OBJ/AMF/3MF parsers, writers, simplifiers, and the format-agnostic dispatcher, plus 1 new integration test in `tests/test_models.py` for the `/optimized` endpoint serving a real 3MF file.
+
+### Changed
+- **`routes/models.py`** — `STL_EXTENSIONS` kept for backward compatibility, but the optimized-file logic is now keyed on `OPTIMIZABLE_MESH_EXTENSIONS = {stl, 3mf, obj, amf}`. The optimized file keeps the source's extension on disk (e.g. `opt_42.3mf`), so the browser viewer's extension-based dispatch still works. `get_optimized_stl_path()` is preserved as the public function name (backward-compatible) but now returns the path for any optimizable mesh format.
+- **Background model-thumbnail worker** — Now scans all mesh formats (STL, 3MF, OBJ, AMF) for files missing an optimized viewer version, not just STL. STL files still get a thumbnail; other formats rely on the existing SVG placeholder.
+
+## [1.103.2] - 2026-06-02
+### Added
+- **Model-Detail Viewer-Optimization Indicators** — The `/models/<id>` page now clearly tells the user which file the 3D viewer will load. Three places are updated:
+  1. **Activation placeholder** above the "Load Preview" button: an amber `fa-clock` badge labelled "Původní soubor / Original file" when no optimized version exists yet, or a green `fa-bolt` badge labelled "Optimized version" when one is cached. For non-STL formats a slate `fa-file` badge labelled "Original file" is shown with the note that no optimization is needed.
+  2. **Right metadata panel** — a new "Browser-optimized version" row shows whether the optimized STL is `Available` (with file size) or `Will be generated on first open` (with a `fa-clock` icon). For non-STL formats a `Not required for this format` note is shown.
+  3. **Version history Preview buttons** — every history entry whose filename is `.stl` gets a small inline icon next to its Preview button (`fa-bolt` green = optimized available, `fa-clock` amber = not yet generated), so users can see the status of every version at a glance.
+  4. **Floating viewer overlay** (active version label in the bottom-left of the 3D viewport) — when the active file is an STL, a small "Optimized version" chip with `fa-bolt` is shown next to the filename. Switching versions in history updates this indicator live.
+- The `model_detail` route in `routes/models.py` now passes per-version optimization state (`history_optimized` keyed by file id, with `is_stl` and `optimized_exists` flags) and latest-version state (`latest_is_stl`, `latest_optimized_exists`, `latest_optimized_size_bytes`) to the template, so the template never has to touch the filesystem.
+
+## [1.103.1] - 2026-06-02
+### Added
+- **Server-Side Mesh Simplification for Fast 3D Viewing** — When an STL model is uploaded, the server now also generates a "viewer-optimized" version with reduced triangle count (target ~50K) using grid-based vertex clustering. The interactive 3D viewer always loads this lighter version via the new `/models/version/<id>/optimized` endpoint, eliminating browser hangs on large (10MB+) models. The full-resolution model is preserved for download. Non-STL formats fall back to the original file. Generation runs on upload and in the background worker, so previously uploaded models are optimized automatically.
+
+## [1.103.0] - 2026-06-02
+### Added
+- **Automatic Server-Side STL Thumbnail Generation** — STL models uploaded to projects or via the Models page now get a real 3D preview rendered automatically, with no user interaction required. The renderer (`routes/model_renderer.py`) parses binary and ASCII STL files, applies isometric projection + simple directional shading + painter's algorithm for hidden surface removal, and outputs a 400×250 PNG. Pure-Python + Pillow only — no heavy 3D libraries (numpy, trimesh, pyrender) needed. Non-STL formats (3MF, OBJ, GCODE, etc.) keep the colour-coded SVG placeholder from v1.102.5.
+- **Background Model-Thumbnail Worker** — A new daemon thread (`model-thumbnail-worker`, started in `app.py`) periodically scans for STL files without a saved thumbnail and renders them in batches of 3 per minute, catching any models missed by the immediate upload trigger (e.g. files imported before this feature shipped, or files where the upload-time render was skipped due to a transient error).
+- **Pillow Dependency** — Added `Pillow>=10.0,<12` to `requirements.txt` for the renderer.
+
+## [1.102.5] - 2026-06-02
+### Added
+- **Default SVG Thumbnails for Models** — Models without a captured thumbnail (manual uploads or newly imported models before first detail-page visit) now display a colour-coded SVG placeholder showing the file extension (STL, 3MF, OBJ, etc.) inside a tinted card. Each file type gets a distinct accent colour for quick visual distinction. Once the user opens the model detail page, the automatic canvas snapshot replaces the placeholder with a real 3D rendered preview.
+- **Clickable Thumbnails** — Thumbnails in both card and list views now act as links to the model detail page (`/models/<id>`), in addition to the existing text link on the model name. This makes navigation more intuitive on mobile/touch interfaces.
+
 ## [1.102.4] - 2026-06-02
 ### Fixed
 - **Lazy 3D Viewer Activation on Model Detail Page** — The heavy O3DV 3D viewer engine no longer auto-loads on page init at `/models/<id>`. Instead, a "Load Preview" button is shown, deferring the CPU-intensive model parsing until the user explicitly requests it. This eliminates page unresponsiveness during initial model detail visits while preserving all viewer features (rotation, color picker, thumbnail capture, version switching) once activated. Version history "Preview" buttons also activate the viewer on first click.

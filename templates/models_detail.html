@@ -63,6 +63,7 @@
                         <i class="fa-solid fa-cube text-5xl mb-4 opacity-40"></i>
                         <div class="font-bold text-lg mb-2 text-white">{{ t('models_load_3d_preview') }}</div>
                         <p class="text-xs text-gray-500 max-w-sm mb-6">{{ t('models_load_3d_preview_desc') }}</p>
+
                         <button type="button" @click="activateViewer()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-xl transition shadow-lg flex items-center gap-2">
                             <i class="fa-solid fa-play"></i> {{ t('models_load_3d_preview_btn') }}
                         </button>
@@ -241,7 +242,8 @@
                         <!-- Preview specific version inline -->
                         {% set file_ext = ver.filename.rsplit('.', 1)[-1].lower() if '.' in ver.filename else '' %}
                         {% if file_ext in ['3mf', 'stl', 'obj', 'amf', 'step', 'stp', 'gcode', 'gc', 'bgcode'] %}
-                        <button type="button" @click="loadModelVersion({{ ver.id }}, '{{ ver.filename }}', '{{ url_for('models.model_view_version', file_id=ver.id, filename=ver.filename) }}', {{ ver.version }}, '{{ ver.file_size_bytes }}', '{{ ver.checksum_sha256 or '' }}', '{{ ver.mime_type or '' }}', '{{ ver.uploaded_by.name or ver.uploaded_by.email if ver.uploaded_by else 'System' }}', '{{ ver.uploaded_at | fmt_dt('%d.%m.%Y %H:%M') }}', '{{ (ver.version_note or '') | replace("'", "\\'") | replace('"', '\\"') }}')" 
+                        {% set preview_url = url_for('models.model_view_version', file_id=ver.id, filename=ver.filename) %}
+                        <button type="button" @click="loadModelVersion({{ ver.id }}, '{{ ver.filename }}', '{{ preview_url }}', {{ ver.version }}, '{{ ver.file_size_bytes }}', '{{ ver.checksum_sha256 or '' }}', '{{ ver.mime_type or '' }}', '{{ ver.uploaded_by.name or ver.uploaded_by.email if ver.uploaded_by else 'System' }}', '{{ ver.uploaded_at | fmt_dt('%d.%m.%Y %H:%M') }}', '{{ (ver.version_note or '') | replace("'", "\\'") | replace('"', '\\"') }}')"
                                 :class="activeFileId === {{ ver.id }} ? 'ui-badge-brand' : ''" class="ui-badge h-8 px-3 gap-1" title="Interactive preview in viewer">
                             <i class="fa-solid fa-eye text-[10px]"></i> {{ t('preview') }}
                         </button>
