@@ -194,6 +194,9 @@ def run_migrations(app: Flask) -> None:
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN version_note TEXT DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN uploaded_by_user_id INTEGER DEFAULT NULL")
 
+        # ── Allow project_file.project_id to be NULL (unassigned models) ─────
+        _migrate_nullable_project_id(app)
+
 
         # ── Seed data (only runs once on fresh database) ─────────────────────
         if not Brand.query.first():
@@ -277,3 +280,46 @@ def _safe_alter(app: Flask, sql: str) -> None:
             app.logger.debug(f"Skipping existing schema change for '{sql}'")
         else:
             app.logger.error(f"Error in _safe_alter executing '{sql}': {e}")
+
+
+def _migrate_nullable_project_id(app: Flask) -> None:
+    """Recreate project_file table with project_id nullable (SQLite-safe)."""
+    try:
+        # Check if already migrated
+        result = db.session.execute(text("PRAGMA table_info(project_file)"))
+        for row in result:
+            if row[1] == 'project_id' and row[3] == 0:  # notnull=0 means already nullable
+                return
+        # Recreate table: create new, copy data, drop old, rename
+        db.session.execute(text("""
+            CREATE TABLE project_file_new (
+                id INTEGER NOT NULL,
+                project_id INTEGER,
+                filename VARCHAR(255) NOT NULL,
+                filepath VARCHAR(255) NOT NULL,
+                uploaded_at DATETIME,
+                version INTEGER NOT NULL DEFAULT 1,
+                parent_file_id INTEGER,
+                display_name VARCHAR(255),
+                file_size_bytes INTEGER,
+                mime_type VARCHAR(120),
+                checksum_sha256 VARCHAR(64),
+                thumbnail_path VARCHAR(255),
+                version_note TEXT,
+                uploaded_by_user_id INTEGER,
+                PRIMARY KEY (id),
+                FOREIGN KEY (project_id) REFERENCES project (id) ON DELETE CASCADE,
+                FOREIGN KEY (parent_file_id) REFERENCES project_file (id) ON DELETE SET NULL,
+                FOREIGN KEY (uploaded_by_user_id) REFERENCES user (id) ON DELETE SET NULL
+            )
+        """))
+        db.session.execute(text("""
+            INSERT INTO project_file_new SELECT * FROM project_file
+        """))
+        db.session.execute(text("DROP TABLE project_file"))
+        db.session.execute(text("ALTER TABLE project_file_new RENAME TO project_file"))
+        db.session.commit()
+        app.logger.info("Successfully migrated project_file.project_id to nullable.")
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error migrating project_file nullable project_id: {e}")

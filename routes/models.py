@@ -50,7 +50,8 @@ def _check_project_access(project_id):
 
 def _check_file_access(file_id):
     f = ProjectFile.query.get_or_404(file_id)
-    _check_project_access(f.project_id)
+    if f.project_id is not None:
+        _check_project_access(f.project_id)
     return f
 
 def _is_allowed_model_file(filename):
@@ -66,6 +67,45 @@ def _get_stl_thumbnail_paths():
     thumb_dir = os.path.join(upload_folder, 'thumbnails')
     os.makedirs(thumb_dir, exist_ok=True)
     return upload_folder, thumb_dir
+
+
+def _extract_3mf_thumbnail(project_file):
+    """Extract an embedded thumbnail from a 3MF file (ZIP archive).
+
+    Many slicers (Bambu Studio, PrusaSlicer, Cura) embed a preview image
+    at Metadata/thumbnail.png inside the 3MF archive.
+    Returns True on success, False otherwise.
+    """
+    if not project_file or not project_file.filename:
+        return False
+    ext = project_file.filename.rsplit('.', 1)[-1].lower() if '.' in project_file.filename else ''
+    if ext != '3mf':
+        return False
+    if project_file.thumbnail_path:
+        return True
+    if not project_file.filepath or not os.path.isfile(project_file.filepath):
+        return False
+    try:
+        import zipfile
+        with zipfile.ZipFile(project_file.filepath, 'r') as zf:
+            candidates = [n for n in zf.namelist() if n.lower().endswith(('thumbnail.png', 'thumbnail.jpg', 'thumbnail.jpeg'))]
+            if not candidates:
+                # Try Metadata/thumbnail.png specifically
+                if 'Metadata/thumbnail.png' in zf.namelist():
+                    candidates = ['Metadata/thumbnail.png']
+            if not candidates:
+                return False
+            upload_folder, thumb_dir = _get_stl_thumbnail_paths()
+            # Use same naming convention as STL thumbnails
+            thumb_name = f'thumb_{project_file.id}.png'
+            thumb_path = os.path.join(thumb_dir, thumb_name)
+            with zf.open(candidates[0]) as src, open(thumb_path, 'wb') as dst:
+                dst.write(src.read())
+            project_file.thumbnail_path = f'thumbnails/{thumb_name}'
+            return True
+    except Exception as exc:
+        logger.warning('3MF thumbnail extraction failed for ProjectFile id=%s: %s', project_file.id, exc)
+    return False
 
 
 def render_stl_thumbnail_for_file(project_file, commit=True):
@@ -126,9 +166,69 @@ def models_index():
         model_extensions=sorted(list(MODEL_EXTENSIONS))
     )
 
+@bp.route('/models/upload', methods=['POST'])
+def model_upload():
+    project_id = request.form.get('project_id', type=int) or None
+    if project_id:
+        project = _check_project_access(project_id)
+    else:
+        project = None
+    if 'file' not in request.files:
+        flash(translate('models_error_upload'), 'error')
+        return redirect(url_for('models.models_index'))
+    file = request.files['file']
+    if file.filename == '':
+        flash(translate('models_error_upload'), 'error')
+        return redirect(url_for('models.models_index'))
+    if not _is_allowed_model_file(file.filename):
+        flash(translate('models_error_type'), 'error')
+        return redirect(url_for('models.models_index'))
+    original_filename = secure_filename(file.filename)
+    if not original_filename:
+        flash(translate('models_error_type'), 'error')
+        return redirect(url_for('models.models_index'))
+    upload_folder = current_app.config.get(
+        'PROJECT_UPLOAD_FOLDER',
+        os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'uploads')
+    )
+    import uuid
+    unique_id = uuid.uuid4().hex[:12]
+    stored_filename = f'{project.id if project else 0}_{unique_id}_{original_filename}'
+    filepath = os.path.join(upload_folder, stored_filename)
+    file.save(filepath)
+    size, checksum = _get_file_size_and_checksum(filepath)
+    mime = mimetypes.guess_type(original_filename)[0] or 'application/octet-stream'
+    display = original_filename.rsplit('.', 1)[0] if '.' in original_filename else original_filename
+    user = get_current_user()
+    version_note = request.form.get('version_note', '').strip() or None
+    new_file = ProjectFile(
+        project_id=project.id if project else None,
+        filename=original_filename,
+        filepath=filepath,
+        version=1,
+        parent_file_id=None,
+        display_name=display,
+        file_size_bytes=size,
+        mime_type=mime,
+        checksum_sha256=checksum,
+        version_note=version_note,
+        uploaded_by_user_id=user.id if user else None
+    )
+    db.session.add(new_file)
+    db.session.commit()
+    # Auto-render STL thumbnail or extract 3MF thumbnail
+    try:
+        if not render_stl_thumbnail_for_file(new_file, commit=True):
+            _extract_3mf_thumbnail(new_file)
+            db.session.commit()
+    except Exception as exc:
+        logger.warning('Auto-thumbnail trigger failed for new model id=%s: %s', new_file.id, exc)
+    flash(translate('models_upload_success'), 'success')
+    return redirect(url_for('models.model_detail', root_id=new_file.id))
+
 @bp.route('/api/models-list')
 def api_models_list():
-    query = ProjectFile.query.join(Project).filter(ProjectFile.parent_file_id.is_(None))
+    query = ProjectFile.query.outerjoin(Project).filter(ProjectFile.parent_file_id.is_(None))
     
     if not is_admin():
         query = query.filter(Project.owner_user_id == get_current_user().id)
@@ -295,7 +395,7 @@ def model_upload_version(root_id):
     # Stored with unique secure format: {project_id}_{uuid.uuid4().hex[:12]}_{filename}
     import uuid
     unique_id = uuid.uuid4().hex[:12]
-    stored_filename = f'{root_file.project_id}_{unique_id}_{original_filename}'
+    stored_filename = f'{root_file.project_id or 0}_{unique_id}_{original_filename}'
     filepath = os.path.join(upload_folder, stored_filename)
     file.save(filepath)
     
@@ -328,14 +428,85 @@ def model_upload_version(root_id):
     db.session.add(new_file)
     db.session.commit()
 
-    # Auto-render STL thumbnail (non-blocking for the user)
+    # Auto-render STL thumbnail or extract 3MF thumbnail (non-blocking for the user)
     try:
-        render_stl_thumbnail_for_file(new_file, commit=True)
+        if not render_stl_thumbnail_for_file(new_file, commit=True):
+            _extract_3mf_thumbnail(new_file)
+            db.session.commit()
     except Exception as exc:
         logger.warning('Auto-thumbnail trigger failed for new version id=%s: %s', new_file.id, exc)
 
     flash(translate('models_success_upload'), 'success')
     return redirect(url_for('models.model_detail', root_id=root_file.id, same_checksum='1' if same_checksum else None))
+
+@bp.route('/models/<int:root_id>/delete', methods=['POST'])
+def model_delete(root_id):
+    root_file = _check_file_access(root_id)
+    # Collect all files in the version chain (root + all versions)
+    all_files = [root_file] + root_file.versions
+    # Delete all files from disk
+    for pf in all_files:
+        _delete_file_on_disk(pf)
+    # Delete all DB records (versions first, then root)
+    for pf in reversed(all_files):
+        db.session.delete(pf)
+    db.session.commit()
+    flash(translate('models_success_deleted'), 'success')
+    return redirect(url_for('models.models_index'))
+
+@bp.route('/models/version/<int:file_id>/delete', methods=['POST'])
+def model_delete_version(file_id):
+    pf = _check_file_access(file_id)
+    is_root = (pf.parent_file_id is None)
+    if is_root:
+        # If deleting the root, handle re-parenting first
+        children = ProjectFile.query.filter_by(parent_file_id=pf.id).order_by(ProjectFile.version.desc()).all()
+        if children:
+            # Promote the newest child as the new root
+            new_root = children[0]
+            new_root.parent_file_id = None
+            # Re-parent remaining children to the new root
+            for child in children[1:]:
+                child.parent_file_id = new_root.id
+            # Delete the old root from DB and disk
+            _delete_file_on_disk(pf)
+            db.session.delete(pf)
+            db.session.commit()
+            flash(translate('models_success_version_deleted'), 'success')
+            return redirect(url_for('models.model_detail', root_id=new_root.id))
+        # No children — delete the only version (entire model gone)
+    # Non-root or lone root
+    root_file = pf if is_root else ProjectFile.query.get(pf.parent_file_id)
+    _delete_file_on_disk(pf)
+    db.session.delete(pf)
+    db.session.commit()
+    if is_root:
+        flash(translate('models_success_deleted'), 'success')
+        return redirect(url_for('models.models_index'))
+    else:
+        flash(translate('models_success_version_deleted'), 'success')
+        return redirect(url_for('models.model_detail', root_id=root_file.id))
+
+
+def _delete_file_on_disk(pf):
+    """Delete a ProjectFile from disk (file + thumbnail)."""
+    try:
+        if os.path.exists(pf.filepath):
+            os.remove(pf.filepath)
+    except OSError:
+        pass
+    if pf.thumbnail_path:
+        upload_folder = current_app.config.get(
+            'PROJECT_UPLOAD_FOLDER',
+            os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'uploads')
+        )
+        thumb_full = os.path.join(upload_folder, pf.thumbnail_path)
+        try:
+            if os.path.exists(thumb_full):
+                os.remove(thumb_full)
+        except OSError:
+            pass
+
 
 @bp.route('/models/<int:root_id>/download')
 def model_download_latest(root_id):

@@ -84,7 +84,7 @@ def _project_file_payload(project_file):
     if project_file.filepath and os.path.isfile(project_file.filepath):
         safe_name = secure_filename(project_file.filename or '') or f'project_file_{uuid.uuid4().hex[:8]}'
         stamp = ''.join(ch for ch in (payload['uploaded_at'] or '') if ch.isdigit())[:14] or uuid.uuid4().hex[:12]
-        payload['archive_path'] = f'uploads/{project_file.project_id}/{stamp}_{safe_name}'
+        payload['archive_path'] = f'uploads/{project_file.project_id or 0}/{stamp}_{safe_name}'
     return payload
 
 

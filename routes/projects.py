@@ -565,7 +565,7 @@ def register(app):
     def project_download_file(id, file_id):
         _project_or_404(id)
         project_file = db.get_or_404(ProjectFile, file_id)
-        if project_file.project_id != id:
+        if project_file.project_id is None or project_file.project_id != id:
             return 'Unauthorized', 401
         real_path = os.path.realpath(project_file.filepath)
         real_folder = os.path.realpath(upload_folder)
@@ -582,7 +582,7 @@ def register(app):
     def project_view_file(id, file_id, filename):
         _project_or_404(id)
         project_file = db.get_or_404(ProjectFile, file_id)
-        if project_file.project_id != id:
+        if project_file.project_id is None or project_file.project_id != id:
             return 'Unauthorized', 401
         real_path = os.path.realpath(project_file.filepath)
         real_folder = os.path.realpath(upload_folder)
@@ -594,7 +594,7 @@ def register(app):
     def project_image_file(id, file_id):
         _project_or_404(id)
         project_file = db.get_or_404(ProjectFile, file_id)
-        if project_file.project_id != id or _get_extension(project_file.filename) not in IMAGE_EXTENSIONS:
+        if project_file.project_id is None or project_file.project_id != id or _get_extension(project_file.filename) not in IMAGE_EXTENSIONS:
             return 'Unauthorized', 401
         real_path = os.path.realpath(project_file.filepath)
         real_folder = os.path.realpath(upload_folder)
@@ -608,7 +608,7 @@ def register(app):
     def project_share_download_file(token, file_id):
         project = Project.query.filter_by(share_token=token).first_or_404()
         project_file = db.get_or_404(ProjectFile, file_id)
-        if project_file.project_id != project.id:
+        if project_file.project_id is None or project_file.project_id != project.id:
             return 'Unauthorized', 401
         real_path = os.path.realpath(project_file.filepath)
         real_folder = os.path.realpath(upload_folder)
@@ -625,7 +625,7 @@ def register(app):
     def project_share_view_file(token, file_id, filename):
         project = Project.query.filter_by(share_token=token).first_or_404()
         project_file = db.get_or_404(ProjectFile, file_id)
-        if project_file.project_id != project.id:
+        if project_file.project_id is None or project_file.project_id != project.id:
             return 'Unauthorized', 401
         real_path = os.path.realpath(project_file.filepath)
         real_folder = os.path.realpath(upload_folder)
@@ -637,7 +637,7 @@ def register(app):
     def project_share_image_file(token, file_id):
         project = Project.query.filter_by(share_token=token).first_or_404()
         project_file = db.get_or_404(ProjectFile, file_id)
-        if project_file.project_id != project.id or _get_extension(project_file.filename) not in IMAGE_EXTENSIONS:
+        if project_file.project_id is None or project_file.project_id != project.id or _get_extension(project_file.filename) not in IMAGE_EXTENSIONS:
             return 'Unauthorized', 401
         real_path = os.path.realpath(project_file.filepath)
         real_folder = os.path.realpath(upload_folder)
@@ -653,7 +653,7 @@ def register(app):
         if not _project_write_allowed(project):
             abort(403)
         project_file = db.get_or_404(ProjectFile, file_id)
-        if project_file.project_id == id:
+        if project_file.project_id is not None and project_file.project_id == id:
             try:
                 os.remove(project_file.filepath)
             except OSError:
@@ -809,15 +809,14 @@ def register(app):
                 project_id=clone.id,
                 filament_id=pf.filament_id,
                 estimated_weight=pf.estimated_weight,
-                actual_weight=0,
-                color_override=pf.color_override,
+                is_used=False,
             ))
         for pi in project.print_items:
             db.session.add(ProjectPrintItem(
                 project_id=clone.id,
-                item_name=pi.item_name,
-                quantity=pi.quantity,
-                done=False,
+                name=pi.name,
+                quantity_total=pi.quantity_total,
+                quantity_done=0,
                 notes=pi.notes,
             ))
         db.session.commit()

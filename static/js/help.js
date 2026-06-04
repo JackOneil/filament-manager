@@ -12,7 +12,7 @@
             id: 'overview',
             icon: 'fa-house',
             hasTour: true,
-            endpoints: ['overview', 'overview_user'],
+            endpoints: ['index', 'overview_user'],
             title: { cs: 'Přehled', en: 'Overview' },
             tips: [
                 {
@@ -56,7 +56,7 @@
             id: 'filaments',
             icon: 'fa-boxes-stacked',
             hasTour: true,
-            endpoints: ['filaments_index', 'index_user', 'filament_detail', 'add_filament', 'edit_filament', 'use_filament', 'filament_import_csv'],
+            endpoints: ['filaments_index', 'filament_detail', 'add', 'edit', 'use_filament', 'add_spool', 'remove_spool', 'delete', 'filament_import_csv', 'filament_export_csv', 'filament_update_meta', 'filament_toggle_reorder_snooze', 'inventory_bulk', 'inventory_undo', 'toggle_ui_mode', 'filament_community_db', 'filament_community_db_import'],
             title: { cs: 'Inventář filamentů', en: 'Filament Inventory' },
             tips: [
                 {
@@ -114,7 +114,7 @@
             id: 'calculator',
             icon: 'fa-calculator',
             hasTour: true,
-            endpoints: ['calculator', 'calculator_history_delete'],
+            endpoints: ['calculator', 'calculator_project', 'delete_history', 'delete_quote', 'export_quote'],
             title: { cs: 'Kalkulačka', en: 'Calculator' },
             tips: [
                 {
@@ -174,7 +174,7 @@
             id: 'projects',
             icon: 'fa-folder-open',
             hasTour: true,
-            endpoints: ['projects_index', 'project_create', 'project_detail', 'project_edit', 'project_add_file', 'project_delete_file', 'project_add_link', 'project_delete_link', 'project_add_comment', 'project_add_filament', 'project_remove_filament', 'project_add_quote', 'project_change_status', 'project_add_todo', 'project_toggle_todo', 'project_delete_todo', 'project_edit_todo', 'project_advance_status', 'project_clone', 'project_generate_share_token', 'project_revoke_share_token', 'project_share', 'project_templates_index', 'project_template_save', 'project_template_delete', 'project_create_from_template', 'project_comment_react'],
+            endpoints: ['projects_index', 'project_create', 'project_detail', 'project_edit', 'project_delete', 'project_upload_file', 'project_download_file', 'project_view_file', 'project_image_file', 'project_delete_file', 'project_add_link', 'project_delete_link', 'project_refresh_link', 'project_add_comment', 'project_update_comment', 'project_delete_comment', 'project_toggle_comment_checkbox', 'project_toggle_description_checkbox', 'project_add_filament', 'project_remove_filament', 'project_update_filament', 'project_consume_filament', 'project_status', 'project_advance_status', 'project_clone', 'project_generate_share_token', 'project_revoke_share_token', 'project_share', 'project_templates_index', 'project_template_save', 'project_template_delete', 'project_create_from_template', 'project_comment_react', 'project_add_todo', 'project_toggle_todo', 'project_delete_todo', 'project_edit_todo', 'project_add_print_item', 'project_edit_print_item', 'project_delete_print_item', 'project_increment_print_item', 'project_decrement_print_item', 'project_share_download_file', 'project_share_view_file', 'project_share_image_file'],
             title: { cs: 'Projekty', en: 'Projects' },
             tips: [
                 {
@@ -288,7 +288,7 @@
             id: 'storage',
             icon: 'fa-warehouse',
             hasTour: true,
-            endpoints: ['storage_index', 'storage_add_shelf', 'storage_edit_shelf', 'storage_delete_shelf', 'storage_add_slot', 'storage_remove_slot', 'storage_reorder_shelves'],
+            endpoints: ['storage', 'storage_add_shelf', 'storage_update_shelf', 'storage_delete_shelf', 'storage_reorder_shelves', 'storage_assign_slot', 'storage_move_placement', 'storage_update_orientation', 'storage_delete_placement'],
             title: { cs: 'Úložiště', en: 'Storage' },
             tips: [
                 {
@@ -339,7 +339,7 @@
             id: 'stats',
             icon: 'fa-chart-line',
             hasTour: true,
-            endpoints: ['stats_index'],
+            endpoints: ['stats'],
             title: { cs: 'Statistiky', en: 'Statistics' },
             tips: [
                 {
@@ -376,7 +376,7 @@
             id: 'bambu',
             icon: 'fa-plug-circle-bolt',
             hasTour: true,
-            endpoints: ['bambu_index', 'bambu_sync', 'bambu_job_detail', 'bambu_job_delete', 'bambu_create_project', 'bambu_job_map', 'bambu_job_deduct_slot'],
+            endpoints: ['bambu_jobs', 'bambu_jobs_partial', 'bambu_sync', 'bambu_refetch_thumbnails', 'bambu_job_thumbnail', 'bambu_job_map', 'bambu_job_deduct_slot', 'bambu_job_remap_slot', 'bambu_job_delete', 'bambu_create_project'],
             title: { cs: 'Bambu Lab', en: 'Bambu Lab' },
             tips: [
                 {
@@ -420,7 +420,7 @@
             id: 'prusa',
             icon: 'fa-plug',
             hasTour: true,
-            endpoints: ['prusa_index', 'prusa_printer_detail', 'prusa_job_detail'],
+            endpoints: ['prusa_jobs', 'prusa_printer_sync', 'prusa_printer_test', 'prusa_job_map', 'prusa_job_delete'],
             title: { cs: 'PrusaLink', en: 'PrusaLink' },
             tips: [
                 {
@@ -443,7 +443,7 @@
             id: 'settings',
             icon: 'fa-sliders',
             hasTour: true,
-            endpoints: ['settings', 'settings_bambu_test', 'toggle_theme', 'export_data', 'import_data', 'backup_trigger_now', 'backup_list_files', 'backup_download_file', 'backup_delete_file'],
+            endpoints: ['settings', 'settings_bambu_test', 'toggle_theme', 'onboarding_dismiss', 'export_data', 'import_data', 'backup_trigger_now', 'backup_list_files', 'backup_download_file', 'backup_delete_file'],
             title: { cs: 'Nastavení', en: 'Settings' },
             tips: [
                 {
@@ -508,7 +508,7 @@
             id: 'users',
             icon: 'fa-users',
             hasTour: true,
-            endpoints: ['users_index', 'user_detail', 'audit_logs', 'invite_delete'],
+            endpoints: ['users_index', 'user_detail', 'audit_logs', 'invite_delete', 'register_account', 'activate_invite', 'login', 'logout'],
             title: { cs: 'Uživatelé', en: 'Users' },
             tips: [
                 {
@@ -677,7 +677,7 @@
             id: 'models',
             icon: 'fa-cube',
             hasTour: false,
-            endpoints: ['models_index', 'model_detail'],
+            endpoints: ['models_index', 'api_models_list', 'model_detail', 'model_edit', 'model_upload_version', 'model_download_latest', 'model_download_version', 'model_view_version', 'model_upload_thumbnail', 'serve_thumbnail', 'model_delete', 'model_delete_version', 'model_upload'],
             title: { cs: 'Modely', en: 'Models' },
             tips: [
                 {
@@ -706,6 +706,20 @@
                     text: {
                         cs: 'Tlačítkem „Save Thumbnail" v prohlížeči můžete pořídit snímek aktuálního pohledu 3D kamery. Tento snímek se uloží na server jako hlavní ikona modelu a zobrazí se v přehledu modelů.',
                         en: 'Using the "Save Thumbnail" button in the viewer, you can take a screenshot of the current 3D camera viewpoint. This screenshot is saved to the server as the model\'s primary icon and displayed in the catalog.'
+                    }
+                },
+                {
+                    title: { cs: 'Mazání modelů a verzí', en: 'Deleting Models and Versions' },
+                    text: {
+                        cs: 'Modely lze smazat z přehledu modelů (ikona koše u každé karty/řádku) nebo z detailu modelu. V detailu modelu je možné smazat celý model (červené tlačítko nahoře) nebo jednotlivé verze v historii. Při smazání poslední verze je odstraněn celý model.',
+                        en: 'Models can be deleted from the model catalog (trash icon on each card/row) or from the model detail page. In model details, you can delete the entire model (red button at the top) or individual versions from the history timeline. Deleting the last version removes the entire model.'
+                    }
+                },
+                {
+                    title: { cs: 'Nahrávání nových modelů', en: 'Uploading New Models' },
+                    text: {
+                        cs: 'Nové 3D modely lze nahrát přímo ze stránky Modelů tlačítkem „Nahrát model" vpravo nahoře. Vyberte soubor (3MF, STL, OBJ, atd.), projekt, ke kterému model patří, a volitelně přidejte poznámku k verzi. Po nahrání budete přesměrováni na detail modelu, kde můžete nahrávat další verze.',
+                        en: 'New 3D models can be uploaded directly from the Models page using the "Upload model" button in the top right. Select a file (3MF, STL, OBJ, etc.), the project it belongs to, and optionally add a version note. After upload, you\'ll be redirected to the model detail page where you can upload additional versions.'
                     }
                 }
             ]

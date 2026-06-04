@@ -80,6 +80,11 @@
                         <a href="{{ url_for('models.model_download_latest', root_id=root_file.id) }}" class="ui-badge ui-badge-brand h-8 w-8 justify-center" title="{{ t('download') }}">
                             <i class="fa-solid fa-download"></i>
                         </a>
+                        <form method="POST" action="{{ url_for('models.model_delete', root_id=root_file.id) }}" onsubmit="return confirm('{{ t('models_delete_confirm') }}');" class="inline-flex">
+                            <button type="submit" class="ui-badge ui-badge-critical h-8 w-8 justify-center" title="{{ t('models_delete_model') }}">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>

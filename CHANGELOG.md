@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.104.6] - 2026-06-03
+### Changed
+- **Version upload modal now uses drag-and-drop** — The "Upload version" modal on the model detail page now has the same drag-and-drop zone as the new model upload, including blue highlight on drag, file name/size feedback, and consistent styling. Drag-and-drop auto-submits; file browser selection only shows the filename (no auto-submit), letting the user add a version note first.
+
+## [1.104.5] - 2026-06-03
+### Fixed
+- **Upload modal no longer auto-submits on file browse** — Selecting a file via the "Browse" link now only shows the filename/size; the user must click "Upload" explicitly. Drag-and-drop still auto-submits for convenience.
+- **3MF files now extract embedded thumbnails** — Many slicers (Bambu Studio, PrusaSlicer, Cura) embed a `Metadata/thumbnail.png` inside the 3MF archive. The uploader now extracts this image automatically, providing a visual preview on the models page instead of the fallback SVG.
+### Changed
+- **Project-less models are now truly unassigned** — The `project_file.project_id` column is now nullable. Models uploaded without a project are stored with `project_id = NULL` instead of being placed in a hidden "Unassigned models" project. The auto-created "Unassigned models" project has been removed. All code paths (auth, listing, detail, export/import) handle null project_id correctly.
+
+## [1.104.4] - 2026-06-03
+### Changed
+- **Redesigned model upload modal** — The upload popup on the Models page now matches the visual style of all other project components (drag-and-drop zone, hover states, dark mode support, consistent typography). File upload is now instant on drop or file select (auto-submit), with filename+size feedback shown below the drop zone.
+- **Models can now be uploaded without a project** — The project selector in the upload modal is now optional. Models uploaded without a project are automatically placed under a hidden "Unassigned models" project (status DONE, priority low), keeping the database constraint intact while allowing free-form model cataloging.
+
+## [1.104.3] - 2026-06-03
+### Added
+- **Direct model upload from Models page** — A new "Upload model" button on the Models page opens a modal where you can upload a 3D model file, select its project, and optionally add a version note. After upload, you are redirected to the model detail page where you can add more versions. Previously, models could only be uploaded from within project detail pages.
+
+## [1.104.2] - 2026-06-03
+### Added
+- **Model deletion** — Models can now be deleted from the Models overview page (trash icon on each card/row) and from the Model detail page. In the model detail, you can delete the entire model chain (all versions) or individual versions from the history timeline. When deleting the root version, the newest remaining child is promoted as the new root. Deleting the last version removes the entire model. All files and thumbnails are cleaned up from disk.
+
+## [1.104.1] - 2026-06-03
+### Fixed
+- **Project cloning now uses correct model columns** — `project_clone` referenced `actual_weight`, `color_override` on `ProjectFilament` and `item_name`, `quantity`, `done` on `ProjectPrintItem`, none of which exist in the current schema. Fixed to use `is_used` (ProjectFilament) and `name`, `quantity_total`, `quantity_done` (ProjectPrintItem). This was a residual from an earlier model schema where these columns were named differently.
+- **3D viewer engine file missing** — `static/js/o3dv.min.js` was referenced by `viewer.html` but never copied from `node_modules`. Now properly included; the interactive 3D model viewer will no longer fail with "Failed to load 3D engine".
+- **Help system endpoint names corrected** — `static/js/help.js` had 13+ stale/mismatched endpoint names (e.g., `overview` → `index`, `add_filament` → `add`, `stats_index` → `stats`, `storage_index` → `storage`, `bambu_index` → `bambu_jobs`, `prusa_index` → `prusa_jobs`, etc.). All sections now reference the actual Flask endpoint names. Missing endpoint names for new features (models, print items, comments, waste, etc.) were also added. Contextual help tips will now correctly match all pages.
+- **Missing SECTION_BY_ENDPOINT entries added** — `bambu_job_thumbnail` and `serve_thumbnail` endpoints were missing from `auth.py`'s section mapping, now properly assigned to `SECTION_PRINTERS` and `SECTION_PROJECTS`.
+
 ## [1.104.0] - 2026-06-03
 ### Removed
 - **Entire viewer-optimized file feature removed.** All simplified/decimated mesh generation, the `/models/version/<id>/optimized` endpoint, the `model_view_optimized` route, and all related functions (`simplify_stl`, `simplify_3mf`, `simplify_obj`, `simplify_amf`, `simplify_mesh_file`, `_decimate_indexed_mesh`, `generate_optimized_stl_for_file`, `get_optimized_stl_path`, etc.) have been removed. All viewer-optimized UI indicators (badges, right-panel status row, floating overlay chip, history preview icons) are also removed. The 3D viewer now always loads the original file via `model_view_version`. STL thumbnail rendering remains intact.
