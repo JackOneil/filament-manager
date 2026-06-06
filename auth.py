@@ -50,6 +50,8 @@ PUBLIC_ENDPOINTS = {
     'project_share_view_file',
     'project_share_image_file',
     'model_public_share',
+    'model_public_share_file',
+    'model_public_share_download',
 }
 
 SECTION_BY_ENDPOINT = {

@@ -690,6 +690,37 @@ def model_public_share(token):
     )
 
 
+@bp.route('/models/share/<token>/file/<int:file_id>/<filename>')
+def model_public_share_file(token, file_id, filename):
+    """Serve a model file for public share (token-based auth, no login needed)."""
+    from sqlalchemy import or_
+    root_file = ProjectFile.query.filter_by(share_token=token, parent_file_id=None).first_or_404()
+    # The requested file must be either the root or one of its versions
+    version_file = ProjectFile.query.filter(
+        ProjectFile.id == file_id,
+        or_(
+            ProjectFile.id == root_file.id,
+            ProjectFile.parent_file_id == root_file.id
+        )
+    ).first_or_404()
+    return _send_file_safely(version_file, as_attachment=False)
+
+
+@bp.route('/models/share/<token>/file/<int:file_id>/<filename>/download')
+def model_public_share_download(token, file_id, filename):
+    """Download a model file from public share (token-based auth)."""
+    from sqlalchemy import or_
+    root_file = ProjectFile.query.filter_by(share_token=token, parent_file_id=None).first_or_404()
+    version_file = ProjectFile.query.filter(
+        ProjectFile.id == file_id,
+        or_(
+            ProjectFile.id == root_file.id,
+            ProjectFile.parent_file_id == root_file.id
+        )
+    ).first_or_404()
+    return _send_file_safely(version_file, as_attachment=True)
+
+
 @bp.route('/models/bulk-delete', methods=['POST'])
 def model_bulk_delete():
     if not is_admin():
