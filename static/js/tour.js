@@ -449,6 +449,113 @@
                     en: 'Click "Detail" on any user to go to their profile page where you can edit the profile, set permissions and notifications, and view their recent projects, comments, and audit entries.'
                 }
             }
+        ],
+
+        models: [
+            {
+                selector: null,
+                title: { cs: 'Centrální prohlížeč modelů', en: 'Central Model Browser' },
+                text: {
+                    cs: 'Toto je katalog všech 3D modelů nahraných napříč projekty — STL, 3MF, OBJ, GCODE a další. Modely lze vyhledávat, filtrovat, řadit a hromadně spravovat.',
+                    en: 'This is the catalogue of all 3D models uploaded across projects — STL, 3MF, OBJ, GCODE and more. Models can be searched, filtered, sorted and bulk-managed.'
+                }
+            },
+            {
+                selector: '#models-list-container',
+                title: { cs: 'Karty modelů', en: 'Model Cards' },
+                text: {
+                    cs: 'Každá karta zobrazuje náhledový obrázek (nebo barevnou ikonu dle typu souboru), název, verzi, projekt a velikost. Při najetí myší na obrázek se zobrazí tlačítka pro náhled, stažení a smazání. Fialový badge ukazuje celkový počet verzí.',
+                    en: 'Each card shows a thumbnail (or a coloured icon by file type), name, version, project and size. Hovering over the image reveals buttons for preview, download and delete. A violet badge shows the total version count.'
+                },
+                position: 'top'
+            },
+            {
+                selector: null,
+                title: { cs: 'Filtry a rychlé pilulky', en: 'Filters and Quick Pills' },
+                text: {
+                    cs: 'Pod statistikami najdete rychlé filtrační pilulky (Vše / Bez projektu) a pod nimi hlavní filtrovací panel. Filtrovat lze fulltextově, podle projektu (interaktivní vyhledávací dropdown), typu souboru a řazení. Projektový filtr i upload modál používají stejný interaktivní dropdown — pište pro filtrování.',
+                    en: 'Below the stats bar are quick filter pills (All / No project) and the main filter panel. Filter by fulltext search, project (interactive searchable dropdown), file type, and sort order. The project filter and upload modal use the same interactive dropdown — just type to filter.'
+                }
+            },
+            {
+                selector: '#models-list-wrapper',
+                title: { cs: 'Hromadné akce', en: 'Bulk Actions' },
+                text: {
+                    cs: 'Každá karta (i řádek tabulky) má checkbox vlevo nahoře. Po zaškrtnutí se dole zobrazí plovoucí panel — můžete hromadně smazat vybrané modely nebo je přesunout do jiného projektu.',
+                    en: 'Each card (and table row) has a checkbox in the top-left corner. When items are selected, a floating bar appears at the bottom — bulk-delete selected models or move them to a different project.'
+                },
+                position: 'top'
+            },
+            {
+                selector: null,
+                title: { cs: 'Detail modelu', en: 'Model Detail' },
+                text: {
+                    cs: 'Kliknutím na kartu nebo název modelu přejdete na detail. Zde najdete interaktivní 3D prohlížeč s podporou fullscreen, historii verzí, metadata, komentáře, poznámku k modelu a možnost sdílet model přes veřejný odkaz.',
+                    en: 'Click a card or model name to open the detail page. Here you\'ll find an interactive 3D viewer with fullscreen support, version history, metadata, comments, a model note, and the option to share the model via a public link.'
+                }
+            }
+        ],
+
+        general: [
+            {
+                selector: null,
+                title: { cs: 'Obecné tipy a ovládání', en: 'General Tips & Controls' },
+                text: {
+                    cs: 'Tento průvodce vás provede univerzálními ovládacími prvky, které najdete na každé stránce aplikace — bez ohledu na to, ve které sekci se právě nacházíte.',
+                    en: 'This tour walks you through the universal controls you\'ll find on every page of the app — no matter which section you\'re currently in.'
+                }
+            },
+            {
+                selector: 'form[action*="toggle_theme"]',
+                title: { cs: 'Přepínání tématu', en: 'Theme Toggle' },
+                text: {
+                    cs: 'Kliknutím na ikonu měsíce/slunce přepnete mezi světlým a tmavým režimem. Nastavení se automaticky ukládá a zůstane i po obnovení stránky. Tlačítko najdete v bočním menu i v mobilní navigaci.',
+                    en: 'Click the moon/sun icon to switch between light and dark mode. Your preference is saved automatically and survives page refresh. The button is in the sidebar and in the mobile navigation.'
+                },
+                position: 'bottom'
+            },
+            {
+                selector: 'button[class*="sm:flex"]',
+                title: { cs: 'Rychlé hledání (Ctrl+K)', en: 'Quick Search (Ctrl+K)' },
+                text: {
+                    cs: 'Klikněte na vyhledávací pole nebo stiskněte Ctrl+K (Cmd+K na Macu). Otevře se příkazová paleta, která prohledává filamenty, projekty i navigaci. Začněte psát a klikněte na výsledek — dostanete se přímo na danou stránku.',
+                    en: 'Click the search bar or press Ctrl+K (Cmd+K on Mac). The command palette opens — it searches filaments, projects, and navigation. Start typing and click a result to go directly to that page.'
+                },
+                position: 'bottom'
+            },
+            {
+                selector: 'a[href*="notifications_index"]',
+                title: { cs: 'Notifikace', en: 'Notifications' },
+                text: {
+                    cs: 'Ikona zvonku v horní liště zobrazuje počet nepřečtených notifikací (červený puntík). Notifikace se generují při dokončení synchronizace tiskáren, detekci nízké zásoby filamentu nebo změně stavu projektu.',
+                    en: 'The bell icon in the top bar shows unread notifications (red dot). Notifications are generated when printer sync completes, low filament stock is detected, or a project status changes.'
+                },
+                position: 'bottom'
+            },
+            {
+                selector: null,
+                title: { cs: 'PWA — instalace aplikace', en: 'PWA — Install as App' },
+                text: {
+                    cs: 'Filament Manager je progresivní webová aplikace (PWA). V prohlížeči Chrome/Edge klikněte na ikonu instalace v adresním řádku. Aplikace pak funguje v samostatném okně bez lišty prohlížeče — podobně jako nativní aplikace.',
+                    en: 'Filament Manager is a Progressive Web App (PWA). In Chrome/Edge, click the install icon in the address bar. The app then runs in a standalone window without the browser chrome — just like a native app.'
+                }
+            },
+            {
+                selector: null,
+                title: { cs: 'Audit log', en: 'Audit Log' },
+                text: {
+                    cs: 'Administrátoři mohou v sekci Uživatelé → Audit log zobrazit kompletní historii důležitých akcí: přihlášení, změny nastavení, přidání/smazání filamentů, změny projektů a další.',
+                    en: 'Administrators can view a complete history of important actions in Users → Audit Log: logins, settings changes, filament additions/deletions, project changes and more.'
+                }
+            },
+            {
+                selector: null,
+                title: { cs: 'Panel nápovědy', en: 'Help Panel' },
+                text: {
+                    cs: 'Fialové tlačítko s otazníkem vpravo dole otevírá tento panel nápovědy. Zde najdete tipy ke každé sekci, můžete prohledávat všechny nápovědy a spouštět interaktivní průvodce jako je tento.',
+                    en: 'The purple question-mark button in the bottom-right opens this help panel. Here you\'ll find tips for every section, you can search all help content, and launch interactive tours like this one.'
+                }
+            }
         ]
     };
 
@@ -467,7 +574,9 @@
         history:     '/history',
         waste:       '/waste',
         maintenance: '/maintenance',
-        users:       '/users'
+        users:       '/users',
+        models:      '/models',
+        general:     '/'
     };
 
     // ── Tour Engine ─────────────────────────────────────────────────────────────

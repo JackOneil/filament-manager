@@ -676,78 +676,92 @@
         {
             id: 'models',
             icon: 'fa-cube',
-            hasTour: false,
+            hasTour: true,
             endpoints: ['models_index', 'api_models_list', 'model_detail', 'model_edit', 'model_upload_version', 'model_download_latest', 'model_download_version', 'model_view_version', 'model_upload_thumbnail', 'serve_thumbnail', 'model_delete', 'model_delete_version', 'model_upload', 'model_add_comment', 'model_delete_comment', 'model_generate_share', 'model_revoke_share', 'model_public_share', 'model_bulk_delete', 'model_bulk_move'],
             title: { cs: 'Modely', en: 'Models' },
             tips: [
                 {
                     title: { cs: 'Prohlížeč 3D modelů', en: '3D Model Browser' },
                     text: {
-                        cs: 'Stránka Modely slouží jako centralizovaný katalog všech 3D modelů (soubory formátů STL, 3MF, OBJ, atd.) nahraných napříč všemi vašimi projekty. Můžete je prohledávat, filtrovat podle projektu či přípony, a řadit podle názvu, velikosti či data nahrání.',
-                        en: 'The Models page serves as a centralized catalog of all 3D models (STL, 3MF, OBJ, etc. file formats) uploaded across all your projects. You can search them, filter by project or file extension, and sort by name, size, or upload date.'
+                        cs: 'Stránka Modely slouží jako centralizovaný katalog všech 3D modelů (STL, 3MF, OBJ, atd.) napříč všemi projekty. Můžete je prohledávat, filtrovat podle projektu či přípony, řadit podle názvu/velikosti/data a přepínat mezi zobrazením karet a tabulky.',
+                        en: 'The Models page is a centralized catalog of all 3D models (STL, 3MF, OBJ, etc.) across all projects. You can search, filter by project or file extension, sort by name/size/date, and switch between card and table view.'
+                    }
+                },
+                {
+                    title: { cs: 'Filtry a rychlé akce', en: 'Filters and Quick Actions' },
+                    text: {
+                        cs: 'Nad hlavním filtrovacím panelem jsou rychlé filtrační pilulky: „Vše" zobrazí všechny modely, „Bez projektu" izoluje nepřiřazené modely. Vedle nich je kompaktní statistický řádek s celkovým počtem modelů, celkovou velikostí a počtem modelů bez náhledu.',
+                        en: 'Above the main filter panel are quick filter pills: "All" shows all models, "No project" isolates unassigned models. Next to them is a compact stats row with total model count, total file size, and number of thumbnailless models.'
+                    }
+                },
+                {
+                    title: { cs: 'Interaktivní výběr projektu', en: 'Interactive Project Selector' },
+                    text: {
+                        cs: 'Výběr projektu ve filtrech, upload modálu i editaci metadat je řešen jako interaktivní vyhledávací dropdown — stačí začít psát název projektu a seznam se filtruje. Vybraný projekt je zvýrazněn modře s fajfkou.',
+                        en: 'The project selector in filters, upload modal, and metadata editing uses an interactive searchable dropdown — just start typing a project name and the list filters. The selected project is highlighted in blue with a checkmark.'
+                    }
+                },
+                {
+                    title: { cs: 'Hover akce na kartách', en: 'Hover Actions on Cards' },
+                    text: {
+                        cs: 'Při najetí myší na náhledový obrázek modelu se zobrazí poloprůhledný overlay s třemi akčními tlačítky: Náhled (detail modelu), Stažení a Smazání. Spodní lišta karty nyní zobrazuje jen velikost souboru a datum nahrání.',
+                        en: 'Hovering over a model thumbnail reveals a semi-transparent overlay with three action buttons: Preview (model detail), Download, and Delete. The card footer now shows only file size and upload date.'
+                    }
+                },
+                {
+                    title: { cs: 'Poznámka k modelu', en: 'Model Note' },
+                    text: {
+                        cs: 'Každý model může mít trvalou poznámku (např. „tisknout s podpěrami" nebo „PETG, 0.4mm tryska"). Na rozdíl od poznámky k verzi (která se mění s každým uploadem) zůstává poznámka modelu stejná napříč všemi verzemi. Zobrazuje se na kartách, v tabulce i v detailu modelu jako modrý zvýrazněný box.',
+                        en: 'Each model can have a persistent note (e.g. "print with supports" or "PETG, 0.4mm nozzle"). Unlike version notes (which change with each upload), the model note stays the same across all versions. It appears on cards, in the table, and in the model detail as a blue highlighted box.'
                     }
                 },
                 {
                     title: { cs: 'Verzování a historie', en: 'Versioning and History' },
                     text: {
-                        cs: 'Každý model podporuje více verzí. Při nahrání nového souboru se automaticky navýší verze. V detailu modelu vidíte přehlednou osu historie, kde lze stáhnout libovolnou historickou verzi nebo si ji načíst přímo do interaktivního náhledu.',
-                        en: 'Each model supports multiple versions. When you upload a new file, the version number automatically increments. In the model details page, you see a complete history timeline where you can download any older version or load it directly into the interactive preview.'
+                        cs: 'Každý model podporuje více verzí. Při nahrání nového souboru se automaticky navýší verze. V detailu modelu vidíte přehlednou osu historie, kde lze stáhnout libovolnou historickou verzi nebo si ji načíst do interaktivního 3D náhledu. Karty modelů zobrazují počet verzí (fialový badge).',
+                        en: 'Each model supports multiple versions. Uploading a new file auto-increments the version. In the model detail you see a complete history timeline — download any older version or load it into the interactive 3D viewer. Model cards show the version count (violet badge).'
                     }
                 },
                 {
                     title: { cs: '3D interaktivní prohlížeč', en: '3D Interactive Viewer' },
                     text: {
-                        cs: 'Detail modelu obsahuje plně interaktivní 3D prohlížeč. Můžete s modelem otáčet, přibližovat a měnit barvu materiálu (podle barev filamentů), abyste viděli, jak bude model vypadat po vytištění.',
-                        en: 'Model details include a fully interactive 3D viewer. You can rotate, zoom, and adjust the material color (matching your filament inventory) to see how the model will look when printed.'
-                    }
-                },
-                {
-                    title: { cs: 'Uložení náhledu (Snapshot)', en: 'Save Thumbnail Snapshot' },
-                    text: {
-                        cs: 'Tlačítkem „Save Thumbnail" v prohlížeči můžete pořídit snímek aktuálního pohledu 3D kamery. Tento snímek se uloží na server jako hlavní ikona modelu a zobrazí se v přehledu modelů.',
-                        en: 'Using the "Save Thumbnail" button in the viewer, you can take a screenshot of the current 3D camera viewpoint. This screenshot is saved to the server as the model\'s primary icon and displayed in the catalog.'
-                    }
-                },
-                {
-                    title: { cs: 'Mazání modelů a verzí', en: 'Deleting Models and Versions' },
-                    text: {
-                        cs: 'Modely lze smazat z přehledu modelů (ikona koše u každé karty/řádku) nebo z detailu modelu. V detailu modelu je možné smazat celý model (červené tlačítko nahoře) nebo jednotlivé verze v historii. Při smazání poslední verze je odstraněn celý model.',
-                        en: 'Models can be deleted from the model catalog (trash icon on each card/row) or from the model detail page. In model details, you can delete the entire model (red button at the top) or individual versions from the history timeline. Deleting the last version removes the entire model.'
-                    }
-                },
-                {
-                    title: { cs: 'Nahrávání nových modelů', en: 'Uploading New Models' },
-                    text: {
-                        cs: 'Nové 3D modely lze nahrát přímo ze stránky Modelů tlačítkem „Nahrát model" vpravo nahoře. Vyberte soubor (3MF, STL, OBJ, atd.), projekt, ke kterému model patří, a volitelně přidejte poznámku k verzi. Po nahrání budete přesměrováni na detail modelu, kde můžete nahrávat další verze.',
-                        en: 'New 3D models can be uploaded directly from the Models page using the "Upload model" button in the top right. Select a file (3MF, STL, OBJ, etc.), the project it belongs to, and optionally add a version note. After upload, you\'ll be redirected to the model detail page where you can upload additional versions.'
+                        cs: 'Detail modelu obsahuje plně interaktivní 3D prohlížeč. Můžete s modelem otáčet, přibližovat a měnit barvu materiálu. Viewer podporuje fullscreen režim (tlačítko v ovládacím panelu) a umožňuje uložit aktuální pohled jako náhledový obrázek modelu.',
+                        en: 'Model details include a fully interactive 3D viewer. Rotate, zoom, and change material color. The viewer supports fullscreen mode (button in the overlay controls) and lets you save the current camera view as the model thumbnail.'
                     }
                 },
                 {
                     title: { cs: 'Hromadné akce', en: 'Bulk Actions' },
                     text: {
-                        cs: 'Na kartách a v řádcích tabulky je checkbox pro hromadný výběr modelů. Po zaškrtnutí se dole zobrazí plovoucí panel s možností hromadně smazat vybrané modely nebo je přesunout do jiného projektu.',
-                        en: 'Each card and table row has a checkbox for bulk selection. When items are selected, a floating bar appears at the bottom with options to bulk-delete selected models or move them to a different project.'
+                        cs: 'Každá karta a řádek tabulky má checkbox pro hromadný výběr. Po zaškrtnutí se dole zobrazí plovoucí panel s možností hromadně smazat vybrané modely nebo je přesunout do jiného projektu. Checkboxy zůstávají i po změně filtrů.',
+                        en: 'Every card and table row has a checkbox for bulk selection. When items are selected, a floating bar appears at the bottom with options to bulk-delete models or move them to another project. Checkboxes persist across filter changes.'
                     }
                 },
                 {
                     title: { cs: 'Komentáře u modelu', en: 'Model Comments' },
                     text: {
-                        cs: 'V detailu modelu pod historií verzí najdete sekci komentářů. Můžete přidávat poznámky, diskutovat o změnách a mazat vlastní komentáře. Správci mohou mazat všechny komentáře.',
-                        en: 'In the model detail page below the version history, you\'ll find a comments section. You can add notes, discuss changes, and delete your own comments. Administrators can delete any comment.'
+                        cs: 'V detailu modelu pod historií verzí najdete sekci komentářů. Můžete přidávat poznámky, diskutovat o změnách a mazat vlastní komentáře. Administrátoři mohou mazat všechny komentáře.',
+                        en: 'In the model detail page below the version history, you\'ll find a comments section. Add notes, discuss changes, and delete your own comments. Administrators can delete any comment.'
                     }
                 },
                 {
                     title: { cs: 'Sdílení modelu', en: 'Model Sharing' },
                     text: {
-                        cs: 'V detailu modelu lze vygenerovat veřejný odkaz pro sdílení. Kliknutím na „Sdílet odkaz" vytvoříte unikátní URL, kterou může kdokoli otevřít a zobrazit si 3D model včetně historie verzí bez přihlášení. Odkaz lze kdykoli zrušit.',
-                        en: 'In the model detail page, you can generate a public share link. Click "Share link" to create a unique URL that anyone can open to view the 3D model and its version history without logging in. The link can be revoked at any time.'
+                        cs: 'V detailu modelu lze vygenerovat veřejný odkaz pro sdílení. Kliknutím na „Sdílet odkaz" vytvoříte unikátní URL, kterou může kdokoli otevřít a zobrazit si 3D model včetně historie verzí — bez přihlášení. Odkaz lze kdykoli zrušit. Po vygenerování se zobrazí jako kopírovatelné vstupní pole.',
+                        en: 'In the model detail, you can generate a public share link. Click "Share link" to create a unique URL that anyone can open to view the 3D model and its version history — no login required. The link can be revoked at any time. Once generated, it appears as a copyable input field.'
                     }
                 },
                 {
-                    title: { cs: 'Statistiky modelů', en: 'Model Statistics' },
+                    title: { cs: 'Mazání modelů a verzí', en: 'Deleting Models and Versions' },
                     text: {
-                        cs: 'V horní části stránky Modelů vidíte statistický pruh zobrazující celkový počet modelů, celkovou velikost souborů a počet modelů bez náhledu. To vám pomůže identifikovat modely, u kterých je vhodné vygenerovat náhledový obrázek.',
-                        en: 'At the top of the Models page, you\'ll see a statistics bar showing the total number of models, total file size, and the count of models without thumbnails. This helps you identify models that could benefit from generating a preview thumbnail.'
+                        cs: 'Modely lze smazat přes hover overlay na kartě (ikona koše) nebo z detailu modelu. V detailu modelu je možné smazat celý model (červené tlačítko v záhlaví) nebo jednotlivé verze v historii. Při smazání poslední verze je odstraněn celý model.',
+                        en: 'Models can be deleted via the hover overlay on cards (trash icon) or from the model detail page. In model details, delete the entire model (red button in the header) or individual versions from the history timeline. Deleting the last version removes the entire model.'
+                    }
+                },
+                {
+                    title: { cs: 'Nahrávání nových modelů', en: 'Uploading New Models' },
+                    text: {
+                        cs: 'Nové 3D modely nahrajete tlačítkem „Nahrát model" vpravo nahoře. Přetáhněte soubor do zóny nebo klikněte na „Procházet". Vyberte projekt (interaktivní vyhledávací dropdown), přidejte poznámku k verzi a volitelně i trvalou poznámku k modelu. Po nahrání jste přesměrováni na detail modelu.',
+                        en: 'Upload new 3D models using the "Upload model" button top-right. Drag a file into the drop zone or click "Browse". Select a project (interactive searchable dropdown), add a version note, and optionally a persistent model note. After upload, you\'re redirected to the model detail.'
                     }
                 },
             ]
@@ -755,6 +769,7 @@
         {
             id: 'general',
             icon: 'fa-circle-info',
+            hasTour: true,
             endpoints: [],
             title: { cs: 'Obecné tipy', en: 'General Tips' },
             tips: [
