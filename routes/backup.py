@@ -457,7 +457,9 @@ def register(app):
                                 checksum_sha256=file_data.get('checksum_sha256'),
                                 thumbnail_path=file_data.get('thumbnail_path'),
                                 version_note=file_data.get('version_note'),
+                                model_note=file_data.get('model_note'),
                                 uploaded_by_user_id=uploaded_by_id,
+                                share_token=file_data.get('share_token'),
                             )
                             db.session.add(new_file)
                             imported_files_map[(proj.id, file_data.get('filename', ''), file_data.get('version', 1))] = new_file

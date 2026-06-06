@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.104.6***
+*Current version: **v1.105.1***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -252,7 +252,7 @@ Tests cover: authentication flows, Bambu sync idempotency, stock deduction logic
 - Waste/scrap tracking with failure reason codes and filament linkage
 - Printer maintenance recurring intervals and ICS calendar export
 - CSRF protection and security hardening
-- Fully self-hosted static assets (no CDN dependencies)
+- Docker-built local static assets for the main app shell (no page-load CDN dependency)
 - Bilingual UI (CS/EN)
 - Project priority levels, client contact fields (email/phone), quick text search on project list
 - One-click status advance, project cloning, and project templates

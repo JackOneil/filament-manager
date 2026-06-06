@@ -49,6 +49,7 @@ PUBLIC_ENDPOINTS = {
     'project_share_download_file',
     'project_share_view_file',
     'project_share_image_file',
+    'model_public_share',
 }
 
 SECTION_BY_ENDPOINT = {
@@ -89,6 +90,12 @@ SECTION_BY_ENDPOINT = {
     'model_delete': SECTION_PROJECTS,
     'model_delete_version': SECTION_PROJECTS,
     'model_upload': SECTION_PROJECTS,
+    'model_add_comment':    SECTION_PROJECTS,
+    'model_delete_comment': SECTION_PROJECTS,
+    'model_generate_share': SECTION_PROJECTS,
+    'model_revoke_share':   SECTION_PROJECTS,
+    'model_bulk_delete':    SECTION_PROJECTS,
+    'model_bulk_move':      SECTION_PROJECTS,
     'project_create': SECTION_PROJECTS,
     'project_detail': SECTION_PROJECTS,
     'project_edit': SECTION_PROJECTS,
@@ -528,6 +535,10 @@ def _audit_target():
         'model_download_version': (ProjectFile, 'file_id'),
         'model_view_version': (ProjectFile, 'file_id'),
         'model_upload_thumbnail': (ProjectFile, 'file_id'),
+        'model_add_comment': (ProjectFile, 'root_id'),
+        'model_delete_comment': (ProjectFile, 'root_id'),
+        'model_bulk_delete': (ProjectFile, 'root_id'),
+        'model_bulk_move': (ProjectFile, 'root_id'),
         'bambu_job_map': (BambuPrintJob, 'job_id'),
         'bambu_job_deduct_slot': (BambuPrintJob, 'job_id'),
         'bambu_job_remap_slot': (BambuPrintJob, 'job_id'),

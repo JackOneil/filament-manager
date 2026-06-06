@@ -3,6 +3,7 @@ import math
 import hashlib
 import mimetypes
 import logging
+import secrets
 from datetime import datetime
 from types import SimpleNamespace
 
@@ -14,7 +15,7 @@ from werkzeug.utils import secure_filename
 
 from database import db
 from auth import get_current_user, is_admin
-from models import Project, ProjectFile, AppSetting, User
+from models import Project, ProjectFile, AppSetting, User, ModelComment
 from utils import escape_like, utc_now, translate
 
 logger = logging.getLogger(__name__)
@@ -159,11 +160,35 @@ def _get_file_size_and_checksum(filepath):
 def models_index():
     projects = _get_projects()
     setting = AppSetting.query.first()
+
+    # Stats bar
+    user = get_current_user()
+    base_q = ProjectFile.query.filter(ProjectFile.parent_file_id.is_(None))
+    if not is_admin(user):
+        base_q = base_q.outerjoin(Project).filter(Project.owner_user_id == user.id if user else False)
+    ext_conditions = [ProjectFile.filename.like(f'%.{ext}') for ext in MODEL_EXTENSIONS]
+    base_q = base_q.filter(db.or_(*ext_conditions))
+
+    total_count = base_q.count()
+    total_size = db.session.query(
+        db.func.sum(ProjectFile.file_size_bytes)
+    ).filter(
+        ProjectFile.id.in_([f.id for f in base_q.with_entities(ProjectFile.id).all()])
+    ).scalar() or 0
+    no_thumb = base_q.filter(ProjectFile.thumbnail_path.is_(None)).count()
+
+    models_stats = {
+        'total': total_count,
+        'total_size': total_size,
+        'no_thumb': no_thumb,
+    }
+
     return render_template(
         'models_index.html',
         projects=projects,
         setting=setting,
-        model_extensions=sorted(list(MODEL_EXTENSIONS))
+        model_extensions=sorted(list(MODEL_EXTENSIONS)),
+        models_stats=models_stats,
     )
 
 @bp.route('/models/upload', methods=['POST'])
@@ -249,7 +274,10 @@ def api_models_list():
         ))
         
     project_id = request.args.get('project_id', type=int)
-    if project_id:
+    no_project = request.args.get('no_project') == '1'
+    if no_project:
+        query = query.filter(ProjectFile.project_id.is_(None))
+    elif project_id:
         query = query.filter(ProjectFile.project_id == project_id)
         
     file_type = request.args.get('file_type', '').strip().lower()
@@ -268,7 +296,9 @@ def api_models_list():
             'display_name': root.display_name or root.filename.rsplit('.', 1)[0],
             'project_name': root.project.name if root.project else '',
             'size': latest.file_size_bytes or 0,
-            'uploaded_at': latest.uploaded_at or datetime.min
+            'uploaded_at': latest.uploaded_at or datetime.min,
+            'version_count': len([root] + root.versions),
+            'model_note': root.model_note or '',
         })
 
     # Sort
@@ -281,7 +311,9 @@ def api_models_list():
         enriched.sort(key=lambda x: x['project_name'].lower())
     elif sort_by == 'size_desc':
         enriched.sort(key=lambda x: x['size'], reverse=True)
-    else:  # uploaded
+    elif sort_by == 'uploaded_asc':
+        enriched.sort(key=lambda x: x['uploaded_at'])
+    else:  # uploaded (newest first)
         enriched.sort(key=lambda x: x['uploaded_at'], reverse=True)
 
     # Paginate
@@ -337,12 +369,17 @@ def model_detail(root_id):
     # Check for same checksum warning flag in request
     same_checksum = request.args.get('same_checksum') == '1'
 
+    comments = ModelComment.query.filter_by(root_file_id=root_id)\
+                                 .order_by(ModelComment.created_at.asc()).all()
+
     return render_template(
         'models_detail.html',
         root=root_file,
         latest=latest,
         history=history,
         same_checksum=same_checksum,
+        projects=_get_projects(),
+        comments=comments,
     )
 
 @bp.route('/models/<int:root_id>/edit', methods=['POST'])
@@ -350,18 +387,24 @@ def model_edit(root_id):
     root_file = _check_file_access(root_id)
     display_name = request.form.get('display_name', '').strip()
     version_note = request.form.get('version_note', '').strip()
-    
+    model_note   = request.form.get('model_note', '').strip() or None
+    project_id   = request.form.get('project_id', type=int) or None
+
     if not display_name:
         flash(translate('models_error_edit_name_required'), 'error')
         return redirect(url_for('models.model_detail', root_id=root_file.id))
-        
+
+    if project_id:
+        _check_project_access(project_id)
+
     latest = _get_latest_version(root_file)
-    
-    # Update display name on the root file (which propagates as the master title)
+
     root_file.display_name = display_name
+    root_file.model_note   = model_note
+    root_file.project_id   = project_id
     # Update note specifically on the latest version
     latest.version_note = version_note
-    
+
     db.session.commit()
     flash(translate('models_success_edit'), 'success')
     return redirect(url_for('models.model_detail', root_id=root_file.id))
@@ -439,17 +482,19 @@ def model_upload_version(root_id):
     flash(translate('models_success_upload'), 'success')
     return redirect(url_for('models.model_detail', root_id=root_file.id, same_checksum='1' if same_checksum else None))
 
+def _delete_model_chain(root_file):
+    """Delete root file and all its versions from DB and disk."""
+    all_files = [root_file] + root_file.versions
+    upload_folder, thumb_dir = _get_stl_thumbnail_paths()
+    for f in all_files:
+        _delete_file_on_disk(f)
+        db.session.delete(f)
+
+
 @bp.route('/models/<int:root_id>/delete', methods=['POST'])
 def model_delete(root_id):
     root_file = _check_file_access(root_id)
-    # Collect all files in the version chain (root + all versions)
-    all_files = [root_file] + root_file.versions
-    # Delete all files from disk
-    for pf in all_files:
-        _delete_file_on_disk(pf)
-    # Delete all DB records (versions first, then root)
-    for pf in reversed(all_files):
-        db.session.delete(pf)
+    _delete_model_chain(root_file)
     db.session.commit()
     flash(translate('models_success_deleted'), 'success')
     return redirect(url_for('models.models_index'))
@@ -587,6 +632,100 @@ def _send_file_safely(project_file, as_attachment=True):
         as_attachment=as_attachment,
         download_name=project_file.filename
     )
+
+
+@bp.route('/models/<int:root_id>/comments', methods=['POST'])
+def model_add_comment(root_id):
+    root_file = _check_file_access(root_id)
+    body = request.form.get('body', '').strip()
+    if not body:
+        flash(translate('models_comment_empty_error'), 'error')
+        return redirect(url_for('models.model_detail', root_id=root_id))
+    user = get_current_user()
+    comment = ModelComment(root_file_id=root_id, user_id=user.id if user else None, body=body)
+    db.session.add(comment)
+    db.session.commit()
+    return redirect(url_for('models.model_detail', root_id=root_id) + '#model-comments')
+
+
+@bp.route('/models/<int:root_id>/comments/<int:comment_id>/delete', methods=['POST'])
+def model_delete_comment(root_id, comment_id):
+    comment = ModelComment.query.get_or_404(comment_id)
+    user = get_current_user()
+    if not is_admin(user) and (not user or comment.user_id != user.id):
+        abort(403)
+    db.session.delete(comment)
+    db.session.commit()
+    return redirect(url_for('models.model_detail', root_id=root_id) + '#model-comments')
+
+
+@bp.route('/models/<int:root_id>/share/generate', methods=['POST'])
+def model_generate_share(root_id):
+    root_file = _check_file_access(root_id)
+    if not root_file.share_token:
+        root_file.share_token = secrets.token_urlsafe(32)
+        db.session.commit()
+    return redirect(url_for('models.model_detail', root_id=root_id))
+
+
+@bp.route('/models/<int:root_id>/share/revoke', methods=['POST'])
+def model_revoke_share(root_id):
+    root_file = _check_file_access(root_id)
+    root_file.share_token = None
+    db.session.commit()
+    return redirect(url_for('models.model_detail', root_id=root_id))
+
+
+@bp.route('/models/share/<token>')
+def model_public_share(token):
+    """Public (no-auth) read-only model view."""
+    root_file = ProjectFile.query.filter_by(share_token=token, parent_file_id=None).first_or_404()
+    latest    = _get_latest_version(root_file)
+    history   = sorted([root_file] + root_file.versions, key=lambda f: f.version, reverse=True)
+    return render_template(
+        'models_share.html',
+        root=root_file,
+        latest=latest,
+        history=history,
+    )
+
+
+@bp.route('/models/bulk-delete', methods=['POST'])
+def model_bulk_delete():
+    if not is_admin():
+        abort(403)
+    raw = request.form.get('ids', '')
+    ids = [int(x) for x in raw.split(',') if x.strip().isdigit()]
+    deleted = 0
+    for root_id in ids:
+        root_file = ProjectFile.query.get(root_id)
+        if root_file and root_file.parent_file_id is None:
+            _delete_model_chain(root_file)
+            deleted += 1
+    db.session.commit()
+    flash(translate('models_bulk_deleted').format(n=deleted), 'success')
+    return redirect(url_for('models.models_index'))
+
+
+@bp.route('/models/bulk-move', methods=['POST'])
+def model_bulk_move():
+    if not is_admin():
+        abort(403)
+    raw = request.form.get('ids', '')
+    ids = [int(x) for x in raw.split(',') if x.strip().isdigit()]
+    project_id = request.form.get('project_id', type=int) or None
+    if project_id:
+        _check_project_access(project_id)
+    moved = 0
+    for root_id in ids:
+        root_file = ProjectFile.query.get(root_id)
+        if root_file and root_file.parent_file_id is None:
+            root_file.project_id = project_id
+            moved += 1
+    db.session.commit()
+    flash(translate('models_bulk_moved').format(n=moved), 'success')
+    return redirect(url_for('models.models_index'))
+
 
 def register(app):
     app.register_blueprint(bp)

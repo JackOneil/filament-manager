@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="{{ lang or 'cs' }}" class="{% if theme == 'dark' %}dark{% endif %}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>{{ root.display_name }} — {{ t('models_share_public_view') }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fontawesome.min.css') }}">
+    <style>
+        :root {
+            --ui-bg: #f1f5f9;
+            --ui-surface: #ffffff;
+            --ui-text: #1e293b;
+            --ui-text-secondary: #64748b;
+            --ui-border: #e2e8f0;
+            --ui-brand: #3b82f6;
+            --ui-brand-hover: #2563eb;
+        }
+        .dark {
+            --ui-bg: #0f172a;
+            --ui-surface: #1e293b;
+            --ui-text: #f1f5f9;
+            --ui-text-secondary: #94a3b8;
+            --ui-border: #334155;
+            --ui-brand: #3b82f6;
+            --ui-brand-hover: #60a5fa;
+        }
+        body { background-color: var(--ui-bg); color: var(--ui-text); font-family: system-ui, -apple-system, sans-serif; }
+        .ui-panel { background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 1rem; padding: 1.5rem; }
+        .ui-badge { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.75rem; border-radius: 0.75rem; font-size: 0.75rem; font-weight: 600; background: var(--ui-border); color: var(--ui-text-secondary); }
+        .ui-badge-brand { background: var(--ui-brand); color: white; }
+        .ui-badge-success { background: #10b981; color: white; }
+        #3d-viewer-container:fullscreen { background: #0f172a; }
+        #3d-viewer-container:fullscreen iframe { width: 100%; height: 100%; }
+        [x-cloak] { display: none !important; }
+    </style>
+    <script defer src="{{ url_for('static', filename='js/alpine.min.js') }}"></script>
+</head>
+<body class="min-h-screen flex flex-col">
+    <!-- Public View Banner -->
+    <div class="bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-900/50 px-4 py-2.5 text-center text-sm text-amber-800 dark:text-amber-300 font-medium">
+        <i class="fa-solid fa-eye mr-1.5"></i> {{ t('models_share_public_view') }} — {{ root.display_name }}
+    </div>
+
+    <div x-data="modelShareApp()" x-init="init()" class="flex-1 max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
+        <!-- Header -->
+        <div class="flex items-center gap-3 min-w-0">
+            <div class="min-w-0">
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-[var(--ui-text)] truncate" title="{{ root.display_name }}">
+                    {{ root.display_name }}
+                </h1>
+                <div class="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-slate-400">
+                    <span class="font-bold uppercase tracking-wider text-gray-400">{{ t('project') }}:</span>
+                    {% if root.project %}
+                    <span class="font-semibold text-blue-600 dark:text-blue-400 truncate">{{ root.project.name }}</span>
+                    {% else %}
+                    <span class="italic">—</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Workspace: 3D Viewer & Metadata -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <!-- Left: 3D Viewer -->
+            <div class="lg:col-span-8 space-y-4">
+                <div class="ui-panel overflow-hidden p-0 flex flex-col relative aspect-[16/10] bg-slate-950 border border-[var(--ui-border)] rounded-2xl group shadow-inner">
+                    <div id="3d-viewer-container" class="w-full h-full flex items-center justify-center relative">
+                        <!-- Activation placeholder -->
+                        <div x-show="!viewerActivated && supportedFormat" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 text-gray-400 p-6 text-center z-20">
+                            <i class="fa-solid fa-cube text-5xl mb-4 opacity-40"></i>
+                            <div class="font-bold text-lg mb-2 text-white">{{ t('models_load_3d_preview') }}</div>
+                            <p class="text-xs text-gray-500 max-w-sm mb-6">{{ t('models_load_3d_preview_desc') }}</p>
+                            <button type="button" @click="activateViewer()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-xl transition shadow-lg flex items-center gap-2">
+                                <i class="fa-solid fa-play"></i> {{ t('models_load_3d_preview_btn') }}
+                            </button>
+                        </div>
+                        <div x-show="viewerLoading" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 text-gray-400 z-10 transition-opacity">
+                            <i class="fa-solid fa-spinner fa-spin text-4xl text-blue-500 mb-3"></i>
+                            <span class="text-sm font-semibold tracking-wide" x-text="viewerStatus"></span>
+                        </div>
+                        <div x-show="!supportedFormat" style="display: none;" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 text-gray-400 p-6 text-center">
+                            <i class="fa-solid fa-cube text-5xl mb-4 opacity-40"></i>
+                            <div class="font-bold text-lg mb-2 text-white">{{ t('models_fallback_preview') }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Floating overlay controls -->
+                    <div x-show="viewerActivated && supportedFormat" class="absolute bottom-4 left-4 right-4 flex justify-between items-center pointer-events-none z-20">
+                        <div class="bg-black/60 backdrop-blur-md border border-white/10 px-4 py-2 rounded-xl shadow-lg flex items-center gap-3 pointer-events-auto">
+                            <span class="text-xs font-bold text-white uppercase tracking-wider" x-text="activeVersionLabel"></span>
+                            <div class="h-4 w-px bg-white/20"></div>
+                            <span class="text-xs font-semibold text-gray-300 truncate max-w-[200px]" x-text="activeFilename"></span>
+                        </div>
+                        <div class="flex gap-2 pointer-events-auto">
+                            <button type="button" @click="toggleFullscreen()"
+                                    class="bg-white/90 hover:bg-white text-slate-900 h-9 px-3 rounded-xl transition font-bold text-xs flex items-center gap-1.5 shadow"
+                                    :title="isFullscreen ? '{{ t('models_viewer_exit_fullscreen') }}' : '{{ t('models_viewer_fullscreen') }}'">
+                                <i class="fa-solid" :class="isFullscreen ? 'fa-compress' : 'fa-expand'"></i>
+                                <span x-text="isFullscreen ? '{{ t('models_viewer_exit_fullscreen') }}' : '{{ t('models_viewer_fullscreen') }}'"></span>
+                            </button>
+                            <a href="{{ url_for('models.model_download_latest', root_id=root.id) }}" class="bg-white/90 hover:bg-white text-slate-900 h-9 px-3 rounded-xl transition font-bold text-xs flex items-center gap-1.5 shadow">
+                                <i class="fa-solid fa-download"></i> {{ t('download') }}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Metadata -->
+            <div class="lg:col-span-4 space-y-6">
+                <div class="ui-panel space-y-5">
+                    <h3 class="text-lg font-bold text-[var(--ui-text)] border-b border-[var(--ui-border)] pb-2">
+                        {{ t('models_preview') }}
+                    </h3>
+                    <div x-show="supportedFormat" class="space-y-2">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">
+                            {{ t('models_select_material_color') }}
+                        </label>
+                        <div class="flex items-center gap-3">
+                            <input type="color" x-model="viewerColor" @input="updateViewerColor()" class="h-9 w-12 rounded-xl border border-[var(--ui-border)] bg-transparent p-0.5 cursor-pointer flex-shrink-0">
+                            <div class="text-xs text-gray-500 dark:text-slate-400 leading-tight">Adjust the preview material tint.</div>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">{{ t('models_filename') }}</label>
+                        <div class="text-sm font-semibold text-[var(--ui-text)] truncate font-mono" x-text="activeFilename"></div>
+                        <div class="grid grid-cols-2 gap-4 pt-2 border-t border-[var(--ui-border)]">
+                            <div><span class="block text-[10px] font-bold uppercase tracking-wider text-gray-400">{{ t('models_model_size') }}</span><span class="text-sm font-bold text-[var(--ui-text)]" x-text="activeSizeFormatted"></span></div>
+                            <div><span class="block text-[10px] font-bold uppercase tracking-wider text-gray-400">{{ t('models_version') }}</span><span class="text-sm font-bold text-[var(--ui-text)]" x-text="activeVersionNumber"></span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Version History Timeline -->
+        <div class="ui-panel">
+            <h3 class="text-lg font-bold text-[var(--ui-text)] border-b border-[var(--ui-border)] pb-3 mb-6">
+                <i class="fa-solid fa-clock-rotate-left text-gray-400 mr-1.5"></i> {{ t('models_version_history') }}
+            </h3>
+            <div class="relative pl-6 border-l-2 border-gray-200 dark:border-slate-800 space-y-8">
+                {% for ver in history %}
+                {% set is_latest = (ver.id == latest.id) %}
+                <div class="relative">
+                    <div class="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full border-2 bg-white dark:bg-slate-900 shadow-sm transition duration-200
+                                {% if is_latest %}border-emerald-500 bg-emerald-500{% else %}border-gray-300 dark:border-slate-700{% endif %}"></div>
+                    <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 bg-gray-50/40 dark:bg-slate-900/10 border border-[var(--ui-border)] p-4 rounded-2xl transition duration-150">
+                        <div class="space-y-1.5 min-w-0">
+                            <div class="flex items-center flex-wrap gap-2">
+                                <span class="font-bold text-[var(--ui-text)] text-sm">{{ t('models_version') }} {{ ver.version }}</span>
+                                {% if is_latest %}<span class="ui-badge ui-badge-success text-[10px] font-extrabold px-2 py-0">{{ t('models_latest_badge') }}</span>{% endif %}
+                            </div>
+                            <div class="text-[11px] text-gray-400 dark:text-slate-500 flex items-center flex-wrap gap-x-3 gap-y-1">
+                                <span><i class="fa-regular fa-calendar mr-1"></i> {{ ver.uploaded_at | fmt_dt('%d.%m.%Y %H:%M') }}</span>
+                                <span><i class="fa-regular fa-hard-drive mr-1"></i> {% if ver.file_size_bytes >= 1048576 %}{{ (ver.file_size_bytes / 1048576) | round(1) }} MB{% elif ver.file_size_bytes >= 1024 %}{{ (ver.file_size_bytes / 1024) | round(1) }} KB{% else %}{{ ver.file_size_bytes or 0 }} B{% endif %}</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5 flex-shrink-0 self-end md:self-start">
+                            {% set file_ext = ver.filename.rsplit('.', 1)[-1].lower() if '.' in ver.filename else '' %}
+                            {% if file_ext in ['3mf', 'stl', 'obj', 'amf', 'step', 'stp', 'gcode', 'gc', 'bgcode'] %}
+                            {% set preview_url = url_for('models.model_view_version', file_id=ver.id, filename=ver.filename) %}
+                            <button type="button" @click="loadModelVersion({{ ver.id }}, '{{ ver.filename }}', '{{ preview_url }}', {{ ver.version }}, '{{ ver.file_size_bytes or 0 }}', '{{ ver.checksum_sha256 or '' }}', '{{ ver.mime_type or '' }}', '{{ ver.uploaded_by.name or ver.uploaded_by.email if ver.uploaded_by else 'System' }}', '{{ ver.uploaded_at | fmt_dt('%d.%m.%Y %H:%M') }}', '{{ (ver.version_note or '') | replace("'", "\\'") | replace('"', '\\"') }}')"
+                                :class="activeFileId === {{ ver.id }} ? 'ui-badge-brand' : ''" class="ui-badge h-8 px-3 gap-1">
+                                <i class="fa-solid fa-eye text-[10px]"></i> {{ t('preview') }}
+                            </button>
+                            {% endif %}
+                            <a href="{{ url_for('models.model_download_version', file_id=ver.id) }}" class="ui-badge h-8 w-8 justify-center" title="Download version file">
+                                <i class="fa-solid fa-download text-xs"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+    /* 3D Viewer bridge (minimal — shared with models_detail.html) */
+    let _viewerIframe = null;
+    let _viewerReady  = false;
+    let _pendingCmd   = null;
+    let _viewerCurrentUrl = null;
+    let _viewerColorDebounce = null;
+
+    function _getViewerContainer() { return document.getElementById('3d-viewer-container'); }
+
+    function _ensureIframe() {
+        if (_viewerIframe) return _viewerIframe;
+        const container = _getViewerContainer();
+        if (!container) return null;
+        _viewerReady = false;
+        const iframe = document.createElement('iframe');
+        iframe.src = "{{ url_for('static', filename='viewer.html') }}";
+        iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;';
+        iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+        iframe.setAttribute('loading', 'eager');
+        iframe.setAttribute('title', '3D Model Viewer');
+        container.appendChild(iframe);
+        _viewerIframe = iframe;
+        return iframe;
+    }
+
+    function _postToViewer(msg) {
+        if (!_viewerIframe || !_viewerIframe.contentWindow) return;
+        _viewerIframe.contentWindow.postMessage(msg, window.location.origin);
+    }
+
+    window.addEventListener('message', function(event) {
+        if (event.origin !== window.location.origin) return;
+        const msg = event.data;
+        if (!msg || msg.source !== 'o3d-viewer') return;
+        switch (msg.type) {
+            case 'ready':
+                _viewerReady = true;
+                if (_pendingCmd) { _postToViewer(_pendingCmd); _pendingCmd = null; }
+                break;
+            case 'loaded': {
+                const el = _getViewerContainer();
+                if (el) el.dispatchEvent(new CustomEvent('viewer:loaded'));
+                break;
+            }
+            case 'failed': {
+                const el2 = _getViewerContainer();
+                if (el2) el2.dispatchEvent(new CustomEvent('viewer:failed'));
+                break;
+            }
+        }
+    });
+
+    function open3DViewer(url, colorHex, onLoadCallback) {
+        clearTimeout(_viewerColorDebounce);
+        if (_viewerCurrentUrl !== url) {
+            _viewerCurrentUrl = url;
+            _loadInIframe(url, colorHex, onLoadCallback);
+        } else {
+            _viewerColorDebounce = setTimeout(function() {
+                _loadInIframe(url, colorHex, onLoadCallback);
+            }, 350);
+        }
+    }
+
+    function _loadInIframe(url, colorHex, onLoadCallback) {
+        _ensureIframe();
+        const container = _getViewerContainer();
+        if (container && onLoadCallback) {
+            const handler = function() {
+                container.removeEventListener('viewer:loaded', handler);
+                container.removeEventListener('viewer:failed', failHandler);
+                onLoadCallback();
+            };
+            const failHandler = function() {
+                container.removeEventListener('viewer:loaded', handler);
+                container.removeEventListener('viewer:failed', failHandler);
+                onLoadCallback();
+            };
+            container.addEventListener('viewer:loaded', handler);
+            container.addEventListener('viewer:failed', failHandler);
+        }
+        const cmd = { type: 'loadModel', url: url, color: colorHex || '#3b82f6' };
+        if (_viewerReady) { _postToViewer(cmd); } else { _pendingCmd = cmd; }
+    }
+
+    function modelShareApp() {
+        return {
+            viewerLoading: false,
+            viewerActivated: false,
+            viewerStatus: '{{ t("loading") }}...',
+            supportedFormat: true,
+            isFullscreen: false,
+            activeFileId: {{ latest.id }},
+            activeFilename: "{{ latest.filename }}",
+            activeVersionNumber: {{ latest.version }},
+            activeVersionLabel: "{{ t('models_version').lower() }} {{ latest.version }}",
+            activeSizeRaw: {{ latest.file_size_bytes or 0 }},
+            viewerColor: '#3b82f6',
+            modelViewerUrl: null,
+
+            init() {
+                const ext = this.activeFilename.split('.').pop().toLowerCase();
+                const allowed = ['3mf', 'stl', 'obj', 'amf', 'step', 'stp', 'gcode', 'gc', 'bgcode'];
+                if (allowed.includes(ext)) {
+                    this.supportedFormat = true;
+                    this.modelViewerUrl = "{{ url_for('models.model_view_version', file_id=latest.id, filename=latest.filename) }}";
+                } else {
+                    this.supportedFormat = false;
+                }
+                this.initFullscreenListener();
+            },
+
+            activateViewer() {
+                this.viewerActivated = true;
+                if (!this.modelViewerUrl) return;
+                this.loadViewer(this.modelViewerUrl);
+            },
+
+            get activeSizeFormatted() {
+                const size = this.activeSizeRaw;
+                if (size >= 1048576) return (size / 1048576).toFixed(1) + ' MB';
+                else if (size >= 1024) return (size / 1024).toFixed(1) + ' KB';
+                return size + ' B';
+            },
+
+            loadViewer(url) {
+                this.viewerLoading = true;
+                this.viewerStatus = '{{ t("loading") }}...';
+                open3DViewer(url, this.viewerColor, () => { this.viewerLoading = false; });
+            },
+
+            updateViewerColor() {
+                if (this.supportedFormat && this.viewerActivated && this.modelViewerUrl) {
+                    open3DViewer(this.modelViewerUrl, this.viewerColor);
+                }
+            },
+
+            loadModelVersion(id, filename, url, version, sizeBytes, checksum, mime, uploadedBy, uploadedAt, note) {
+                this.activeFileId = id;
+                this.activeFilename = filename;
+                this.activeVersionNumber = version;
+                this.activeVersionLabel = "{{ t('models_version').lower() }} " + version;
+                this.activeSizeRaw = parseInt(sizeBytes, 10) || 0;
+                const ext = filename.split('.').pop().toLowerCase();
+                const allowed = ['3mf', 'stl', 'obj', 'amf', 'step', 'stp', 'gcode', 'gc', 'bgcode'];
+                if (allowed.includes(ext)) {
+                    this.supportedFormat = true;
+                    this.modelViewerUrl = url;
+                    this.viewerActivated = true;
+                    this.loadViewer(url);
+                } else {
+                    this.supportedFormat = false;
+                    this.viewerLoading = false;
+                }
+            },
+
+            toggleFullscreen() {
+                const el = document.getElementById('3d-viewer-container');
+                if (!document.fullscreenElement) {
+                    el.requestFullscreen().catch(err => { console.warn('Fullscreen request failed:', err); });
+                } else {
+                    document.exitFullscreen();
+                }
+            },
+
+            initFullscreenListener() {
+                document.addEventListener('fullscreenchange', () => {
+                    this.isFullscreen = !!document.fullscreenElement;
+                });
+            }
+        };
+    }
+    </script>
+</body>
+</html>

@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.105.1] - 2026-06-06
+### Added
+- **Model-level persistent notes** — A new `model_note` field on the `ProjectFile` model. Unlike version notes (which change per upload), the model note persists across all versions. It appears on model cards (table+card views) as an italic line, in the detail page metadata panel as a blue highlighted card, and in the Edit Metadata modal. Useful for reminders like "print with supports" or "PETG, 0.4mm nozzle".
+
+### Fixed
+- **Card click-through** — The hover overlay no longer blocks clicks to the model detail page. Replaced `onclick="stopPropagation()"` with `pointer-events-none group-hover:pointer-events-auto`.
+
+### Changed
+- **Stats bar** — Redesigned as a compact inline text row instead of three large cards, keeping it subtle and unobtrusive.
+
+## [1.105.0] - 2026-06-06
+### Added
+- **Hover overlay on model cards** — Action buttons (Preview, Download, Delete) now appear as a semi-transparent overlay when hovering over the thumbnail image, freeing up footer space for metadata-only display.
+- **Version count badge** — Cards now show a violet badge with the total number of versions when a model has more than one version.
+- **"No project" quick filter** — A new filter pill above the filter panel lets you instantly isolate models that are not assigned to any project.
+- **Model statistics bar** — A new stats row at the top of the Models page shows total model count, total file size, and number of models without thumbnails.
+- **Fullscreen 3D viewer** — The model detail page now has a fullscreen toggle button in the viewer overlay, using the browser's Fullscreen API.
+- **Project assignment from model detail** — The "Edit Metadata" modal now includes a project selector, allowing you to assign or reassign a model to a project directly from the detail page.
+- **Model comments** — A new comments section below the version history timeline allows users to add, view, and delete comments on individual models.
+- **Model sharing** — Generate a public read-only share link for any model, allowing unauthenticated users to view the 3D model and its version history.
+- **Bulk actions** — Checkboxes on cards and table rows enable bulk selection, with a floating action bar offering bulk-delete and bulk-move-to-project operations.
+
+### Changed
+- **Model card footer** — Simplified to show only file size and upload date; action buttons moved to hover overlay.
+- **Backup/export** — `share_token` column on `ProjectFile` is now included in exports and imports.
+
 ## [1.104.6] - 2026-06-03
 ### Changed
 - **Version upload modal now uses drag-and-drop** — The "Upload version" modal on the model detail page now has the same drag-and-drop zone as the new model upload, including blue highlight on drag, file name/size feedback, and consistent styling. Drag-and-drop auto-submits; file browser selection only shows the filename (no auto-submit), letting the user add a version note first.

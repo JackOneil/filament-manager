@@ -14,11 +14,11 @@
 | Backend          | Python 3.11, Flask 3.0, Gunicorn (1 worker, 4 threads)  |
 | Database         | SQLite via Flask-SQLAlchemy 3.1 (`./data/filament.db`)   |
 | Templates        | Jinja2 (server-side rendering)                           |
-| Reactive UI      | Alpine.js 3.x (CDN)                                     |
-| Styling          | TailwindCSS (CDN)                                        |
-| Charts           | Chart.js (CDN)                                           |
-| 3D Preview       | Online3DViewer (CDN) for `.stl` and `.3mf`               |
-| Icons            | FontAwesome                                              |
+| Reactive UI      | Alpine.js 3.x (local static bundle from npm)            |
+| Styling          | TailwindCSS (local static bundle from npm)              |
+| Charts           | Chart.js (local static bundle from npm)                 |
+| 3D Preview       | Online3DViewer (local static bundle from npm)           |
+| Icons            | FontAwesome (local static bundle from npm)              |
 | Security         | Flask-WTF (CSRF), cryptography (Fernet), scrypt hashing  |
 | Auth             | Session-based multi-user (roles: `admin`, `user`)        |
 | Infrastructure   | Docker & Docker Compose, PWA (Service Worker + manifest) |
@@ -66,7 +66,7 @@ routes/
                         #   /audit — auth, users, notifications, audit log routes
   pwa.py                # /manifest.json, /sw.js — Progressive Web App support
 templates/
-  base.html             # Shared layout (nav, toast, Alpine, Tailwind CDN, CSRF injection)
+  base.html             # Shared layout (nav, toast, Alpine, local Tailwind/CSS assets, CSRF injection)
   overview.html         # Admin overview (Action Center, live printers, lowest stock, 9-widget dashboard)
   overview_user.html    # Regular user overview (own projects summary)
   index.html            # Filament inventory — admin (Alpine.js inventoryApp(), filters, bulk ops)
@@ -213,7 +213,9 @@ Three daemon threads start in `create_app()`:
 | `beautifulsoup4`   | ≥4.12, <5    | HTML parsing for OpenGraph/link preview metadata           |
 | `cryptography`     | ≥42          | Fernet encryption (Bambu token, Prusa API key at rest)    |
 
-### CDN Dependencies (Frontend)
+### Local Frontend Assets (Docker build)
+
+The frontend assets are generated during `docker build` from the local npm dependencies in `package.json` and copied into `static/` for runtime serving. This keeps the main app shell self-hosted and avoids browser page-load dependency on external CDNs.
 
 | Library           | Purpose                                   |
 | ----------------- | ----------------------------------------- |

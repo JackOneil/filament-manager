@@ -5,6 +5,15 @@
         {% set root_file = item.root %}
         {% set latest_file = item.latest %}
         <div class="ui-card flex flex-col h-full bg-[var(--ui-surface)] border border-[var(--ui-border)] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition duration-200">
+            <!-- Bulk selection checkbox -->
+            <div class="absolute top-2 left-2 z-20"
+                 x-data="{}"
+                 @click.stop>
+                <input type="checkbox" :checked="window.__models && window.__models.isSelected({{ root_file.id }})"
+                       @change="window.__models && window.__models.toggleSelect({{ root_file.id }})"
+                       data-id="{{ root_file.id }}"
+                       class="model-checkbox w-4 h-4 rounded accent-blue-600 cursor-pointer">
+            </div>
             <!-- Thumbnail wrapper (clickable → model detail) -->
             <a href="{{ url_for('models.model_detail', root_id=root_file.id) }}" class="block aspect-[16/10] relative bg-gray-100 dark:bg-slate-800 border-b border-[var(--ui-border)] flex items-center justify-center overflow-hidden flex-shrink-0 group cursor-pointer">
                 {% if latest_file.thumbnail_path %}
@@ -20,7 +29,7 @@
                     </svg>
                 </div>
                 {% endif %}
-                <!-- Version badge -->
+                <!-- Version badges -->
                 <div class="absolute top-3 left-3 flex gap-1.5">
                     <span class="ui-badge ui-badge-brand text-xs font-extrabold px-2.5 py-0.5 leading-5">
                         {{ t('models_version').lower() }} {{ latest_file.version }}
@@ -28,6 +37,27 @@
                     <span class="ui-badge ui-badge-success text-xs font-extrabold px-2.5 py-0.5 leading-5">
                         {{ t('models_latest_badge') }}
                     </span>
+                    {% if item.version_count > 1 %}
+                    <span class="ui-badge bg-violet-600 text-white text-xs font-extrabold px-2.5 py-0.5 leading-5">
+                        {{ item.version_count }} {{ t('models_versions_count_badge') }}
+                    </span>
+                    {% endif %}
+                </div>
+                <!-- Hover overlay with action buttons -->
+                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/55 transition-all duration-200 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 z-10 pointer-events-none group-hover:pointer-events-auto">
+                    <a href="{{ url_for('models.model_detail', root_id=root_file.id) }}" title="{{ t('preview') }}"
+                       class="bg-white/90 hover:bg-white text-slate-900 h-9 w-9 rounded-xl flex items-center justify-center shadow transition">
+                        <i class="fa-solid fa-expand text-sm"></i>
+                    </a>
+                    <a href="{{ url_for('models.model_download_latest', root_id=root_file.id) }}" title="{{ t('download') }}"
+                       class="bg-white/90 hover:bg-white text-slate-900 h-9 w-9 rounded-xl flex items-center justify-center shadow transition">
+                        <i class="fa-solid fa-download text-sm"></i>
+                    </a>
+                    <form method="POST" action="{{ url_for('models.model_delete', root_id=root_file.id) }}" onsubmit="return confirm('{{ t('models_delete_confirm') }}');" class="inline-flex">
+                        <button type="submit" class="bg-red-500/90 hover:bg-red-600 text-white h-9 w-9 rounded-xl flex items-center justify-center shadow transition" title="{{ t('models_delete_model') }}">
+                            <i class="fa-solid fa-trash text-sm"></i>
+                        </button>
+                    </form>
                 </div>
             </a>
 
@@ -54,11 +84,17 @@
                         <span class="italic">—</span>
                         {% endif %}
                     </div>
+
+                    <!-- Model note -->
+                    {% if item.model_note %}
+                    <div class="mt-2 pt-2 border-t border-[var(--ui-border)]/50">
+                        <p class="text-xs text-gray-500 dark:text-slate-400 line-clamp-2 leading-relaxed italic">{{ item.model_note }}</p>
+                    </div>
+                    {% endif %}
                 </div>
 
-                <!-- Footer Stats & Actions -->
+                <!-- Footer Stats (metadata only — actions are now in hover overlay) -->
                 <div class="mt-4 pt-3 border-t border-[var(--ui-border)] flex items-center justify-between">
-                    <!-- Size & Upload Date -->
                     <div class="text-[10px] text-gray-400 dark:text-slate-500 leading-tight">
                         <div class="font-semibold text-gray-600 dark:text-slate-400">
                             {% if item.size >= 1048576 %}
@@ -70,21 +106,6 @@
                             {% endif %}
                         </div>
                         <div class="mt-0.5">{{ latest_file.uploaded_at | fmt_dt('%d.%m.%Y') }}</div>
-                    </div>
-
-                    <!-- Action buttons -->
-                    <div class="flex items-center gap-1.5 flex-shrink-0">
-                        <a href="{{ url_for('models.model_detail', root_id=root_file.id) }}" class="ui-badge h-8 w-8 justify-center" title="{{ t('edit') }}">
-                            <i class="fa-solid fa-expand"></i>
-                        </a>
-                        <a href="{{ url_for('models.model_download_latest', root_id=root_file.id) }}" class="ui-badge ui-badge-brand h-8 w-8 justify-center" title="{{ t('download') }}">
-                            <i class="fa-solid fa-download"></i>
-                        </a>
-                        <form method="POST" action="{{ url_for('models.model_delete', root_id=root_file.id) }}" onsubmit="return confirm('{{ t('models_delete_confirm') }}');" class="inline-flex">
-                            <button type="submit" class="ui-badge ui-badge-critical h-8 w-8 justify-center" title="{{ t('models_delete_model') }}">
-                                <i class="fa-solid fa-trash"></i>
-                            </button>
-                        </form>
                     </div>
                 </div>
             </div>

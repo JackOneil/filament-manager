@@ -677,7 +677,7 @@
             id: 'models',
             icon: 'fa-cube',
             hasTour: false,
-            endpoints: ['models_index', 'api_models_list', 'model_detail', 'model_edit', 'model_upload_version', 'model_download_latest', 'model_download_version', 'model_view_version', 'model_upload_thumbnail', 'serve_thumbnail', 'model_delete', 'model_delete_version', 'model_upload'],
+            endpoints: ['models_index', 'api_models_list', 'model_detail', 'model_edit', 'model_upload_version', 'model_download_latest', 'model_download_version', 'model_view_version', 'model_upload_thumbnail', 'serve_thumbnail', 'model_delete', 'model_delete_version', 'model_upload', 'model_add_comment', 'model_delete_comment', 'model_generate_share', 'model_revoke_share', 'model_public_share', 'model_bulk_delete', 'model_bulk_move'],
             title: { cs: 'Modely', en: 'Models' },
             tips: [
                 {
@@ -721,7 +721,35 @@
                         cs: 'Nové 3D modely lze nahrát přímo ze stránky Modelů tlačítkem „Nahrát model" vpravo nahoře. Vyberte soubor (3MF, STL, OBJ, atd.), projekt, ke kterému model patří, a volitelně přidejte poznámku k verzi. Po nahrání budete přesměrováni na detail modelu, kde můžete nahrávat další verze.',
                         en: 'New 3D models can be uploaded directly from the Models page using the "Upload model" button in the top right. Select a file (3MF, STL, OBJ, etc.), the project it belongs to, and optionally add a version note. After upload, you\'ll be redirected to the model detail page where you can upload additional versions.'
                     }
-                }
+                },
+                {
+                    title: { cs: 'Hromadné akce', en: 'Bulk Actions' },
+                    text: {
+                        cs: 'Na kartách a v řádcích tabulky je checkbox pro hromadný výběr modelů. Po zaškrtnutí se dole zobrazí plovoucí panel s možností hromadně smazat vybrané modely nebo je přesunout do jiného projektu.',
+                        en: 'Each card and table row has a checkbox for bulk selection. When items are selected, a floating bar appears at the bottom with options to bulk-delete selected models or move them to a different project.'
+                    }
+                },
+                {
+                    title: { cs: 'Komentáře u modelu', en: 'Model Comments' },
+                    text: {
+                        cs: 'V detailu modelu pod historií verzí najdete sekci komentářů. Můžete přidávat poznámky, diskutovat o změnách a mazat vlastní komentáře. Správci mohou mazat všechny komentáře.',
+                        en: 'In the model detail page below the version history, you\'ll find a comments section. You can add notes, discuss changes, and delete your own comments. Administrators can delete any comment.'
+                    }
+                },
+                {
+                    title: { cs: 'Sdílení modelu', en: 'Model Sharing' },
+                    text: {
+                        cs: 'V detailu modelu lze vygenerovat veřejný odkaz pro sdílení. Kliknutím na „Sdílet odkaz" vytvoříte unikátní URL, kterou může kdokoli otevřít a zobrazit si 3D model včetně historie verzí bez přihlášení. Odkaz lze kdykoli zrušit.',
+                        en: 'In the model detail page, you can generate a public share link. Click "Share link" to create a unique URL that anyone can open to view the 3D model and its version history without logging in. The link can be revoked at any time.'
+                    }
+                },
+                {
+                    title: { cs: 'Statistiky modelů', en: 'Model Statistics' },
+                    text: {
+                        cs: 'V horní části stránky Modelů vidíte statistický pruh zobrazující celkový počet modelů, celkovou velikost souborů a počet modelů bez náhledu. To vám pomůže identifikovat modely, u kterých je vhodné vygenerovat náhledový obrázek.',
+                        en: 'At the top of the Models page, you\'ll see a statistics bar showing the total number of models, total file size, and the count of models without thumbnails. This helps you identify models that could benefit from generating a preview thumbnail.'
+                    }
+                },
             ]
         },
         {

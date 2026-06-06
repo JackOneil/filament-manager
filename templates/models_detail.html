@@ -13,7 +13,7 @@
                     {{ root.display_name }}
                 </h1>
                 <div class="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-slate-400">
-                    <span class="font-bold uppercase tracking-wider text-gray-400">{{ t('project_client') }}:</span>
+                    <span class="font-bold uppercase tracking-wider text-gray-400">{{ t('project') }}:</span>
                     {% if root.project %}
                     <a href="{{ url_for('project_detail', id=root.project.id) }}" class="hover:underline font-semibold text-blue-600 dark:text-blue-400 truncate">
                         {{ root.project.name }}
@@ -41,6 +41,29 @@
                     <i class="fa-solid fa-trash"></i> {{ t('models_delete_model') }}
                 </button>
             </form>
+
+            <!-- Share link block -->
+            {% if root.share_token %}
+            <div class="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 rounded-xl px-3 py-2">
+                <i class="fa-solid fa-link text-emerald-600 text-sm"></i>
+                <input type="text" readonly
+                       value="{{ request.host_url.rstrip('/') }}{{ url_for('models.model_public_share', token=root.share_token) }}"
+                       class="bg-transparent text-xs font-mono text-emerald-700 dark:text-emerald-300 outline-none w-64 truncate"
+                       onclick="this.select(); document.execCommand('copy');"
+                       title="{{ t('models_share_copy_hint') }}">
+                <form method="POST" action="{{ url_for('models.model_revoke_share', root_id=root.id) }}" class="inline-flex">
+                    <button type="submit" class="text-red-400 hover:text-red-600 transition text-xs font-semibold whitespace-nowrap">
+                        {{ t('models_share_revoke') }}
+                    </button>
+                </form>
+            </div>
+            {% else %}
+            <form method="POST" action="{{ url_for('models.model_generate_share', root_id=root.id) }}" class="inline-flex">
+                <button type="submit" class="ui-badge h-10 px-4 gap-1.5 font-bold">
+                    <i class="fa-solid fa-share-nodes"></i> {{ t('models_share_generate') }}
+                </button>
+            </form>
+            {% endif %}
         </div>
     </div>
 
@@ -97,6 +120,12 @@
                     </div>
 
                     <div class="flex gap-2 pointer-events-auto">
+                        <button type="button" @click="toggleFullscreen()"
+                                class="bg-white/90 hover:bg-white text-slate-900 h-9 px-3 rounded-xl transition font-bold text-xs flex items-center gap-1.5 shadow"
+                                :title="isFullscreen ? '{{ t('models_viewer_exit_fullscreen') }}' : '{{ t('models_viewer_fullscreen') }}'">
+                            <i class="fa-solid" :class="isFullscreen ? 'fa-compress' : 'fa-expand'"></i>
+                            <span x-text="isFullscreen ? '{{ t('models_viewer_exit_fullscreen') }}' : '{{ t('models_viewer_fullscreen') }}'"></span>
+                        </button>
                         <button type="button" @click="captureThumbnail()" class="bg-white/90 hover:bg-white text-slate-900 h-9 px-3 rounded-xl transition font-bold text-xs flex items-center gap-1.5 shadow" title="Save this camera viewpoint as the main thumbnail">
                             <i class="fa-solid fa-camera"></i> Save Thumbnail
                         </button>
@@ -168,6 +197,16 @@
                     <div class="pt-2 border-t border-[var(--ui-border)] space-y-1">
                         <span class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">{{ t('models_note') }}</span>
                         <p class="text-xs text-gray-500 dark:text-slate-400 leading-relaxed italic" x-text="activeVersionNote || 'No description provided for this version.'"></p>
+                    </div>
+
+                    <!-- Model-level Note (persistent across versions) -->
+                    <div class="pt-2 border-t border-[var(--ui-border)] space-y-1">
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">{{ t('models_model_note_label') }}</span>
+                        {% if root.model_note %}
+                        <p class="text-xs text-blue-700 dark:text-blue-300 leading-relaxed bg-blue-50 dark:bg-blue-950/30 p-2.5 rounded-xl border border-blue-200 dark:border-blue-900/50">{{ root.model_note }}</p>
+                        {% else %}
+                        <p class="text-xs text-gray-400 dark:text-slate-500 italic">—</p>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -268,6 +307,56 @@
         </div>
     </div>
 
+    <!-- Model Comments -->
+    <div id="model-comments" class="ui-panel">
+        <h3 class="text-lg font-bold text-[var(--ui-text)] border-b border-[var(--ui-border)] pb-3 mb-6">
+            <i class="fa-solid fa-comments text-gray-400 mr-1.5"></i> {{ t('models_comments_title') }}
+        </h3>
+
+        {% if comments %}
+        <div class="space-y-4 mb-6">
+            {% for c in comments %}
+            <div class="flex gap-3">
+                <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950/40 flex items-center justify-center flex-shrink-0 text-xs font-bold text-blue-700 dark:text-blue-400">
+                    {{ (c.author.name or c.author.email or '?')[0].upper() if c.author else '?' }}
+                </div>
+                <div class="flex-1 bg-gray-50 dark:bg-slate-900/30 rounded-2xl px-4 py-3 border border-[var(--ui-border)]">
+                    <div class="flex items-center justify-between gap-2 mb-1">
+                        <span class="text-xs font-bold text-gray-700 dark:text-slate-300">
+                            {{ c.author.name or c.author.email if c.author else t('unknown') }}
+                        </span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] text-gray-400">{{ c.created_at | fmt_dt('%d.%m.%Y %H:%M') }}</span>
+                            {% if current_user and (auth_is_admin(current_user) or c.user_id == current_user.id) %}
+                            <form method="POST" action="{{ url_for('models.model_delete_comment', root_id=root.id, comment_id=c.id) }}"
+                                  onsubmit="return confirm('{{ t('models_comment_delete_confirm') }}');" class="inline-flex">
+                                <button type="submit" class="text-gray-300 hover:text-red-500 transition text-xs">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-700 dark:text-slate-300 whitespace-pre-line">{{ c.body }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-400 dark:text-slate-500 italic mb-6">{{ t('models_comment_empty') }}</p>
+        {% endif %}
+
+        <!-- Comment form -->
+        <form method="POST" action="{{ url_for('models.model_add_comment', root_id=root.id) }}" class="flex gap-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <textarea name="body" rows="2" placeholder="{{ t('models_comment_placeholder') }}"
+                      class="ui-input flex-1 resize-none" required></textarea>
+            <button type="submit" class="ui-badge ui-badge-brand h-10 px-4 self-end font-bold">
+                <i class="fa-solid fa-paper-plane mr-1.5"></i>{{ t('models_comment_add') }}
+            </button>
+        </form>
+    </div>
+
     <!-- MODAL 1: Edit Metadata -->
     <div x-show="editModalOpen" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs" @keydown.escape.window="editModalOpen = false">
         <div class="ui-panel w-full max-w-lg shadow-2xl relative" @click.away="editModalOpen = false">
@@ -287,9 +376,49 @@
                 </div>
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">
+                        {{ t('models_model_note_label') }}
+                    </label>
+                    <textarea name="model_note" rows="2" placeholder="{{ t('models_model_note_placeholder') }}" class="ui-input">{{ root.model_note or '' }}</textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">
                         {{ t('models_edit_version_note') }} (v{{ latest.version }})
                     </label>
                     <textarea name="version_note" rows="3" class="ui-input">{{ latest.version_note or '' }}</textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">
+                        {{ t('project') }}
+                    </label>
+                    <!-- Hidden field that submits the actual project_id -->
+                    <input type="hidden" name="project_id" :value="editProjectId">
+                    <div class="relative" @click.outside="editProjectOpen = false">
+                        <div class="relative">
+                            <input type="text" x-model="editProjectQ" @focus="editProjectOpen = true" @input="editProjectOpen = true"
+                                placeholder="{{ t('models_project_filter') }}" autocomplete="off"
+                                :class="editProjectId ? 'border-blue-400 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-600' : ''"
+                                class="ui-input pr-8">
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400">
+                                <i class="fa-solid fa-chevron-down text-xs transition-transform duration-150" :class="editProjectOpen ? 'rotate-180' : ''"></i>
+                            </div>
+                        </div>
+                        <div x-show="editProjectOpen" x-cloak class="absolute z-40 w-full mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                            <div @click="clearEditProject()"
+                                class="px-3 py-2 cursor-pointer text-sm italic border-b border-gray-100 dark:border-slate-700"
+                                :class="!editProjectId ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-400 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-700/50'">
+                                — {{ t('models_upload_no_project_option') }} —
+                            </div>
+                            <template x-for="opt in filteredEditProjects" :key="opt.id">
+                                <div @click="selectEditProject(opt.id, opt.name)"
+                                    class="px-3 py-2 cursor-pointer text-sm border-b border-gray-50 dark:border-slate-700/50 last:border-b-0 flex items-center justify-between"
+                                    :class="editProjectId == opt.id ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-800 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-700/50'">
+                                    <span x-text="opt.name"></span>
+                                    <i x-show="editProjectId == opt.id" class="fa-solid fa-check text-blue-500 text-xs"></i>
+                                </div>
+                            </template>
+                            <div x-show="filteredEditProjects.length === 0" class="px-3 py-2 text-gray-400 dark:text-slate-500 italic text-xs text-center">–</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" @click="editModalOpen = false" class="ui-badge h-10 px-4">
@@ -352,6 +481,16 @@
         </div>
     </div>
 </div>
+
+<style>
+#3d-viewer-container:fullscreen {
+    background: #0f172a;
+}
+#3d-viewer-container:fullscreen iframe {
+    width: 100%;
+    height: 100%;
+}
+</style>
 
 <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
 /**
@@ -576,6 +715,27 @@ function modelDetailApp() {
         viewerActivated: false,
         viewerStatus: '{{ t("loading") }}...',
         supportedFormat: true,
+        isFullscreen: false,
+
+        // Edit modal — interactive project selector
+        editProjectId: {% if root.project_id %}{{ root.project_id }}{% else %}''{% endif %},
+        editProjectQ: '{% if root.project %}{{ root.project.name }}{% endif %}',
+        editProjectOpen: false,
+        editProjectOptions: [{% for p in projects %}{"id":{{ p.id }},"name":{{ p.name|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}],
+        get filteredEditProjects() {
+            const q = (this.editProjectQ || '').toLowerCase();
+            return q ? this.editProjectOptions.filter(o => o.name.toLowerCase().includes(q)) : this.editProjectOptions;
+        },
+        selectEditProject(id, name) {
+            this.editProjectId = id;
+            this.editProjectQ = name;
+            this.editProjectOpen = false;
+        },
+        clearEditProject() {
+            this.editProjectId = '';
+            this.editProjectQ = '';
+            this.editProjectOpen = false;
+        },
 
         // Active Version metadata state
         activeFileId: {{ latest.id }},
@@ -605,6 +765,7 @@ function modelDetailApp() {
                 this.supportedFormat = false;
                 this.viewerLoading = false;
             }
+            this.initFullscreenListener();
         },
 
         activateViewer() {
@@ -675,6 +836,23 @@ function modelDetailApp() {
 
         openUploadModal() {
             this.uploadModalOpen = true;
+        },
+
+        toggleFullscreen() {
+            const el = document.getElementById('3d-viewer-container');
+            if (!document.fullscreenElement) {
+                el.requestFullscreen().catch(err => {
+                    console.warn('Fullscreen request failed:', err);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        },
+
+        initFullscreenListener() {
+            document.addEventListener('fullscreenchange', () => {
+                this.isFullscreen = !!document.fullscreenElement;
+            });
         },
 
         // Manual canvas snapshot capture

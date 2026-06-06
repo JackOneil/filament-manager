@@ -194,6 +194,12 @@ def run_migrations(app: Flask) -> None:
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN version_note TEXT DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN uploaded_by_user_id INTEGER DEFAULT NULL")
 
+        # ── Project File share token ──────────────────────────────────────────
+        _safe_alter(app, "ALTER TABLE project_file ADD COLUMN share_token VARCHAR(64)")
+
+        # ── Project File model-level note ─────────────────────────────────────
+        _safe_alter(app, "ALTER TABLE project_file ADD COLUMN model_note TEXT")
+
         # ── Allow project_file.project_id to be NULL (unassigned models) ─────
         _migrate_nullable_project_id(app)
 

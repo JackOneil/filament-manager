@@ -347,11 +347,28 @@ class ProjectFile(db.Model):
     checksum_sha256 = db.Column(db.String(64), nullable=True)
     thumbnail_path = db.Column(db.String(255), nullable=True)
     version_note = db.Column(db.Text, nullable=True)
+    model_note = db.Column(db.Text, nullable=True)
     uploaded_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
+    share_token = db.Column(db.String(64), nullable=True, unique=True)
 
     project = db.relationship('Project', backref=db.backref('files', lazy=True, cascade="all, delete-orphan"))
     versions = db.relationship('ProjectFile', backref=db.backref('parent', remote_side='ProjectFile.id'), lazy=True, cascade='all, delete-orphan')
     uploaded_by = db.relationship('User', backref=db.backref('uploaded_files', lazy=True))
+
+
+class ModelComment(db.Model):
+    __tablename__ = 'model_comment'
+    id           = db.Column(db.Integer, primary_key=True)
+    root_file_id = db.Column(db.Integer, db.ForeignKey('project_file.id', ondelete='CASCADE'),
+                             nullable=False, index=True)
+    user_id      = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
+    body         = db.Column(db.Text, nullable=False)
+    created_at   = db.Column(db.DateTime, default=_utc_now, index=True)
+
+    root_file = db.relationship('ProjectFile',
+                                backref=db.backref('model_comments', lazy=True,
+                                                   cascade='all, delete-orphan'))
+    author    = db.relationship('User', backref=db.backref('model_comments', lazy=True))
 
 
 

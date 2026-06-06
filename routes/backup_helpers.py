@@ -77,7 +77,9 @@ def _project_file_payload(project_file):
         'checksum_sha256': project_file.checksum_sha256,
         'thumbnail_path': project_file.thumbnail_path,
         'version_note': project_file.version_note,
+        'model_note': project_file.model_note,
         'uploaded_by': _user_ref(project_file.uploaded_by) if getattr(project_file, 'uploaded_by', None) else None,
+        'share_token': project_file.share_token,
         'archive_path': None,
         'content_b64': None,
     }

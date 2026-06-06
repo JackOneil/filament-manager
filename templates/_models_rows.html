@@ -5,9 +5,10 @@
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="border-b border-[var(--ui-border)] bg-gray-50/50 dark:bg-slate-800/30 text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">
+                        <th class="py-3 px-4 w-8"></th>
                         <th class="py-3 px-4 w-16"></th>
                         <th class="py-3 px-4">{{ t('models_edit_display_name') }}</th>
-                        <th class="py-3 px-4">{{ t('project_client') }}</th>
+                        <th class="py-3 px-4">{{ t('project') }}</th>
                         <th class="py-3 px-4">{{ t('models_version') }}</th>
                         <th class="py-3 px-4 text-right">{{ t('models_model_size') }}</th>
                         <th class="py-3 px-4">{{ t('models_uploaded_at') }}</th>
@@ -19,6 +20,13 @@
                     {% set root_file = item.root %}
                     {% set latest_file = item.latest %}
                     <tr class="hover:bg-gray-50/40 dark:hover:bg-slate-800/20 transition duration-150">
+                        <!-- Bulk selection checkbox -->
+                        <td class="py-3 px-4" @click.stop>
+                            <input type="checkbox" :checked="window.__models && window.__models.isSelected({{ root_file.id }})"
+                                   @change="window.__models && window.__models.toggleSelect({{ root_file.id }})"
+                                   data-id="{{ root_file.id }}"
+                                   class="model-checkbox w-4 h-4 rounded accent-blue-600 cursor-pointer">
+                        </td>
                         <!-- Thumbnail Column (clickable → model detail) -->
                         <td class="py-3 px-4">
                             <a href="{{ url_for('models.model_detail', root_id=root_file.id) }}" class="block w-10 h-10 rounded-lg bg-gray-100 dark:bg-slate-800 border border-[var(--ui-border)] overflow-hidden flex items-center justify-center relative flex-shrink-0 hover:ring-2 hover:ring-blue-400/50 transition cursor-pointer">
@@ -45,6 +53,11 @@
                                 <span class="text-xs text-gray-400 dark:text-slate-500 truncate block mt-0.5" title="{{ latest_file.filename }}">
                                     {{ latest_file.filename }}
                                 </span>
+                                {% if item.model_note %}
+                                <span class="text-[11px] text-gray-400 dark:text-slate-500 italic truncate block mt-0.5" title="{{ item.model_note }}">
+                                    {{ item.model_note }}
+                                </span>
+                                {% endif %}
                             </div>
                         </td>
 

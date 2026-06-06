@@ -25,53 +25,143 @@
         </div>
     </div>
 
+    <!-- Stats bar — compact, subtle -->
+    <div class="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-gray-400 dark:text-slate-500">
+        <span>
+            <i class="fa-solid fa-cubes text-blue-500/60 mr-1"></i>
+            <span class="font-bold text-gray-500 dark:text-slate-400">{{ models_stats.total }}</span>
+            {{ t('models_stats_total') }}
+        </span>
+        <span class="text-gray-300 dark:text-slate-700">|</span>
+        <span>
+            <i class="fa-solid fa-hard-drive text-emerald-500/60 mr-1"></i>
+            {% set sz = models_stats.total_size %}
+            <span class="font-bold text-gray-500 dark:text-slate-400">
+                {% if sz >= 1073741824 %}{{ (sz / 1073741824) | round(1) }} GB
+                {% elif sz >= 1048576 %}{{ (sz / 1048576) | round(1) }} MB
+                {% elif sz >= 1024 %}{{ (sz / 1024) | round(1) }} KB
+                {% else %}{{ sz }} B{% endif %}
+            </span>
+            {{ t('models_stats_total_size') }}
+        </span>
+        <span class="text-gray-300 dark:text-slate-700">|</span>
+        <span class="{% if models_stats.no_thumb > 0 %}text-amber-500 dark:text-amber-400{% endif %}">
+            <i class="fa-solid fa-image-slash mr-1"></i>
+            <span class="font-bold">{{ models_stats.no_thumb }}</span>
+            {{ t('models_stats_no_thumb') }}
+        </span>
+    </div>
+
+    <!-- Quick-filter pills -->
+    <div class="flex flex-wrap gap-2">
+        <button type="button" @click="noProject = false; projectId = ''; projectQ = ''"
+            :class="!noProject && !projectId ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+            class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all border-0 cursor-pointer">
+            <i class="fa-solid fa-cubes"></i> {{ t('filter_all') }}
+        </button>
+        <button type="button" @click="noProject = true; projectId = ''; projectQ = ''"
+            :class="noProject ? 'bg-violet-600 text-white shadow-sm' : 'bg-violet-50 text-violet-700 hover:bg-violet-100'"
+            class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all border-0 cursor-pointer">
+            <i class="fa-solid fa-unlink"></i> {{ t('models_filter_no_project') }}
+        </button>
+    </div>
+
     <!-- Filters & Sorting Panel -->
-    <div class="ui-panel">
+    <div class="ui-panel relative z-20">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-            <!-- Search -->
-            <div class="relative">
+            <!-- Fulltext search -->
+            <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">{{ t('search_filament') }}</label>
                 <div class="relative">
-                    <input type="text" x-model.debounce.300ms="fulltext" placeholder="{{ t('models_search_placeholder') }}" class="ui-input pr-10">
+                    <input type="text" x-model.debounce.300ms="fulltext" placeholder="{{ t('models_search_placeholder') }}" class="ui-input pr-10" autocomplete="off">
                     <div class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 pointer-events-none">
                         <i class="fa-solid fa-magnifying-glass"></i>
                     </div>
                 </div>
             </div>
 
-            <!-- Project filter -->
-            <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">{{ t('project_client') }}</label>
-                <select x-model="projectId" class="ui-input">
-                    <option value="">{{ t('models_project_filter') }}</option>
-                    {% for p in projects %}
-                    <option value="{{ p.id }}">{{ p.name }}</option>
-                    {% endfor %}
-                </select>
+            <!-- Project interactive dropdown -->
+            <div class="relative" @click.outside="projectOpen = false">
+                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">{{ t('project') }}</label>
+                <div class="relative">
+                    <input type="text" x-model="projectQ" @focus="projectOpen = true" @input="projectOpen = true"
+                        placeholder="{{ t('models_project_filter') }}" autocomplete="off"
+                        :class="projectId ? 'border-blue-400 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-600' : ''"
+                        class="ui-input pr-8">
+                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400">
+                        <i class="fa-solid fa-chevron-down text-xs transition-transform duration-150" :class="projectOpen ? 'rotate-180' : ''"></i>
+                    </div>
+                </div>
+                <div x-show="projectOpen" x-cloak class="absolute z-30 w-full mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                    <div @click="selectProject('', ''); projectOpen = false"
+                        class="px-3 py-2 cursor-pointer text-sm italic border-b border-gray-100 dark:border-slate-700"
+                        :class="projectId === '' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-400 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-700/50'">
+                        — {{ t('filter_all') }} —
+                    </div>
+                    <template x-for="opt in filteredProjects" :key="opt.id">
+                        <div @click="selectProject(opt.id, opt.name); projectOpen = false"
+                            class="px-3 py-2 cursor-pointer text-sm border-b border-gray-50 dark:border-slate-700/50 last:border-b-0 flex items-center justify-between"
+                            :class="projectId == opt.id ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-800 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-700/50'">
+                            <span x-text="opt.name"></span>
+                            <i x-show="projectId == opt.id" class="fa-solid fa-check text-blue-500 text-xs"></i>
+                        </div>
+                    </template>
+                    <div x-show="filteredProjects.length === 0" class="px-3 py-2 text-gray-400 dark:text-slate-500 italic text-xs text-center">–</div>
+                </div>
             </div>
 
-            <!-- File Type filter -->
-            <div>
+            <!-- File Type interactive dropdown -->
+            <div class="relative" @click.outside="fileTypeOpen = false">
                 <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">{{ t('models_model_file') }}</label>
-                <select x-model="fileType" class="ui-input">
-                    <option value="">{{ t('models_type_filter') }}</option>
-                    {% for ext in model_extensions %}
-                    <option value="{{ ext }}">{{ ext | upper }}</option>
-                    {% endfor %}
-                </select>
+                <div class="relative">
+                    <input type="text" x-model="fileTypeQ" @focus="fileTypeOpen = true" @input="fileTypeOpen = true"
+                        placeholder="{{ t('models_type_filter') }}" autocomplete="off"
+                        :class="fileType ? 'border-blue-400 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-600' : ''"
+                        class="ui-input pr-8">
+                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400">
+                        <i class="fa-solid fa-chevron-down text-xs transition-transform duration-150" :class="fileTypeOpen ? 'rotate-180' : ''"></i>
+                    </div>
+                </div>
+                <div x-show="fileTypeOpen" x-cloak class="absolute z-30 w-full mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                    <div @click="selectFileType(''); fileTypeOpen = false"
+                        class="px-3 py-2 cursor-pointer text-sm italic border-b border-gray-100 dark:border-slate-700"
+                        :class="fileType === '' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-400 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-700/50'">
+                        — {{ t('filter_all') }} —
+                    </div>
+                    <template x-for="ext in filteredFileTypes" :key="ext">
+                        <div @click="selectFileType(ext); fileTypeOpen = false"
+                            class="px-3 py-2 cursor-pointer text-sm border-b border-gray-50 dark:border-slate-700/50 last:border-b-0 flex items-center justify-between"
+                            :class="fileType === ext ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-800 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-700/50'">
+                            <span class="font-mono font-bold" x-text="ext.toUpperCase()"></span>
+                            <i x-show="fileType === ext" class="fa-solid fa-check text-blue-500 text-xs"></i>
+                        </div>
+                    </template>
+                    <div x-show="filteredFileTypes.length === 0" class="px-3 py-2 text-gray-400 dark:text-slate-500 italic text-xs text-center">–</div>
+                </div>
             </div>
 
-            <!-- Sort & Reset -->
+            <!-- Sort interactive dropdown + Reset -->
             <div class="flex gap-2">
-                <div class="flex-1">
+                <div class="relative flex-1" @click.outside="sortOpen = false">
                     <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">{{ t('sort_by') }}</label>
-                    <select x-model="sortBy" class="ui-input">
-                        <option value="uploaded">{{ t('models_sort_uploaded') }}</option>
-                        <option value="name_asc">{{ t('models_sort_name_asc') }}</option>
-                        <option value="name_desc">{{ t('models_sort_name_desc') }}</option>
-                        <option value="project">{{ t('models_sort_project') }}</option>
-                        <option value="size_desc">{{ t('models_sort_size_desc') }}</option>
-                    </select>
+                    <div class="relative">
+                        <input type="text" x-model="sortQ" @click="sortOpen = !sortOpen"
+                            placeholder="{{ t('sort_by') }}" autocomplete="off" readonly
+                            class="ui-input pr-8 cursor-pointer">
+                        <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400">
+                            <i class="fa-solid fa-chevron-down text-xs transition-transform duration-150" :class="sortOpen ? 'rotate-180' : ''"></i>
+                        </div>
+                    </div>
+                    <div x-show="sortOpen" x-cloak class="absolute z-30 w-full mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden">
+                        <template x-for="opt in sortOptions" :key="opt.value">
+                            <div @click="selectSort(opt.value, opt.label); sortOpen = false"
+                                class="px-3 py-2 cursor-pointer text-sm border-b border-gray-50 dark:border-slate-700/50 last:border-b-0 flex items-center justify-between"
+                                :class="sortBy === opt.value ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-800 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-700/50'">
+                                <span x-text="opt.label"></span>
+                                <i x-show="sortBy === opt.value" class="fa-solid fa-check text-blue-500 text-xs"></i>
+                            </div>
+                        </template>
+                    </div>
                 </div>
                 <button type="button" @click="resetFilters()" class="ui-badge ui-badge-critical h-11 px-4 self-end flex items-center justify-center gap-1.5" title="{{ t('filter_reset') }}">
                     <i class="fa-solid fa-filter-circle-xmark"></i>
@@ -156,30 +246,122 @@
             </form>
         </div>
     </div>
+    <!-- Bulk action bar — shown when items are selected -->
+    <div x-show="selectedIds.length > 0" x-cloak
+         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 
+                bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-white/10">
+        <span class="text-sm font-bold" x-text="selectedIds.length + ' {{ t('models_bulk_selected') }}'"></span>
+        <div class="h-5 w-px bg-white/20"></div>
+
+        <!-- Move to project form -->
+        <form method="POST" action="{{ url_for('models.model_bulk_move') }}" @submit.prevent="submitBulk($el)">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="ids" :value="selectedIds.join(',')">
+            <select name="project_id" class="text-sm bg-slate-800 border border-white/20 rounded-lg px-2 py-1.5 text-white">
+                <option value="">— {{ t('models_bulk_move_no_project') }} —</option>
+                {% for p in projects %}
+                <option value="{{ p.id }}">{{ p.name }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="ml-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition">
+                <i class="fa-solid fa-right-to-bracket mr-1"></i>{{ t('models_bulk_move') }}
+            </button>
+        </form>
+
+        <!-- Bulk delete form -->
+        <form method="POST" action="{{ url_for('models.model_bulk_delete') }}"
+              @submit.prevent="if(confirm('{{ t('models_bulk_delete_confirm') }}')) submitBulk($el)">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="ids" :value="selectedIds.join(',')">
+            <button type="submit" class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition">
+                <i class="fa-solid fa-trash mr-1"></i>{{ t('models_bulk_delete') }}
+            </button>
+        </form>
+
+        <button type="button" @click="clearSelection()" class="text-white/50 hover:text-white transition ml-1">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
 </div>
 
 <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
 function modelsApp() {
     return {
         viewMode: localStorage.getItem('models_view_mode') || 'card',
+
+        // Sort
         sortBy: 'uploaded',
+        sortQ: '',
+        sortOpen: false,
+        sortOptions: [
+            {"value": "uploaded",     "label": {{ t('models_sort_uploaded')|tojson }}},
+            {"value": "uploaded_asc", "label": {{ t('models_sort_uploaded_asc')|tojson }}},
+            {"value": "name_asc",     "label": {{ t('models_sort_name_asc')|tojson }}},
+            {"value": "name_desc",    "label": {{ t('models_sort_name_desc')|tojson }}},
+            {"value": "project",      "label": {{ t('models_sort_project')|tojson }}},
+            {"value": "size_desc",    "label": {{ t('models_sort_size_desc')|tojson }}},
+        ],
+
+        // Project filter
         projectId: '',
+        projectQ: '',
+        projectOpen: false,
+        projectOptions: [{% for p in projects %}{"id":{{ p.id }},"name":{{ p.name|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}],
+
+        // File type filter
         fileType: '',
+        fileTypeQ: '',
+        fileTypeOpen: false,
+        fileTypeOptions: {{ model_extensions|tojson }},
+
         fulltext: '',
         page: 1,
+        noProject: false,
         uploadModalOpen: false,
+        selectedIds: [],
         _fetchPending: false,
         _abortController: null,
 
+        get filteredProjects() {
+            const q = (this.projectQ || '').toLowerCase();
+            return q ? this.projectOptions.filter(o => o.name.toLowerCase().includes(q)) : this.projectOptions;
+        },
+        get filteredFileTypes() {
+            const q = (this.fileTypeQ || '').toLowerCase();
+            return q ? this.fileTypeOptions.filter(e => e.toLowerCase().includes(q)) : this.fileTypeOptions;
+        },
+
+        selectProject(id, name) {
+            this.projectId = id;
+            this.projectQ = name;
+            this.noProject = false;
+            this.page = 1;
+        },
+        selectFileType(val) {
+            this.fileType = val;
+            this.fileTypeQ = val ? val.toUpperCase() : '';
+            this.page = 1;
+        },
+        selectSort(val, label) {
+            this.sortBy = val;
+            this.sortQ = label;
+            this.page = 1;
+        },
+
         init() {
+            const defaultSort = this.sortOptions.find(o => o.value === this.sortBy);
+            if (defaultSort) this.sortQ = defaultSort.label;
+
             this.$watch('viewMode', val => {
                 localStorage.setItem('models_view_mode', val);
                 this.fetchContent();
             });
-            this.$watch('sortBy', () => { this.page = 1; this.fetchContent(); });
-            this.$watch('projectId', () => { this.page = 1; this.fetchContent(); });
-            this.$watch('fileType', () => { this.page = 1; this.fetchContent(); });
+            this.$watch('sortBy', () => { this.fetchContent(); });
+            this.$watch('projectId', () => { this.fetchContent(); });
+            this.$watch('fileType', () => { this.fetchContent(); });
             this.$watch('fulltext', () => { this.page = 1; this.fetchContent(); });
+            this.$watch('noProject', () => { this.page = 1; this.fetchContent(); });
+            window.__models = this;
             this.fetchContent();
         },
 
@@ -201,6 +383,7 @@ function modelsApp() {
                     fulltext: this.fulltext,
                     page: this.page
                 });
+                if (this.noProject) params.append('no_project', '1');
 
                 const res = await fetch(`/api/models-list?${params.toString()}`, {
                     signal: this._abortController.signal
@@ -246,12 +429,34 @@ function modelsApp() {
 
         resetFilters() {
             this.projectId = '';
+            this.projectQ = '';
             this.fileType = '';
+            this.fileTypeQ = '';
             this.fulltext = '';
+            this.noProject = false;
             this.sortBy = 'uploaded';
+            const defaultSort = this.sortOptions.find(o => o.value === 'uploaded');
+            this.sortQ = defaultSort ? defaultSort.label : '';
             this.page = 1;
             this.fetchContent();
-        }
+        },
+
+        isSelected(id) { return this.selectedIds.includes(id); },
+        toggleSelect(id) {
+            const idx = this.selectedIds.indexOf(id);
+            if (idx === -1) this.selectedIds.push(id);
+            else this.selectedIds.splice(idx, 1);
+        },
+        selectAll() {
+            this.selectedIds = Array.from(
+                document.querySelectorAll('.model-checkbox')
+            ).map(el => parseInt(el.dataset.id));
+        },
+        clearSelection() { this.selectedIds = []; },
+        submitBulk(form) {
+            form.querySelector('[name="ids"]').value = this.selectedIds.join(',');
+            form.submit();
+        },
     }
 }
 </script>
