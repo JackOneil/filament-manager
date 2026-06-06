@@ -8,13 +8,15 @@
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
     <title>{{ t('title') }}</title>
     <style>[x-cloak]{display:none!important}</style>
+    <script defer src="{{ url_for('static', filename='js/alpine.min.js') }}"></script>
     <link rel="preload" href="{{ url_for('static', filename='fonts/files/plus-jakarta-sans-latin-wght-normal.woff2') }}" as="font" type="font/woff2" crossorigin fetchpriority="high">
     <link rel="preload" href="{{ url_for('static', filename='fonts/files/plus-jakarta-sans-latin-ext-wght-normal.woff2') }}" as="font" type="font/woff2" crossorigin fetchpriority="high">
     <link rel="stylesheet" href="{{ url_for('static', filename='fonts/plus-jakarta-sans.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fontawesome.min.css') }}">
-    <script defer src="{{ url_for('static', filename='js/alpine.min.js') }}"></script>
+
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/skeleton.css') }}">
     <style>
         {% if nav_palette == 'slate' %}
         :root {
@@ -374,6 +376,32 @@
     <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
         window.__helpLang = {{ current_lang | tojson }};
         window.__helpEndpoint = {{ (request.endpoint or '') | tojson }};
+        window.__firstLoginTour = {{ ('1' if request.args.get('welcome') == '1' else '0') | tojson }};
+        {# Client-side toast i18n: a curated subset of keys used by JS code
+           (reactions, upload stepper, etc.). Keep this list small — the
+           full dictionary is large and not needed on the client. #}
+        window.__i18n = {
+            cs: {
+                'reaction_failed': 'Nepodařilo se uložit reakci. Zkuste to prosím znovu.',
+                'upload_validating': 'Ověřuji soubor…',
+                'upload_uploading': 'Nahrávám soubor…',
+                'upload_preview': 'Generuji 3D náhled…',
+                'upload_done': 'Hotovo!',
+                'upload_failed': 'Nahrání selhalo. Zkuste to prosím znovu.',
+                'upload_invalid_type': 'Nepodporovaný typ souboru.',
+                'upload_too_large': 'Soubor je příliš velký (max. {max} MB).',
+            },
+            en: {
+                'reaction_failed': 'Could not save your reaction. Please try again.',
+                'upload_validating': 'Validating file…',
+                'upload_uploading': 'Uploading file…',
+                'upload_preview': 'Generating 3D preview…',
+                'upload_done': 'Done!',
+                'upload_failed': 'Upload failed. Please try again.',
+                'upload_invalid_type': 'Unsupported file type.',
+                'upload_too_large': 'File is too large (max. {max} MB).',
+            }
+        };
     </script>
     <script src="{{ url_for('static', filename='js/app-shell.js') }}"></script>
     {% if current_user %}
@@ -504,38 +532,20 @@
                     {% endfor %}
 
                     {% if pending_inventory_undo %}
-                        <div x-data="{ show: true }"
-                             x-init="setTimeout(() => show = false, 14000)"
-                             x-show="show"
-                             x-transition:enter="transition ease-out duration-300"
-                             x-transition:enter-start="opacity-0 translate-x-8"
-                             x-transition:enter-end="opacity-100 translate-x-0"
-                             x-transition:leave="transition ease-in duration-200"
-                             x-transition:leave-start="opacity-100"
-                             x-transition:leave-end="opacity-0 translate-x-8"
-                             class="rounded-lg border px-4 py-3 shadow-xl flex items-start gap-3 backdrop-blur-md pointer-events-auto bg-amber-50/95 border-amber-200 text-amber-900 dark:bg-amber-900/95 dark:border-amber-700 dark:text-amber-100">
-                            <div class="mt-0.5 text-amber-600 dark:text-amber-300">
-                                <i class="fa-solid fa-rotate-left"></i>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <div class="font-semibold">{{ t(pending_inventory_undo.title_key) }}</div>
-                                {% if pending_inventory_undo.detail %}
-                                <div class="text-sm opacity-85 truncate mt-0.5">{{ pending_inventory_undo.detail }}</div>
-                                {% endif %}
-                                <div class="mt-2">
-                                    <form method="POST" action="{{ url_for('inventory_undo') }}" class="inline">
-                                        <input type="hidden" name="undo_log_id" value="{{ pending_inventory_undo.undo_log_id }}">
-                                        <button type="submit" class="inline-flex items-center gap-1 rounded-full border border-amber-400/60 bg-white/80 dark:bg-amber-800/40 px-3 py-1 text-xs font-semibold hover:bg-white dark:hover:bg-amber-800/70 transition">
-                                            <i class="fa-solid fa-rotate-left"></i>
-                                            <span>{{ t('undo_toast_button') }}</span>
-                                        </button>
-                                    </form>
-                                </div>
-                            </div>
-                            <button @click="show = false" class="opacity-60 hover:opacity-100 focus:outline-none transition-opacity">
-                                <i class="fa-solid fa-xmark"></i>
-                            </button>
-                        </div>
+                    {# Inventory undo (filament delete, bulk delete, remove spool). #}
+                    {% set undo_url = url_for('inventory_undo') %}
+                    {% set undo_title = t(pending_inventory_undo.title_key) %}
+                    {% set undo_detail = pending_inventory_undo.detail %}
+                    {% set undo_log_id = pending_inventory_undo.undo_log_id %}
+                    {% include '_toast_undo.html' %}
+                    {% endif %}
+                    {% if pending_project_undo %}
+                    {# Project / project-file undo. #}
+                    {% set undo_url = url_for('project_undo') %}
+                    {% set undo_title = t(pending_project_undo.title_key) %}
+                    {% set undo_detail = pending_project_undo.detail %}
+                    {% set undo_log_id = pending_project_undo.undo_log_id %}
+                    {% include '_toast_undo.html' %}
                     {% endif %}
                 </div>
             {% endif %}
@@ -671,11 +681,26 @@
                         </div>
                         {# Tour button for current page #}
                         <template x-if="currentSection.length > 0 && currentSection[0].hasTour">
-                            <div class="mb-2">
+                            <div class="mb-2 space-y-1.5">
                                 <button @click="startTour(currentSection[0].id)"
                                         class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[var(--ui-brand)] hover:opacity-90 text-white text-xs font-semibold transition-opacity">
                                     <i class="fa-solid fa-route text-[11px]"></i>
                                     <span>{{ t('tour_start_btn') }}</span>
+                                </button>
+                                <button @click="if (typeof window.startFirstLoginTour === 'function') { window.startFirstLoginTour(1); } else { window.location.href = '/?welcome=1'; }"
+                                        class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-[var(--ui-brand-ring)] bg-[var(--ui-brand-soft)] hover:opacity-90 text-[var(--ui-brand-strong)] text-xs font-semibold transition-opacity">
+                                    <i class="fa-solid fa-star text-[11px]"></i>
+                                    <span>{{ t('tour_full_wizard_btn') }}</span>
+                                </button>
+                            </div>
+                        </template>
+                        {# If no per-section tour, still offer the full wizard. #}
+                        <template x-if="!(currentSection.length > 0 && currentSection[0].hasTour)">
+                            <div class="mb-2">
+                                <button @click="if (typeof window.startFirstLoginTour === 'function') { window.startFirstLoginTour(1); } else { window.location.href = '/?welcome=1'; }"
+                                        class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-[var(--ui-brand-ring)] bg-[var(--ui-brand-soft)] hover:opacity-90 text-[var(--ui-brand-strong)] text-xs font-semibold transition-opacity">
+                                    <i class="fa-solid fa-star text-[11px]"></i>
+                                    <span>{{ t('tour_full_wizard_btn') }}</span>
                                 </button>
                             </div>
                         </template>

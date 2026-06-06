@@ -51,7 +51,7 @@ from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
 
-APP_VERSION = '1.106.1'
+APP_VERSION = '1.107.3'
 
 csrf = CSRFProtect()
 
@@ -251,6 +251,21 @@ def create_app(test_config=None) -> Flask:
             else:
                 _session.pop('inventory_pending_undo', None)
 
+        # Generic project-undo slot (project + project file deletion).
+        pending_project_undo = None
+        raw_proj_undo = _session.get('project_pending_undo')
+        if isinstance(raw_proj_undo, dict):
+            expires_raw = raw_proj_undo.get('expires_at')
+            try:
+                expires_at = datetime.fromisoformat(expires_raw) if expires_raw else None
+            except (TypeError, ValueError):
+                expires_at = None
+
+            if expires_at and expires_at > utc_now():
+                pending_project_undo = raw_proj_undo
+            else:
+                _session.pop('project_pending_undo', None)
+
         return dict(
             t=t,
             current_lang=lang,
@@ -266,6 +281,7 @@ def create_app(test_config=None) -> Flask:
             auth_is_admin=is_admin,
             ui_mode=ui_mode,
             pending_inventory_undo=pending_inventory_undo,
+            pending_project_undo=pending_project_undo,
             csp_nonce=getattr(g, 'csp_nonce', ''),
         )
 

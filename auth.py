@@ -102,6 +102,7 @@ SECTION_BY_ENDPOINT = {
     'project_detail': SECTION_PROJECTS,
     'project_edit': SECTION_PROJECTS,
     'project_delete': SECTION_PROJECTS,
+    'project_undo': SECTION_PROJECTS,
     'project_upload_file': SECTION_PROJECTS,
     'project_download_file': SECTION_PROJECTS,
     'project_view_file': SECTION_PROJECTS,

@@ -19,7 +19,18 @@ _DEFAULT_SW_CACHE_PREFIX = 'filament-manager'
 
 
 def _sw_cache_name() -> str:
-    version = (current_app.config.get('APP_VERSION') or '0').split('.')[0]
+    """Return the current cache name, derived from the full APP_VERSION.
+
+    Using the *full* version string (e.g. ``1.107.0``) means every release
+    — including patch and minor bumps — installs a fresh cache and the
+    service worker's ``activate`` handler purges the previous one. Using
+    only the major version (the previous behaviour) would leave the cache
+    name unchanged on minor/patch upgrades, so the browser would keep
+    serving stale ``/static/`` assets and the new HTML would reference
+    functions that don't yet exist in the old JS — visible as empty
+    content or a frozen loading spinner.
+    """
+    version = (current_app.config.get('APP_VERSION') or '0')
     return f'{_DEFAULT_SW_CACHE_PREFIX}-v{version}-static'
 
 

@@ -1,0 +1,6 @@
+{# Skeleton row loader — 8 placeholder rows for list view / table bodies. #}
+<div role="status" aria-label="{{ t('loading') }}">
+    {% for i in range(8) %}
+    <div class="skeleton-row"></div>
+    {% endfor %}
+</div>

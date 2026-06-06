@@ -100,7 +100,24 @@ def register(app):
             if user and verify_password(user, password) and user.is_active:
                 login_user(user, plain_password=password)
                 flash('auth_login_success', 'success')
-                return redirect(safe_redirect_target(request.args.get('next'), fallback_endpoint='index'))
+                # First-login onboarding tour: append ?welcome=1 if the user
+                # has not yet completed the tour (tracked via a 1-year cookie).
+                target = safe_redirect_target(request.args.get('next'), fallback_endpoint='index')
+                if not request.cookies.get('first_login_tour_v1'):
+                    from urllib.parse import urlparse, urlparse as _urlp, urlunparse, parse_qsl, urlencode
+                    parts = _urlp(target)
+                    qs = dict(parse_qsl(parts.query, keep_blank_values=True))
+                    qs['welcome'] = '1'
+                    target = urlunparse(parts._replace(query=urlencode(qs)))
+                response = redirect(target)
+                if not request.cookies.get('first_login_tour_v1'):
+                    response.set_cookie(
+                        'first_login_tour_v1', 'done',
+                        max_age=365 * 24 * 60 * 60,
+                        httponly=True,
+                        samesite='Lax',
+                    )
+                return response
             flash('auth_login_failed', 'error')
         return render_template('auth_login.html', user_count=User.query.count())
 

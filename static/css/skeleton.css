@@ -1,0 +1,65 @@
+/*
+ * Filament Manager — skeleton loaders
+ * Used by fetchContent() in inventory / projects / bambu / prusa to show
+ * 6-8 shimmering placeholder cards while the server response is loading.
+ *
+ * Accessibility: the parent wrapper should set aria-busy="true" while
+ * the skeleton is visible and aria-busy="false" when real content lands.
+ */
+
+@keyframes skeleton-shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.skeleton-card {
+    background: linear-gradient(
+        90deg,
+        rgba(148, 163, 184, 0.08) 0%,
+        rgba(148, 163, 184, 0.22) 50%,
+        rgba(148, 163, 184, 0.08) 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+    border-radius: 0.75rem;
+    height: 110px;
+}
+
+.skeleton-row {
+    background: linear-gradient(
+        90deg,
+        rgba(148, 163, 184, 0.08) 0%,
+        rgba(148, 163, 184, 0.22) 50%,
+        rgba(148, 163, 184, 0.08) 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+    border-radius: 0.5rem;
+    height: 24px;
+    margin-bottom: 8px;
+}
+
+.skeleton-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+}
+@media (min-width: 768px) {
+    .skeleton-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1024px) {
+    .skeleton-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* Dark mode: slightly lighter shimmer so cards are visible on dark bg. */
+.dark .skeleton-card,
+.dark .skeleton-row {
+    background: linear-gradient(
+        90deg,
+        rgba(148, 163, 184, 0.06) 0%,
+        rgba(148, 163, 184, 0.18) 50%,
+        rgba(148, 163, 184, 0.06) 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}

@@ -187,9 +187,14 @@ function appShell() {
         window.open(url, '_blank', 'noopener,noreferrer');
     };
 
-    // Patch window.fetch to send the CSRF header on every non-GET same-origin request.
-    // Skip blob: and data: URLs — they are internal browser resources and the CSRF token
-    // is both unnecessary and blocked by CSP connect-src for those schemes.
+    // ── CSRF auto-injection for window.fetch ────────────────────────────
+    // Paired with the meta[name="csrf-token"] tag injected by base.html.
+    // Every call to fetch() — including those from templates, third-party
+    // libraries, and inline scripts — automatically gets the X-CSRFToken
+    // header on non-GET/HEAD requests. We use new Headers(opts.headers)
+    // instead of Object.assign() to preserve Headers-instance methods
+    // (iteration, .get(), .set()) that Object.assign strips.
+    // Skip blob: and data: URLs — they are internal browser resources.
     var _origFetch = window.fetch;
     window.fetch = function (url, opts) {
         var urlStr = (typeof url === 'string') ? url : (url && url.url) || '';
@@ -199,10 +204,95 @@ function appShell() {
         opts = opts || {};
         var method = (opts.method || 'GET').toUpperCase();
         if (method !== 'GET' && method !== 'HEAD') {
-            opts.headers = Object.assign({}, opts.headers, {
-                'X-CSRFToken': csrfToken
-            });
+            var headers = new Headers(opts.headers || {});
+            headers.set('X-CSRFToken', csrfToken);
+            var newOpts = {};
+            for (var k in opts) {
+                if (k === 'headers') continue;
+                newOpts[k] = opts[k];
+            }
+            newOpts.headers = headers;
+            return _origFetch.call(this, url, newOpts);
         }
         return _origFetch.call(this, url, opts);
     };
+
+    // ── Client-side toast helper ─────────────────────────────────────────
+    // Used by JS code (e.g. optimistic reaction rollback) to display a
+    // brief message. The container is injected into <body> on first use.
+    // i18n: keys are resolved via the server-rendered __i18n map exposed
+    // on the window (set in base.html). Falls back to the raw key.
+    window.showToast = function (messageKey, category, opts) {
+        category = category || 'info';
+        opts = opts || {};
+        var ttl = opts.ttl || 4000;
+        var actions = opts.actions || [];
+        var lang = (window.__helpLang || 'cs');
+        var dict = (window.__i18n && window.__i18n[lang]) || {};
+        var text = dict[messageKey] || dict[messageKey.replace(/^[a-z_]+_/, function(m){ return m; })] || messageKey;
+
+        var container = document.getElementById('client-toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'client-toast-container';
+            container.className = 'fixed bottom-6 right-6 z-[60] flex flex-col gap-2 pointer-events-none';
+            document.body.appendChild(container);
+        }
+
+        var palette = {
+            info:    'bg-slate-50 border-slate-200 text-slate-800 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100',
+            success: 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/95 dark:border-green-700 dark:text-green-100',
+            error:   'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/95 dark:border-red-700 dark:text-red-100',
+        }[category] || 'bg-slate-50 border-slate-200 text-slate-800';
+
+        var icon = {
+            info:    'fa-circle-info text-slate-500',
+            success: 'fa-circle-check text-green-500',
+            error:   'fa-circle-exclamation text-red-500',
+        }[category] || 'fa-circle-info text-slate-500';
+
+        var toast = document.createElement('div');
+        toast.className = 'rounded-lg border px-4 py-3 shadow-xl flex items-start gap-3 backdrop-blur-md pointer-events-auto ' + palette;
+        toast.setAttribute('role', 'status');
+        toast.setAttribute('aria-live', 'polite');
+
+        var html = '<div class="mt-0.5"><i class="fa-solid ' + icon + '"></i></div>' +
+                   '<div class="flex-1 min-w-0 font-medium">' + escapeHtml(text) + '</div>';
+        if (actions.length) {
+            html += '<div class="flex gap-2">';
+            actions.forEach(function (a) {
+                html += '<button type="button" data-action="' + escapeAttr(a.action) + '" class="text-xs font-semibold underline hover:no-underline">' + escapeHtml(a.label) + '</button>';
+            });
+            html += '</div>';
+        }
+        html += '<button type="button" class="opacity-50 hover:opacity-100 focus:outline-none transition-opacity" aria-label="close">' +
+                '<i class="fa-solid fa-xmark"></i></button>';
+        toast.innerHTML = html;
+
+        var close = function () {
+            if (!toast.parentNode) return;
+            toast.style.transition = 'opacity 200ms, transform 200ms';
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(8px)';
+            setTimeout(function () { toast.remove(); }, 220);
+        };
+        toast.querySelector('button[aria-label="close"]').addEventListener('click', close);
+        actions.forEach(function (a) {
+            var btn = toast.querySelector('button[data-action="' + cssEscape(a.action) + '"]');
+            if (btn) btn.addEventListener('click', function () {
+                try { a.onClick(); } finally { close(); }
+            });
+        });
+        container.appendChild(toast);
+        if (ttl > 0) setTimeout(close, ttl);
+        return { close: close };
+    };
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function escapeAttr(s) { return escapeHtml(s); }
+    function cssEscape(s) { return String(s).replace(/[^a-zA-Z0-9_-]/g, '_'); }
 })();

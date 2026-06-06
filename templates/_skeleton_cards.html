@@ -1,0 +1,8 @@
+{# Skeleton loader partial — 6 placeholder cards for inventory / projects / Bambu / Prusa.
+   Rendered via innerHTML swap in fetchContent() while the real response is in flight.
+   The grid breakpoint matches the live card grid (md:grid-cols-2 lg:grid-cols-3). #}
+<div class="skeleton-grid" role="status" aria-label="{{ t('loading') }}">
+    {% for i in range(6) %}
+    <div class="skeleton-card"></div>
+    {% endfor %}
+</div>

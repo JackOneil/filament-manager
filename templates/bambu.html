@@ -114,9 +114,11 @@
 
     {# ── Infinite scroll sentinel ── #}
     <div id="bambu-scroll-sentinel" class="py-6 text-center">
-        <span id="bambu-loading-indicator" class="hidden text-gray-400 text-sm">
-            <i class="fa-solid fa-spinner fa-spin mr-2"></i>{{ t('bambu_loading_jobs') }}
-        </span>
+        <div id="bambu-loading-indicator" class="hidden space-y-2 max-w-md mx-auto" aria-live="polite">
+            <div class="skeleton-card" style="height: 88px;"></div>
+            <div class="skeleton-card" style="height: 88px;"></div>
+            <div class="skeleton-card" style="height: 88px;"></div>
+        </div>
         <span id="bambu-all-loaded-msg" class="hidden text-gray-400 text-sm italic">
             <i class="fa-solid fa-check-circle mr-1 text-green-400"></i>{{ t('bambu_all_loaded') }}
         </span>

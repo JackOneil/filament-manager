@@ -922,17 +922,32 @@
     };
 
     TourEngine.prototype.close = function () {
+        var wasCompleted = this.current >= this.steps.length - 1;
         if (this._svg) { this._svg.remove(); this._svg = null; }
         if (this._tip) { this._tip.remove(); this._tip = null; }
         if (this._resizeHandler) {
             window.removeEventListener('resize', this._resizeHandler);
             this._resizeHandler = null;
         }
+        // Fire close callback (used by the first-login wizard to chain steps).
+        if (typeof this.onClose === 'function') {
+            try { this.onClose(); } catch (e) { /* non-critical */ }
+        }
+        if (wasCompleted && typeof this.onComplete === 'function') {
+            try { this.onComplete(); } catch (e) { /* non-critical */ }
+        }
     };
 
-    // ── Keyboard shortcut (Escape = close) ──────────────────────────────────────
+    // ── Keyboard shortcut (Escape = close; for first-login wizard it also
+    //    aborts the entire chain via the engine's onCancel callback). ──────
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && _engine) { _engine.close(); _engine = null; }
+        if (e.key === 'Escape' && _engine) {
+            if (typeof _engine.onCancel === 'function') {
+                try { _engine.onCancel(); } catch (e2) { /* non-critical */ }
+            }
+            _engine.close();
+            _engine = null;
+        }
     });
 
     // ── Public API ───────────────────────────────────────────────────────────────
@@ -980,5 +995,81 @@
     window.stopPageTour = function () {
         if (_engine) { _engine.close(); _engine = null; }
     };
+
+    // ── First-login wizard ────────────────────────────────────────────────────
+    // Sequenced tour that walks a brand-new user through the 5 key screens:
+    //   1. Filaments (where you add a spool)
+    //   2. Projects (where you create a print project)
+    //   3. Printers / Settings (where you connect a Bambu or Prusa)
+    //   4. Statistics (where you see your print history)
+    //   5. Help (opened at the end as a final tip)
+    // Auto-starts when the URL contains ?welcome=1 (set by the login route
+    // on the first successful login). Escape at any time aborts the chain.
+    var FIRST_LOGIN_STEPS = [
+        { tour: 'filaments', wait: 500 },
+        { tour: 'projects',  wait: 500 },
+        { tour: 'settings',  wait: 500 },
+        { tour: 'stats',     wait: 500 },
+    ];
+
+    window.startFirstLoginTour = function (startIndex) {
+        var lang = window.__helpLang || 'cs';
+        var i = Math.max(0, (startIndex || 0) - 1); // -1 because next() pre-increments
+        var cancelled = false;
+        function finish() {
+            // All done — open the help panel as a final tip.
+            if (typeof window.openHelp === 'function') {
+                window.openHelp();
+            } else if (window.dispatchEvent) {
+                window.dispatchEvent(new CustomEvent('help:open'));
+            }
+        }
+        function next() {
+            if (cancelled) return;
+            if (i >= FIRST_LOGIN_STEPS.length) { finish(); return; }
+            var step = FIRST_LOGIN_STEPS[i++];
+            if (!step.tour || !TOUR_STEPS[step.tour]) { next(); return; }
+            // If the user is on the wrong page, navigate there first.
+            var expectedPath = TOUR_PAGES[step.tour];
+            var current = window.location.pathname.replace(/\/+$/, '') || '/';
+            var onPage = expectedPath === '/'
+                ? (current === '' || current === '/')
+                : (current === expectedPath || current.startsWith(expectedPath + '/'));
+            if (!onPage) {
+                var sep = expectedPath.indexOf('?') >= 0 ? '&' : '?';
+                window.location.href = expectedPath + sep + 'first_login=' + (i + 1);
+                return;
+            }
+            // Show the per-section tour. We instantiate a fresh engine so
+            // the chain can call onClose / onComplete / onCancel directly.
+            _engine = new TourEngine();
+            _engine.onClose = function () { if (!cancelled) setTimeout(next, step.wait || 600); };
+            _engine.onCancel = function () { cancelled = true; };
+            _engine.start(TOUR_STEPS[step.tour], lang);
+        }
+        next();
+    };
+
+    // Auto-start the first-login tour when the URL has ?welcome=1 (set by
+    // the login route) or when the wizard has redirected via ?first_login=N.
+    document.addEventListener('DOMContentLoaded', function () {
+        try {
+            var params = new URLSearchParams(window.location.search);
+            var firstLoginIdx = parseInt(params.get('first_login') || '0', 10) || 0;
+            if (params.get('welcome') === '1' || firstLoginIdx > 0) {
+                // Clean both params from the URL without a reload.
+                var clean = new URL(window.location.href);
+                clean.searchParams.delete('welcome');
+                clean.searchParams.delete('first_login');
+                window.history.replaceState({}, '', clean.toString());
+                // Wait for Alpine to initialise the page widgets, then start.
+                setTimeout(function () {
+                    if (typeof window.startFirstLoginTour === 'function') {
+                        window.startFirstLoginTour(firstLoginIdx);
+                    }
+                }, 800);
+            }
+        } catch (e) { /* non-critical */ }
+    });
 
 })();

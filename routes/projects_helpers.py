@@ -1,8 +1,10 @@
 import math
 import os
+import shutil
+import tempfile
 import threading
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from types import SimpleNamespace
 
 from flask import abort, current_app, flash, jsonify, redirect, render_template, request, send_from_directory, url_for, Blueprint
@@ -512,4 +514,302 @@ def _schedule_link_preview_refresh(flask_app, link_id, url, max_attempts=3, retr
 
     t = threading.Thread(target=_fetch, daemon=True)
     t.start()
+
+
+# ── Undo system for project + project-file deletion ─────────────────────
+# Uses a session-based snapshot (no new DB tables). On delete we dump the
+# row(s) to a temp JSON file and store the path + kind in the session.
+# On undo we restore from that file. The session-stored payload is small
+# (a few fields); the heavy data lives on disk and is reaped automatically
+# after _PROJECT_UNDO_TTL_MINUTES or by an opportunistic janitor pass.
+
+_PROJECT_UNDO_TTL_MINUTES = 30
+_PROJECT_UNDO_DIR = os.path.join(tempfile.gettempdir(), 'filament_undo')
+
+
+def _ensure_undo_dir():
+    os.makedirs(_PROJECT_UNDO_DIR, exist_ok=True)
+
+
+def _project_undo_path(snapshot_id):
+    return os.path.join(_PROJECT_UNDO_DIR, f'project_{snapshot_id}.json')
+
+
+def _file_undo_path(snapshot_id, filename):
+    return os.path.join(_PROJECT_UNDO_DIR, f'file_{snapshot_id}_{secure_filename(filename) or "blob"}')
+
+
+def _store_pending_undo(session, *, kind, undo_log_id, title_key, detail, expires_at, project_id=None):
+    """Generic session-based undo slot.
+
+    `kind` is 'project' or 'file' (future-proof for 'comment', 'todo', etc.).
+    `undo_log_id` is a short unique key matching the temp file/dir.
+    `title_key` and `detail` are rendered into the toast by base.html.
+    """
+    session['project_pending_undo'] = {
+        'kind': kind,
+        'undo_log_id': undo_log_id,
+        'title_key': title_key,
+        'detail': detail,
+        'expires_at': expires_at,
+        'project_id': project_id,
+    }
+
+
+def _consume_pending_undo(session):
+    slot = session.pop('project_pending_undo', None)
+    if not slot:
+        return None
+    expires_raw = slot.get('expires_at')
+    try:
+        expires_at = datetime.fromisoformat(expires_raw) if expires_raw else None
+    except (TypeError, ValueError):
+        expires_at = None
+    if expires_at and expires_at < utc_now():
+        return None  # expired; caller will show "not available"
+    return slot
+
+
+def _cleanup_undo_artifacts(slot):
+    """Best-effort delete of the on-disk snapshot files. Never raises."""
+    if not slot:
+        return
+    undo_id = slot.get('undo_log_id')
+    kind = slot.get('kind')
+    if not undo_id:
+        return
+    try:
+        if kind == 'project':
+            p = _project_undo_path(undo_id)
+            if os.path.isfile(p):
+                os.remove(p)
+        elif kind == 'file':
+            # The undo_log_id encodes the file name; try a couple of patterns.
+            d = os.path.join(_PROJECT_UNDO_DIR, f'file_{undo_id}_')
+            if os.path.isdir(_PROJECT_UNDO_DIR):
+                for fn in os.listdir(_PROJECT_UNDO_DIR):
+                    if fn.startswith(f'file_{undo_id}_'):
+                        try:
+                            full = os.path.join(_PROJECT_UNDO_DIR, fn)
+                            if os.path.isfile(full):
+                                os.remove(full)
+                        except OSError:
+                            pass
+    except OSError:
+        current_app.logger.warning('Failed to clean up undo artifacts for %s', undo_id)
+
+
+def snapshot_project_for_undo(project):
+    """Dump the project (and its children) to a temp JSON file.
+
+    Returns a (snapshot_id, expires_at_iso) tuple.
+    """
+    import json as _json
+    _ensure_undo_dir()
+    snapshot_id = uuid.uuid4().hex
+    payload = {
+        'project': {
+            'name': project.name,
+            'description': project.description,
+            'client_name': project.client_name,
+            'client_email': project.client_email,
+            'client_phone': project.client_phone,
+            'estimated_print_time': project.estimated_print_time,
+            'status': project.status,
+            'priority': project.priority,
+            'tag_text': project.tag_text,
+            'due_date': project.due_date.isoformat() if project.due_date else None,
+            'share_token': project.share_token,
+            'owner_user_id': project.owner_user_id,
+            'owner_name': project.owner_name,
+            'created_by_user_id': project.created_by_user_id,
+        },
+        'filaments': [
+            {
+                'filament_id': pf.filament_id,
+                'estimated_weight': pf.estimated_weight,
+                'is_used': pf.is_used,
+            }
+            for pf in project.filaments
+        ],
+        'todos': [
+            {
+                'body': t.body,
+                'is_done': t.is_done,
+                'position': t.position,
+            }
+            for t in sorted(project.todos, key=lambda x: (x.position or 0, x.id or 0))
+        ],
+        'links': [
+            {
+                'url': l.url,
+                'name': l.name,
+                'og_title': l.og_title,
+                'og_image': l.og_image,
+                'og_description': l.og_description,
+                'domain': l.domain,
+            }
+            for l in project.links
+        ],
+    }
+    path = _project_undo_path(snapshot_id)
+    with open(path, 'w', encoding='utf-8') as f:
+        _json.dump(payload, f, ensure_ascii=False, default=str)
+    expires_at = utc_now() + timedelta(minutes=_PROJECT_UNDO_TTL_MINUTES)
+    return snapshot_id, expires_at.isoformat(timespec='seconds')
+
+
+def restore_project_from_undo(snapshot_id):
+    """Re-create a project (and its children) from a previously stored snapshot.
+
+    Returns the new Project object, or raises KeyError/ValueError on failure.
+    """
+    import json as _json
+    path = _project_undo_path(snapshot_id)
+    if not os.path.isfile(path):
+        raise KeyError('snapshot_missing')
+    with open(path, 'r', encoding='utf-8') as f:
+        payload = _json.load(f)
+
+    proj_data = payload.get('project') or {}
+    new_project = Project(
+        name=proj_data.get('name', 'Restored project'),
+        description=proj_data.get('description'),
+        client_name=proj_data.get('client_name'),
+        client_email=proj_data.get('client_email'),
+        client_phone=proj_data.get('client_phone'),
+        estimated_print_time=proj_data.get('estimated_print_time') or 0,
+        status=proj_data.get('status') or 'NEW',
+        priority=proj_data.get('priority') or 'medium',
+        tag_text=proj_data.get('tag_text'),
+        owner_user_id=proj_data.get('owner_user_id'),
+        owner_name=proj_data.get('owner_name'),
+        created_by_user_id=proj_data.get('created_by_user_id'),
+    )
+    if proj_data.get('due_date'):
+        try:
+            new_project.due_date = date.fromisoformat(proj_data['due_date'])
+        except (TypeError, ValueError):
+            pass
+    if proj_data.get('share_token'):
+        new_project.share_token = proj_data['share_token']
+
+    db.session.add(new_project)
+    db.session.flush()  # get an id for children
+
+    for fl in payload.get('filaments', []):
+        if not fl.get('filament_id'):
+            continue
+        db.session.add(ProjectFilament(
+            project_id=new_project.id,
+            filament_id=fl['filament_id'],
+            estimated_weight=fl.get('estimated_weight'),
+            is_used=bool(fl.get('is_used')),
+        ))
+
+    for t in payload.get('todos', []):
+        db.session.add(ProjectTodo(
+            project_id=new_project.id,
+            body=t.get('body', ''),
+            is_done=bool(t.get('is_done')),
+            position=t.get('position', 0),
+        ))
+
+    for l in payload.get('links', []):
+        if not l.get('url'):
+            continue
+        db.session.add(ProjectLink(
+            project_id=new_project.id,
+            url=l['url'],
+            name=l.get('name'),
+            og_title=l.get('og_title'),
+            og_image=l.get('og_image'),
+            og_description=l.get('og_description'),
+            domain=l.get('domain'),
+        ))
+
+    db.session.commit()
+    return new_project
+
+
+def snapshot_file_for_undo(project_file):
+    """Copy a project file to a temp location for potential restoration.
+
+    Returns (snapshot_id, expires_at_iso). Also writes a small JSON sidecar
+    with the file's DB row fields.
+    """
+    import json as _json
+    _ensure_undo_dir()
+    snapshot_id = uuid.uuid4().hex
+    sidecar = {
+        'project_id': project_file.project_id,
+        'filename': project_file.filename,
+        'filepath': project_file.filepath,
+        'version': project_file.version,
+        'parent_file_id': project_file.parent_file_id,
+        'version_note': project_file.version_note,
+        'model_note': project_file.model_note,
+        'checksum_sha256': project_file.checksum_sha256,
+        'file_size_bytes': project_file.file_size_bytes,
+        'mime_type': project_file.mime_type,
+        'uploaded_by_user_id': project_file.uploaded_by_user_id,
+    }
+    sidecar_path = _file_undo_path(snapshot_id, sidecar['filename'] or 'blob') + '.json'
+    content_path = _file_undo_path(snapshot_id, sidecar['filename'] or 'blob')
+    with open(sidecar_path, 'w', encoding='utf-8') as f:
+        _json.dump(sidecar, f, ensure_ascii=False, default=str)
+    # Best-effort copy of the file content. If the file is gone, the undo
+    # will restore the row but the content will be missing (logged).
+    try:
+        if project_file.filepath and os.path.isfile(project_file.filepath):
+            shutil.copy2(project_file.filepath, content_path)
+        elif project_file.filepath:
+            current_app.logger.warning('Undo snapshot: source file missing: %s', project_file.filepath)
+    except OSError as exc:
+        current_app.logger.warning('Undo snapshot: copy failed for %s: %s', project_file.filepath, exc)
+
+    expires_at = utc_now() + timedelta(minutes=_PROJECT_UNDO_TTL_MINUTES)
+    return snapshot_id, expires_at.isoformat(timespec='seconds'), sidecar_path, content_path
+
+
+def restore_file_from_undo(snapshot_id):
+    """Re-create a ProjectFile row (and its content) from a previous snapshot.
+
+    Returns the new ProjectFile object, or raises KeyError/ValueError.
+    """
+    import json as _json
+    _ensure_undo_dir()
+    sidecars = [fn for fn in os.listdir(_PROJECT_UNDO_DIR) if fn.startswith(f'file_{snapshot_id}_') and fn.endswith('.json')]
+    if not sidecars:
+        raise KeyError('snapshot_missing')
+    sidecar_path = os.path.join(_PROJECT_UNDO_DIR, sidecars[0])
+    with open(sidecar_path, 'r', encoding='utf-8') as f:
+        sidecar = _json.load(f)
+
+    # Content path = sidecar path with .json stripped
+    content_path = sidecar_path[:-5]
+    project_file = ProjectFile(
+        project_id=sidecar.get('project_id'),
+        filename=sidecar.get('filename') or 'restored',
+        filepath=sidecar.get('filepath') or '',
+        version=sidecar.get('version') or 1,
+        parent_file_id=sidecar.get('parent_file_id'),
+        version_note=sidecar.get('version_note'),
+        model_note=sidecar.get('model_note'),
+        checksum_sha256=sidecar.get('checksum_sha256'),
+        file_size_bytes=sidecar.get('file_size_bytes'),
+        mime_type=sidecar.get('mime_type'),
+        uploaded_by_user_id=sidecar.get('uploaded_by_user_id'),
+    )
+    # If the original on-disk file is still around, re-link it; otherwise
+    # try to restore from the temp copy.
+    if os.path.isfile(content_path) and project_file.filepath:
+        try:
+            os.makedirs(os.path.dirname(project_file.filepath) or '.', exist_ok=True)
+            shutil.copy2(content_path, project_file.filepath)
+        except OSError as exc:
+            current_app.logger.warning('Undo restore: file copy failed: %s', exc)
+    db.session.add(project_file)
+    db.session.commit()
+    return project_file
 

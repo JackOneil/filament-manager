@@ -327,7 +327,11 @@ class AuthAccessTests(unittest.TestCase):
             follow_redirects=False,
         )
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.headers['Location'], '/')
+        location = response.headers['Location']
+        # The redirect must NOT go to the external host. (It may include a
+        # `?welcome=1` query string from the first-login tour, which is fine.)
+        self.assertTrue(location.startswith('/'), f"Expected internal redirect, got {location!r}")
+        self.assertNotIn('evil.example', location)
 
     def test_security_headers_are_present(self):
         response = self.client.get('/login')

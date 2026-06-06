@@ -457,6 +457,12 @@ def register(app):
     def project_delete(id):
         project = _project_or_404(id)
         _require_project_admin()
+        from routes.projects_helpers import (
+            snapshot_project_for_undo, _store_pending_undo,
+        )
+        # Snapshot the project BEFORE deleting, so the user can undo.
+        project_name = project.name or '—'
+        snapshot_id, expires_at = snapshot_project_for_undo(project)
         for item in project.files:
             try:
                 os.remove(item.filepath)
@@ -464,6 +470,15 @@ def register(app):
                 pass
         db.session.delete(project)
         db.session.commit()
+        from flask import session
+        _store_pending_undo(
+            session,
+            kind='project',
+            undo_log_id=snapshot_id,
+            title_key='project_undo_toast_title',
+            detail=project_name,
+            expires_at=expires_at,
+        )
         return redirect(url_for('projects_index'))
 
     @bp.route('/projects/<int:id>/upload', methods=['POST'])
@@ -654,13 +669,71 @@ def register(app):
             abort(403)
         project_file = db.get_or_404(ProjectFile, file_id)
         if project_file.project_id is not None and project_file.project_id == id:
+            from routes.projects_helpers import (
+                snapshot_file_for_undo, _store_pending_undo,
+            )
+            file_name = project_file.filename or '—'
+            snapshot_id, expires_at, _sidecar, _content = snapshot_file_for_undo(project_file)
             try:
                 os.remove(project_file.filepath)
             except OSError:
                 pass
             db.session.delete(project_file)
             db.session.commit()
+            from flask import session
+            _store_pending_undo(
+                session,
+                kind='file',
+                undo_log_id=snapshot_id,
+                title_key='project_file_undo_toast_title',
+                detail=file_name,
+                expires_at=expires_at,
+                project_id=id,
+            )
         return _project_detail_redirect(id, 'files')
+
+    @bp.route('/projects/undo', methods=['POST'])
+    def project_undo():
+        """Restore the most recently deleted project or project file.
+
+        Looks at the `project_pending_undo` session slot populated by
+        `project_delete` or `project_delete_file`. The slot is consumed
+        atomically — submitting it twice does not work.
+        """
+        from flask import session
+        from routes.projects_helpers import (
+            _consume_pending_undo, _cleanup_undo_artifacts,
+            restore_project_from_undo, restore_file_from_undo,
+        )
+        slot = _consume_pending_undo(session)
+        if not slot:
+            flash('undo_toast_not_available', 'error')
+            return redirect(request.referrer or url_for('projects_index'))
+        kind = slot.get('kind')
+        undo_id = slot.get('undo_log_id')
+        project_id = slot.get('project_id')
+        try:
+            if kind == 'project':
+                new_project = restore_project_from_undo(undo_id)
+                db.session.commit()
+                flash('undo_toast_applied', 'success')
+                _cleanup_undo_artifacts(slot)
+                return redirect(url_for('project_detail', id=new_project.id))
+            elif kind == 'file':
+                new_file = restore_file_from_undo(undo_id)
+                db.session.commit()
+                flash('undo_toast_applied', 'success')
+                _cleanup_undo_artifacts(slot)
+                return _project_detail_redirect(project_id, 'files') if project_id else redirect(url_for('projects_index'))
+            else:
+                flash('undo_toast_not_available', 'error')
+                return redirect(request.referrer or url_for('projects_index'))
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("Project undo failed for slot=%s", slot)
+            flash('undo_toast_failed', 'error')
+            _cleanup_undo_artifacts(slot)
+            return redirect(request.referrer or url_for('projects_index'))
 
     @bp.route('/projects/<int:id>/add_link', methods=['POST'])
     def project_add_link(id):

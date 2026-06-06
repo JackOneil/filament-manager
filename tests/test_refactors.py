@@ -196,12 +196,18 @@ class TestAutoBackupScheduling:
 # ── 5.12 — PWA service worker cache name ─────────────────────────────
 class TestPwaServiceWorker:
     def test_cache_name_includes_version(self):
+        """Cache name MUST include the full version so every release
+        (major, minor, patch) installs a fresh cache. Major-version-only
+        was the v1.106.0 bug that left stale ``/static/`` assets cached
+        on minor/patch upgrades and broke pages that referenced
+        functions added in the new release.
+        """
         from routes.pwa import _sw_cache_name
         from flask import Flask
         app = Flask(__name__)
         app.config["APP_VERSION"] = "9.42.1"
         with app.app_context():
-            assert _sw_cache_name() == "filament-manager-v9-static"
+            assert _sw_cache_name() == "filament-manager-v9.42.1-static"
 
     def test_cache_name_handles_missing_version(self):
         from routes.pwa import _sw_cache_name

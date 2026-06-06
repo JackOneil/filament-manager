@@ -471,18 +471,75 @@
                     <div class="ui-label">{{ t('project_files_title') }}</div>
                     <h2 class="text-2xl font-bold mt-1 mb-4">{{ t('project_files_heading') }}</h2>
                     {% if can_edit_project %}
-                    <form id="upload-form" method="POST" action="{{ url_for('project_upload_file', id=project.id) }}" enctype="multipart/form-data" class="mb-5">
-                        <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center hover:bg-gray-50 transition cursor-pointer flex flex-col items-center justify-center gap-2">
-                            <i class="fa-solid fa-cloud-arrow-up text-3xl text-gray-400"></i>
-                            <div class="text-gray-600">
-                                {{ t('drop_files_here') }}
-                                <label class="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer underline">
-                                    {{ t('browse') }}
-                                    <input type="file" name="file" multiple class="hidden" id="file-input">
-                                </label>
+                    {# Multi-phase upload stepper: idle → validating → uploading → preview → done.
+                       Replaces the legacy form.submit() with XHR for real upload progress. #}
+                    <div x-data="uploadStepper({
+                        url: '{{ url_for('project_upload_file', id=project.id) }}',
+                        accept: '.3mf,.stl,.obj,.amf,.step,.stp,.gcode,.gc,.bgcode,.jpg,.jpeg,.png,.gif,.webp',
+                        maxSizeMB: 64,
+                        isModel: (name) => /\.(3mf|stl|obj|amf|step|stp|gcode|gc|bgcode)$/i.test(name)
+                    })" class="mb-5">
+                        <div x-show="phase === 'idle' || phase === 'error'"
+                             x-ref="dropZone"
+                             class="border-2 border-dashed rounded-2xl p-8 text-center transition cursor-pointer flex flex-col items-center justify-center gap-2"
+                             :class="phase === 'error' ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : 'border-gray-300 hover:bg-gray-50'"
+                             @click="$refs.fileInput.click()"
+                             @dragover.prevent="dragOver = true"
+                             @dragleave.prevent="dragOver = false"
+                             @drop.prevent="handleDrop($event)">
+                            <i class="fa-solid fa-cloud-arrow-up text-3xl"
+                               :class="phase === 'error' ? 'text-red-400' : 'text-gray-400'"></i>
+                            <div :class="phase === 'error' ? 'text-red-700' : 'text-gray-600'">
+                                <span x-show="phase === 'idle'">{{ t('drop_files_here') }}
+                                    <span class="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer underline">{{ t('browse') }}</span>
+                                </span>
+                                <span x-show="phase === 'error'" x-text="errorMessage"></span>
+                            </div>
+                            <input type="file" x-ref="fileInput" :accept="accept" multiple class="hidden" @change="handleSelect($event)">
+                        </div>
+
+                        {# Stepper UI — visible while a file is being processed. #}
+                        <div x-show="phase !== 'idle' && phase !== 'error'"
+                             x-cloak
+                             class="rounded-2xl border border-gray-200 dark:border-slate-700 p-5 space-y-3"
+                             role="status" aria-live="polite">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-300">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="font-semibold text-sm truncate" x-text="currentFileName"></div>
+                                    <div class="text-xs text-gray-500" x-text="phaseLabel"></div>
+                                </div>
+                                <button type="button" x-show="phase !== 'done' && phase !== 'uploading'" @click="reset()" class="text-xs text-gray-500 hover:text-gray-700">
+                                    <i class="fa-solid fa-xmark"></i> {{ t('cancel') }}
+                                </button>
+                            </div>
+                            {# Stepper bar: 4 phases. #}
+                            <ol class="grid grid-cols-4 gap-1 text-center text-xs">
+                                <li class="rounded-full py-1.5 font-semibold transition-colors"
+                                    :class="stepIndex >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-slate-400'">
+                                    <span class="hidden sm:inline">1. </span>{{ t('upload_step_validate') }}
+                                </li>
+                                <li class="rounded-full py-1.5 font-semibold transition-colors"
+                                    :class="stepIndex >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-slate-400'">
+                                    <span class="hidden sm:inline">2. </span>{{ t('upload_step_upload') }}
+                                </li>
+                                <li class="rounded-full py-1.5 font-semibold transition-colors"
+                                    :class="stepIndex >= 3 ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-slate-400'">
+                                    <span class="hidden sm:inline">3. </span>{{ t('upload_step_preview') }}
+                                </li>
+                                <li class="rounded-full py-1.5 font-semibold transition-colors"
+                                    :class="stepIndex >= 4 ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-slate-400'">
+                                    <span class="hidden sm:inline">4. </span>{{ t('upload_step_done') }}
+                                </li>
+                            </ol>
+                            {# Progress bar (active during upload phase). #}
+                            <div x-show="phase === 'uploading'" class="h-2 w-full rounded-full bg-gray-200 dark:bg-slate-700 overflow-hidden">
+                                <div class="h-full bg-blue-600 transition-all" :style="'width:' + progress + '%'"></div>
                             </div>
                         </div>
-                    </form>
+                    </div>
                     {% endif %}
 
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -878,37 +935,149 @@
 </div>
 
 <script>
-const dropZone = document.getElementById('drop-zone');
-const fileInput = document.getElementById('file-input');
-const uploadForm = document.getElementById('upload-form');
+{# Legacy drop-zone JS removed — replaced by Alpine x-data="uploadStepper(...)" component.
+   The stepper handles file selection, drag & drop, validation, XHR upload with
+   progress events, and the 4-phase stepper UI. #}
+</script>
 
-if (dropZone && fileInput && uploadForm) {
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, preventDefaults, false);
-    });
+<script>
+/**
+ * Multi-phase upload stepper.
+ * Phases: idle → validating → uploading → preview → done (or error at any point).
+ * Uses XMLHttpRequest for real upload progress events (fetch doesn't expose them).
+ *
+ * @param {Object} config
+ * @param {string} config.url       POST endpoint for the upload
+ * @param {string} config.accept    Comma-separated accept attribute (file picker filter)
+ * @param {number} config.maxSizeMB Hard client-side size cap (matches MAX_CONTENT_LENGTH)
+ * @param {Function} config.isModel Returns true if the filename is a 3D model
+ *                                  (triggers the "Generating 3D preview" phase)
+ */
+function uploadStepper(config) {
+    return {
+        url: config.url,
+        accept: config.accept,
+        maxSizeMB: config.maxSizeMB || 64,
+        isModel: config.isModel || (() => false),
+        phase: 'idle',         // idle | validating | uploading | preview | done | error
+        progress: 0,
+        currentFileName: '',
+        currentFileIsModel: false,
+        errorMessage: '',
+        dragOver: false,
+        _xhr: null,
+        _csrf: (document.querySelector('meta[name="csrf-token"]') || {}).content || '',
 
-    function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+        get stepIndex() {
+            return { idle: 0, validating: 1, uploading: 2, preview: 3, done: 4, error: 0 }[this.phase] || 0;
+        },
+        get phaseLabel() {
+            const lang = window.__helpLang || 'cs';
+            const dict = (window.__i18n && window.__i18n[lang]) || {};
+            return {
+                validating: dict['upload_validating'] || 'Validating…',
+                uploading: (dict['upload_uploading'] || 'Uploading…') + ' ' + this.progress + '%',
+                preview: dict['upload_preview'] || 'Generating 3D preview…',
+                done: dict['upload_done'] || 'Done!',
+            }[this.phase] || '';
+        },
 
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropZone.addEventListener(eventName, () => dropZone.classList.add('bg-blue-50', 'border-blue-400'), false);
-    });
+        handleSelect(e) {
+            const files = e.target.files;
+            if (files && files.length > 0) this._startUpload(files[0]);
+        },
+        handleDrop(e) {
+            const files = e.dataTransfer && e.dataTransfer.files;
+            if (files && files.length > 0) this._startUpload(files[0]);
+        },
 
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, () => dropZone.classList.remove('bg-blue-50', 'border-blue-400'), false);
-    });
+        _startUpload(file) {
+            this.errorMessage = '';
+            this.progress = 0;
+            // Phase 1: validate.
+            this.phase = 'validating';
+            this.currentFileName = file.name;
+            this.currentFileIsModel = this.isModel(file.name);
 
-    dropZone.addEventListener('drop', (e) => {
-        if (e.dataTransfer.files.length > 0) {
-            fileInput.files = e.dataTransfer.files;
-            uploadForm.submit();
+            const ext = (file.name.split('.').pop() || '').toLowerCase();
+            const allowed = this.accept.split(',').map(s => s.trim().replace(/^\./, '').toLowerCase());
+            if (allowed.length && !allowed.includes(ext)) {
+                this._fail(window.__i18n && ((window.__i18n.cs && window.__i18n.cs.upload_invalid_type) || (window.__i18n.en && window.__i18n.en.upload_invalid_type)) || 'Unsupported file type.');
+                return;
+            }
+            if (file.size > this.maxSizeMB * 1024 * 1024) {
+                const tpl = (window.__i18n && ((window.__i18n.cs && window.__i18n.cs.upload_too_large) || (window.__i18n.en && window.__i18n.en.upload_too_large))) || 'File is too large.';
+                this._fail(tpl.replace('{max}', this.maxSizeMB));
+                return;
+            }
+
+            // Allow the validating phase to render briefly for UX.
+            setTimeout(() => this._doUpload(file), 120);
+        },
+
+        _doUpload(file) {
+            // Phase 2: upload via XHR (fetch doesn't expose upload progress events).
+            this.phase = 'uploading';
+            const xhr = new XMLHttpRequest();
+            this._xhr = xhr;
+            xhr.open('POST', this.url, true);
+            if (this._csrf) xhr.setRequestHeader('X-CSRFToken', this._csrf);
+
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) this.progress = Math.round((e.loaded / e.total) * 100);
+            });
+            xhr.addEventListener('load', () => {
+                if (xhr.status >= 200 && xhr.status < 400) {
+                    this._onUploadComplete();
+                } else {
+                    const msg = (xhr.responseText || '').slice(0, 200) || ('HTTP ' + xhr.status);
+                    this._fail((window.__i18n && ((window.__i18n.cs && window.__i18n.cs.upload_failed) || (window.__i18n.en && window.__i18n.en.upload_failed))) || 'Upload failed.');
+                    console.error('Upload failed:', msg);
+                }
+            });
+            xhr.addEventListener('error', () => {
+                this._fail((window.__i18n && ((window.__i18n.cs && window.__i18n.cs.upload_failed) || (window.__i18n.en && window.__i18n.en.upload_failed))) || 'Upload failed.');
+            });
+            xhr.addEventListener('abort', () => { this.phase = 'idle'; });
+
+            const fd = new FormData();
+            fd.append('file', file);
+            xhr.send(fd);
+        },
+
+        _onUploadComplete() {
+            // Phase 3: 3D preview generation (only for model files).
+            if (this.currentFileIsModel) {
+                this.phase = 'preview';
+                // Allow the stepper to render the "Generating 3D preview" label.
+                setTimeout(() => this._finish(), 600);
+            } else {
+                this._finish();
+            }
+        },
+
+        _finish() {
+            this.phase = 'done';
+            this.progress = 100;
+            // Reload the page to show the new file in the list.
+            setTimeout(() => window.location.reload(), 700);
+        },
+
+        _fail(message) {
+            this.phase = 'error';
+            this.errorMessage = message;
+            if (this._xhr) { try { this._xhr.abort(); } catch (e) {} this._xhr = null; }
+        },
+
+        reset() {
+            if (this._xhr) { try { this._xhr.abort(); } catch (e) {} this._xhr = null; }
+            this.phase = 'idle';
+            this.progress = 0;
+            this.currentFileName = '';
+            this.errorMessage = '';
+            if (this.$refs.fileInput) this.$refs.fileInput.value = '';
         }
-    }, false);
-
-    fileInput.addEventListener('change', () => {
-        if (fileInput.files.length > 0) {
-            uploadForm.submit();
-        }
-    });
+    };
 }
 </script>
 

@@ -364,8 +364,35 @@ function commentReactions(commentId, initialReactions) {
     return {
         commentId,
         reactions: initialReactions || {},
+        /**
+         * Optimistic toggle: apply the change locally first, send POST in the
+         * background, and revert on failure with an error toast. This makes
+         * reaction clicks feel instant even on slow networks.
+         */
         toggle(emoji) {
             const csrf = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : (window._csrf_token || '');
+            // 1. Apply the change locally (optimistic).
+            const before = this.reactions[emoji]
+                ? { count: this.reactions[emoji].count, user_reacted: this.reactions[emoji].user_reacted }
+                : null;
+            if (before && before.user_reacted) {
+                // Was reacted → remove my reaction.
+                if (before.count <= 1) {
+                    delete this.reactions[emoji];
+                } else {
+                    this.reactions[emoji] = { count: before.count - 1, user_reacted: false };
+                }
+            } else {
+                // Was not reacted → add my reaction.
+                this.reactions[emoji] = {
+                    count: (before ? before.count : 0) + 1,
+                    user_reacted: true,
+                };
+            }
+            // Force Alpine to re-render the x-for.
+            this.reactions = { ...this.reactions };
+
+            // 2. Send POST; on failure, revert and show error.
             const fd = new FormData();
             fd.append('emoji', emoji);
             if (csrf) fd.append('csrf_token', csrf);
@@ -375,19 +402,34 @@ function commentReactions(commentId, initialReactions) {
                 body: fd,
                 credentials: 'same-origin',
             })
-            .then(r => r.json())
-            .then(data => {
-                if (!this.reactions[data.emoji]) {
-                    this.reactions[data.emoji] = { count: 0, user_reacted: false };
+            .then(r => r.json().then(data => ({ ok: r.ok, data })))
+            .then(({ ok, data }) => {
+                if (!ok || !data || typeof data.count !== 'number') {
+                    throw new Error('invalid response');
                 }
-                this.reactions[data.emoji].count = data.count;
-                this.reactions[data.emoji].user_reacted = data.reacted;
+                // Reconcile with server's authoritative count.
                 if (data.count === 0) {
                     delete this.reactions[data.emoji];
+                } else {
+                    this.reactions[data.emoji] = {
+                        count: data.count,
+                        user_reacted: !!data.reacted,
+                    };
                 }
                 this.reactions = { ...this.reactions };
             })
-            .catch(() => {});
+            .catch(() => {
+                // Revert optimistic change.
+                if (before) {
+                    this.reactions[emoji] = { count: before.count, user_reacted: before.user_reacted };
+                } else {
+                    delete this.reactions[emoji];
+                }
+                this.reactions = { ...this.reactions };
+                if (window.showToast) {
+                    window.showToast('reaction_failed', 'error');
+                }
+            });
         }
     };
 }

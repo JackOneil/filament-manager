@@ -247,6 +247,22 @@ function projectsApp() {
             this._fetchController = new AbortController();
             const signal = this._fetchController.signal;
 
+            // Inject skeleton placeholders into each dynamic container so the
+            // user sees shimmering rows immediately instead of stale content.
+            const wrapperEl = document.getElementById('projects-content');
+            if (wrapperEl) {
+                const skelCards = (n) => Array.from({length: n}).map(() => '<div class="skeleton-card" style="height: 56px; margin-bottom: 8px;"></div>').join('');
+                const skelRows = (n) => Array.from({length: n}).map(() => '<div class="skeleton-row" style="height: 36px; margin-bottom: 6px;"></div>').join('');
+                const calEl = wrapperEl.querySelector('#projects-calendar-items');
+                if (calEl) calEl.innerHTML = skelCards(4);
+                for (const status of Object.keys(this.statusPages)) {
+                    const itemsEl = wrapperEl.querySelector(`#kanban-items-${status.toLowerCase()}`);
+                    if (itemsEl) itemsEl.innerHTML = skelCards(3);
+                }
+                const tbodyEl = wrapperEl.querySelector('#project-table-body');
+                if (tbodyEl) tbodyEl.innerHTML = skelRows(6);
+            }
+
             try {
                 let params = new URLSearchParams();
                 params.append('ajax', '1');
