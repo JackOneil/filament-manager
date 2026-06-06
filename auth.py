@@ -600,6 +600,10 @@ def _audit_prepare_request():
         return
     if '_audit_sid' not in session:
         session['_audit_sid'] = secrets.token_hex(12)
+    # Resolve the audit target exactly once per request and stash it in
+    # the context — ``_audit_finish_request`` reuses it for the after
+    # snapshot instead of running the (potentially expensive) DB lookup
+    # twice (refactor 5.3).
     target = _audit_target()
     endpoint = request.endpoint or ''
     if '.' in endpoint:
@@ -622,6 +626,7 @@ def _audit_prepare_request():
             'route_args': {key: _audit_safe_value(value) for key, value in (request.view_args or {}).items()},
         },
         'form': _audit_sanitized_form(),
+        'target_object': target.get('object'),
     }
 
 
@@ -629,13 +634,17 @@ def _audit_finish_request(response):
     ctx = getattr(g, 'audit_context', None)
     if not ctx or response.status_code >= 400:
         return response
-    target = _audit_target()
     after_payload = {
-        'object': _audit_snapshot_model(target.get('object')),
+        'object': _audit_snapshot_model(ctx.get('target_object')),
         'form': ctx.get('form') or {},
     }
-    if target.get('object_id') and not ctx.get('object_id'):
-        ctx['object_id'] = target.get('object_id')
+    if ctx.get('object_id') is None and ctx.get('target_object') is not None:
+        # Fallback: pull object_id from the resolved object in case the
+        # endpoint-specific lookup returned an id we didn't capture.
+        try:
+            ctx['object_id'] = str(ctx['target_object'].id)
+        except AttributeError:
+            pass
     try:
         row = AuditLog(
             user_id=ctx.get('user_id'),
@@ -657,7 +666,9 @@ def _audit_finish_request(response):
         db.session.commit()
     except Exception as exc:
         db.session.rollback()
-        current_app.logger.warning('Audit log write failed: %s', exc)
+        # Promote to error level so audit-write failures are visible in
+        # centralised monitoring (refactor in audit log review 5.3).
+        current_app.logger.error('Audit log write failed: %s', exc)
     return response
 
 

@@ -29,8 +29,45 @@ from routes.backup_helpers import (
     _resolve_user_ref,
     _build_export_data,
     _build_backup_archive_bytes,
+    _build_backup_archive_from_data,
     _cleanup_old_backups,
 )
+
+
+# ── Module-level path helpers (3.7 — backup path safety) ────────────────
+# ``os.path.abspath`` only resolves ``..`` syntactically — symlinks inside
+# the data directory could still allow escape.  We therefore canonicalise
+# both the target and the storage directory with ``realpath`` and verify
+# containment.  The check is cheap (two stat calls) and only runs on the
+# small number of operations that touch the on-disk archive.
+
+_BACKUP_STORAGE_DIRNAME = 'backup'
+
+
+def _backup_storage_dir() -> str:
+    """Return the absolute, realpath of the on-disk backup directory.
+
+    The directory is created on demand so the very first backup works
+    without manual ``mkdir``.  The returned path contains no symlinks.
+    """
+    base = os.path.abspath(os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        'data',
+        _BACKUP_STORAGE_DIRNAME,
+    ))
+    os.makedirs(base, exist_ok=True)
+    return os.path.realpath(base)
+
+
+def _is_path_inside(path: str, directory: str) -> bool:
+    """Return True iff *path* (after symlink resolution) lies inside *directory*."""
+    try:
+        path_real = os.path.realpath(path)
+        dir_real = os.path.realpath(directory)
+    except (OSError, ValueError):
+        return False
+    # Use os.sep to avoid the ``/backup-evil`` prefix-matching pitfall.
+    return path_real == dir_real or path_real.startswith(dir_real + os.sep)
 
 def register(app):
     bp = Blueprint('backup', __name__)
@@ -60,25 +97,29 @@ def register(app):
             return redirect(url_for('settings') + '?tab=data')
 
         try:
-            archive_bytes = _build_backup_archive_bytes(
-                app, include_files=bool(setting.backup_auto_include_files)
-            )
-            backup_dir = os.path.join(
-                os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'backup'
-            )
+            include_files = bool(setting.backup_auto_include_files)
+            # Build export data and archive in a single pass (refactor 5.5:
+            # avoid the previous pattern of calling _build_export_data twice).
+            data, _ = _build_export_data(app, include_files=include_files)
+            archive_bytes = _build_backup_archive_from_data(data, include_files=include_files)
+            backup_dir = _backup_storage_dir()
             os.makedirs(backup_dir, exist_ok=True)
 
             now = utc_now()
             ts = now.strftime('%Y%m%d_%H%M%S')
-            suffix = 'full' if setting.backup_auto_include_files else 'db'
+            suffix = 'full' if include_files else 'db'
             filename = f'auto_backup_{suffix}_{ts}.tar.gz'
             filepath = os.path.join(backup_dir, filename)
+            if not _is_path_inside(filepath, backup_dir):
+                # Belt-and-suspenders: should never trigger for hard-coded names.
+                app.logger.error('Computed backup path escaped storage dir: %r', filepath)
+                flash(translate('backup_auto_failed'), 'error')
+                return redirect(url_for('settings') + '?tab=data')
             with open(filepath, 'wb') as fh:
                 fh.write(archive_bytes)
 
             setting.backup_auto_last_run_at = now
             setting.backup_last_export_at = now
-            data, _ = _build_export_data(app, include_files=bool(setting.backup_auto_include_files))
             setting.backup_last_export_meta = json.dumps(data['backup_meta'], ensure_ascii=False)
             db.session.commit()
 
@@ -100,24 +141,21 @@ def register(app):
     @bp.route('/backup/list-files')
     def backup_list_files():
         """Return JSON list of existing auto-backup files."""
-        backup_dir = os.path.join(
-            os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'backup'
-        )
+        backup_dir = _backup_storage_dir()
         files = []
         if os.path.isdir(backup_dir):
             for name in sorted(os.listdir(backup_dir), reverse=True):
                 fpath = os.path.join(backup_dir, name)
                 if os.path.isfile(fpath) and name.endswith('.tar.gz'):
                     stat = os.stat(fpath)
+                    # Defensive realpath check — should always be inside backup_dir,
+                    # but we re-verify to be safe against any future symlink additions.
+                    if not _is_path_inside(fpath, backup_dir):
+                        continue
                     files.append({
                         'filename': name,
                         'size_bytes': stat.st_size,
-                        'modified_at': utc_now().replace(
-                            year=2020, month=1, day=1,
-                            hour=0, minute=0, second=0, microsecond=0
-                        ).isoformat() if not hasattr(stat, 'st_mtime') else None,
-                        # Use the file's actual mtime
-                        'modified_at_ts': int(stat.st_mtime) if hasattr(stat, 'st_mtime') else 0,
+                        'modified_at_ts': int(stat.st_mtime),
                     })
         from flask import jsonify
         return jsonify({'files': files})
@@ -129,10 +167,12 @@ def register(app):
         safe_name = secure_filename(filename)
         if not safe_name or not safe_name.endswith('.tar.gz'):
             return 'Invalid filename', 400
-        backup_dir = os.path.join(
-            os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'backup'
-        )
+        backup_dir = _backup_storage_dir()
         filepath = os.path.join(backup_dir, safe_name)
+        # Defence-in-depth: realpath must remain inside the backup directory.
+        if not _is_path_inside(filepath, backup_dir):
+            app.logger.warning('Backup download path traversal attempt: %r', filename)
+            return 'Invalid filename', 400
         if not os.path.isfile(filepath):
             return 'File not found', 404
         from flask import send_file
@@ -146,10 +186,12 @@ def register(app):
         safe_name = secure_filename(filename)
         if not safe_name or not safe_name.endswith('.tar.gz'):
             return 'Invalid filename', 400
-        backup_dir = os.path.join(
-            os.path.abspath(os.path.dirname(__file__)), '..', 'data', 'backup'
-        )
+        backup_dir = _backup_storage_dir()
         filepath = os.path.join(backup_dir, safe_name)
+        if not _is_path_inside(filepath, backup_dir):
+            app.logger.warning('Backup delete path traversal attempt: %r', filename)
+            flash(translate('backup_auto_file_invalid'), 'error')
+            return redirect(url_for('settings') + '?tab=data')
         if os.path.isfile(filepath):
             os.remove(filepath)
             app.logger.info(f"Deleted backup file: {safe_name}")

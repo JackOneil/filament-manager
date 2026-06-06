@@ -51,7 +51,7 @@ from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
 
-APP_VERSION = '1.105.1'
+APP_VERSION = '1.106.1'
 
 csrf = CSRFProtect()
 
@@ -472,8 +472,102 @@ def _start_prusa_sync_worker(app: Flask) -> None:
     thread.start()
 
 
+def _compute_next_auto_backup_run(
+    now_local,
+    freq: str,
+    time_str: str,
+    day_val: int,
+):
+    """Return the next local-time datetime the backup should run.
+
+    Refactor 4.4: previously the worker relied on a 5-minute polling
+    window and string-typed freq/day.  We now compute the next run
+    explicitly so:
+
+    * a sleep gap longer than 5 minutes (GC pause, IO stall, restart)
+      no longer causes the worker to silently skip a cycle;
+    * "weekly" / "monthly" decisions are made against a *target* day
+      rather than the polling tick;
+    * the worker can sleep for the full interval (≈24 h for daily)
+      and only spin every 60 s for cheap reconfiguration detection.
+
+    Returns ``None`` when the configuration is invalid.
+    """
+    from datetime import datetime as _datetime, timedelta as _timedelta
+
+    try:
+        hour, minute = (int(p) for p in time_str.split(':', 1))
+    except (ValueError, AttributeError):
+        return None
+    if not (0 <= hour <= 23 and 0 <= minute <= 59):
+        return None
+
+    freq = (freq or 'weekly').lower()
+    if freq not in {'daily', 'weekly', 'monthly'}:
+        return None
+
+    # Anchor at today's target time in the local timezone.
+    target_today = now_local.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+    if freq == 'daily':
+        next_run = target_today if now_local < target_today else target_today + _timedelta(days=1)
+
+    elif freq == 'weekly':
+        # 0 = Monday, 6 = Sunday (Python's ``weekday()`` convention).
+        day_val = max(0, min(int(day_val or 0), 6))
+        days_ahead = (day_val - now_local.weekday()) % 7
+        candidate = target_today + _timedelta(days=days_ahead)
+        if candidate <= now_local:
+            candidate += _timedelta(days=7)
+        next_run = candidate
+
+    else:  # monthly
+        day_val = max(1, min(int(day_val or 1), 31))
+        year, month = now_local.year, now_local.month
+
+        def _clamped(year_, month_):
+            """Return the day-of-month for the requested schedule in the
+            given calendar month, clamping to the month's last day so
+            e.g. Feb 31 → Feb 28/29.  All datetimes are offset-aware so
+            they can be compared with ``now_local`` (Python 3.12+
+            requires consistent tz-awareness)."""
+            if month_ == 12:
+                first_next = _datetime(year_ + 1, 1, 1, tzinfo=now_local.tzinfo)
+            else:
+                first_next = _datetime(year_, month_ + 1, 1, tzinfo=now_local.tzinfo)
+            last_day = (first_next - _timedelta(days=1)).day
+            clamped = min(day_val, last_day)
+            return _datetime(year_, month_, clamped, hour, minute, tzinfo=now_local.tzinfo)
+
+        # Try the current month first (with day-of-month clamping).
+        current_month_candidate = _clamped(year, month)
+        if current_month_candidate > now_local:
+            next_run = current_month_candidate
+        else:
+            # Otherwise walk forward to the next month(s).
+            while True:
+                if month == 12:
+                    year += 1
+                    month = 1
+                else:
+                    month += 1
+                candidate = _clamped(year, month)
+                if candidate > now_local:
+                    next_run = candidate
+                    break
+
+    return next_run
+
+
 def _start_auto_backup_worker(app: Flask) -> None:
-    """Background thread that runs automatic backups on a schedule."""
+    """Background thread that runs automatic backups on a schedule.
+
+    The worker is now driven by an explicit next-run computation
+    (refactor 4.4): we look up the next scheduled time, sleep until
+    60 s before it, then poll every 60 s to either run the backup or
+    fall through to the next cycle if a restart / long pause caused us
+    to miss the previous one.
+    """
     if app.config.get('TESTING'):
         return
     if app.debug and os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
@@ -503,65 +597,47 @@ def _start_auto_backup_worker(app: Flask) -> None:
                     day_val = getattr(setting, 'backup_auto_day', 1) or 1
                     include_files = bool(getattr(setting, 'backup_auto_include_files', True))
 
-                    # Determine app timezone
                     tz_name = getattr(setting, 'app_timezone', 'Europe/Prague') or 'Europe/Prague'
                     try:
                         tz = ZoneInfo(tz_name)
                     except (ZoneInfoNotFoundError, KeyError):
                         tz = ZoneInfo('Europe/Prague')
 
-                    # Get current time in app timezone
                     now_utc = _datetime.now(ZoneInfo('UTC'))
                     now_local = now_utc.astimezone(tz)
 
-                    # Parse target time
-                    try:
-                        hour, minute = map(int, time_str.split(':'))
-                    except (ValueError, Exception):
-                        app.logger.warning(f"Auto-backup: invalid time format '{time_str}'")
+                    next_run = _compute_next_auto_backup_run(now_local, freq, time_str, day_val)
+                    if next_run is None:
+                        app.logger.warning(
+                            "Auto-backup: invalid configuration (freq=%r, time=%r, day=%r) — skipping this cycle",
+                            freq, time_str, day_val,
+                        )
                         continue
 
-                    # Check if we are due for a run
-                    should_run = False
+                    # Wait for the next scheduled slot, then run.
+                    seconds_until = (next_run - now_local).total_seconds()
+                    if seconds_until > 60:
+                        # Long way off — sleep for the bulk of the gap and
+                        # re-check next iteration.  We never sleep for more
+                        # than ~15 min so a config change is picked up quickly.
+                        time.sleep(min(seconds_until - 60, 900))
+                        continue
+
+                    # If we already ran in this exact slot, skip.  Compare
+                    # against the local-time floor of the slot so a missed
+                    # weekly run that wakes up 6 h late still re-runs.
                     last_run = getattr(setting, 'backup_auto_last_run_at', None)
-                    last_run_dt = None
-
-                    # Build the target datetime for today in local TZ
-                    target_today = now_local.replace(hour=hour, minute=minute, second=0, microsecond=0)
-                    if now_local < target_today:
-                        # Target time hasn't happened yet today — check yesterday's slot
-                        target_today -= _timedelta(days=1)
-
-                    # Check if the target is within the last 5 minutes and after last_run
-                    # Using a 5-minute window to catch the run
-                    diff_minutes = (now_local - target_today).total_seconds() / 60.0
-                    if 0 <= diff_minutes < 5:
-                        # The target time is right now (within 5 min window)
-                        if freq == 'daily':
-                            # Always run at the daily time
-                            should_run = True
-                        elif freq == 'weekly':
-                            # Monday=0, ..., Sunday=6
-                            target_weekday = target_today.weekday()
-                            if target_weekday == day_val:
-                                should_run = True
-                        elif freq == 'monthly':
-                            # Day of month
-                            if target_today.day == day_val:
-                                should_run = True
-
-                    # Safety: don't run if already ran today
-                    if should_run and last_run is not None:
-                        # Convert last_run (naive UTC) to local time for comparison
+                    last_run_local = None
+                    if last_run is not None:
                         if last_run.tzinfo is None:
                             last_run_local = last_run.replace(tzinfo=ZoneInfo('UTC')).astimezone(tz)
                         else:
                             last_run_local = last_run.astimezone(tz)
-                        # If we already ran in the same calendar day (local), skip
-                        if last_run_local.date() >= now_local.date():
-                            should_run = False
 
-                    if not should_run:
+                    if last_run_local and last_run_local >= next_run:
+                        # Already executed this slot — sleep until the next one.
+                        # Fall through to the top of the loop; we'll re-derive
+                        # the future run from the new ``now_local``.
                         continue
 
                     app.logger.info(
@@ -569,12 +645,9 @@ def _start_auto_backup_worker(app: Flask) -> None:
                         f"day={day_val}, files={include_files}"
                     )
 
-                    from routes.backup import _build_backup_archive_bytes
+                    from routes.backup import _build_backup_archive_bytes, _backup_storage_dir
                     archive_bytes = _build_backup_archive_bytes(app, include_files=include_files)
-                    backup_dir = os.path.join(
-                        os.path.abspath(os.path.dirname(__file__)), 'data', 'backup'
-                    )
-                    os.makedirs(backup_dir, exist_ok=True)
+                    backup_dir = _backup_storage_dir()
 
                     ts = now_utc.strftime('%Y%m%d_%H%M%S')
                     suffix = 'full' if include_files else 'db'

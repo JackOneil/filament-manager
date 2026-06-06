@@ -43,9 +43,16 @@ models.py               # All ORM models (~25 tables): Brand, Color, Material, F
                         #   FilamentUndoLog
 auth.py                 # Multi-user auth, RBAC, session management, invite system
 messages.py             # i18n translations (cs + en), ~700 keys per language
-utils.py                # Shared helpers: get_settings(), utc_now(), translate(), log_movement(),
-                        #   encrypt/decrypt_token(), escape_like(), link preview (SSRF-safe),
-                        #   stock status logic, action center builder
+utils/                   # Shared helpers package (was utils.py in 1.105.x and earlier)
+  __init__.py            # re-exports the most-used helpers for backward compat:
+                        #   utc_now(), translate(), get_settings(), log_movement(),
+                        #   render_markdown(), _toggle_markdown_checkbox(), escape_like(),
+                        #   encrypt/decrypt_token(), stock status logic, action center builder
+  markdown.py            # Standalone Markdown → HTML renderer (Refactor B in 1.106.0).
+                        #   Pre-compiled regexes, escape-first pipeline, only
+                        #   http/https/mailto URL schemes permitted in links.
+                        #   Public API: render_markdown(), toggle_markdown_checkbox(),
+                        #   markdown_extract_checkboxes().
 routes/
   __init__.py           # register_all(app) — calls all register() functions
   inventory.py          # /, /filaments, /filament/<id>, /add, /edit, /use, /delete, bulk operations
@@ -86,7 +93,10 @@ tests/
   test_auth.py          # Auth flows, sessions, RBAC
   test_bambu.py         # Bambu sync, deduction, idempotency
   test_calculator.py    # Calculator, quote creation
+  test_markdown.py      # Markdown renderer: XSS payloads, basic features, checkboxes
   test_projects.py      # Project CRUD, uploads, link previews
+  test_refactors.py     # Backup path safety, auto-backup scheduling, PWA cache name,
+                        #   movement_action_label i18n (added 1.106.0)
   test_settings.py      # Export/import, full backup restore
   test_stats.py         # Statistics route
   test_utils.py         # URL validation, SSRF protection

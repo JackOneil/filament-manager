@@ -1,5 +1,4 @@
 import ipaddress
-import html
 import json
 import math
 import os
@@ -87,6 +86,22 @@ def translate(key):
 
 from time_utils import utc_now, utc_now_aware  # noqa: F811 — re-exported from leaf module to avoid circular imports
 
+# ── Markdown renderer (Refactor B: extracted to utils/markdown.py) ──────
+# Re-exported for backward compatibility — new code should import directly
+# from ``utils.markdown``.
+from utils.markdown import (  # noqa: E402,F401  (re-exports)
+    _render_markdown_inline,
+    _toggle_markdown_checkbox,
+    render_markdown,
+)
+
+# ── Sort-key sentinel for mixed tz-aware/naive datetimes ───────────────
+# Using ``datetime.min`` here would crash on Python 3.12+ when the list
+# contains timezone-aware datetimes (e.g. recent records inserted via
+# ``utc_now_aware()``).  A naive 1970-01-01 epoch works for both.  See
+# 5.1 in the code-review report.
+_SORT_EPOCH = datetime(1970, 1, 1)
+
 
 def get_current_currency():
     setting = get_settings()
@@ -139,182 +154,9 @@ def escape_like(value):
 
 
 def _is_safe_markdown_href(href):
-    href = (href or '').strip()
-    if not href:
-        return False
-    parsed = urlparse(href)
-    return parsed.scheme in {'http', 'https', 'mailto'}
-
-
-def _render_markdown_inline(text):
-    escaped = html.escape(text or '')
-    code_tokens = {}
-
-    def _store_code(match):
-        token = f'@@CODE{len(code_tokens)}@@'
-        code_tokens[token] = f'<code>{match.group(1)}</code>'
-        return token
-
-    escaped = re.sub(r'`([^`\n]+)`', _store_code, escaped)
-
-    def _replace_link(match):
-        label = match.group(1)
-        href = html.unescape(match.group(2)).strip()
-        if not _is_safe_markdown_href(href):
-            return label
-        safe_href = html.escape(href, quote=True)
-        return f'<a href="{safe_href}" target="_blank" rel="noopener noreferrer">{label}</a>'
-
-    escaped = re.sub(r'\[([^\]]+)\]\(([^)\s]+)\)', _replace_link, escaped)
-    escaped = re.sub(r'\*\*([^*\n]+)\*\*', r'<strong>\1</strong>', escaped)
-    escaped = re.sub(r'(?<!\*)\*([^*\n]+)\*(?!\*)', r'<em>\1</em>', escaped)
-
-    for token, value in code_tokens.items():
-        escaped = escaped.replace(token, value)
-    return escaped
-
-
-def _toggle_markdown_checkbox(text, index):
-    """Toggle the checkbox at the given 0-based index in the markdown text."""
-    lines = (text or '').split('\n')
-    count = 0
-    for i, line in enumerate(lines):
-        if re.match(r'^\s*[-*+]\s+\[[ xX]\]\s+', line):
-            if count == index:
-                if re.match(r'^\s*[-*+]\s+\[ \]\s+', line):
-                    lines[i] = re.sub(r'^(\s*[-*+]\s+)\[ \]', r'\1[x]', line)
-                else:
-                    lines[i] = re.sub(r'^(\s*[-*+]\s+)\[[xX]\]', r'\1[ ]', line)
-                return '\n'.join(lines)
-            count += 1
-    return text
-
-
-def render_markdown(text):
-    lines = (text or '').replace('\r\n', '\n').replace('\r', '\n').split('\n')
-    blocks = []
-    paragraph_lines = []
-    quote_lines = []
-    list_type = None
-    list_items = []
-    in_code_block = False
-    code_lines = []
-    checkbox_index = [0]
-
-    def _flush_paragraph():
-        nonlocal paragraph_lines
-        if not paragraph_lines:
-            return
-        content = '<br>'.join(_render_markdown_inline(line) for line in paragraph_lines)
-        blocks.append(f'<p>{content}</p>')
-        paragraph_lines = []
-
-    def _flush_quote():
-        nonlocal quote_lines
-        if not quote_lines:
-            return
-        content = '<br>'.join(_render_markdown_inline(line) for line in quote_lines)
-        blocks.append(f'<blockquote>{content}</blockquote>')
-        quote_lines = []
-
-    def _flush_list():
-        nonlocal list_type, list_items
-        if not list_items:
-            return
-        if list_type == 'task':
-            items = ''.join(list_items)
-            blocks.append(f'<ul class="task-list">{items}</ul>')
-        else:
-            items = ''.join(f'<li>{item}</li>' for item in list_items)
-            blocks.append(f'<{list_type}>{items}</{list_type}>')
-        list_type = None
-        list_items = []
-
-    def _flush_code():
-        nonlocal in_code_block, code_lines
-        code_html = html.escape('\n'.join(code_lines))
-        blocks.append(f'<pre><code>{code_html}</code></pre>')
-        in_code_block = False
-        code_lines = []
-
-    for raw_line in lines:
-        stripped = raw_line.strip()
-
-        if in_code_block:
-            if stripped.startswith('```'):
-                _flush_code()
-            else:
-                code_lines.append(raw_line)
-            continue
-
-        if stripped.startswith('```'):
-            _flush_paragraph()
-            _flush_quote()
-            _flush_list()
-            in_code_block = True
-            code_lines = []
-            continue
-
-        if not stripped:
-            _flush_paragraph()
-            _flush_quote()
-            _flush_list()
-            continue
-
-        heading_match = re.match(r'^(#{1,6})\s+(.*)$', raw_line)
-        if heading_match:
-            _flush_paragraph()
-            _flush_quote()
-            _flush_list()
-            level = len(heading_match.group(1))
-            blocks.append(f'<h{level}>{_render_markdown_inline(heading_match.group(2).strip())}</h{level}>')
-            continue
-
-        quote_match = re.match(r'^>\s?(.*)$', raw_line)
-        if quote_match:
-            _flush_paragraph()
-            _flush_list()
-            quote_lines.append(quote_match.group(1))
-            continue
-
-        task_match = re.match(r'^\s*[-*+]\s+\[([ xX])\]\s+(.*)$', raw_line)
-        if task_match:
-            _flush_paragraph()
-            _flush_quote()
-            if list_type and list_type != 'task':
-                _flush_list()
-            list_type = 'task'
-            checked = task_match.group(1).lower() == 'x'
-            idx = checkbox_index[0]
-            checkbox_index[0] += 1
-            checked_attr = ' checked' if checked else ''
-            item_text = _render_markdown_inline(task_match.group(2))
-            list_items.append(f'<li class="task-list-item"><input type="checkbox" class="task-checkbox" data-index="{idx}"{checked_attr}> {item_text}</li>')
-            continue
-
-        unordered_match = re.match(r'^\s*[-*+]\s+(.*)$', raw_line)
-        ordered_match = re.match(r'^\s*\d+\.\s+(.*)$', raw_line)
-        if unordered_match or ordered_match:
-            _flush_paragraph()
-            _flush_quote()
-            next_list_type = 'ul' if unordered_match else 'ol'
-            if list_type and list_type != next_list_type:
-                _flush_list()
-            list_type = next_list_type
-            list_items.append(_render_markdown_inline((unordered_match or ordered_match).group(1)))
-            continue
-
-        _flush_quote()
-        _flush_list()
-        paragraph_lines.append(raw_line)
-
-    _flush_paragraph()
-    _flush_quote()
-    _flush_list()
-    if in_code_block:
-        _flush_code()
-
-    return ''.join(blocks)
+    """Deprecated re-export. Prefer ``utils.markdown._is_safe_markdown_href``."""
+    from utils.markdown import _is_safe_markdown_href as _impl
+    return _impl(href)
 
 
 def remove_tag(raw_value, tag_to_remove):
@@ -332,15 +174,20 @@ def get_filament_tags(filament):
 
 
 def movement_action_label(action_type):
-    return {
-        'add': 'Add',
-        'remove': 'Use',
-        'bambu_print': 'Bambu print',
-        'bulk_add_weight': 'Bulk add weight',
-        'bulk_delete': 'Bulk delete',
-        'bulk_add_spool': 'Bulk add spool',
-        'bulk_remove_spool': 'Bulk remove spool',
-    }.get(action_type, action_type.replace('_', ' ').title())
+    """Return a human-readable label for a movement-history action type.
+
+    Lookup goes through the i18n dictionary first (rule 25) so labels
+    follow the active language.  Falls back to a title-cased version of
+    the raw action_type when no translation is registered — the fallback
+    is intentionally language-neutral (ASCII-only title-case).
+    """
+    key = f'movement_action_{action_type}' if action_type else ''
+    if key:
+        from utils import translate
+        label = translate(key)
+        if label != key:
+            return label
+    return (action_type or '').replace('_', ' ').title()
 
 
 def compute_stock_status(filament, usage_30=0.0, usage_90=0.0):
@@ -719,7 +566,7 @@ def build_project_metrics(project, setting=None, bambu_powers=None, prusa_powers
     actual_total_cost = actual_material_cost + energy_cost
     latest_quote = None
     if getattr(project, 'quotes', None):
-        latest_quote = max(project.quotes, key=lambda item: item.created_at or datetime.min)
+        latest_quote = max(project.quotes, key=lambda item: item.created_at or _SORT_EPOCH)
 
     quote_price = float(latest_quote.final_price or 0.0) if latest_quote else 0.0
     profit = quote_price - actual_total_cost if latest_quote else None
@@ -900,7 +747,10 @@ def build_action_center(now=None):
             'weight_grams': job.weight_grams,
             'detail_url': '/prusa',
         })
-    recent_prints.sort(key=lambda x: x['timestamp'] or datetime.min, reverse=True)
+    # Use a tz-naive epoch sentinel (see _SORT_EPOCH docstring) to avoid the
+    # Python 3.12+ "can't compare aware and naive" TypeError.  Job timestamps
+    # may be aware (newer records) or naive (legacy rows).
+    recent_prints.sort(key=lambda x: x['timestamp'] or _SORT_EPOCH, reverse=True)
     recent_prints = recent_prints[:6]
 
     result = {

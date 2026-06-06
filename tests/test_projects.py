@@ -235,6 +235,70 @@ class ProjectCollaborationTests(unittest.TestCase):
         self.assertIn('<strong>Bold</strong>', html)
         self.assertIn('href="https://example.com"', html)
 
+    def test_project_detail_renders_well_formed_xdata_for_comment_reactions(self):
+        """Regression: emoji reactions in JSON must not break the x-data attribute.
+
+        Jinja's tojson emits double quotes which used to terminate the
+        double-quoted x-data="…" attribute early, causing
+        "Uncaught SyntaxError: missing ) after argument list" in Alpine.
+        The x-data attribute is now single-quoted so the JSON's " survive.
+        """
+        self.login('owner@example.com')
+
+        # Add a reaction so the rendered reactions dict is non-empty and
+        # contains a JSON object (multiple " characters).
+        react = self.client.post(
+            f'/projects/{self.project_id}/comments/{self.comment_id}/react',
+            data={'emoji': '👍'},
+            follow_redirects=True,
+        )
+        self.assertEqual(react.status_code, 200)
+
+        # Render the project detail page and inspect the x-data attribute.
+        detail = self.client.get(f'/projects/{self.project_id}')
+        self.assertEqual(detail.status_code, 200)
+        html = detail.data.decode('utf-8')
+
+        import re
+        # Find the x-data attribute for the commentReactions component.
+        match = re.search(r"x-data=(['\"])(commentReactions\([^']*?\))\1", html)
+        self.assertIsNotNone(
+            match,
+            msg=(
+                "commentReactions x-data attribute is missing or malformed. "
+                "Likely cause: JSON double-quotes terminated the attribute."
+            ),
+        )
+
+        quote_char = match.group(1)
+        raw_value = match.group(2)
+
+        # Guard: must be single-quoted so the JSON's " characters do not
+        # close the attribute prematurely.
+        self.assertEqual(
+            quote_char, "'",
+            "x-data for commentReactions must be single-quoted to survive tojson output",
+        )
+
+        # Guard: the second argument (the JSON) must be valid JSON and the
+        # outer call must have balanced parentheses.
+        import json
+        prefix, rest = raw_value.split('(', 1)
+        self.assertEqual(prefix, 'commentReactions')
+        # Strip the trailing ')'
+        self.assertTrue(rest.endswith(')'), f"unbalanced parens in x-data: {raw_value!r}")
+        inner_args = rest[:-1]
+        # The first argument is the comment id; the JSON object is the
+        # second argument and starts at the first '{' (no nested objects
+        # beyond what the dict literal contains).
+        first_brace = inner_args.find('{')
+        self.assertGreater(first_brace, -1, f"no JSON object in x-data: {raw_value!r}")
+        json_part = inner_args[first_brace:].strip()
+        parsed = json.loads(json_part)
+        # Must contain our reaction.
+        self.assertIn('👍', parsed)
+        self.assertEqual(parsed['👍']['count'], 1)
+
     def test_only_comment_author_can_edit_comment(self):
         client_admin = self.app.test_client()
         client_admin.post('/login', data={'email': 'admin@example.com', 'password': 'password123'}, follow_redirects=True)

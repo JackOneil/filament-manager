@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.106.1] - 2026-06-06
+### Fixed
+- **Project detail page: Alpine `x-data` attribute for comment reactions was malformed** — `templates/_project_overview.html` rendered `x-data="commentReactions(<id>, {{ comment.reactions | tojson }})"`. Because Jinja's `tojson` emits double quotes, those `"` characters terminated the `x-data="…"` HTML attribute early, producing `Uncaught SyntaxError: missing ) after argument list` and `Uncaught ReferenceError: reactions is not defined` in Alpine on every project page that contained a comment. The attribute is now single-quoted (`x-data='commentReactions(…)'`) so the JSON's `"` survive. Regression test `test_project_detail_renders_well_formed_xdata_for_comment_reactions` added in `tests/test_projects.py`.
+
+## [1.106.0] - 2026-06-06
+### Changed
+- **Markdown renderer extracted to `utils/markdown.py`** (Refactor B) — Pre-compiled regexes at import time, escape-first pipeline, and a public `toggle_markdown_checkbox()` alias.  The renderer is now in its own module so the security-sensitive XSS code is testable in isolation.  All existing `from utils import render_markdown` / `_toggle_markdown_checkbox` calls continue to work via re-exports.
+- **`movement_action_label` now uses i18n** — Replaces the hardcoded English label map with `translate('movement_action_<type>')` lookups; new keys added to both `cs` and `en` in `messages.py`.  Falls back to a neutral title-cased string when no translation is registered.
+- **Auto-backup scheduling rewritten** (4.4) — Replaced the brittle "5-minute polling window" with an explicit `_compute_next_auto_backup_run()` helper.  The worker now sleeps until 60 s before the next scheduled slot, then re-checks every 60 s.  Missed weekly/monthly runs are recovered automatically; 5+ minute GC pauses or restarts no longer cause silent skips.  All candidate datetimes are offset-aware to avoid the Python 3.12+ "can't compare naive and aware" TypeError.
+- **PWA service worker hardened** (5.12) — Cache name is now derived from `APP_VERSION` (`filament-manager-v<MAJOR>-static`).  The `activate` handler purges caches belonging to previous versions.  Static assets under `/static/` and `/manifest.json` are served cache-first; everything else falls through to the browser default.  Response sets `Cache-Control: no-cache` and `Service-Worker-Allowed: /` headers.
+- **Audit log: `_audit_target()` no longer queried twice** (5.3) — The resolved target object is stashed in `g.audit_context['target_object']` so `_audit_finish_request` reuses the in-memory reference instead of re-running the DB lookup.  Audit-write failures are now logged at `ERROR` level (was `WARNING`).
+
+### Fixed
+- **Backup path traversal hardening** (3.7) — `routes/backup.py` now uses a `_backup_storage_dir()` helper that returns the `realpath` of the directory, plus an `_is_path_inside()` containment check.  Download and delete endpoints refuse any path whose `realpath` is not inside the storage directory, with a `WARNING` audit log on attempted traversal.
+- **Backup dead code removed** (5.2) — `backup_list_files` no longer constructs a fake `modified_at` ISO string from `utc_now().replace(year=2020, ...)`.  Replaced with a clean `modified_at_ts` field.
+- **Backup "dual work" fixed** (5.5) — `backup_trigger_now` no longer calls `_build_export_data` twice.  New `_build_backup_archive_from_data()` helper takes the pre-built export dict and only serialises the archive.
+- **`datetime.min` vs timezone-aware sort** (5.1) — `build_action_center` and `build_project_metrics` now use a `datetime(1970, 1, 1)` epoch sentinel (`_SORT_EPOCH`) for `max()` / `sort()` against a list that may contain mixed aware/naive datetimes.  Prevents the Python 3.12+ `TypeError: can't compare aware and naive` crash when sorting `BambuPrintJob.finished_at`.
+
+### Added
+- **`utils/markdown.py`** — Standalone Markdown renderer with `render_markdown()`, `toggle_markdown_checkbox()`, `markdown_extract_checkboxes()` public API.  Pre-compiled regexes, escape-first rendering, only `http`/`https`/`mailto` URL schemes permitted in links.
+- **`tests/test_markdown.py`** — 49 tests covering XSS payloads, basic Markdown features, checkboxes, URL safety, edge cases, and re-export backward-compat.
+- **`tests/test_refactors.py`** — 20 tests covering backup path containment (including symlink escape attempts), `movement_action_label` i18n, auto-backup scheduling math (daily/weekly/monthly + edge cases), and PWA service-worker cache name derivation.
+
 ## [1.105.1] - 2026-06-06
 ### Added
 - **Model-level persistent notes** — A new `model_note` field on the `ProjectFile` model. Unlike version notes (which change per upload), the model note persists across all versions. It appears on model cards (table+card views) as an italic line, in the detail page metadata panel as a blue highlighted card, and in the Edit Metadata modal. Useful for reminders like "print with supports" or "PETG, 0.4mm nozzle".

@@ -555,7 +555,16 @@ def _build_export_data(app, include_files=True):
 def _build_backup_archive_bytes(app, include_files=True):
     """Build backup tar.gz archive bytes from the full export data. Returns bytes."""
     data, _setting = _build_export_data(app, include_files=include_files)
+    return _build_backup_archive_from_data(data, include_files=include_files)
 
+
+def _build_backup_archive_from_data(data, include_files=True):
+    """Serialise a pre-built export *data* dict to a tar.gz archive.
+
+    Extracted from ``_build_backup_archive_bytes`` (refactor 5.5) so callers
+    that already hold the export data — e.g. ``backup_trigger_now`` — can
+    avoid a second full ``_build_export_data`` pass and its DB walk.
+    """
     archive_buffer = io.BytesIO()
     manifest_bytes = json.dumps(data, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
     with tarfile.open(fileobj=archive_buffer, mode='w:gz') as archive:
