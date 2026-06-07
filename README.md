@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.107.4***
+*Current version: **v1.108.0***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -218,12 +218,26 @@ cp -r /opt/git/filament/data /path/to/backup/
 ## 🧪 Running Tests
 
 ```bash
-# Inside the project directory (or from the container)
+# Install test runner (includes pytest-xdist for parallel execution)
 pip install -r requirements.txt
+pip install pytest-xdist
+
+# Run full suite (parallel, auto-detects CPU cores — ~35s on 12 cores)
+python -m pytest tests/ -n auto -v
+
+# Run a single file
+python -m pytest tests/test_bambu.py -v
+
+# Run sequential (slower but easier to debug)
 python -m pytest tests/ -v
 ```
 
-Tests cover: authentication flows, Bambu sync idempotency, stock deduction logic, backup/restore integrity, SSRF protection, calculator, statistics routes, waste record CRUD, printer maintenance CRUD and ICS export, `_clean_title` helper, and thumbnail MIME-type caching (S3 binary/octet-stream fallback).
+Tests cover: authentication flows, Bambu sync idempotency, stock deduction logic, backup/restore integrity, SSRF protection, calculator, statistics routes, waste record CRUD, printer maintenance CRUD and ICS export, `_clean_title` helper, thumbnail MIME-type caching (S3 binary/octet-stream fallback), settings CRUD (dictionaries, Bambu Cloud, company, auto-backup), extended inventory CRUD and bulk ops, project status workflow and templates, undo system, model integrity, security (XSS/SSRF/path traversal), and performance benchmarks.
+
+**Test suite statistics (v1.108.0):**
+- **622 tests** across **31 test files**
+- **~35 seconds** parallel (12 workers) vs **~168 seconds** sequential
+- Covers **13 new test files** with ~440 new tests added
 
 ---
 

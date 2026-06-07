@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.108.0] - 2026-06-07
+### Added
+- **Comprehensive test coverage expansion** — 13 new test files with ~440 new tests across previously untested or under-tested areas:
+  - `test_settings_integration.py` — Settings CRUD for dictionaries (brands/colors/materials), Bambu Cloud integration (connect/disconnect/test), company/billing details, reorder shop URL validation, auto-backup configuration, language/locale settings, onboarding dismiss (25 tests)
+  - `test_inventory_extended.py` — Filament CRUD (add/edit/delete/use), spool management (add/remove), metadata update, reorder snooze toggle, bulk delete with undo, CSV import/export, community database import, UI mode toggle, overview onboarding (30 tests)
+  - `test_calculator_extended.py` — Quote calculation unit tests (material/energy/margin math), project-based multi-material quotes, calculator history management, energy cost computation (14 tests)
+  - `test_projects_extended.py` — Status workflow (advance/set), project clone, share tokens (generate/revoke/public view), project templates (save/delete/create-from), link management, filament planning, comment reactions, print items CRUD/increment/decrement, project detail rendering (25 tests)
+  - `test_stats_extended.py` — HSL sort key unit tests, helper function tests (date_labels, empty_series, safe_divide), project usage rows, stats page rendering with custom days and chart data (15 tests)
+  - `test_utils_extended.py` — Encrypt/decrypt (with and without Fernet key, roundtrip), compute_stock_status (all states), deduct_filament_stock (clamping, quantity update), tag parsing (separators, dedup, format, remove), hex normalization, duration formatting, auto-map filament, validate printer host, Bambu API base, clean title (40 tests)
+  - `test_undo_system.py` — Undo snapshot creation (single/bulk/with references), get pending undo (recent/expired/consumed), consume undo (ownership/expiry/double-consume), purge expired logs, restore from snapshot (recreate/update/bulk) (9 tests)
+  - `test_bambu_extended.py` — Jobs page rendering with filters (status/search/filament/pagination), job delete, map/deduct/remap, create project, auto-map history, refetch thumbnails, multi-material slot deduct (13 tests)
+  - `test_backup_extended.py` — Export (full/db-only), backup storage dir creation, path safety (symlink/prefix), legacy JSON import, tar.gz import, conflict modes (skip/overwrite), retention cleanup by count (14 tests)
+  - `test_models_core.py` — User/Filament/Project creation and relationships, notification creation, user sessions, invites, audit logs, project content (comments/reactions/templates/todos/print items), storage shelves/placements, printer models (Bambu/Prusa with jobs/materials), maintenance records, waste records with files (8 tests)
+  - `test_security.py` — Escape LIKE, URL safety (SSRF: localhost/loopback/private IP/evil schemes), path traversal (project files), session cookie hardening (HttpOnly/SameSite), XSS prevention in filament names, project names, search queries (6 tests)
+  - `test_waste_extended.py` — Waste file upload (valid/invalid extension), file serve/download, file delete, waste index filtering by reason/filament/pagination (6 tests)
+  - `test_performance.py` — Smoke performance benchmarks with 50-filament/20-project dataset, verifying 7 key pages render under time limits (7 tests)
+- **Parallel test execution** — Added `pytest-xdist` and configured `pytest.ini` with `addopts = -n auto`. Test suite now runs with 12 parallel workers (detected CPU cores). Full suite: 622 tests in ~35 seconds (was ~168 seconds sequentially, ~4.8× speedup).
+
+### Changed
+- `pytest.ini` — Added `addopts = -n auto` for parallel execution by default
+- `requirements.txt` — Added `pytest-xdist>=3.6` for parallel test worker support
+
 ## [1.107.4] - 2026-06-07
 ### Added
 - **Smart filament assignment from print-job history** — When a new Bambu job shares the same `model_name` as a previously manually-mapped job, `_auto_map_from_history()` now copies the filament assignments slot-by-slot using colour hex + material name as the matching key. This runs during auto-mapping (after sync / on manual trigger) and takes priority over material+colour heuristic matching, so repeating the same print multiple times requires zero manual remapping.

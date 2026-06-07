@@ -521,7 +521,7 @@ def model_delete_version(file_id):
             return redirect(url_for('models.model_detail', root_id=new_root.id))
         # No children — delete the only version (entire model gone)
     # Non-root or lone root
-    root_file = pf if is_root else ProjectFile.query.get(pf.parent_file_id)
+    root_file = pf if is_root else db.session.get(ProjectFile, pf.parent_file_id)
     _delete_file_on_disk(pf)
     db.session.delete(pf)
     db.session.commit()
@@ -729,7 +729,7 @@ def model_bulk_delete():
     ids = [int(x) for x in raw.split(',') if x.strip().isdigit()]
     deleted = 0
     for root_id in ids:
-        root_file = ProjectFile.query.get(root_id)
+        root_file = db.session.get(ProjectFile, root_id)
         if root_file and root_file.parent_file_id is None:
             _delete_model_chain(root_file)
             deleted += 1
@@ -749,7 +749,7 @@ def model_bulk_move():
         _check_project_access(project_id)
     moved = 0
     for root_id in ids:
-        root_file = ProjectFile.query.get(root_id)
+        root_file = db.session.get(ProjectFile, root_id)
         if root_file and root_file.parent_file_id is None:
             root_file.project_id = project_id
             moved += 1

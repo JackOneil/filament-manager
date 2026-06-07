@@ -1169,7 +1169,7 @@ def restore_filament_from_snapshot(snapshot_data):
     filament_data = snapshot_data['filament']
 
     # Check if filament still exists (might have been recreated)
-    filament = Filament.query.get(filament_data['id'])
+    filament = db.session.get(Filament, filament_data['id'])
 
     if filament:
         # Update existing filament
