@@ -411,7 +411,8 @@
     </script>
     <script src="{{ url_for('static', filename='js/app-shell.js') }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
     {% if current_user %}
-    <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>[
+    {# Command palette static items — sorted by priority (most-used first) #}
+    <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %} x-ref="commandItems">[
         {% set comma = joiner(',') %}
         {% if auth_has_section_access('overview') or auth_is_admin(current_user) %}
         {{ comma() }}{{ {'label': t('overview'), 'note': t('nav_inventory_overview_note'), 'href': url_for('index'), 'icon': 'fa-house', 'section': t('inventory_nav')}|tojson }}
@@ -419,19 +420,8 @@
         {% if auth_has_section_access('filaments') or auth_is_admin(current_user) %}
         {{ comma() }}{{ {'label': t('filaments_nav'), 'note': t('nav_filaments_note'), 'href': url_for('filaments_index'), 'icon': 'fa-layer-group', 'section': t('inventory_nav')}|tojson }}
         {% endif %}
-        {% if auth_has_section_access('storage') or auth_is_admin(current_user) %}
-        {{ comma() }}{{ {'label': t('storage_nav'), 'note': t('nav_storage_note'), 'href': url_for('storage'), 'icon': 'fa-warehouse', 'section': t('inventory_nav')}|tojson }}
-        {% endif %}
-        {% if auth_has_section_access('history') or auth_is_admin(current_user) %}
-        {{ comma() }}{{ {'label': t('movement_history'), 'note': t('nav_history_note'), 'href': url_for('history'), 'icon': 'fa-clock-rotate-left', 'section': t('inventory_nav')}|tojson }}
-        {% endif %}
         {% if auth_has_section_access('projects') or auth_is_admin(current_user) %}
         {{ comma() }}{{ {'label': t('projects'), 'note': t('nav_projects_note'), 'href': url_for('projects_index'), 'icon': 'fa-diagram-project', 'section': t('projects')}|tojson }}
-        {{ comma() }}{{ {'label': t('project_create'), 'note': t('nav_project_create_note'), 'href': url_for('project_create'), 'icon': 'fa-plus', 'section': t('projects')}|tojson }}
-        {{ comma() }}{{ {'label': t('models_nav'), 'note': t('models_desc'), 'href': url_for('models.models_index'), 'icon': 'fa-cube', 'section': t('projects')}|tojson }}
-        {% endif %}
-        {% if auth_has_section_access('calculator') or auth_is_admin(current_user) %}
-        {{ comma() }}{{ {'label': t('calculator'), 'note': t('nav_calculator_note'), 'href': url_for('calculator'), 'icon': 'fa-calculator', 'section': t('projects')}|tojson }}
         {% endif %}
         {% if nav_bambu_enabled %}
         {{ comma() }}{{ {'label': t('bambu_jobs'), 'note': t('nav_bambu_note'), 'href': url_for('bambu_jobs'), 'icon': 'fa-print', 'section': t('printers_nav')}|tojson }}
@@ -439,8 +429,27 @@
         {% if nav_prusa_enabled %}
         {{ comma() }}{{ {'label': t('prusa_jobs'), 'note': t('nav_prusa_note'), 'href': url_for('prusa_jobs'), 'icon': 'fa-cube', 'section': t('printers_nav')}|tojson }}
         {% endif %}
+        {% if auth_has_section_access('calculator') or auth_is_admin(current_user) %}
+        {{ comma() }}{{ {'label': t('calculator'), 'note': t('nav_calculator_note'), 'href': url_for('calculator'), 'icon': 'fa-calculator', 'section': t('projects')}|tojson }}
+        {% endif %}
         {% if auth_has_section_access('stats') or auth_is_admin(current_user) %}
         {{ comma() }}{{ {'label': t('stats_nav'), 'note': t('nav_stats_note'), 'href': url_for('stats'), 'icon': 'fa-chart-column', 'section': t('nav_admin_tools')}|tojson }}
+        {% endif %}
+        {% if auth_has_section_access('storage') or auth_is_admin(current_user) %}
+        {{ comma() }}{{ {'label': t('storage_nav'), 'note': t('nav_storage_note'), 'href': url_for('storage'), 'icon': 'fa-warehouse', 'section': t('inventory_nav')}|tojson }}
+        {% endif %}
+        {% if auth_has_section_access('projects') or auth_is_admin(current_user) %}
+        {{ comma() }}{{ {'label': t('models_nav'), 'note': t('models_desc'), 'href': url_for('models.models_index'), 'icon': 'fa-cube', 'section': t('inventory_nav')}|tojson }}
+        {% endif %}
+        {% if auth_has_section_access('history') or auth_is_admin(current_user) %}
+        {{ comma() }}{{ {'label': t('movement_history'), 'note': t('nav_history_note'), 'href': url_for('history'), 'icon': 'fa-clock-rotate-left', 'section': t('inventory_nav')}|tojson }}
+        {% endif %}
+        {% if auth_is_admin(current_user) %}
+        {{ comma() }}{{ {'label': t('maintenance_title'), 'note': t('nav_maintenance_note'), 'href': url_for('maintenance_index'), 'icon': 'fa-screwdriver-wrench', 'section': t('printers_nav')}|tojson }}
+        {{ comma() }}{{ {'label': t('waste_title'), 'note': t('nav_waste_note'), 'href': url_for('waste_index'), 'icon': 'fa-triangle-exclamation', 'section': t('printers_nav')}|tojson }}
+        {% endif %}
+        {% if auth_has_section_access('projects') or auth_is_admin(current_user) %}
+        {{ comma() }}{{ {'label': t('project_create'), 'note': t('nav_project_create_note'), 'href': url_for('project_create'), 'icon': 'fa-plus', 'section': t('projects')}|tojson }}
         {% endif %}
         {% if auth_has_section_access('settings') or auth_is_admin(current_user) %}
         {{ comma() }}{{ {'label': t('settings'), 'note': t('nav_settings_note'), 'href': url_for('settings'), 'icon': 'fa-cog', 'section': t('nav_admin_tools')}|tojson }}

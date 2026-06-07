@@ -1037,7 +1037,7 @@
                 : (current === expectedPath || current.startsWith(expectedPath + '/'));
             if (!onPage) {
                 var sep = expectedPath.indexOf('?') >= 0 ? '&' : '?';
-                window.location.href = expectedPath + sep + 'first_login=' + (i + 1);
+                window.location.href = expectedPath + sep + 'first_login=' + i;
                 return;
             }
             // Show the per-section tour. We instantiate a fresh engine so

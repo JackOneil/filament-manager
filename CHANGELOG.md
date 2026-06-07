@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.112.1] - 2026-06-07
+### Fixed
+- **Tour wizard**: Fixed off-by-one error in `startFirstLoginTour()` redirect — the `first_login` URL parameter was set to `i+1` (next step index) instead of `i` (current step index), causing the wizard to redirect through all pages without ever showing the tour overlay (static/js/tour.js)
+- **BUG-422**: Command palette (Ctrl+K) showed empty state because `<script>` tag was missing `x-ref="commandItems"` attribute — broke static item loading (templates/base.html)
+
+## [1.112.0] - 2026-06-07
+### Changed
+- Command palette (Ctrl+K): reordered navigation items by priority — Overview, Filaments, Projects, Bambu, Prusa, Calculator, Stats, Storage, Models, History at the top (templates/base.html)
+- Command palette: added missing Maintenance and Waste entries (admin-only), with new i18n keys `nav_maintenance_note` and `nav_waste_note` (templates/base.html, messages.py)
+
 ## [1.111.0] - 2026-06-07
 ### Fixed
 - **BUG-400**: Fixed column order mismatch in `_migrate_nullable_project_id()` — `model_note` and `uploaded_by_user_id` were swapped in CREATE TABLE, causing silent data corruption on legacy upgrade (migrations.py)
