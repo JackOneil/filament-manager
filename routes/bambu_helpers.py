@@ -11,7 +11,7 @@ import re
 import logging
 import os
 import mimetypes
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import requests
 from flask import current_app, render_template, request, redirect, url_for, jsonify, Blueprint, send_file, abort
@@ -394,14 +394,25 @@ def _job_display_state(job: BambuPrintJob) -> dict:
 def do_sync(token: str, region: str) -> dict:
     """Idempotent fetch-and-store of Bambu Cloud print tasks.
 
+    Fetches the latest 100 tasks from the Bambu Cloud API, then reconciles
+    any job still marked RUNNING that was NOT returned by the API (i.e. has
+    been evicted from the API response) to FINISH.
+
+    Additionally, an ``endTime``-based override handles the case where Bambu
+    Cloud's status field lags behind reality: if the API provides ``endTime``
+    but the resolved status is still ``RUNNING``, the job is promoted to
+    ``FINISH`` immediately.
+
     Returns a dict::
 
-        {'added': int, 'updated': int, 'skipped': int, 'error': str|None}
+        {'added': int, 'updated': int, 'skipped': int, 'orphans_reconciled': int, 'error': str|None}
 
     Only the official *.bambulab.com / *.bambulab.cn domain is ever called.
     """
     added = updated = skipped = 0
+    orphans_reconciled = 0
     new_job_ids: list = []  # IDs of newly inserted jobs (for auto-mapping)
+    all_ext_ids: set = set()
 
     base = bambu_api_base(region)
     url = f'{base}/v1/user-service/my/tasks'
@@ -416,9 +427,15 @@ def do_sync(token: str, region: str) -> dict:
         data = resp.json()
     except Exception as exc:
         _LOG.exception('Bambu sync API fetch error: %s', exc)
-        return {'added': 0, 'updated': 0, 'skipped': 0, 'error': str(exc)}
+        return {'added': 0, 'updated': 0, 'skipped': 0, 'orphans_reconciled': 0, 'error': str(exc)}
 
     hits = data.get('hits') or data.get('tasks') or []
+    hits_count = len(hits)
+    if not hits:
+        _LOG.error('Bambu sync: API returned 0 tasks (response keys: %s)', list(data.keys()))
+    else:
+        _LOG.info('Bambu sync: API returned %d tasks, first status=%s, keys=%s',
+                   hits_count, hits[0].get('status', 'N/A'), list(hits[0].keys())[:15])
 
     # Track device_ids registered in this batch to avoid duplicate INSERTs
     # before the session is committed (query won't see uncommitted rows).
@@ -441,6 +458,7 @@ def do_sync(token: str, region: str) -> dict:
         if not ext_id:
             skipped += 1
             continue
+        all_ext_ids.add(ext_id)
 
         cover_url = _cover_url_from_payload(task)
         if cover_url and not _find_cached_thumb_path(ext_id):
@@ -449,12 +467,39 @@ def do_sync(token: str, region: str) -> dict:
         task_payload = json.dumps(task, ensure_ascii=False)
         status = _resolve_status(task.get('status', 0))
 
+        # ── endTime override ─────────────────────────────────────
+        # Bambu Cloud sometimes lags in updating the status field:
+        # a completed job may still report status=1 (RUNNING) even
+        # though endTime is already set.  If endTime exists and the
+        # resolved status is still RUNNING, promote to FINISH so the
+        # UI shows the correct state.
+        end_time_ts = task.get('endTime')
+        if end_time_ts and status == 'RUNNING':
+            status = 'FINISH'
+            _LOG.debug('Bambu sync: override RUNNING→FINISH for task %s (endTime=%s)', ext_id, end_time_ts)
+
+        # ── costTime heuristic ────────────────────────────────────
+        # If the API doesn't provide endTime yet but the print
+        # duration (costTime) + startTime is in the past, the print
+        # must have completed.  Apply a 1-hour safety margin.
+        # Covers both RUNNING and PAUSED — Bambu Cloud sometimes
+        # reports status=4 (PAUSED) during active printing and only
+        # updates to FINISH (2) after the job fully completes.
+        if status in ('RUNNING', 'PAUSED'):
+            ct = task.get('costTime')
+            st = task.get('startTime') or task.get('createTime')
+            if ct and st:
+                started = _parse_ts(st)
+                if started and utc_now() > started + timedelta(seconds=int(ct) + 3600):
+                    status = 'FINISH'
+                    _LOG.debug('Bambu sync: costTime heuristic %s→FINISH for task %s', status, ext_id)
+
         existing = existing_by_ext_id.get(ext_id)
         if existing:
             changed = False
+            # Always sync raw_payload (Bambu may add metadata timestamps).
             if existing.raw_payload != task_payload:
                 existing.raw_payload = task_payload
-                changed = True
             if existing.status != status:
                 existing.status = status
                 changed = True
@@ -473,12 +518,12 @@ def do_sync(token: str, region: str) -> dict:
             if changed:
                 updated += 1
             else:
+                # raw_payload-only changes are counted as "skipped" — the
+                # job was processed but no status or meaningful field changed.
                 skipped += 1
             continue
 
         # ── Correct field names from actual Bambu Cloud API ─────────────────
-        # Primary device identifier: deviceId is the real serial number.
-        # instanceId is often 0 (falsy) or an unrelated numeric ID — ignore it.
         device_id = task.get('deviceId') or task.get('instanceId') or None
         if device_id == 0:
             device_id = None
@@ -492,14 +537,12 @@ def do_sync(token: str, region: str) -> dict:
             or task.get('printerModel')
             or (task.get('printer') or {}).get('model')
         )
-        # Model name: prefer designTitle (human-readable design name), fall
-        # back to title cleaned of STL plate indices.
         raw_design = (task.get('designTitle') or '').strip()
         raw_title = (task.get('title') or '').strip()
         model_name = raw_design or clean_bambu_title(raw_title) or None
-        cost_time = task.get('costTime')  # seconds
+        cost_time = task.get('costTime')
 
-        # ── Gather material slots (Bambu uses amsDetailMappings or amsDetail)
+        # ── Gather material slots
         ams_list = (
             task.get('amsDetailMappings')
             or task.get('amsDetailMapping')
@@ -521,7 +564,7 @@ def do_sync(token: str, region: str) -> dict:
             finished_at=_parse_ts(task.get('endTime')),
             weight_grams=total_weight if total_weight > 0 else None,
             cost_time=int(cost_time) if cost_time else None,
-                raw_payload=task_payload,
+            raw_payload=task_payload,
         )
         db.session.add(job)
         db.session.flush()  # populate job.id
@@ -534,16 +577,12 @@ def do_sync(token: str, region: str) -> dict:
                 ams_id=m.get('amsId') if m.get('amsId') is not None else m.get('ams'),
                 tray_id=m.get('trayId') if m.get('trayId') is not None else m.get('slotId'),
                 color_hex=(
-                    m.get('color')
-                    or m.get('colorHex')
-                    or m.get('targetColor')
-                    or m.get('sourceColor')
+                    m.get('color') or m.get('colorHex')
+                    or m.get('targetColor') or m.get('sourceColor')
                 ),
                 material_name=(
-                    m.get('materialName')
-                    or m.get('material')
-                    or m.get('filamentType')
-                    or m.get('targetFilamentType')
+                    m.get('materialName') or m.get('material')
+                    or m.get('filamentType') or m.get('targetFilamentType')
                 ),
                 weight_grams=slot_w if slot_w > 0 else None,
             ))
@@ -564,7 +603,29 @@ def do_sync(token: str, region: str) -> dict:
     except Exception as exc:
         db.session.rollback()
         _LOG.exception('Bambu sync commit error: %s', exc)
-        return {'added': 0, 'updated': 0, 'skipped': skipped, 'error': str(exc)}
+        return {'added': 0, 'updated': 0, 'skipped': skipped, 'orphans_reconciled': 0, 'error': str(exc)}
+
+    # ── Orphan reconciliation ──────────────────────────────────────────────
+    # Any job still marked RUNNING whose external_id was NOT seen in the API
+    # response is reconciled to FINISH.  When the API returns zero tasks
+    # (e.g. temporary outage), ALL RUNNING jobs are treated as orphans rather
+    # than leaving them stuck forever.
+    try:
+        orphans_query = BambuPrintJob.query.filter(BambuPrintJob.status == 'RUNNING')
+        if all_ext_ids:
+            orphans_query = orphans_query.filter(~BambuPrintJob.external_id.in_(all_ext_ids))
+        orphans = orphans_query.all()
+        for orphan in orphans:
+            orphan.status = 'FINISH'
+            if not orphan.finished_at:
+                orphan.finished_at = utc_now()
+        if orphans:
+            db.session.commit()
+            orphans_reconciled = len(orphans)
+            _LOG.info('Bambu sync: auto-reconciled %d orphan RUNNING job(s) to FINISH', orphans_reconciled)
+    except Exception as exc:
+        db.session.rollback()
+        _LOG.warning('Bambu sync orphan reconciliation failed: %s', exc)
 
     # ── Auto-mapping (runs after commit so job IDs are stable) ───────────────
     setting = get_settings()
@@ -573,7 +634,7 @@ def do_sync(token: str, region: str) -> dict:
         if auto_mapped:
             _LOG.info('Auto-mapped %d filament slot(s) across %d new Bambu job(s)', auto_mapped, len(new_job_ids))
 
-    return {'added': added, 'updated': updated, 'skipped': skipped, 'error': None}
+    return {'added': added, 'updated': updated, 'skipped': skipped, 'hits': hits_count, 'orphans_reconciled': orphans_reconciled, 'error': None}
 
 
 def _auto_map_from_history(job) -> int:

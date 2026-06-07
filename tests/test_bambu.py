@@ -163,17 +163,36 @@ class DoSyncTests(unittest.TestCase):
     @patch('routes.bambu.requests.get')
     def test_updates_status_for_existing_job(self, mock_get):
         """A job that changes from RUNNING to FINISH must be updated, not duplicated."""
-        mock_get.return_value = _api_response([_make_task(3001, status=1)])  # RUNNING
+        from utils import utc_now
+        now_iso = utc_now().strftime('%Y-%m-%dT%H:%M:%S')
+        # First sync: job without endTime, with very recent startTime so
+        # costTime heuristic (started + cost + 1h) does NOT trigger yet.
+        task1 = _make_task(3001, status=1)
+        task1['startTime'] = now_iso
+        task1['endTime'] = None
+        mock_get.return_value = _api_response([task1])
         do_sync('token', 'global')
 
-        mock_get.return_value = _api_response([_make_task(3001, status=2)])  # FINISH
+        # Second sync: job with endTime + status=2 (completed)
+        mock_get.return_value = _api_response([_make_task(3001, status=2)])
         r2 = do_sync('token', 'global')
 
         self.assertEqual(r2['updated'], 1)
         self.assertEqual(r2['added'], 0)
+        self.assertEqual(r2['skipped'], 0)
         job = BambuPrintJob.query.filter_by(external_id='3001').first()
         self.assertEqual(job.status, 'FINISH')
         self.assertEqual(BambuPrintJob.query.count(), 1)
+
+    @patch('routes.bambu.requests.get')
+    def test_endtime_override_marks_running_as_finish(self, mock_get):
+        """A job with status=1 (RUNNING) but endTime set should be stored as FINISH."""
+        mock_get.return_value = _api_response([_make_task(3100, status=1)])
+        r = do_sync('token', 'global')
+        job = BambuPrintJob.query.filter_by(external_id='3100').first()
+        self.assertIsNotNone(job)
+        self.assertEqual(job.status, 'FINISH')
+        self.assertEqual(r['added'], 1)
 
     @patch('routes.bambu_helpers._cache_cover_image', return_value='/tmp/thumb.png')
     @patch('routes.bambu_helpers._find_cached_thumb_path', return_value=None)
