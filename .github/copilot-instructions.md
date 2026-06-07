@@ -1,6 +1,9 @@
 # Filament Manager — AI & Developer Instructions
 
-> Single source of truth for architecture, conventions, data flow, and development rules.
+> Architecture, conventions, data flow, and development rules.
+> **Canonical source:** `.kilo/ARCHITECTURE.md` — always kept in sync with this file.
+> **Backlog & feature tracking:** `.kilo/BACKLOG.md`
+> **Changelog archive:** `CHANGELOG-ARCHIVE.md` (versions v1.100.0 and older)
 > Always keep this context in mind when working on the project.
 
 ---
@@ -486,13 +489,15 @@ This is already applied to `projects_index.html` and overrides any stale localSt
 
 ### Rule 29 — Architecture Documentation Updates
 - **After implementing new features, refactoring, or structural changes, always update architecture documentation:**
-  - `.github/copilot-instructions.md` — update file structure, data flow diagrams, key dependencies, or rules if they changed
+  - `.kilo/ARCHITECTURE.md` — canonical source of truth; update file structure, data flow, key dependencies, or rules if they changed
+  - `.github/copilot-instructions.md` — keep in sync with ARCHITECTURE.md
   - `README.md` — update key features, project structure, roadmap
   - `.kilo/agent/filament-agent.md` — ensure Project Context section reflects current state
+  - `.github/agents/filament-release.agent.md` — ensure delivery workflow reflects current state
 - **When refactoring:**
   - Document extracted/merged/removed functions in the changelog
   - Note consolidated duplicates or new patterns (base classes, interfaces)
-  - Update relevant sections in this file
+  - Update relevant sections in `.kilo/ARCHITECTURE.md` and this file
 - **Keep all architecture docs in sync with the codebase.** Outdated docs cause confusion and technical debt.
 
 ---
@@ -518,6 +523,7 @@ After every set of feature additions or structural fixes, **always** complete AL
 15. ✅ If any dashboard page (Overview, Projects, Stats) modified → verify compliance with rule 22
 16. ✅ Keep this instruction file up to date with any new rules or patterns
 17. ✅ **ARCHITECTURE UPDATE** — After implementing new features, refactoring, or structural changes, update all architecture-related documents:
+    - `.kilo/ARCHITECTURE.md` — canonical source of truth
     - `.github/copilot-instructions.md` — update file structure, data flow diagrams, key dependencies, rules if changed
     - `README.md` — update key features, project structure, roadmap
     - `.kilo/agent/filament-agent.md` — ensure Project Context section reflects current state

@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.108.0***
+*Current version: **v1.108.1***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -290,5 +290,8 @@ Private project — see repository settings for access and licensing information
 
 ## 📚 Further Reading
 
+- [`.kilo/ARCHITECTURE.md`](.kilo/ARCHITECTURE.md) — Canonical architecture documentation (single source of truth for all rules and conventions)
 - [`.github/copilot-instructions.md`](.github/copilot-instructions.md) — Technical manual for AI assistants and developers
-- [`CHANGELOG.md`](CHANGELOG.md) — Detailed version history (Keep a Changelog format)
+- [`.kilo/BACKLOG.md`](.kilo/BACKLOG.md) — Implementation backlog with features, bugs, and technical debt
+- [`CHANGELOG.md`](CHANGELOG.md) — Recent version history (Keep a Changelog format)
+- [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) — Archived changelog entries (v1.100.0 and older)
