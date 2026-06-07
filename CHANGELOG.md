@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.107.4] - 2026-06-07
+### Added
+- **Smart filament assignment from print-job history** — When a new Bambu job shares the same `model_name` as a previously manually-mapped job, `_auto_map_from_history()` now copies the filament assignments slot-by-slot using colour hex + material name as the matching key. This runs during auto-mapping (after sync / on manual trigger) and takes priority over material+colour heuristic matching, so repeating the same print multiple times requires zero manual remapping.
+
+### Fixed
+- **Project detail Print Jobs tab: filament colour dot always white** — The `_project_jobs.html` template used `item.filament_color_hex` but `_build_project_job_feed()` never populated that key (only `filament_colors` list). For Bambu jobs the primary colour is now derived from the first slot's hex or the mapped filament's colour; for Prusa jobs from the mapped filament's colour.
+
 ## [1.107.3] - 2026-06-07
 ### Fixed
 - **All `fetch()` POST calls broken after v1.107.1 (CSRF rejection)** — v1.107.1 removed the `window.fetch` auto-injection patch from `app-shell.js` because it used `Object.assign({}, opts.headers, …)` which stripped methods from native `Headers` instances. However, eleven inline `fetch()` POST calls across `bambu.html`, `prusa.html`, `project_detail.html`, and `settings.html` relied on that patch for their `X-CSRFToken` header — none of them sent CSRF tokens themselves. The patch has been restored using **`new Headers(opts.headers)`** instead of `Object.assign`, so `Headers`-instance methods (`.get()`, `.set()`, iteration) are preserved while every non-GET `fetch()` call still receives the CSRF token automatically. User-visible symptom: "Chyba synchronizace: Unexpected token '<', … is not valid JSON" when triggering Bambu/Prusa sync.

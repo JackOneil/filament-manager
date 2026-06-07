@@ -576,11 +576,79 @@ def do_sync(token: str, region: str) -> dict:
     return {'added': added, 'updated': updated, 'skipped': skipped, 'error': None}
 
 
+def _auto_map_from_history(job) -> int:
+    """Try to assign filaments from a previously-mapped job with the same model_name.
+
+    When a Bambu job shares the same ``model_name`` as an earlier job that was
+    already manually mapped, copy the filament assignments slot-by-slot using
+    colour hex + material name as the matching key.
+
+    Returns the number of slots mapped from history (0 when no historic match
+    exists or the job has no ``model_name``).
+    """
+    if not job.model_name:
+        return 0
+
+    materials = list(job.materials)
+    unmapped = [m for m in materials if m.filament_id is None]
+    if not unmapped:
+        return 0
+
+    # Find the most recently-synced job with the same model_name that has AT
+    # LEAST one mapped slot.
+    historic_job = (
+        BambuPrintJob.query
+        .filter(
+            BambuPrintJob.model_name == job.model_name,
+            BambuPrintJob.id != job.id,
+            BambuPrintJob.materials.any(BambuJobMaterial.filament_id.is_not(None)),
+        )
+        .order_by(BambuPrintJob.synced_at.desc())
+        .first()
+    )
+    if not historic_job:
+        return 0
+
+    # Build a lookup: (norm_color_hex, norm_material) → filament_id
+    historic_slots = {}
+    for hm in historic_job.materials:
+        if hm.filament_id is None:
+            continue
+        key = (
+            normalize_hex(hm.color_hex) or '',
+            (hm.material_name or '').strip().upper(),
+        )
+        historic_slots[key] = hm.filament_id
+
+    if not historic_slots:
+        return 0
+
+    mapped_count = 0
+    for mat in unmapped:
+        key = (
+            normalize_hex(mat.color_hex) or '',
+            (mat.material_name or '').strip().upper(),
+        )
+        if key in historic_slots and historic_slots[key] is not None:
+            mat.filament_id = historic_slots[key]
+            mapped_count += 1
+
+    if mapped_count and len(materials) == 1:
+        # Sync top-level filament_id for single-slot jobs
+        if materials[0].filament_id is not None:
+            job.filament_id = materials[0].filament_id
+
+    return mapped_count
+
+
 def _auto_map_new_jobs(job_ids: list) -> int:
     """Run auto-mapping on the given job IDs.
 
-    For each unmapped material slot on those jobs, calls ``try_auto_map_filament``
-    and assigns the filament when there is exactly one candidate.
+    Mapping strategy (ordered by priority):
+    1. **History-based**: re-use assignments from a previously-mapped job with
+       the same ``model_name`` (colour + material slot matching).
+    2. **Material+colour matching**: calls ``try_auto_map_filament`` and
+       assigns the filament when there is exactly one candidate.
 
     Returns the number of slots that were automatically mapped.
     """
@@ -591,6 +659,12 @@ def _auto_map_new_jobs(job_ids: list) -> int:
     jobs = BambuPrintJob.query.filter(BambuPrintJob.id.in_(job_ids)).all()
 
     for job in jobs:
+        # ── Step 1: History-based mapping ─────────────────────────────────
+        history_mapped = _auto_map_from_history(job)
+        if history_mapped:
+            mapped_count += history_mapped
+
+        # ── Step 2: Material + colour matching for remaining unmapped slots ─
         materials = list(job.materials)
         is_mm = len(materials) > 1
 

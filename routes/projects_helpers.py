@@ -34,7 +34,7 @@ from models import (
     PrusaPrinter,
     User,
 )
-from utils import build_project_metrics, clean_bambu_title, escape_like, format_tags, parse_tags, render_markdown, translate, utc_now, _toggle_markdown_checkbox
+from utils import build_project_metrics, clean_bambu_title, escape_like, format_tags, normalize_hex, parse_tags, render_markdown, translate, utc_now, _toggle_markdown_checkbox
 
 
 ALLOWED_PROJECT_FILE_EXTENSIONS = {
@@ -112,7 +112,7 @@ def _job_slots(job, source, weight_grams_total):
     if source == 'bambu':
         for slot in getattr(job, 'materials', []) or []:
             fil = slot.filament
-            color = slot.color_hex or (fil.color.hex_value if fil and fil.color else None)
+            color = normalize_hex(slot.color_hex) or (fil.color.hex_value if fil and fil.color else None)
             slots.append({
                 'color_hex': color,
                 'material_name': slot.material_name or (fil.material.name if fil and fil.material else None),
@@ -137,14 +137,15 @@ def _job_slots(job, source, weight_grams_total):
 
 def _job_colors(job, source):
     """Return a deduplicated list of color hex strings for a job.
-    For Bambu: prefer per-slot color_hex (available even without filament mapping).
+    For Bambu: prefer per-slot color_hex (available even without filament mapping),
+    normalised to #RRGGBB for valid CSS rendering.
     For Prusa: use the mapped filament's color.
     Falls back to the mapped filament color on the job itself."""
     colors = []
     seen = set()
     if source == 'bambu':
         for slot in getattr(job, 'materials', []) or []:
-            c = slot.color_hex
+            c = normalize_hex(slot.color_hex)
             if not c:
                 # fallback: mapped filament color for this slot
                 c = slot.filament.color.hex_value if slot.filament and slot.filament.color else None
@@ -164,6 +165,17 @@ def _build_project_job_feed(project, setting, show_bambu_jobs, show_prusa_jobs, 
     if show_bambu_jobs:
         for job in getattr(project, 'bambu_jobs', []) or []:
             weight_grams, material_cost, energy_cost = _job_cost_parts(job, setting, bambu_powers, prusa_powers)
+            filament_colors = _job_colors(job, 'bambu')
+            # Derive the single primary colour hex for the compact row dot.
+            # For single-slot jobs use the mapped filament colour; for
+            # multi-material jobs use the first slot colour so the dot is at
+            # least representative.
+            if filament_colors:
+                filament_color_hex = filament_colors[0]
+            elif job.filament and job.filament.color:
+                filament_color_hex = job.filament.color.hex_value
+            else:
+                filament_color_hex = None
             items.append({
                 'source': 'bambu',
                 'title': job.model_name or job.external_id or f'Job #{job.id}',
@@ -176,7 +188,8 @@ def _build_project_job_feed(project, setting, show_bambu_jobs, show_prusa_jobs, 
                 'energy_cost': energy_cost,
                 'total_cost': round(material_cost + energy_cost, 2),
                 'filament_name': job.filament.name if job.filament else None,
-                'filament_colors': _job_colors(job, 'bambu'),
+                'filament_color_hex': filament_color_hex,
+                'filament_colors': filament_colors,
                 'slots': _job_slots(job, 'bambu', weight_grams),
                 'material_slots': len([slot for slot in getattr(job, 'materials', []) or [] if slot.weight_grams]),
                 'deducted': bool(job.deducted),
@@ -203,6 +216,7 @@ def _build_project_job_feed(project, setting, show_bambu_jobs, show_prusa_jobs, 
                 'energy_cost': energy_cost,
                 'total_cost': round(material_cost + energy_cost, 2),
                 'filament_name': job.filament.name if job.filament else None,
+                'filament_color_hex': job.filament.color.hex_value if job.filament and job.filament.color else None,
                 'filament_colors': _job_colors(job, 'prusa'),
                 'slots': _job_slots(job, 'prusa', weight_grams),
                 'material_slots': 0,

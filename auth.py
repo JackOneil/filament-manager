@@ -148,6 +148,7 @@ SECTION_BY_ENDPOINT = {
     'bambu_job_remap_slot': SECTION_PRINTERS,
     'bambu_job_delete': SECTION_PRINTERS,
     'bambu_create_project': SECTION_PRINTERS,
+    'bambu_auto_map_history': SECTION_PRINTERS,
     'bambu_job_thumbnail': SECTION_PRINTERS,
     'prusa_jobs': SECTION_PRINTERS,
     'prusa_printer_sync': SECTION_PRINTERS,

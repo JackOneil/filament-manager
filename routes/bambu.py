@@ -44,6 +44,7 @@ from routes.bambu_helpers import (
     _job_display_state,
     do_sync,
     _auto_map_new_jobs,
+    _auto_map_from_history,
     _refetch_missing_thumbnails,
 )
 
@@ -59,6 +60,10 @@ def register(app):
         page = request.args.get('page', 1, type=int)
         job_filter = request.args.get('filter', '')
         filament_id = request.args.get('filament_id', type=int)
+        project_id = request.args.get('project_id', type=int)
+        search = request.args.get('search', '').strip()
+        date_from = request.args.get('date_from', '').strip()
+        date_to = request.args.get('date_to', '').strip()
         per_page = 20
 
         hide_failed = request.args.get('hide_failed', '') == '1'
@@ -69,6 +74,24 @@ def register(app):
                 BambuPrintJob.filament_id == filament_id,
                 BambuPrintJob.materials.any(BambuJobMaterial.filament_id == filament_id),
             ))
+        if project_id:
+            base_q = base_q.filter(BambuPrintJob.project_id == project_id)
+        if search:
+            base_q = base_q.filter(BambuPrintJob.model_name.ilike(f'%{search}%'))
+        if date_from:
+            try:
+                df = datetime.strptime(date_from, '%Y-%m-%d')
+                base_q = base_q.filter(BambuPrintJob.started_at >= df)
+            except (ValueError, OverflowError):
+                pass
+        if date_to:
+            try:
+                dt = datetime.strptime(date_to, '%Y-%m-%d')
+                # Include the entire end day
+                dt_end = dt.replace(hour=23, minute=59, second=59)
+                base_q = base_q.filter(BambuPrintJob.started_at <= dt_end)
+            except (ValueError, OverflowError):
+                pass
         if hide_failed:
             base_q = base_q.filter(BambuPrintJob.status.notin_(('FAILED', 'CANCELLED')))
         if job_filter == 'unassigned':
@@ -88,6 +111,23 @@ def register(app):
                 BambuPrintJob.filament_id == filament_id,
                 BambuPrintJob.materials.any(BambuJobMaterial.filament_id == filament_id),
             ))
+        if project_id:
+            count_base = count_base.filter(BambuPrintJob.project_id == project_id)
+        if search:
+            count_base = count_base.filter(BambuPrintJob.model_name.ilike(f'%{search}%'))
+        if date_from:
+            try:
+                df = datetime.strptime(date_from, '%Y-%m-%d')
+                count_base = count_base.filter(BambuPrintJob.started_at >= df)
+            except (ValueError, OverflowError):
+                pass
+        if date_to:
+            try:
+                dt = datetime.strptime(date_to, '%Y-%m-%d')
+                dt_end = dt.replace(hour=23, minute=59, second=59)
+                count_base = count_base.filter(BambuPrintJob.started_at <= dt_end)
+            except (ValueError, OverflowError):
+                pass
         if hide_failed:
             count_base = count_base.filter(BambuPrintJob.status.notin_(('FAILED', 'CANCELLED')))
         count_all = count_base.count()
@@ -122,6 +162,9 @@ def register(app):
             bambu_payload_meta[job.id] = job_meta
             slot_meta_by_material.update(slot_meta)
 
+        # Resolve active project/filament names for search bar display
+        active_project = db.session.get(Project, project_id) if project_id else None
+        active_filament_obj = filament = active_filament
         return render_template(
             'bambu.html',
             jobs=jobs,
@@ -136,6 +179,11 @@ def register(app):
             job_filter=job_filter,
             active_filament=active_filament,
             active_filament_id=filament_id,
+            active_project=active_project,
+            active_project_id=project_id,
+            active_search=search,
+            active_date_from=date_from,
+            active_date_to=date_to,
             count_all=count_all,
             count_unassigned=count_unassigned,
             count_not_deducted=count_not_deducted,
@@ -149,6 +197,10 @@ def register(app):
         page = request.args.get('page', 1, type=int)
         job_filter = request.args.get('filter', '')
         filament_id = request.args.get('filament_id', type=int)
+        project_id = request.args.get('project_id', type=int)
+        search = request.args.get('search', '').strip()
+        date_from = request.args.get('date_from', '').strip()
+        date_to = request.args.get('date_to', '').strip()
         hide_failed = request.args.get('hide_failed', '') == '1'
         per_page = 20
 
@@ -158,6 +210,23 @@ def register(app):
                 BambuPrintJob.filament_id == filament_id,
                 BambuPrintJob.materials.any(BambuJobMaterial.filament_id == filament_id),
             ))
+        if project_id:
+            base_q = base_q.filter(BambuPrintJob.project_id == project_id)
+        if search:
+            base_q = base_q.filter(BambuPrintJob.model_name.ilike(f'%{search}%'))
+        if date_from:
+            try:
+                df = datetime.strptime(date_from, '%Y-%m-%d')
+                base_q = base_q.filter(BambuPrintJob.started_at >= df)
+            except (ValueError, OverflowError):
+                pass
+        if date_to:
+            try:
+                dt = datetime.strptime(date_to, '%Y-%m-%d')
+                dt_end = dt.replace(hour=23, minute=59, second=59)
+                base_q = base_q.filter(BambuPrintJob.started_at <= dt_end)
+            except (ValueError, OverflowError):
+                pass
         if hide_failed:
             base_q = base_q.filter(BambuPrintJob.status.notin_(('FAILED', 'CANCELLED')))
         if job_filter == 'unassigned':
@@ -567,5 +636,41 @@ def register(app):
         job.project_id = project.id
         db.session.commit()
         return jsonify({'ok': True, 'project_id': project.id, 'project_name': project.name})
+
+    @bp.route('/bambu/auto-map-history', methods=['POST'])
+    def bambu_auto_map_history():
+        """Trigger history-based auto-mapping on all unmapped Bambu jobs.
+
+        Finds every BambuPrintJob that has unmapped material slots and a
+        non-empty model_name, then attempts to copy filament assignments from
+        the most recent previously-mapped job with the same model_name.
+        """
+        total_mapped = 0
+        # Get all jobs that have at least one unmapped slot and have a model_name
+        unmapped_jobs = (
+            BambuPrintJob.query
+            .filter(
+                BambuPrintJob.model_name.is_not(None),
+                BambuPrintJob.model_name != '',
+                BambuPrintJob.materials.any(BambuJobMaterial.filament_id.is_(None)),
+            )
+            .all()
+        )
+
+        for job in unmapped_jobs:
+            count = _auto_map_from_history(job)
+            if count:
+                total_mapped += count
+
+        if total_mapped:
+            try:
+                db.session.commit()
+                invalidate_kpi_cache()
+            except Exception:
+                db.session.rollback()
+                _LOG.warning('History auto-map commit error')
+                return jsonify({'ok': False, 'error': 'commit failed'}), 500
+
+        return jsonify({'ok': True, 'mapped': total_mapped, 'jobs_scanned': len(unmapped_jobs)})
 
     app.register_blueprint(bp)
