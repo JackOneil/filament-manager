@@ -70,7 +70,17 @@ def get_settings():
 
 def get_current_lang():
     setting = get_settings()
-    return setting.lang if setting else 'cs'
+    lang = setting.lang if setting else 'cs'
+    # Per-user language override — lazy import to avoid circular dependency
+    # (auth.py imports utc_now from utils).
+    try:
+        from auth import get_current_user as _gcu
+        user = _gcu()
+        if user and user.preferred_language:
+            lang = user.preferred_language
+    except (ImportError, RuntimeError):
+        pass
+    return lang
 
 
 def translate(key):
@@ -264,7 +274,13 @@ def encrypt_token(plaintext: str) -> str:
     try:
         from cryptography.fernet import Fernet
         return Fernet(raw_key).encrypt(plaintext.encode()).decode()
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            'Fernet encryption failed (invalid FERNET_KEY?): %s — '
+            'storing token as plaintext',
+            exc,
+        )
         return plaintext
 
 
@@ -919,7 +935,21 @@ def top_tags(items, attr_name='tag_text', limit=10):
 
 
 def log_movement(filament, action_type, weight, project_id=None, bambu_job_id=None, note=None):
-    """Record a filament weight movement with cost calculation."""
+    """Record a filament weight movement with cost calculation.
+
+    .. warning::
+
+        This function **only** adds a ``MovementHistory`` row to the
+        current SQLAlchemy session.  It does **not** call
+        ``db.session.commit()``.  The **caller is responsible** for
+        committing the transaction; otherwise the movement record is
+        silently lost when the session closes without a commit.
+
+        Example::
+
+            log_movement(filament, 'use', 12.5, note='Benchy')
+            db.session.commit()
+    """
     if weight <= 0:
         return
     cost_per_gram = filament.price / filament.weight_total if filament.weight_total > 0 else 0

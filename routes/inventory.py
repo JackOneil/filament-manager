@@ -241,16 +241,8 @@ def register(app):
 
         undo_entries = [_build_filament_restore_bundle(filament) for filament in selected]
 
-        selected_ids = [f.id for f in selected]
-        ProjectFilament.query.filter(ProjectFilament.filament_id.in_(selected_ids)).delete(synchronize_session=False)
-        ProjectQuote.query.filter(ProjectQuote.filament_id.in_(selected_ids)).update({'filament_id': None}, synchronize_session=False)
-        for filament in selected:
-            log_movement(filament, 'bulk_delete', filament.weight_remaining, note='Bulk delete')
-            db.session.delete(filament)
-
-        db.session.commit()
-        
-        # Create DB-backed undo snapshot
+        # Create DB-backed undo snapshot BEFORE deleting filaments
+        # so FK constraints on filament_undo_log.filament_id are satisfied.
         user = get_current_user()
         if user:
             undo_log = create_bulk_undo_snapshot(user.id, undo_entries)
@@ -260,6 +252,15 @@ def register(app):
                 'detail': translate('undo_toast_bulk_delete_detail').format(count=len(undo_entries)),
                 'expires_at': undo_log.expires_at.isoformat(timespec='seconds'),
             }
+
+        selected_ids = [f.id for f in selected]
+        ProjectFilament.query.filter(ProjectFilament.filament_id.in_(selected_ids)).delete(synchronize_session=False)
+        ProjectQuote.query.filter(ProjectQuote.filament_id.in_(selected_ids)).update({'filament_id': None}, synchronize_session=False)
+        for filament in selected:
+            log_movement(filament, 'bulk_delete', filament.weight_remaining, note='Bulk delete')
+            db.session.delete(filament)
+
+        db.session.commit()
         return redirect(url_for('filaments_index'))
 
     @bp.route('/add', methods=['GET', 'POST'])
@@ -428,10 +429,9 @@ def register(app):
         log_movement(filament, 'remove', filament.weight_remaining, note='Deleted filament')
         ProjectFilament.query.filter_by(filament_id=filament.id).delete()
         ProjectQuote.query.filter_by(filament_id=filament.id).update({'filament_id': None})
-        db.session.delete(filament)
-        db.session.commit()
-        
-        # Create DB-backed undo snapshot
+
+        # Create DB-backed undo snapshot BEFORE deleting the filament
+        # so the FK constraint on filament_undo_log.filament_id is satisfied.
         user = get_current_user()
         if user:
             undo_log = create_undo_snapshot(
@@ -449,6 +449,9 @@ def register(app):
                 'detail': undo_entry['filament']['name'],
                 'expires_at': undo_log.expires_at.isoformat(timespec='seconds'),
             }
+
+        db.session.delete(filament)
+        db.session.commit()
         return redirect(url_for('filaments_index'))
 
     @bp.route('/inventory/undo', methods=['POST'])

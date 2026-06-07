@@ -173,8 +173,10 @@ class ProjectUsageRowTests(_BaseStatsTests):
             db.session.commit()
 
             rows = _project_usage_rows()
-            # At minimum, our project should be present (might have 0 weight if no materials)
-            self.assertGreaterEqual(len(rows), 0)
+            # The project with a 200g job should be present in usage rows
+            self.assertGreater(len(rows), 0)
+            project_names = [r['project_name'] for r in rows]
+            self.assertIn('Stats Project', project_names)
 
     def test_project_usage_empty_when_no_jobs(self):
         with self.app.app_context():
@@ -197,18 +199,16 @@ class StatsRouteTests(_BaseStatsTests):
         response = self.client.get('/stats')
         self.assertEqual(response.status_code, 200)
         html = response.data.decode('utf-8')
-        # Should contain Chart.js data JSON
-        self.assertIn('labels', html)
+        # Should contain Chart.js data JSON with chart configuration
+        # Chart data is embedded as: const statsData = {"labels": [...], ...}
+        self.assertIn('const statsData', html)
+        self.assertIn('"labels"', html)
 
     def test_stats_page_with_multiple_filaments_shows_purchase_table(self):
         response = self.client.get('/stats')
         self.assertEqual(response.status_code, 200)
         html = response.data.decode('utf-8')
         self.assertIn('PLA', html)
-
-    def test_stats_page_returns_200_with_no_data(self):
-        response = self.client.get('/stats')
-        self.assertEqual(response.status_code, 200)
 
     def test_stats_page_color_palette_data(self):
         """The stats page should render color palette data for the colors section."""

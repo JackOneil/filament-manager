@@ -51,7 +51,7 @@ from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
 
-APP_VERSION = '1.108.1'
+APP_VERSION = '1.110.0'
 
 csrf = CSRFProtect()
 
@@ -108,6 +108,7 @@ def create_app(test_config=None) -> Flask:
                 cursor = dbapi_connection.cursor()
                 cursor.execute("PRAGMA journal_mode=WAL")
                 cursor.execute("PRAGMA synchronous=NORMAL")
+                cursor.execute("PRAGMA foreign_keys=ON")
                 cursor.execute("PRAGMA cache_size=-16000")
                 cursor.execute("PRAGMA mmap_size=268435456")
                 cursor.execute("PRAGMA temp_store=MEMORY")
@@ -284,6 +285,19 @@ def create_app(test_config=None) -> Flask:
             pending_project_undo=pending_project_undo,
             csp_nonce=getattr(g, 'csp_nonce', ''),
         )
+
+    @app.teardown_request
+    def teardown_db_session(_exception=None):
+        """Roll back the DB session if the request left it dirty or failed.
+        This is a safety net for ~30 POST handlers that commit but lack
+        try/except blocks — if a constraint violation or other DB error
+        occurs, the session is cleaned up to prevent cascading failures
+        on subsequent requests."""
+        try:
+            if _exception is not None:
+                db.session.rollback()
+        except Exception:
+            pass
 
     @app.errorhandler(403)
     def forbidden(_error):
@@ -657,8 +671,8 @@ def _start_auto_backup_worker(app: Flask) -> None:
                         continue
 
                     app.logger.info(
-                        f"Auto-backup triggered: freq={freq}, time={time_str}, "
-                        f"day={day_val}, files={include_files}"
+                        "Auto-backup triggered: freq=%s, time=%s, day=%s, files=%s",
+                        freq, time_str, day_val, include_files
                     )
 
                     from routes.backup import _build_backup_archive_bytes, _backup_storage_dir
@@ -682,12 +696,14 @@ def _start_auto_backup_worker(app: Flask) -> None:
                     removed = _cleanup_old_backups(backup_dir, keep_count=keep_count, keep_days=keep_days)
                     if removed:
                         app.logger.info(
-                            f"Auto-backup cleanup: removed {removed} old backup(s) "
-                            f"(keep_count={keep_count}, keep_days={keep_days})"
+                            "Auto-backup cleanup: removed %s old backup(s) "
+                            "(keep_count=%s, keep_days=%s)",
+                            removed, keep_count, keep_days
                         )
 
                     app.logger.info(
-                        f"Auto-backup completed: {filename} ({len(archive_bytes)} bytes)"
+                        "Auto-backup completed: %s (%s bytes)",
+                        filename, len(archive_bytes)
                     )
             except Exception as exc:
                 app.logger.error("Background auto-backup failed: %s", exc)

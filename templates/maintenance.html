@@ -196,8 +196,8 @@
                     <label class="ui-label">{{ t('maintenance_printer_type') }}</label>
                     <select name="printer_type" id="mPrinterType" onchange="updatePrinterNames()"
                             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                        <option value="bambu">Bambu Lab</option>
-                        <option value="prusa">Prusa</option>
+                        <option value="bambu">{{ t('maintenance_printer_bambu') }}</option>
+                        <option value="prusa">{{ t('maintenance_printer_prusa') }}</option>
                     </select>
                 </div>
                 <div>
@@ -342,8 +342,8 @@
                     <label class="ui-label">{{ t('maintenance_printer_type') }}</label>
                     <select name="printer_type" id="ePrinterType" onchange="eUpdatePrinterNames()"
                             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                        <option value="bambu">Bambu Lab</option>
-                        <option value="prusa">Prusa</option>
+                        <option value="bambu">{{ t('maintenance_printer_bambu') }}</option>
+                        <option value="prusa">{{ t('maintenance_printer_prusa') }}</option>
                     </select>
                 </div>
                 <div>
@@ -472,7 +472,7 @@
     </div>
 </div>
 
-<script>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
 const bambuPrinters = {{ bambu_printers | map(attribute='name') | list | tojson }};
 const prusaPrinters = {{ prusa_printers | map(attribute='name') | list | tojson }};
 const maintenanceSopTemplates = {{ sop_templates | tojson }};

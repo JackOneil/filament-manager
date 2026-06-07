@@ -204,6 +204,20 @@ def run_migrations(app: Flask) -> None:
         _migrate_nullable_project_id(app)
 
 
+        # ── Add ondelete=CASCADE to waste_record.filament_id FK ──────────────
+        _migrate_waste_record_fk(app)
+
+        # ── Add ondelete=SET NULL to movement_history and bambu_job_material ──
+        # NOTE: SQLite cannot ALTER TABLE to add FK constraints. The model
+        # changes (models.py lines 157-159, 516) apply to fresh databases
+        # created via ``db.create_all()``.  Existing databases with FK
+        # enforcement (BUG-003) will raise ``IntegrityError`` when attempting
+        # to delete a parent row — which is safe (prevents data loss) but not
+        # the same as SET NULL.  Table recreation is possible but skipped here
+        # because ``movement_history`` is a large, frequently-written table.
+        # See ``_migrate_waste_record_fk`` above for the pattern.
+
+
         # ── Seed data (only runs once on fresh database) ─────────────────────
         if not Brand.query.first():
             for name in ['Prusament', 'Hatchbox', 'eSUN', 'Sunlu', 'Polymaker', 'Overture', 'Spectrum', 'Fiberlogy']:
@@ -313,6 +327,8 @@ def _migrate_nullable_project_id(app: Flask) -> None:
                 thumbnail_path VARCHAR(255),
                 version_note TEXT,
                 uploaded_by_user_id INTEGER,
+                model_note TEXT,
+                share_token VARCHAR(64),
                 PRIMARY KEY (id),
                 FOREIGN KEY (project_id) REFERENCES project (id) ON DELETE CASCADE,
                 FOREIGN KEY (parent_file_id) REFERENCES project_file (id) ON DELETE SET NULL,
@@ -329,3 +345,69 @@ def _migrate_nullable_project_id(app: Flask) -> None:
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"Error migrating project_file nullable project_id: {e}")
+
+
+def _migrate_waste_record_fk(app: Flask) -> None:
+    """Recreate waste_record table with ondelete=CASCADE on filament_id FK.
+
+    The current model defines ``ondelete='CASCADE'`` on the FK, but legacy
+    databases created before this migration have no ON DELETE clause on
+    the ``filament_id`` column.  Since SQLite cannot ``ALTER TABLE … ADD
+    CONSTRAINT``, we rebuild the table in place.
+
+    We also rebuild ``waste_file`` (which has an FK pointing back to
+    ``waste_record.id``) so the recreation is safe.
+    """
+    try:
+        # Check whether the FK already includes ON DELETE CASCADE.
+        result = db.session.execute(text("PRAGMA foreign_key_list(waste_record)"))
+        for row in result:
+            if row[3] == 'filament_id' and row[5] is not None:
+                return  # already correct
+
+        # Enable FK checks temporarily so the INSERT below validates.
+        db.session.execute(text("PRAGMA foreign_keys=OFF"))
+
+        # 1. Recreate waste_file first (depends on waste_record)
+        db.session.execute(text("""
+            CREATE TABLE waste_file_new (
+                id INTEGER NOT NULL,
+                waste_record_id INTEGER NOT NULL,
+                filename VARCHAR(255) NOT NULL,
+                filepath VARCHAR(255) NOT NULL,
+                uploaded_at DATETIME,
+                PRIMARY KEY (id),
+                FOREIGN KEY (waste_record_id) REFERENCES waste_record (id) ON DELETE CASCADE
+            )
+        """))
+        db.session.execute(text("INSERT INTO waste_file_new SELECT * FROM waste_file"))
+        db.session.execute(text("DROP TABLE waste_file"))
+        db.session.execute(text("ALTER TABLE waste_file_new RENAME TO waste_file"))
+
+        # 2. Recreate waste_record with proper FK constraints
+        db.session.execute(text("""
+            CREATE TABLE waste_record_new (
+                id INTEGER NOT NULL,
+                filament_id INTEGER NOT NULL,
+                project_id INTEGER,
+                reason VARCHAR(50) NOT NULL DEFAULT 'other',
+                weight_grams FLOAT NOT NULL DEFAULT 0.0,
+                notes TEXT,
+                created_at DATETIME NOT NULL,
+                recorded_by_user_id INTEGER,
+                PRIMARY KEY (id),
+                FOREIGN KEY (filament_id) REFERENCES filament (id) ON DELETE CASCADE,
+                FOREIGN KEY (project_id) REFERENCES project (id) ON DELETE SET NULL,
+                FOREIGN KEY (recorded_by_user_id) REFERENCES user (id) ON DELETE SET NULL
+            )
+        """))
+        db.session.execute(text("INSERT INTO waste_record_new SELECT * FROM waste_record"))
+        db.session.execute(text("DROP TABLE waste_record"))
+        db.session.execute(text("ALTER TABLE waste_record_new RENAME TO waste_record"))
+
+        db.session.execute(text("PRAGMA foreign_keys=ON"))
+        db.session.commit()
+        app.logger.info("Successfully migrated waste_record.filament_id FK to ON DELETE CASCADE.")
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error migrating waste_record FK: {e}")

@@ -23,7 +23,7 @@ from models import (
 )
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import joinedload
-from utils import bambu_api_base, clean_bambu_title, deduct_filament_stock, decrypt_token, get_settings, log_movement, utc_now, try_auto_map_filament, invalidate_kpi_cache, format_duration, normalize_hex
+from utils import bambu_api_base, clean_bambu_title, deduct_filament_stock, decrypt_token, get_settings, log_movement, utc_now, try_auto_map_filament, invalidate_kpi_cache, format_duration, normalize_hex, translate
 
 
 from routes.bambu_helpers import (
@@ -282,7 +282,7 @@ def register(app):
     def bambu_sync():
         setting = get_settings()
         if not setting or not setting.bambu_token:
-            return jsonify({'ok': False, 'error': 'No Bambu token configured'}), 400
+            return jsonify({'ok': False, 'error': translate('bambu_no_token')}), 400
         token = decrypt_token(setting.bambu_token)
         result = do_sync(token, setting.bambu_region or 'global')
         setting.bambu_last_sync_at = utc_now()
@@ -609,9 +609,10 @@ def register(app):
     @bp.route('/bambu/job/<int:job_id>/delete', methods=['POST'])
     def bambu_job_delete(job_id):
         job = db.session.get(BambuPrintJob, job_id)
-        if job:
-            db.session.delete(job)
-            db.session.commit()
+        if not job:
+            return jsonify({'ok': False, 'error': 'not found'}), 404
+        db.session.delete(job)
+        db.session.commit()
         return redirect(url_for('bambu_jobs'))
 
     @bp.route('/bambu/job/<int:job_id>/create_project', methods=['POST'])
@@ -625,7 +626,7 @@ def register(app):
             return jsonify({'ok': False, 'error': 'not found'}), 404
         project_name = request.form.get('project_name', '').strip()
         if not project_name:
-            return jsonify({'ok': False, 'error': 'Name required'}), 400
+            return jsonify({'ok': False, 'error': translate('bambu_name_required')}), 400
         project = Project(
             name=project_name,
             created_by_user_id=user.id if user else None,

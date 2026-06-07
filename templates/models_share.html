@@ -37,7 +37,7 @@
         [x-cloak] { display: none !important; }
     </style>
     <script defer src="{{ url_for('static', filename='js/alpine.min.js') }}"></script>
-    <script>
+    <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
         // Apply saved theme before page renders to prevent FOUC
         (function() {
             var saved = localStorage.getItem('models_share_theme');
@@ -185,7 +185,7 @@
         </div>
     </div>
 
-    <script>
+    <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
     // Theme toggle (vanilla JS — runs before Alpine)
     function toggleShareTheme() {
         var html = document.documentElement;

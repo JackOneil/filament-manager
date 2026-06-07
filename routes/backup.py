@@ -6,14 +6,16 @@ import json
 import os
 import tarfile
 import uuid
-from flask import current_app as app, request, redirect, url_for, Response, Blueprint, flash
+from flask import abort, current_app as app, request, redirect, url_for, Response, Blueprint, flash
 
 from database import db
 from models import (
     Brand, Color, Material, AppSetting, Filament, MovementHistory,
     PrintHistory, Project, ProjectFile, ProjectLink, ProjectFilament, ProjectQuote,
     BambuPrinter, BambuPrintJob, BambuJobMaterial, StoragePlacement, StorageShelf,
-    PrusaPrinter, PrusaPrintJob, ProjectComment, ProjectTodo, ProjectPrintItem, User, UserInvite, Notification, AuditLog,
+    PrusaPrinter, PrusaPrintJob, ProjectComment, ProjectCommentReaction,
+    ProjectTodo, ProjectPrintItem, User, UserInvite, UserSession,
+    Notification, AuditLog, ModelComment,
     PrinterMaintenance, WasteRecord, WasteFile, FilamentUndoLog, ProjectTemplate,
 )
 from utils import encrypt_token, format_tags, utc_now, translate
@@ -166,15 +168,15 @@ def register(app):
         from werkzeug.utils import secure_filename
         safe_name = secure_filename(filename)
         if not safe_name or not safe_name.endswith('.tar.gz'):
-            return 'Invalid filename', 400
+            abort(400)
         backup_dir = _backup_storage_dir()
         filepath = os.path.join(backup_dir, safe_name)
         # Defence-in-depth: realpath must remain inside the backup directory.
         if not _is_path_inside(filepath, backup_dir):
             app.logger.warning('Backup download path traversal attempt: %r', filename)
-            return 'Invalid filename', 400
+            abort(400)
         if not os.path.isfile(filepath):
-            return 'File not found', 404
+            abort(404)
         from flask import send_file
         return send_file(filepath, mimetype='application/gzip', as_attachment=True,
                          download_name=safe_name)
@@ -185,7 +187,7 @@ def register(app):
         from werkzeug.utils import secure_filename
         safe_name = secure_filename(filename)
         if not safe_name or not safe_name.endswith('.tar.gz'):
-            return 'Invalid filename', 400
+            abort(400)
         backup_dir = _backup_storage_dir()
         filepath = os.path.join(backup_dir, safe_name)
         if not _is_path_inside(filepath, backup_dir):
@@ -954,6 +956,87 @@ def register(app):
                         expires_at=datetime.fromisoformat(ul_data['expires_at']) if ul_data.get('expires_at') else utc_now(),
                         is_consumed=ul_data.get('is_consumed', True),
                         consumed_at=datetime.fromisoformat(ul_data['consumed_at']) if ul_data.get('consumed_at') else None,
+                    ))
+
+                # ── 14. User sessions ─────────────────────────────────
+                for us_data in data.get('user_sessions', []):
+                    us_user = _resolve_user_ref(us_data.get('user'))
+                    if not us_user:
+                        continue
+                    exists_us = UserSession.query.filter_by(
+                        user_id=us_user.id,
+                        session_key=us_data.get('session_key', ''),
+                    ).first()
+                    if exists_us:
+                        continue
+                    db.session.add(UserSession(
+                        user_id=us_user.id,
+                        session_key=us_data.get('session_key', ''),
+                        ip_address=us_data.get('ip_address'),
+                        user_agent=us_data.get('user_agent'),
+                        created_at=datetime.fromisoformat(us_data['created_at']) if us_data.get('created_at') else utc_now(),
+                        last_activity=datetime.fromisoformat(us_data['last_activity']) if us_data.get('last_activity') else None,
+                        expires_at=datetime.fromisoformat(us_data['expires_at']) if us_data.get('expires_at') else None,
+                    ))
+
+                # ── 15. Model comments ────────────────────────────────
+                for mc_data in data.get('model_comments', []):
+                    project_name = mc_data.get('project_name')
+                    filename = mc_data.get('filename')
+                    root_file = None
+                    if project_name and filename:
+                        proj = Project.query.filter_by(name=project_name).first()
+                        if proj:
+                            root_file = ProjectFile.query.filter_by(
+                                project_id=proj.id, filename=filename
+                            ).first()
+                    mc_user = _resolve_user_ref(mc_data.get('user'))
+                    if not root_file:
+                        continue
+                    exists_mc = ModelComment.query.filter_by(
+                        root_file_id=root_file.id,
+                        body=mc_data.get('body', ''),
+                        created_at=datetime.fromisoformat(mc_data['created_at']) if mc_data.get('created_at') else utc_now(),
+                    ).first()
+                    if exists_mc:
+                        continue
+                    db.session.add(ModelComment(
+                        root_file_id=root_file.id,
+                        user_id=mc_user.id if mc_user else None,
+                        body=mc_data.get('body', ''),
+                        created_at=datetime.fromisoformat(mc_data['created_at']) if mc_data.get('created_at') else utc_now(),
+                    ))
+
+                # ── 16. Comment reactions ─────────────────────────────
+                for cr_data in data.get('comment_reactions', []):
+                    project_name = cr_data.get('project_name')
+                    comment_body = cr_data.get('comment_body')
+                    if not project_name or not comment_body:
+                        continue
+                    proj = Project.query.filter_by(name=project_name).first()
+                    if not proj:
+                        continue
+                    comment = ProjectComment.query.filter_by(
+                        project_id=proj.id,
+                        body=comment_body,
+                    ).order_by(ProjectComment.created_at.desc()).first()
+                    if not comment:
+                        continue
+                    cr_user = _resolve_user_ref(cr_data.get('user'))
+                    if not cr_user:
+                        continue
+                    exists_cr = ProjectCommentReaction.query.filter_by(
+                        comment_id=comment.id,
+                        user_id=cr_user.id,
+                        emoji=cr_data.get('emoji', ''),
+                    ).first()
+                    if exists_cr:
+                        continue
+                    db.session.add(ProjectCommentReaction(
+                        comment_id=comment.id,
+                        user_id=cr_user.id,
+                        emoji=cr_data.get('emoji', ''),
+                        created_at=datetime.fromisoformat(cr_data['created_at']) if cr_data.get('created_at') else utc_now(),
                     ))
 
             app.logger.debug(f"Import finished: {imported_filaments} filaments, projects and Bambu jobs processed.")

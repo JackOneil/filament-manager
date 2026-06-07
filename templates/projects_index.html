@@ -99,7 +99,10 @@
 
 </div>
 
-<script>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
+window._dashColorTitle = {{ t('dashboard_color')|tojson }};
+window._dashResizeTitle = {{ t('dashboard_resize')|tojson }};
+window._dashRowsTitle = {{ t('dashboard_rows')|tojson }};
 window.initProjectsLayout = function() {
     window.projectsLayout = createWidgetLayoutManager({
         containerId: 'projects-layout',
@@ -114,6 +117,7 @@ window.initProjectsLayout = function() {
         hideBtnTitle: {{ t('dashboard_hide_widget')|tojson }},
         showBtnTitle: {{ t('dashboard_show_widget')|tojson }},
         limitAllText: {{ t('stats_limit_all')|tojson }},
+        limitSelectTitle: {{ t('dashboard_rows')|tojson }},
         defaultOrder: ['due_calendar', 'status_new', 'status_printing', 'status_done', 'project_table'],
     });
 };

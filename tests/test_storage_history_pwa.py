@@ -87,11 +87,13 @@ class StorageRouteTests(unittest.TestCase):
 
     def test_add_shelf_duplicate_name_skipped(self):
         """Adding a shelf with an existing name is silently skipped."""
-        self.client.post('/storage/shelf', data={
+        resp = self.client.post('/storage/shelf', data={
             'name': 'Shelf A',
             'columns': 2,
             'slots_count': 4,
         })
+        # Should redirect (302) or return OK — the key is no duplicate is created
+        self.assertIn(resp.status_code, (302, 200))
         with self.app.app_context():
             count = StorageShelf.query.filter_by(name='Shelf A').count()
             self.assertEqual(count, 1)

@@ -934,13 +934,13 @@
     </div>
 </div>
 
-<script>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
 {# Legacy drop-zone JS removed — replaced by Alpine x-data="uploadStepper(...)" component.
    The stepper handles file selection, drag & drop, validation, XHR upload with
    progress events, and the 4-phase stepper UI. #}
 </script>
 
-<script>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
 /**
  * Multi-phase upload stepper.
  * Phases: idle → validating → uploading → preview → done (or error at any point).
@@ -1081,7 +1081,7 @@ function uploadStepper(config) {
 }
 </script>
 
-<script>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
 const _PF_FILAMENTS = {{ filaments_json | tojson }};
 
 function projectFilamentPicker() {
@@ -1109,7 +1109,7 @@ function projectFilamentPicker() {
 }
 </script>
 
-<script>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
 /**
  * 3D Viewer — iframe-isolated bridge (project detail page)
  *

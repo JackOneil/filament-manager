@@ -145,7 +145,7 @@
     </div>
 </div>
 
-<script>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
 function _auditEscHtml(s) {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -209,7 +209,7 @@ function auditDiffPanel(el) {
                     html += `<div class="px-4 py-px bg-emerald-50 dark:bg-emerald-950/40"><span class="select-none text-emerald-500 mr-2 font-bold">+</span><span class="text-emerald-800 dark:text-emerald-300">${esc}</span></div>`;
                 }
             }
-            return html || '<span class="p-4 text-gray-400 italic">Žádné změny</span>';
+            return html || '<span class="p-4 text-gray-400 italic">' + (window.__i18n && window.__i18n[window.__helpLang||'cs'] && window.__i18n[window.__helpLang||'cs']['audit_no_changes'] || '{{ t('audit_no_changes')|e }}') + '</span>';
         }
     };
 }

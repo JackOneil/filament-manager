@@ -729,7 +729,7 @@
 </div>
 
 <script src="{{ url_for('static', filename='js/inventory.js') }}"></script>
-<script>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
 // =============================================
 // Alpine.js component – inventoryApp()
 // =============================================

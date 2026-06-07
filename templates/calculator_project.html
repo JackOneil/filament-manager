@@ -293,7 +293,7 @@
 
 </div>
 
-<script>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
 // Live result update when margin changes
 var BASE_COST = {{ project_result.base_cost | round(4) }};
 var CURRENCY = "{{ project_result.currency }}";

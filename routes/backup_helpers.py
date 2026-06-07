@@ -13,7 +13,9 @@ from models import (
     Brand, Color, Material, AppSetting, Filament, MovementHistory,
     PrintHistory, Project, ProjectFile, ProjectLink, ProjectFilament, ProjectQuote,
     BambuPrinter, BambuPrintJob, BambuJobMaterial, StoragePlacement, StorageShelf,
-    PrusaPrinter, PrusaPrintJob, ProjectComment, ProjectTodo, ProjectPrintItem, User, UserInvite, Notification, AuditLog,
+    PrusaPrinter, PrusaPrintJob, ProjectComment, ProjectCommentReaction,
+    ProjectTodo, ProjectPrintItem, User, UserInvite, UserSession,
+    Notification, AuditLog, ModelComment,
     PrinterMaintenance, WasteRecord, WasteFile, FilamentUndoLog, ProjectTemplate,
 )
 from utils import encrypt_token, format_tags, utc_now, translate
@@ -368,6 +370,32 @@ def _build_export_data(app, include_files=True):
                 'is_read': notification.is_read,
                 'created_at': notification.created_at.isoformat() if notification.created_at else None,
             } for notification in Notification.query.order_by(Notification.created_at).all()],
+
+            'user_sessions': [{
+                'user': _user_ref(s.user),
+                'session_key': s.session_key,
+                'ip_address': s.ip_address,
+                'user_agent': s.user_agent,
+                'created_at': s.created_at.isoformat() if s.created_at else None,
+                'last_activity': s.last_activity.isoformat() if s.last_activity else None,
+                'expires_at': s.expires_at.isoformat() if s.expires_at else None,
+            } for s in UserSession.query.order_by(UserSession.created_at).all()],
+
+            'model_comments': [{
+                'project_name': mc.root_file.project.name if mc.root_file and mc.root_file.project else None,
+                'filename': mc.root_file.filename if mc.root_file else None,
+                'user': _user_ref(mc.user),
+                'body': mc.body,
+                'created_at': mc.created_at.isoformat() if mc.created_at else None,
+            } for mc in ModelComment.query.order_by(ModelComment.created_at).all()],
+
+            'comment_reactions': [{
+                'project_name': cr.comment.project.name if cr.comment and cr.comment.project else None,
+                'comment_body': cr.comment.body if cr.comment else None,
+                'user': _user_ref(cr.user),
+                'emoji': cr.emoji,
+                'created_at': cr.created_at.isoformat() if cr.created_at else None,
+            } for cr in ProjectCommentReaction.query.order_by(ProjectCommentReaction.created_at).all()],
 
             'audit_logs': [{
                 'user': _user_ref(audit.user),

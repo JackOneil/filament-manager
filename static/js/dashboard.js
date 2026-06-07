@@ -72,13 +72,14 @@ function _dashInnerCard(item) {
 
 function _dashUpdateColorBtnUI(btn, colorId) {
     var dot = _dashColorDot(colorId);
+    var colorLabel = window._dashColorTitle || 'Color';
     if (dot) {
         btn.innerHTML = '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:' +
             dot + ';border:2px solid rgba(0,0,0,0.15)"></span>';
         btn.title = colorId.charAt(0).toUpperCase() + colorId.slice(1);
     } else {
         btn.innerHTML = '<i class="fa-solid fa-palette text-xs text-gray-400"></i>';
-        btn.title = 'Color';
+        btn.title = colorLabel;
     }
 }
 
@@ -387,7 +388,7 @@ function createWidgetLayoutManager(config) {
                     if (hasRows) {
                         var sel = document.createElement('select');
                         sel.className = 'widget-limit-select text-xs border border-blue-200 rounded px-1 py-0.5 bg-white text-blue-700 ml-2';
-                        sel.title = config.limitSelectTitle || 'Rows';
+                        sel.title = config.limitSelectTitle || window._dashRowsTitle || 'Rows';
                         [5, 10, 20, 'all'].forEach(function(opt) {
                             var o = document.createElement('option');
                             o.value = String(opt);
@@ -495,7 +496,7 @@ function createWidgetLayoutManager(config) {
         var handle = document.createElement('div');
         handle.className = 'resize-handle';
         handle.setAttribute('draggable', 'false');
-        handle.title     = 'Resize';
+        handle.title     = window._dashResizeTitle || 'Resize';
         handle.innerHTML = _DASH_RESIZE_SVG;
         item.appendChild(handle);
 
@@ -659,21 +660,13 @@ function createWidgetLayoutManager(config) {
         var newSrcIdx = allItems.indexOf(dragSrc);
 
         if (e.clientY < midY) {
-            // Insert before target
-            if (newSrcIdx > dstIdx) {
-                // Moving up: insert dragSrc before target
-                container.insertBefore(dragSrc, this);
-            } else if (newSrcIdx < dstIdx - 1) {
-                // Target is further down, insert before the item just before target
+            // Insert before target (dragged item moved up or down into area above target midpoint)
+            if (newSrcIdx > dstIdx || newSrcIdx < dstIdx - 1) {
                 container.insertBefore(dragSrc, this);
             }
         } else {
-            // Insert after target
-            if (newSrcIdx < dstIdx) {
-                // Moving down: insert dragSrc after target
-                container.insertBefore(dragSrc, this.nextSibling);
-            } else if (newSrcIdx > dstIdx + 1) {
-                // Target is further up, insert after target
+            // Insert after target (dragged item moved down or up into area below target midpoint)
+            if (newSrcIdx < dstIdx || newSrcIdx > dstIdx + 1) {
                 container.insertBefore(dragSrc, this.nextSibling);
             }
         }
@@ -694,8 +687,23 @@ function createWidgetLayoutManager(config) {
         // Visual highlight on the target area
         this.classList.add('drag-over');
 
-        // Save layout progressively during drag for live feedback
-        saveLayout();
+        // Save layout progressively during drag for live feedback.
+        // Debounce: only save once per animation frame to avoid excessive
+        // localStorage writes on rapid dragenter events.
+        if (!window._debouncedSaveLayout) {
+            window._debouncedSaveLayout = (function() {
+                var pending = false;
+                return function() {
+                    if (pending) return;
+                    pending = true;
+                    requestAnimationFrame(function() {
+                        saveLayout();
+                        pending = false;
+                    });
+                };
+            })();
+        }
+        window._debouncedSaveLayout();
     }
 
     function onDragLeave(e) {
@@ -1053,7 +1061,7 @@ function createCardResizeManager(config) {
                 var handle = document.createElement('div');
                 handle.className = 'resize-handle';
                 handle.setAttribute('draggable', 'false');
-                handle.title     = 'Resize';
+                handle.title     = window._dashResizeTitle || 'Resize';
                 handle.innerHTML = _DASH_RESIZE_SVG;
                 card.appendChild(handle);
                 handle.addEventListener('mousedown', function(e) {

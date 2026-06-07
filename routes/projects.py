@@ -581,11 +581,11 @@ def register(app):
         _project_or_404(id)
         project_file = db.get_or_404(ProjectFile, file_id)
         if project_file.project_id is None or project_file.project_id != id:
-            return 'Unauthorized', 401
+            abort(401)
         real_path = os.path.realpath(project_file.filepath)
         real_folder = os.path.realpath(upload_folder)
         if not real_path.startswith(real_folder + os.sep):
-            return 'Forbidden', 403
+            abort(403)
         return send_from_directory(
             os.path.dirname(project_file.filepath),
             os.path.basename(project_file.filepath),
@@ -598,11 +598,11 @@ def register(app):
         _project_or_404(id)
         project_file = db.get_or_404(ProjectFile, file_id)
         if project_file.project_id is None or project_file.project_id != id:
-            return 'Unauthorized', 401
+            abort(401)
         real_path = os.path.realpath(project_file.filepath)
         real_folder = os.path.realpath(upload_folder)
         if not real_path.startswith(real_folder + os.sep):
-            return 'Forbidden', 403
+            abort(403)
         return send_from_directory(os.path.dirname(project_file.filepath), os.path.basename(project_file.filepath), as_attachment=False)
 
     @bp.route('/projects/<int:id>/image/<int:file_id>')
@@ -610,11 +610,11 @@ def register(app):
         _project_or_404(id)
         project_file = db.get_or_404(ProjectFile, file_id)
         if project_file.project_id is None or project_file.project_id != id or _get_extension(project_file.filename) not in IMAGE_EXTENSIONS:
-            return 'Unauthorized', 401
+            abort(401)
         real_path = os.path.realpath(project_file.filepath)
         real_folder = os.path.realpath(upload_folder)
         if not real_path.startswith(real_folder + os.sep):
-            return 'Forbidden', 403
+            abort(403)
         return send_from_directory(os.path.dirname(project_file.filepath), os.path.basename(project_file.filepath), as_attachment=False)
 
     # ── Public share endpoints for files ─────────────────────────────────────
@@ -624,11 +624,11 @@ def register(app):
         project = Project.query.filter_by(share_token=token).first_or_404()
         project_file = db.get_or_404(ProjectFile, file_id)
         if project_file.project_id is None or project_file.project_id != project.id:
-            return 'Unauthorized', 401
+            abort(401)
         real_path = os.path.realpath(project_file.filepath)
         real_folder = os.path.realpath(upload_folder)
         if not real_path.startswith(real_folder + os.sep):
-            return 'Forbidden', 403
+            abort(403)
         return send_from_directory(
             os.path.dirname(project_file.filepath),
             os.path.basename(project_file.filepath),
@@ -641,11 +641,11 @@ def register(app):
         project = Project.query.filter_by(share_token=token).first_or_404()
         project_file = db.get_or_404(ProjectFile, file_id)
         if project_file.project_id is None or project_file.project_id != project.id:
-            return 'Unauthorized', 401
+            abort(401)
         real_path = os.path.realpath(project_file.filepath)
         real_folder = os.path.realpath(upload_folder)
         if not real_path.startswith(real_folder + os.sep):
-            return 'Forbidden', 403
+            abort(403)
         return send_from_directory(os.path.dirname(project_file.filepath), os.path.basename(project_file.filepath), as_attachment=False)
 
     @bp.route('/projects/share/<token>/image/<int:file_id>')
@@ -653,11 +653,11 @@ def register(app):
         project = Project.query.filter_by(share_token=token).first_or_404()
         project_file = db.get_or_404(ProjectFile, file_id)
         if project_file.project_id is None or project_file.project_id != project.id or _get_extension(project_file.filename) not in IMAGE_EXTENSIONS:
-            return 'Unauthorized', 401
+            abort(401)
         real_path = os.path.realpath(project_file.filepath)
         real_folder = os.path.realpath(upload_folder)
         if not real_path.startswith(real_folder + os.sep):
-            return 'Forbidden', 403
+            abort(403)
         return send_from_directory(os.path.dirname(project_file.filepath), os.path.basename(project_file.filepath), as_attachment=False)
 
     # ── End of public share file endpoints ───────────────────────────────────

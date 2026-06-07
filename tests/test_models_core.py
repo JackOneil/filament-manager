@@ -93,7 +93,7 @@ class FilamentModelTests(_BaseModelTests):
         self.assertEqual(f.brand.name, 'TestBrand')
 
     def test_filament_cascade_on_brand_delete(self):
-        """Deleting a brand should set brand_id to None (SET NULL not used, but verify)."""
+        """Deleting a brand that has filaments raises IntegrityError (ondelete='RESTRICT')."""
         f = Filament(
             name='Cascade Filament',
             brand_id=self.brand.id,
@@ -139,15 +139,27 @@ class ProjectModelTests(_BaseModelTests):
         project = Project(name='Mark Used')
         db.session.add(project)
         db.session.flush()
+        brand = Brand(name='TestBrand')
+        color = Color(name='TestColor', hex_value='#123456')
+        material = Material(name='TestMat')
+        db.session.add_all([brand, color, material])
+        db.session.flush()
+        filament = Filament(
+            name='Test Filament',
+            brand_id=brand.id, color_id=color.id, material_id=material.id,
+            weight_total=1000, weight_remaining=800, price=500, quantity=1,
+        )
+        db.session.add(filament)
+        db.session.flush()
         pf = ProjectFilament(
             project_id=project.id,
-            filament_id=1,
+            filament_id=filament.id,
             estimated_weight=100,
             is_used=False,
         )
         db.session.add(pf)
         db.session.commit()
-        project.mark_planned_filament_used(1)
+        project.mark_planned_filament_used(filament.id)
         self.assertTrue(pf.is_used)
 
 
@@ -224,8 +236,12 @@ class ProjectContentModelTests(_BaseModelTests):
         db.session.add(comment)
         db.session.flush()
 
+        user = User(email='reaction@example.com', name='Reaction', password_hash='hash')
+        db.session.add(user)
+        db.session.flush()
+
         reaction = ProjectCommentReaction(
-            comment_id=comment.id, user_id=1, emoji='👍'
+            comment_id=comment.id, user_id=user.id, emoji='👍'
         )
         db.session.add(reaction)
         db.session.commit()
@@ -278,8 +294,20 @@ class StorageModelTests(_BaseModelTests):
         shelf = StorageShelf(name='Place Shelf', columns=2, slots_count=4)
         db.session.add(shelf)
         db.session.flush()
+        brand = Brand(name='StorageBrand')
+        color = Color(name='StorageColor', hex_value='#654321')
+        material = Material(name='StorageMat')
+        db.session.add_all([brand, color, material])
+        db.session.flush()
+        filament = Filament(
+            name='Storage Filament',
+            brand_id=brand.id, color_id=color.id, material_id=material.id,
+            weight_total=1000, weight_remaining=800, price=500, quantity=1,
+        )
+        db.session.add(filament)
+        db.session.flush()
         placement = StoragePlacement(
-            shelf_id=shelf.id, filament_id=1, slot_index=1
+            shelf_id=shelf.id, filament_id=filament.id, slot_index=1
         )
         db.session.add(placement)
         db.session.commit()
@@ -376,9 +404,31 @@ class MaintenanceModelTests(_BaseModelTests):
 
 
 class WasteModelTests(_BaseModelTests):
+    def _make_filament(self):
+        brand = Brand(name='WasteBrand')
+        color = Color(name='WasteColor', hex_value='#abcdef')
+        material = Material(name='WasteMat')
+        db.session.add_all([brand, color, material])
+        db.session.flush()
+        filament = Filament(
+            name='Waste Filament',
+            brand_id=brand.id, color_id=color.id, material_id=material.id,
+            weight_total=1000, weight_remaining=800, price=500, quantity=1,
+        )
+        db.session.add(filament)
+        db.session.flush()
+        return filament
+
+    def _make_user(self):
+        user = User(email='waste@example.com', name='WasteUser', password_hash='hash')
+        db.session.add(user)
+        db.session.flush()
+        return user
+
     def test_waste_record_creation(self):
+        filament = self._make_filament()
         record = WasteRecord(
-            filament_id=1,
+            filament_id=filament.id,
             reason='warping',
             weight_grams=25.0,
         )
@@ -387,7 +437,8 @@ class WasteModelTests(_BaseModelTests):
         self.assertIsNotNone(record.id)
 
     def test_waste_file_attachment(self):
-        record = WasteRecord(filament_id=1, reason='stringing', weight_grams=10)
+        filament = self._make_filament()
+        record = WasteRecord(filament_id=filament.id, reason='stringing', weight_grams=10)
         db.session.add(record)
         db.session.flush()
         wf = WasteFile(
@@ -400,11 +451,12 @@ class WasteModelTests(_BaseModelTests):
         self.assertEqual(len(record.files), 1)
 
     def test_waste_record_with_project(self):
+        filament = self._make_filament()
         project = Project(name='Waste Project')
         db.session.add(project)
         db.session.flush()
         record = WasteRecord(
-            filament_id=1,
+            filament_id=filament.id,
             project_id=project.id,
             reason='layer_shift',
             weight_grams=15,
@@ -414,10 +466,12 @@ class WasteModelTests(_BaseModelTests):
         self.assertEqual(record.project.name, 'Waste Project')
 
     def test_filament_undo_log(self):
+        user = self._make_user()
+        filament = self._make_filament()
         log = FilamentUndoLog(
-            user_id=1,
+            user_id=user.id,
             action_type='delete_filament',
-            filament_id=1,
+            filament_id=filament.id,
             snapshot_data='{"test": true}',
             expires_at=utc_now(),
         )
@@ -426,8 +480,19 @@ class WasteModelTests(_BaseModelTests):
         self.assertFalse(log.is_consumed)
 
     def test_model_comment_creation(self):
+        filament = self._make_filament()
+        project = Project(name='ModelComment Project')
+        db.session.add(project)
+        db.session.flush()
+        pf = ProjectFile(
+            project_id=project.id,
+            filename='model.stl',
+            filepath='/tmp/model.stl',
+        )
+        db.session.add(pf)
+        db.session.flush()
         comment = ModelComment(
-            root_file_id=1,
+            root_file_id=pf.id,
             body='Model comment text',
         )
         db.session.add(comment)

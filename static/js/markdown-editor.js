@@ -331,7 +331,9 @@
                 renderInline(value) {
                     var html = this.escapeHtml(value || '');
                     html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
-                    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+|mailto:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+                    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s"]+|mailto:[^)"]+)\)/g, function(match, text, url) {
+                        return '<a href="' + url.replace(/"/g, '&quot;') + '" target="_blank" rel="noopener noreferrer">' + text + '</a>';
+                    });
                     html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
                     html = html.replace(/(^|[^\*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
                     return html;

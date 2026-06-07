@@ -110,7 +110,7 @@
         'initFilter': job_filter or '',
         'initHideFailed': 'true' if hide_failed else 'false',
     } %}
-    <script>window._bambuSearchInit = {{ _bs_init_data|tojson|safe }};</script>
+    <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>window._bambuSearchInit = {{ _bs_init_data|tojson|safe }};</script>
     <div x-data="bambuSearch(window._bambuSearchInit)" class="bg-white border border-gray-200 rounded-xl p-3 flex flex-wrap items-end gap-3">
 
         {# Project dropdown #}
@@ -347,7 +347,7 @@
     </div>
 </div>
 
-<script>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
 // ── Waste from failed print: modal open handler ───────────────────────────────────────────
 document.addEventListener('click', function(e) {
     var btn = e.target.closest('[data-waste-btn]');
@@ -365,7 +365,7 @@ document.addEventListener('keydown', function(e) {
         if (m) m.classList.add('hidden');
     }
 });
-// ── Data: embedded once at page render, safe inside <script> (no HTML attr quotes) ──
+// ── Data: embedded once at page render, safe inside <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}> (no HTML attr quotes) ──
 const _BF = {{ filaments|tojson }};   // [{id, label, mat, material_name, color_hex}, ...]
 const _BP = {{ projects|tojson }};    // [{id, name}, ...]
 const _BAMBU_FILTER = {{ job_filter|tojson }};

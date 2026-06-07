@@ -67,12 +67,6 @@ function buildInventoryListSkeletonHtml() {
 }
 
 
-// Reorder shop search
-function openReorderShop(name, template) {
-    const url = template.replace(/\{[^}]+\}/g, encodeURIComponent(name));
-    window.open(url, '_blank', 'noopener,noreferrer');
-}
-
 let __lastCheckedFilament = null;
 
 function updateBulkDeleteState() {
@@ -198,13 +192,15 @@ document.addEventListener('DOMContentLoaded', function () {
         var t = window._filCtxT || {};
         var truncName = name.length > 22 ? name.substring(0, 22) + '\u2026' : name;
         var safeName = truncName.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        // Attribute-escape values interpolated into HTML attributes
+        var attrEsc = function(v) { return String(v).replace(/"/g, '&quot;'); };
         var html = '<div class="px-3 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 mb-1">' + safeName + '</div>';
         if (isAdmin) {
             html += '<button type="button" id="_fctx_use" class="w-full text-left px-4 py-2 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center gap-2"><i class="fa-solid fa-minus-circle w-4 text-blue-500"></i> ' + (t.use||'') + '</button>';
             html += '<button type="button" id="_fctx_add" class="w-full text-left px-4 py-2 hover:bg-emerald-50 hover:text-emerald-700 transition-colors flex items-center gap-2"><i class="fa-solid fa-plus-circle w-4 text-emerald-500"></i> ' + (t.addSpool||'') + '</button>';
-            html += '<a href="' + editUrl + '" class="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors flex items-center gap-2 block"><i class="fa-solid fa-edit w-4 text-gray-500"></i> ' + (t.edit||'') + '</a>';
+            html += '<a href="' + attrEsc(editUrl) + '" class="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors flex items-center gap-2 block"><i class="fa-solid fa-edit w-4 text-gray-500"></i> ' + (t.edit||'') + '</a>';
         }
-        html += '<a href="' + detailUrl + '" class="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors flex items-center gap-2 block"><i class="fa-solid fa-wave-square w-4 text-indigo-400"></i> ' + (t.timeline||'') + '</a>';
+        html += '<a href="' + attrEsc(detailUrl) + '" class="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors flex items-center gap-2 block"><i class="fa-solid fa-wave-square w-4 text-indigo-400"></i> ' + (t.timeline||'') + '</a>';
         if (shopUrl) {
             html += '<div class="border-t border-gray-100 my-1"></div>';
             html += '<button type="button" id="_fctx_shop" class="w-full text-left px-4 py-2 hover:bg-orange-50 hover:text-orange-700 transition-colors flex items-center gap-2"><i class="fa-solid fa-cart-shopping w-4 text-orange-400"></i> ' + (t.shop||'') + '</button>';

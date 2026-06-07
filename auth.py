@@ -634,11 +634,13 @@ def _audit_prepare_request():
 
 def _audit_finish_request(response):
     ctx = getattr(g, 'audit_context', None)
-    if not ctx or response.status_code >= 400:
+    if not ctx:
         return response
+    is_error = response.status_code >= 400
     after_payload = {
         'object': _audit_snapshot_model(ctx.get('target_object')),
         'form': ctx.get('form') or {},
+        'http_status': response.status_code,
     }
     if ctx.get('object_id') is None and ctx.get('target_object') is not None:
         # Fallback: pull object_id from the resolved object in case the

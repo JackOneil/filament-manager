@@ -157,7 +157,7 @@
         {% endif %}
     </div>
 </div>
-<script>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
 function changeUserFilamentsPerPage(value) {
     localStorage.setItem('user_filaments_per_page', value);
     const params = new URLSearchParams(window.location.search);

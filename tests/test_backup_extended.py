@@ -300,8 +300,9 @@ class BackupRetentionCleanupTests(unittest.TestCase):
         removed = _cleanup_old_backups(self.backup_dir, keep_count=3, keep_days=0)
         self.assertGreater(removed, 0)
         remaining = os.listdir(self.backup_dir)
-        # Only the 3 newest auto_backup files + the old_backup file should remain
-        self.assertLessEqual(len(remaining), 4)
+        # Exactly 3 newest auto_backup files + 1 non-auto old_backup file should remain
+        auto_backups = [f for f in remaining if f.startswith('auto_backup_')]
+        self.assertEqual(len(auto_backups), 3)
 
     def test_cleanup_keeps_all_when_count_zero(self):
         removed = _cleanup_old_backups(self.backup_dir, keep_count=0, keep_days=0)

@@ -120,10 +120,19 @@ class ProjectStatusWorkflowTests(_BaseProjectTests):
         self.login_admin()
         flow = ['NEW', 'PENDING_APPROVAL', 'APPROVED', 'PRINTING', 'DONE']
         for expected_status in flow:
+            # Set status directly via DB
             with self.app.app_context():
                 project = db.session.get(Project, self.project_id)
                 project.status = expected_status
                 db.session.commit()
+            # Advance to the next status via HTTP endpoint
+            response = self.client.post(f'/projects/{self.project_id}/advance_status',
+                                         follow_redirects=False)
+            self.assertIn(response.status_code, (302, 200))
+        # After full flow, status should be DONE (cannot advance further)
+        with self.app.app_context():
+            project = db.session.get(Project, self.project_id)
+            self.assertEqual(project.status, 'DONE')
 
     def test_set_status_directly(self):
         self.login_admin()

@@ -151,7 +151,7 @@
                 <canvas id="consumptionMiniChart" height="100"></canvas>
             </div>
             <div class="ui-card-soft p-4">
-                <div class="ui-label">Knowledge Layer</div>
+                <div class="ui-label">{{ t('quality_knowledge_layer') }}</div>
                 <div class="grid grid-cols-2 gap-3 mt-3 text-sm">
                     <div>
                         <div class="text-gray-500">{{ t('recommended_nozzle_temp') }}</div>
@@ -163,9 +163,9 @@
                     </div>
                 </div>
                 <div class="space-y-2 mt-3 text-sm">
-                    {% if filament.quality_drying %}<div><span class="font-semibold text-gray-700">Drying:</span> <span class="text-gray-500">{{ filament.quality_drying }}</span></div>{% endif %}
-                    {% if filament.quality_profile %}<div><span class="font-semibold text-gray-700">Profile:</span> <span class="text-gray-500">{{ filament.quality_profile }}</span></div>{% endif %}
-                    {% if filament.quality_notes %}<div><span class="font-semibold text-gray-700">Notes:</span> <span class="text-gray-500">{{ filament.quality_notes }}</span></div>{% endif %}
+                    {% if filament.quality_drying %}<div><span class="font-semibold text-gray-700">{{ t('quality_drying_label') }}:</span> <span class="text-gray-500">{{ filament.quality_drying }}</span></div>{% endif %}
+                    {% if filament.quality_profile %}<div><span class="font-semibold text-gray-700">{{ t('quality_profile_label') }}:</span> <span class="text-gray-500">{{ filament.quality_profile }}</span></div>{% endif %}
+                    {% if filament.quality_notes %}<div><span class="font-semibold text-gray-700">{{ t('quality_notes_label') }}:</span> <span class="text-gray-500">{{ filament.quality_notes }}</span></div>{% endif %}
                     {% if not filament.quality_drying and not filament.quality_profile and not filament.quality_notes %}
                     <div class="text-gray-400">{{ t('quality_fill_hint') }}</div>
                     {% endif %}
@@ -180,17 +180,17 @@
             </div>
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
                 <div class="ui-card-soft p-4">
-                    <div class="ui-label">Print Profile</div>
-                    <div class="text-sm text-gray-500 mt-2">Nozzle: <span class="font-semibold text-gray-800">{{ filament.recommended_nozzle_temp if filament.recommended_nozzle_temp is not none else '-' }}</span></div>
-                    <div class="text-sm text-gray-500 mt-1">Bed: <span class="font-semibold text-gray-800">{{ filament.recommended_bed_temp if filament.recommended_bed_temp is not none else '-' }}</span></div>
+                    <div class="ui-label">{{ t('quality_print_profile') }}</div>
+                    <div class="text-sm text-gray-500 mt-2">{{ t('quality_nozzle_label') }}: <span class="font-semibold text-gray-800">{{ filament.recommended_nozzle_temp if filament.recommended_nozzle_temp is not none else '-' }}</span></div>
+                    <div class="text-sm text-gray-500 mt-1">{{ t('quality_bed_label') }}: <span class="font-semibold text-gray-800">{{ filament.recommended_bed_temp if filament.recommended_bed_temp is not none else '-' }}</span></div>
                 </div>
                 <div class="ui-card-soft p-4">
-                    <div class="ui-label">Drying & Adhesion</div>
+                    <div class="ui-label">{{ t('quality_drying_adhesion') }}</div>
                     <div class="text-sm text-gray-500 mt-2">{{ filament.quality_drying or t('quality_no_drying') }}</div>
                     <div class="text-sm text-gray-500 mt-2">{{ filament.quality_adhesion or t('quality_no_adhesion') }}</div>
                 </div>
                 <div class="ui-card-soft p-4">
-                    <div class="ui-label">Stringing & Notes</div>
+                    <div class="ui-label">{{ t('quality_stringing_notes') }}</div>
                     <div class="text-sm text-gray-500 mt-2">{{ filament.quality_stringing or t('quality_no_stringing') }}</div>
                     <div class="text-sm text-gray-500 mt-2">{{ filament.quality_notes or t('quality_no_notes') }}</div>
                 </div>
@@ -342,13 +342,13 @@
         </div>
     </div>
 </div>
-<script>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
 function openReorderShop(name, template) {
     var url = template.replace('{query}', encodeURIComponent(name));
     window.open(url, '_blank', 'noopener,noreferrer');
 }
 </script>
-<script>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
 (function() {
     window.loadScript("{{ url_for('static', filename='js/chart.min.js') }}")
         .then(function() {

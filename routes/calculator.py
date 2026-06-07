@@ -2,7 +2,7 @@
 from flask import render_template, request, redirect, url_for, abort, Blueprint
 from database import db
 from models import Filament, AppSetting, PrintHistory, Project, ProjectQuote
-from utils import get_current_currency, utc_now
+from utils import get_current_currency, translate, utc_now
 
 
 def _build_filament_label(filament):
@@ -153,7 +153,7 @@ def _calculate_project_quote(project, margin_percent, setting):
         else:
             cost_per_gram = 0.0
             material_cost = 0.0
-            name = entry.get('label', 'Neznámý filament')
+            name = entry.get('label', translate('calc_unknown_filament'))
             brand_material = '—'
 
         total_material_cost += material_cost
@@ -284,7 +284,7 @@ def register(app):
             # Aggregate into a single quote for the entire project
             labels = []
             for line in project_result['lines']:
-                f_name = line.get('name') or (line.get('filament').name if line.get('filament') else 'Neznámý')
+                f_name = line.get('name') or (line.get('filament').name if line.get('filament') else translate('calc_unknown'))
                 labels.append(f"{f_name} ({line['weight']:.0f}g)")
             
             combined_name = " + ".join(labels)

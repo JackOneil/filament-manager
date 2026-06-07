@@ -13,7 +13,7 @@ from auth import hash_password
 from database import db
 from models import (
     Brand, Color, Filament, Material, MovementHistory,
-    ProjectFilament, ProjectQuote, User,
+    Project, ProjectFilament, ProjectQuote, User,
 )
 from utils import utc_now
 
@@ -298,16 +298,38 @@ class FilamentDeleteTests(_BaseInventoryTests):
 
     def test_delete_filament_cleans_project_references(self):
         self._login_admin()
-        with self.app.app_context():
-            project = type('Project', (object,), {'id': 999})()
-            # Can't easily make a real Project here; the test verifies
-            # that ProjectFilament and ProjectQuote references are handled
-            pass
 
-        # Just verify the endpoint doesn't crash when there are no references
+        # Create a project and attach filament references
+        with self.app.app_context():
+            project = Project(
+                name='Ref Cleanup Test',
+                status='NEW',
+            )
+            db.session.add(project)
+            db.session.flush()
+
+            pf = ProjectFilament(
+                project_id=project.id,
+                filament_id=self.filament_id,
+                estimated_weight=100.0,
+            )
+            db.session.add(pf)
+            db.session.commit()
+            self.project_ref_id = project.id
+
+        # Delete the filament
         response = self.client.post(f'/delete/{self.filament_id}',
                                      follow_redirects=False)
         self.assertEqual(response.status_code, 302)
+
+        # Verify project references are cleaned up
+        with self.app.app_context():
+            remaining = ProjectFilament.query.filter_by(filament_id=self.filament_id).all()
+            self.assertEqual(len(remaining), 0)
+            # Verify the filament no longer exists
+            self.assertIsNone(db.session.get(Filament, self.filament_id))
+            # Verify the project still exists (cascade should NOT delete the project)
+            self.assertIsNotNone(db.session.get(Project, self.project_ref_id))
 
 
 class FilamentRemoveSpoolTests(_BaseInventoryTests):
@@ -495,17 +517,19 @@ class UiModeToggleTests(_BaseInventoryTests):
         response = self.client.post('/toggle-ui-mode', follow_redirects=False)
         self.assertEqual(response.status_code, 302)
 
-        # Subsequent request should show operator mode
-        response = self.client.get('/')
-        self.assertEqual(response.status_code, 200)
-        # In operator mode, the admin overview is shown with operator styling
-        # but the key is the session change
+        # Verify session changed to operator mode
+        with self.client.session_transaction() as sess:
+            self.assertEqual(sess.get('ui_mode'), 'operator')
 
     def test_toggle_ui_mode_back_to_admin(self):
         self._login_admin()
         self.client.post('/toggle-ui-mode', follow_redirects=False)
         response = self.client.post('/toggle-ui-mode', follow_redirects=False)
         self.assertEqual(response.status_code, 302)
+
+        # Verify session toggled back to admin
+        with self.client.session_transaction() as sess:
+            self.assertEqual(sess.get('ui_mode'), 'admin')
 
     def test_non_admin_cannot_toggle_ui_mode(self):
         with self.app.app_context():

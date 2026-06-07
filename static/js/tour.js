@@ -704,7 +704,7 @@
                     '<span id="fm-tour-label" style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;' +
                          'color:var(--ui-brand,#6366f1);"></span>' +
                 '</div>' +
-                '<button id="fm-tour-close" title="Zavřít" style="width:24px;height:24px;border:none;background:none;cursor:pointer;' +
+                '<button id="fm-tour-close" title="' + this._t({cs:'Zavřít',en:'Close'}) + '" style="width:24px;height:24px;border:none;background:none;cursor:pointer;' +
                     'display:flex;align-items:center;justify-content:center;border-radius:6px;color:var(--ui-text-muted,#9ca3af);">' +
                     '<i class="fa-solid fa-xmark" style="font-size:13px;"></i>' +
                 '</button>' +

@@ -81,7 +81,7 @@
                 <i class="fa-solid fa-layer-group text-lg w-8 text-center flex-shrink-0"></i>
                 <span class="font-bold whitespace-nowrap ml-2 opacity-0 group-[.pinned]:opacity-100 transition-opacity duration-300">{{ t('title') }}</span>
             </a>
-            <button @click="$store.appState.toggleSidebar()" class="w-8 h-8 mr-2 flex items-center justify-center text-white/70 hover:text-white rounded-lg hover:bg-white/10 transition-colors shrink-0" :title="$store.appState.sidebarPinned ? 'Sbalit menu' : 'Rozbalit menu'">
+            <button @click="$store.appState.toggleSidebar()" class="w-8 h-8 mr-2 flex items-center justify-center text-white/70 hover:text-white rounded-lg hover:bg-white/10 transition-colors shrink-0" :title="$store.appState.sidebarPinned ? '{{ t('sidebar_collapse') }}' : '{{ t('sidebar_expand') }}'">
                 <i class="fa-solid" :class="$store.appState.sidebarPinned ? 'fa-angles-left' : 'fa-angles-right'"></i>
             </button>
         </div>
@@ -230,7 +230,7 @@
             {% endif %}
             <button type="button" @click="$store.appState.toggleMobile()" class="flex flex-col items-center justify-center w-full h-full text-xs text-gray-500">
                 <i class="fa-solid fa-bars mb-1 text-lg"></i>
-                <span class="scale-90 opacity-90">Menu</span>
+                <span class="scale-90 opacity-90">{{ t('menu') }}</span>
             </button>
         </div>
     </nav>
@@ -245,7 +245,7 @@
              x-transition:leave-start="translate-y-0"
              x-transition:leave-end="translate-y-full">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="font-bold text-lg text-[var(--ui-text)]">Menu</h3>
+                <h3 class="font-bold text-lg text-[var(--ui-text)]">{{ t('menu') }}</h3>
                 <button @click="$store.appState.mobileOpen = false" class="text-gray-500 hover:text-gray-800 text-xl w-8 h-8 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
             </div>
             
@@ -375,7 +375,7 @@
     <script src="{{ url_for('static', filename='js/help.js') }}"></script>
     <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
         window.__helpLang = {{ current_lang | tojson }};
-        window.__helpEndpoint = {{ (request.endpoint or '') | tojson }};
+        window.__helpEndpoint = {{ (request.endpoint or '').split('.').pop() | tojson }};
         window.__firstLoginTour = {{ ('1' if request.args.get('welcome') == '1' else '0') | tojson }};
         {# Client-side toast i18n: a curated subset of keys used by JS code
            (reactions, upload stepper, etc.). Keep this list small — the
@@ -405,7 +405,7 @@
     </script>
     <script src="{{ url_for('static', filename='js/app-shell.js') }}"></script>
     {% if current_user %}
-    <script type="application/json" x-ref="commandItems">[
+    <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>[
         {% set comma = joiner(',') %}
         {% if auth_has_section_access('overview') or auth_is_admin(current_user) %}
         {{ comma() }}{{ {'label': t('overview'), 'note': t('nav_inventory_overview_note'), 'href': url_for('index'), 'icon': 'fa-house', 'section': t('inventory_nav')}|tojson }}

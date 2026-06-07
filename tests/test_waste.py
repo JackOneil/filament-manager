@@ -105,10 +105,12 @@ class WasteRecordTests(unittest.TestCase):
 
     def test_add_waste_record_without_filament_id_redirects_without_creating(self):
         self._login_admin()
-        self.client.post('/waste/add', data={
+        resp = self.client.post('/waste/add', data={
             'weight_grams': '5',
             'reason': 'warping',
         }, follow_redirects=False)
+        # Should redirect (302) back to the form without creating a record
+        self.assertEqual(resp.status_code, 302)
 
         with self.app.app_context():
             self.assertEqual(WasteRecord.query.count(), 0)

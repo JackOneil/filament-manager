@@ -200,11 +200,24 @@ def _sop_templates():
     ]
 
 
+def _validate_printer_exists(printer_type, printer_id):
+    """Verify that the printer_id references a real printer in the DB."""
+    if printer_id is None:
+        return True  # No printer selected — valid (record is unattached)
+    if printer_type == 'bambu':
+        return db.session.get(BambuPrinter, printer_id) is not None
+    elif printer_type == 'prusa':
+        return db.session.get(PrusaPrinter, printer_id) is not None
+    return False
+
+
 def _apply_form_to_record(rec):
     printer_type = request.form.get('printer_type', 'bambu')
     if printer_type not in ('bambu', 'prusa'):
         printer_type = 'bambu'
     printer_id = request.form.get('printer_id', type=int)
+    if printer_id is not None and not _validate_printer_exists(printer_type, printer_id):
+        printer_id = None
     printer_name = request.form.get('printer_name', '').strip()
     maintenance_type = request.form.get('maintenance_type', 'other')
     if maintenance_type not in MAINTENANCE_TYPES:

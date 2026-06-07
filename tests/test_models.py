@@ -372,3 +372,69 @@ class ModelsFeatureTests(unittest.TestCase):
         self.assertIn('User1 Owned', html)
         self.assertIn('User2 Owned', html)
 
+    def test_model_public_share_with_valid_token(self):
+        """Public (no-auth) share view with a valid token."""
+        self.login('admin@example.com')
+
+        # Create a model file and generate a share token
+        with self.app.app_context():
+            root_file = ProjectFile(
+                project_id=self.project1_id,
+                filename='public_model.stl',
+                filepath=os.path.join(self.upload_dir, 'public_model.stl'),
+                version=1,
+                file_size_bytes=1024,
+                share_token='public-test-token-123',
+            )
+            # Create a physical file so the page renders
+            with open(root_file.filepath, 'w') as f:
+                f.write('dummy model data')
+            db.session.add(root_file)
+            db.session.commit()
+            self.root_file_id = root_file.id
+
+        # Access public share WITHOUT login
+        self.client.get('/logout', follow_redirects=True)
+        response = self.client.get('/models/share/public-test-token-123')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'public_model.stl', response.data)
+
+    def test_model_public_share_with_invalid_token(self):
+        """Public (no-auth) share view with an invalid token returns 404."""
+        self.client.get('/logout', follow_redirects=True)
+        response = self.client.get('/models/share/invalid-token-xyz')
+        self.assertEqual(response.status_code, 404)
+
+    def test_model_generate_and_revoke_share_token(self):
+        """Generate a share token for a model, then revoke it."""
+        self.login('admin@example.com')
+
+        with self.app.app_context():
+            root_file = ProjectFile(
+                project_id=self.project1_id,
+                filename='shareable.stl',
+                filepath=os.path.join(self.upload_dir, 'shareable.stl'),
+                version=1,
+            )
+            with open(root_file.filepath, 'w') as f:
+                f.write('shareable data')
+            db.session.add(root_file)
+            db.session.commit()
+            root_id = root_file.id
+
+        # Generate share token
+        resp = self.client.post(f'/models/{root_id}/share/generate', follow_redirects=True)
+        self.assertEqual(resp.status_code, 200)
+
+        with self.app.app_context():
+            f = db.session.get(ProjectFile, root_id)
+            self.assertIsNotNone(f.share_token)
+
+        # Revoke share token
+        resp = self.client.post(f'/models/{root_id}/share/revoke', follow_redirects=True)
+        self.assertEqual(resp.status_code, 200)
+
+        with self.app.app_context():
+            f = db.session.get(ProjectFile, root_id)
+            self.assertIsNone(f.share_token)
+

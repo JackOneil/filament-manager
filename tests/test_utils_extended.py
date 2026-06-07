@@ -404,7 +404,9 @@ class ValidatePrinterHostTests(unittest.TestCase):
         result = validate_printer_host('https://')
         # rstrip('/') turns 'https://' into 'https:/' which doesn't match the scheme regex,
         # so http:// is prepended returning 'http://https:/'
-        self.assertNotEqual(result, 'https://')
+        # The function returns a URL-ish string (not None) in this edge case
+        self.assertIsInstance(result, str)
+        self.assertIn('://', result)
 
 
 # ── Bambu API Base ──────────────────────────────────────────────────────

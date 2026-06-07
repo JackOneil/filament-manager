@@ -5,6 +5,76 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.110.0] - 2026-06-07
+### Added
+- **Prusa HTTP endpoint tests**: 23 new tests covering job page rendering, printer sync/test, job mapping, and job deletion for PrusaLink routes — addresses BUG-108 (tests/test_prusa_extended.py)
+- **Model public share tests**: Test coverage for `model_public_share`, `model_generate_share`, and `model_revoke_share` endpoints — addresses BUG-112 (tests/test_models.py)
+- **i18n keys**: Added `dashboard_color`, `dashboard_resize`, `dashboard_rows`, `bambu_name_required`, `tag_example` translation keys in both cs and en (messages.py)
+- **DB safety net**: Global `app.teardown_request` handler rolls back the SQLAlchemy session on unhandled exceptions — prevents cascading failures in POST handlers (BUG-107, app.py)
+- **Maintenance validation**: `_validate_printer_exists()` checks `printer_id` against real printer rows before assigning maintenance records (BUG-305, routes/maintenance.py)
+
+### Fixed
+- **BUG-007**: `test_advance_status_full_flow` now makes actual HTTP requests and asserts final status instead of being vacuous (tests/test_projects_extended.py)
+- **BUG-008**: `test_project_usage_returns_rows` now uses a meaningful assertion that checks project name is in usage rows (tests/test_stats_extended.py)
+- **BUG-009**: `test_delete_filament_cleans_project_references` creates real Project/ProjectFilament records and verifies cleanup (tests/test_inventory_extended.py)
+- **BUG-010**: Tour tooltip close button uses `this._t({cs:'Zavřít',en:'Close'})` instead of hardcoded Czech (static/js/tour.js)
+- **BUG-011**: `showToast` i18n fallback no longer uses identity-replacement dead code (static/js/app-shell.js)
+- **BUG-012**: Dashboard hardcoded strings `'Color'`, `'Resize'`, `'Rows'` now use `window._dashColorTitle`, `_dashResizeTitle`, `_dashRowsTitle` set from template `t()` calls (static/js/dashboard.js, templates/overview.html, projects_index.html, stats.html)
+- **BUG-013**: Removed duplicate `openReorderShop` function from inventory.js (already defined in app-shell.js) (static/js/inventory.js)
+- **BUG-104**: Added `bambu_auto_map_history` endpoint to help.js bambu section endpoints array (static/js/help.js)
+- **BUG-105**: Added `project_undo` endpoint to help.js projects section endpoints array (static/js/help.js)
+- **BUG-106**: Changed `ProjectFile.parent_file_id` FK from `ondelete='SET NULL'` to `ondelete='CASCADE'` to match ORM `all, delete-orphan` cascade (models.py)
+- **BUG-109**: Removed identical duplicate `test_stats_page_returns_200_with_no_data` test (tests/test_stats_extended.py)
+- **BUG-110**: Fixed `_login_admin` dead code by removing `if False else None` pattern (tests/test_bambu_extended.py)
+- **BUG-111**: `loadScript` now deletes the cache entry on script load failure, allowing retries instead of returning stale rejection (static/js/app-shell.js)
+- **BUG-200**: Added defense-in-depth attribute escaping to markdown editor link URLs (static/js/markdown-editor.js)
+- **BUG-201**: Added `attrEsc()` helper to escape URLs from data-attributes in inventory context menu (static/js/inventory.js)
+- **BUG-202**: Debounced `saveLayout()` calls during drag-and-drop to avoid excessive localStorage writes (static/js/dashboard.js)
+- **BUG-204**: Strengthened chart data assertion to check for `const statsData` and `"labels"` JSON (tests/test_stats_extended.py)
+- **BUG-205**: Fixed vacuously-true assertion in `test_just_scheme_no_host_returns_none` to check result type and content (tests/test_utils_extended.py)
+- **BUG-206**: Changed loose `assertLessEqual` to precise `assertEqual` for auto-backup count test (tests/test_backup_extended.py)
+- **BUG-207**: Changed `file_size_bytes` from `db.Integer` to `db.BigInteger` to prevent overflow on files >2GB (models.py)
+- **BUG-208**: Added `x-cloak` to `x-show` element in `_projects_layout.html` (templates/_projects_layout.html)
+- **BUG-209**: Fixed MutationObserver `DOMContentLoaded` edge case by checking `document.readyState` (static/js/app-shell.js)
+- **BUG-210**: Simplified redundant conditional branches in dashboard.js drag-and-drop handler (static/js/dashboard.js)
+- **BUG-212**: Added response status code check to `test_add_waste_record_without_filament_id` (tests/test_waste.py)
+- **BUG-213**: Added response status code check to `test_add_shelf_duplicate_name_skipped` (tests/test_storage_history_pwa.py)
+- **BUG-214**: `test_toggle_ui_mode_to_operator` now verifies session change via `session_transaction` (tests/test_inventory_extended.py)
+- **BUG-215**: Replaced hardcoded English error messages with `translate()` calls in bambu.py JSON API (routes/bambu.py, messages.py)
+- **BUG-216**: Changed f-string to lazy `%s` formatting in auto-backup logger call (app.py)
+- **BUG-305**: Added `_validate_printer_exists()` to prevent attaching maintenance records to non-existent printers (routes/maintenance.py)
+- **BUG-307**: Fixed hardcoded English tag placeholder and Czech shop URL placeholder (templates/add.html, templates/settings.html, messages.py)
+- **BUG-308**: `_audit_finish_request` now logs audit entries even for failed write requests (4xx/5xx), including HTTP status in payload (auth.py)
+
+## [1.109.1] - 2026-06-07
+### Added
+- **Backup coverage**: `UserSession`, `ModelComment`, and `ProjectCommentReaction` models now included in `/export` and `/import` — full round-trip backup/restore for user sessions, model file comments, and emoji reactions (routes/backup_helpers.py, routes/backup.py)
+- **FK documentation**: Added migration notes for `movement_history` and `bambu_job_material` ondelete constraints (migrations.py)
+
+### Fixed
+- **BUG-302**: `encrypt_token()` now logs a warning when Fernet encryption fails (invalid key) — previously silently fell back to plaintext (utils/__init__.py)
+- **BUG-303**: `log_movement()` docstring now explicitly warns callers that they must call `db.session.commit()` (utils/__init__.py)
+- **BUG-100**: Added `ondelete='SET NULL'` to `MovementHistory.filament_id`, `project_id`, `bambu_job_id` and `BambuJobMaterial.filament_id` FK constraints (models.py)
+
+## [1.109.0] - 2026-06-07
+### Added
+- **i18n translations**: Added ~25 new translation keys (sidebar labels, quality labels, printer names, activity events, audit, stats, placeholders) in both `cs` and `en` (messages.py)
+- **CSP nonce**: All inline `<script>` blocks across 24 templates now inject `nonce="{{ csp_nonce }}"` — enabling strict nonce-based CSP in the future (templates/*.html)
+
+### Changed
+- **BUG-301**: `utils.get_current_lang()` and `translate()` now respect `current_user.preferred_language` — backend notifications, flash messages, and audit labels follow the user's language preference (utils/__init__.py)
+- **BUG-101**: Added `ondelete='RESTRICT'` to `Filament.brand_id`, `color_id`, `material_id` FK constraints — prevents deletion of brands/colors/materials in use (models.py)
+- **BUG-102**: Replaced all hardcoded user-visible strings in route error responses (`return 'Unauthorized', 401` → `abort(401)` etc.) and activity event labels with translations (routes/projects.py, routes/backup.py, routes/calculator.py, routes/projects_helpers.py)
+- **BUG-103**: Replaced all hardcoded user-visible text in templates with `{{ t("key") }}` — sidebar tooltips, printer type options, input placeholders, quality labels, etc. (templates/*.html)
+
+## [1.108.2] - 2026-06-07
+### Fixed
+- **BUG-001**: `_migrate_nullable_project_id` CREATE TABLE missing `share_token` and `model_note` columns — crash on legacy database upgrade (migrations.py)
+- **BUG-002**: Help panel `currentSection` detection broken due to Flask blueprint prefix mismatch — contextual tips never rendered (base.html)
+- **BUG-003**: Missing `PRAGMA foreign_keys=ON` in SQLite connection setup — all FK constraints silently ignored (app.py)
+- **BUG-004**: `WasteRecord.filament_id` FK missing `ondelete='CASCADE'` — risk of orphaned references when deleting a filament (models.py, migrations.py)
+- **BUG-006**: `bambu_job_delete` returned 302 redirect for nonexistent jobs instead of 404; test name promised 404 but asserted 302 (routes/bambu.py, tests/test_bambu_extended.py)
+
 ## [1.108.1] - 2026-06-07
 ### Added
 - **Canonical architecture documentation** — New `.kilo/ARCHITECTURE.md` serves as the single source of truth for all project architecture, conventions, rules, and data flow. All agent files now reference this document as their Phase 0 (mandatory first step).

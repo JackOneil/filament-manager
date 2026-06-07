@@ -391,7 +391,7 @@
     </div>
 
     <!--Initialization/Logic-->
-    <script>
+    <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
         function quoteExport() {
             const createdRaw = {{ (quote.created_at.isoformat() if quote.created_at else '')|tojson }};
             let dCreated = new Date();

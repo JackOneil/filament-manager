@@ -122,9 +122,9 @@ class Material(db.Model):
 class Filament(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
-    brand_id = db.Column(db.Integer, db.ForeignKey('brand.id'), nullable=False)
-    color_id = db.Column(db.Integer, db.ForeignKey('color.id'), nullable=False)
-    material_id = db.Column(db.Integer, db.ForeignKey('material.id'), nullable=False)
+    brand_id = db.Column(db.Integer, db.ForeignKey('brand.id', ondelete='RESTRICT'), nullable=False)
+    color_id = db.Column(db.Integer, db.ForeignKey('color.id', ondelete='RESTRICT'), nullable=False)
+    material_id = db.Column(db.Integer, db.ForeignKey('material.id', ondelete='RESTRICT'), nullable=False)
 
     weight_total = db.Column(db.Float, nullable=False)
     weight_remaining = db.Column(db.Float, nullable=False)
@@ -154,9 +154,9 @@ class Filament(db.Model):
 class MovementHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     created_at = db.Column(db.DateTime, default=_utc_now, index=True)
-    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id'), nullable=True, index=True)
-    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
-    bambu_job_id = db.Column(db.Integer, db.ForeignKey('bambu_print_job.id'), nullable=True)
+    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='SET NULL'), nullable=True, index=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='SET NULL'), nullable=True)
+    bambu_job_id = db.Column(db.Integer, db.ForeignKey('bambu_print_job.id', ondelete='SET NULL'), nullable=True)
     filament_name = db.Column(db.String(255), nullable=False)
     action_type = db.Column(db.String(50), nullable=False)
     weight = db.Column(db.Float, nullable=False)
@@ -340,9 +340,9 @@ class ProjectFile(db.Model):
     filepath = db.Column(db.String(255), nullable=False)
     uploaded_at = db.Column(db.DateTime, default=_utc_now)
     version = db.Column(db.Integer, nullable=False, default=1)
-    parent_file_id = db.Column(db.Integer, db.ForeignKey('project_file.id', ondelete='SET NULL'), nullable=True)
+    parent_file_id = db.Column(db.Integer, db.ForeignKey('project_file.id', ondelete='CASCADE'), nullable=True)
     display_name = db.Column(db.String(255), nullable=True)
-    file_size_bytes = db.Column(db.Integer, nullable=True)
+    file_size_bytes = db.Column(db.BigInteger, nullable=True)
     mime_type = db.Column(db.String(120), nullable=True)
     checksum_sha256 = db.Column(db.String(64), nullable=True)
     thumbnail_path = db.Column(db.String(255), nullable=True)
@@ -513,7 +513,7 @@ class BambuJobMaterial(db.Model):
     color_hex = db.Column(db.String(10), nullable=True)
     material_name = db.Column(db.String(100), nullable=True)
     weight_grams = db.Column(db.Float, nullable=True)
-    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id'), nullable=True)
+    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='SET NULL'), nullable=True)
     deducted = db.Column(db.Boolean, default=False)
 
     job = db.relationship('BambuPrintJob', backref=db.backref('materials', lazy=True, cascade='all, delete-orphan'))
@@ -597,16 +597,16 @@ class PrinterMaintenance(db.Model):
 class WasteRecord(db.Model):
     """Record of failed/scrapped prints with reason, weight, and filament reference."""
     id = db.Column(db.Integer, primary_key=True)
-    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id'), nullable=False)
-    filament = db.relationship('Filament', backref=db.backref('waste_records', lazy=True))
-    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=True)
+    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='CASCADE'), nullable=False)
+    filament = db.relationship('Filament', backref=db.backref('waste_records', lazy=True, cascade='all, delete-orphan'))
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='SET NULL'), nullable=True)
     project = db.relationship('Project', backref=db.backref('waste_records', lazy=True))
     reason = db.Column(db.String(50), nullable=False, default='other')
     # stringing, warping, bed_adhesion, clogging, layer_shift, spaghetti, broken_support, other
     weight_grams = db.Column(db.Float, nullable=False, default=0.0)
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=_utc_now)
-    recorded_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    recorded_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     recorded_by = db.relationship('User', backref=db.backref('waste_records', lazy=True))
 
     def __repr__(self):

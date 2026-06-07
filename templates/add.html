@@ -112,7 +112,7 @@
             </div>
             <div>
                 <label class="block text-gray-700 text-sm font-semibold mb-2">{{ t('tag_list') }}</label>
-                <input type="text" name="tag_text" placeholder="PLA, matte, prototype" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="text" name="tag_text" placeholder="{{ t('tag_example') }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
         </div>
 
@@ -136,7 +136,7 @@
     </form>
 </div>
 
-<script>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
 const _ADD_BRANDS   = [{% for b in brands %}{"id":{{ b.id }},"name":{{ b.name|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];
 const _ADD_MATS     = [{% for m in materials %}{"id":{{ m.id }},"name":{{ m.name|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];
 const _ADD_COLORS   = [{% for c in colors %}{"id":{{ c.id }},"name":{{ c.name|tojson }},"hex":{{ c.hex_value|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];

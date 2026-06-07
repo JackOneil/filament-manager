@@ -151,7 +151,7 @@
                         <h2 class="text-xl font-bold mt-1">{{ t('projects_table_heading') }}</h2>
                     </div>
                     <div class="flex flex-wrap gap-2">
-                        <a href="#" @click.prevent="resetFilters()" x-show="hasFilters" class="ui-badge ui-badge-warning" style="display: none;">
+                        <a href="#" @click.prevent="resetFilters()" x-show="hasFilters" x-cloak class="ui-badge ui-badge-warning" style="display: none;">
                             <i class="fa-solid fa-filter-circle-xmark"></i> {{ t('filter_reset') }}
                         </a>
                         <a href="#" @click.prevent="toggleSort('name')" class="ui-badge" :class="sortBy === 'name' ? 'ui-badge-brand' : ''">{{ t('project_name') }}</a>

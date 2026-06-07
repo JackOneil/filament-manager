@@ -30,7 +30,12 @@ window.loadScript = function(src) {
         const script = document.createElement('script');
         script.src = src;
         script.onload = () => resolve(true);
-        script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+        script.onerror = () => {
+            // Clear the cache entry so a future call retries instead of
+            // returning the stale rejection permanently.
+            delete window.loadedScripts[src];
+            reject(new Error(`Failed to load script: ${src}`));
+        };
         document.head.appendChild(script);
     });
     return window.loadedScripts[src];
@@ -171,12 +176,17 @@ function appShell() {
     }
 
     // Inject into forms added by AJAX (e.g. fetchContent() in inventory)
-    document.addEventListener('DOMContentLoaded', function () {
+    function startMutationObserver() {
         new MutationObserver(injectCsrfIntoForms).observe(
             document.body,
             { childList: true, subtree: true }
         );
-    });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startMutationObserver);
+    } else {
+        startMutationObserver();
+    }
 
     // ── Shop URL resolver ─────────────────────────────────────────────────
     // Shared by filament cards, list rows, stats, and overview widgets.
@@ -229,7 +239,7 @@ function appShell() {
         var actions = opts.actions || [];
         var lang = (window.__helpLang || 'cs');
         var dict = (window.__i18n && window.__i18n[lang]) || {};
-        var text = dict[messageKey] || dict[messageKey.replace(/^[a-z_]+_/, function(m){ return m; })] || messageKey;
+        var text = dict[messageKey] || messageKey;
 
         var container = document.getElementById('client-toast-container');
         if (!container) {

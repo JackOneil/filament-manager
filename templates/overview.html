@@ -106,7 +106,7 @@
                      x-init="init()"
                      @click.away="closeAll()">
                     {# Pass all available metrics as JSON #}
-                    <script>
+                    <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
                     const _KPI_TRENDS = {{ overview_focus.kpi_trends | tojson }};
                     const _KPI_PERIOD_LABELS = {
                         '7d':        {{ t('kpi_trend_vs_7d')|tojson }},
@@ -395,8 +395,8 @@
                         <span id="live-printers-refresh-indicator" class="text-xs text-gray-400 hidden">
                             <i class="fa-solid fa-rotate fa-spin text-blue-400 mr-1"></i>
                         </span>
-                        <a href="{{ url_for('bambu_jobs') }}" class="ui-badge"><i class="fa-solid fa-print"></i> Bambu</a>
-                        <a href="{{ url_for('prusa_jobs') }}" class="ui-badge"><i class="fa-solid fa-network-wired"></i> Prusa</a>
+                        <a href="{{ url_for('bambu_jobs') }}" class="ui-badge"><i class="fa-solid fa-print"></i> {{ t('printer_bambu') }}</a>
+                        <a href="{{ url_for('prusa_jobs') }}" class="ui-badge"><i class="fa-solid fa-network-wired"></i> {{ t('printer_prusa') }}</a>
                     </div>
                 </div>
                 <div id="live-printers-content" class="flex flex-col flex-1 min-h-0">
@@ -404,7 +404,7 @@
                 </div>
             </div>
         </section>
-        <script>
+        <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
         (function() {
             var refreshInterval = setInterval(function() {
                 var indicator = document.getElementById('live-printers-refresh-indicator');
@@ -845,7 +845,7 @@
     </div>
 </div>
 
-<script>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
 (function() {
     const container = document.getElementById('activity-heatmap-grid');
     if (!container) return;
@@ -877,6 +877,9 @@
         container.appendChild(col);
     }
 })();
+window._dashColorTitle = {{ t('dashboard_color')|tojson }};
+window._dashResizeTitle = {{ t('dashboard_resize')|tojson }};
+window._dashRowsTitle = {{ t('dashboard_rows')|tojson }};
 const overviewLayout = createWidgetLayoutManager({
     containerId: 'overview-layout',
     scopeId: 'overview-page',
@@ -890,6 +893,7 @@ const overviewLayout = createWidgetLayoutManager({
     hideBtnTitle: {{ t('dashboard_hide_widget')|tojson }},
     showBtnTitle: {{ t('dashboard_show_widget')|tojson }},
     limitAllText: {{ t('stats_limit_all')|tojson }},
+    limitSelectTitle: {{ t('dashboard_rows')|tojson }},
     mdGridCols: 2,
     defaultOrder: ['recent_activity', 'live_printers', 'action_center', 'lowest_stock', 'upcoming_deadlines', 'usage_7d', 'top_turnover', 'quick_links', 'activity_heatmap'],
 });

@@ -527,7 +527,7 @@ html.dark .widget-color-picker > div {
                 </div>
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-lg font-bold text-gray-800">{{ t('stats_purchase_recommendations') }}</h2>
-                    <span class="text-xs text-gray-400">30d / 90d</span>
+                    <span class="text-xs text-gray-400">{{ t('stats_period_30d_90d') }}</span>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-sm">
@@ -722,7 +722,7 @@ html.dark .widget-color-picker > div {
 
 </div>
 
-<script>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
 const statsData = {{ chart_data|safe }};
 
 function statsDashboard() {
@@ -940,10 +940,13 @@ function saveLayout() {
     localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
 }
 
+window._dashColorTitle = {{ t('dashboard_color')|tojson }};
+window._dashResizeTitle = {{ t('dashboard_resize')|tojson }};
 const cardManager = createCardResizeManager({
     getLayout:    () => layout,
     saveLayout:   saveLayout,
     isEditMode:   () => editMode,
+    limitAllText: {{ t('stats_limit_all')|tojson }},
 });
 
 function applyOrder() {

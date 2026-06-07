@@ -2,7 +2,7 @@
 {% block content %}
 
 {# Filament + project data as JSON for Alpine dropdowns #}
-<script>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
 const _WF = {{ filaments_json | tojson | safe }};
 const _WP = {{ projects_json | tojson | safe }};
 </script>
@@ -307,7 +307,7 @@ const _WP = {{ projects_json | tojson | safe }};
     </div>
 </div>
 
-<script>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
 // ── Lightbox for waste photo attachments ─────────────────────────────────────
 function wasteLightbox() {
     return {

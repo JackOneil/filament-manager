@@ -434,7 +434,7 @@
     </div>
 </div>
 
-<script>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
 // ── Waste from failed print: modal open handler ───────────────────────────────────────────
 document.addEventListener('click', function(e) {
     var btn = e.target.closest('[data-waste-btn]');

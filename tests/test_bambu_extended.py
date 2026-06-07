@@ -72,7 +72,7 @@ class _BaseBambuExtTests(unittest.TestCase):
             '/login',
             data={'email': 'admin@example.com', 'password': 'password123'},
             follow_redirects=True,
-        ) if False else None  # Skip login for most tests (no auth on bambu)
+        )
 
 
 # ── Bambu Jobs Page ─────────────────────────────────────────────────────
@@ -138,7 +138,8 @@ class BambuJobManagementTests(_BaseBambuExtTests):
     def test_job_delete_nonexistent_returns_404(self):
         response = self.client.post('/bambu/job/99999/delete',
                                      follow_redirects=False)
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json, {'ok': False, 'error': 'not found'})
 
     def test_job_map_assigns_filament(self):
         with self.app.app_context():

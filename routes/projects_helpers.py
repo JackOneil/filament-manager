@@ -418,7 +418,7 @@ def _build_project_activity_events(project):
     for quote in sorted(project.quotes, key=lambda item: item.created_at or datetime.min, reverse=True):
         activity_events.append({
             'created_at': quote.created_at,
-            'label': f'Quote saved: {quote.final_price:.2f} {quote.currency}',
+            'label': translate('activity_quote_saved').format(price=f'{quote.final_price:.2f}', currency=quote.currency),
             'detail': f'{quote.filament_name} · {quote.weight} g · {quote.final_price:.2f} {quote.currency}',
             'meta': f'{quote.filament_name} · {quote.weight} g',
             'kind': 'quote',
@@ -426,7 +426,7 @@ def _build_project_activity_events(project):
     for project_file in sorted(project.files, key=lambda item: item.uploaded_at or datetime.min, reverse=True):
         activity_events.append({
             'created_at': project_file.uploaded_at,
-            'label': f'File uploaded: {project_file.filename}',
+            'label': translate('activity_file_uploaded').format(filename=project_file.filename),
             'detail': project_file.filename,
             'meta': _get_extension(project_file.filename).upper() or 'FILE',
             'kind': 'file',
@@ -434,7 +434,7 @@ def _build_project_activity_events(project):
     for comment in sorted(project.comments, key=lambda item: item.created_at or datetime.min, reverse=True):
         activity_events.append({
             'created_at': comment.updated_at or comment.created_at,
-            'label': f'Comment: {(comment.body or "")[:60]}',
+            'label': translate('activity_comment').format(body=(comment.body or '')[:60]),
             'detail': (comment.body or '')[:200],
             'meta': comment.user.name if comment.user else '-',
             'kind': 'comment',
@@ -442,7 +442,7 @@ def _build_project_activity_events(project):
     for todo in sorted(project.todos, key=lambda item: item.created_at or datetime.min, reverse=True):
         activity_events.append({
             'created_at': todo.completed_at or todo.created_at,
-            'label': f'TODO: {todo.body}',
+            'label': translate('activity_todo').format(body=todo.body),
             'detail': todo.body or '',
             'meta': 'done' if todo.is_done else 'open',
             'kind': 'todo',
