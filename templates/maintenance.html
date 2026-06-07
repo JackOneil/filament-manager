@@ -151,7 +151,7 @@
                     <i class="fa-solid fa-pen-to-square"></i>
                 </button>
                 <form method="POST" action="{{ url_for('maintenance_delete', rec_id=rec.id) }}"
-                      onsubmit="return confirm('{{ t('maintenance_delete_confirm') }}')" class="inline">
+                      data-confirm="{{ t('maintenance_delete_confirm') }}" class="inline">
                     <button type="submit" class="text-gray-300 hover:text-red-500 transition" title="{{ t('delete') }}">
                         <i class="fa-solid fa-trash-can"></i>
                     </button>

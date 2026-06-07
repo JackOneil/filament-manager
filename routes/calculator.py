@@ -240,11 +240,15 @@ def register(app):
                             )
                             db.session.add(saved_quote)
 
-                    app.logger.debug(
-                        f"Print calculated: {filament.name}, weight={weight}g, "
-                        f"material={result['material_cost']:.2f}, elec={result['electricity_cost']:.2f}, total={result['total_cost']:.2f}"
-                    )
-                    db.session.commit()
+                    try:
+                        db.session.commit()
+                        app.logger.debug(
+                            f"Print calculated: {filament.name}, weight={weight}g, "
+                            f"material={result['material_cost']:.2f}, elec={result['electricity_cost']:.2f}, total={result['total_cost']:.2f}"
+                        )
+                    except Exception:
+                        db.session.rollback()
+                        app.logger.exception("Failed to save print calculation")
 
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)

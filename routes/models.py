@@ -575,13 +575,13 @@ def model_upload_thumbnail(file_id):
     
     img_data = request.form.get('image')
     if not img_data:
-        return jsonify({'error': 'invalid data'}), 400
+        return jsonify({'error': translate('error_invalid_data')}), 400
         
     is_jpeg = img_data.startswith('data:image/jpeg;base64,')
     is_png = img_data.startswith('data:image/png;base64,')
     
     if not (is_jpeg or is_png):
-        return jsonify({'error': 'invalid data'}), 400
+        return jsonify({'error': translate('error_invalid_data')}), 400
         
     import base64
     raw_data = base64.b64decode(img_data.split(',')[1])

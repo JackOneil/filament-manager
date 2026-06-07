@@ -91,7 +91,7 @@
                 </form>
                 {% endif %}
                 <form method="POST" action="{{ url_for('notification_delete', id=notification.id) }}"
-                      onsubmit="return confirm('{{ t('notifications_delete_confirm') }}')">
+                      data-confirm="{{ t('notifications_delete_confirm') }}">
                     <input type="hidden" name="page" value="{{ notifications.page }}">
                     <input type="hidden" name="kind" value="{{ kind_filter }}">
                     <button type="submit" class="ui-badge ui-badge-danger text-xs"><i class="fa-solid fa-trash-can"></i></button>

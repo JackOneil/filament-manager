@@ -12,7 +12,7 @@
             id: 'overview',
             icon: 'fa-house',
             hasTour: true,
-            endpoints: ['index', 'overview_user'],
+            endpoints: ['index', 'overview_user', 'api_live_printers_partial', 'api_search'],
             title: { cs: 'Přehled', en: 'Overview' },
             tips: [
                 {
@@ -56,7 +56,7 @@
             id: 'filaments',
             icon: 'fa-boxes-stacked',
             hasTour: true,
-            endpoints: ['filaments_index', 'filament_detail', 'add', 'edit', 'use_filament', 'add_spool', 'remove_spool', 'delete', 'filament_import_csv', 'filament_export_csv', 'filament_update_meta', 'filament_toggle_reorder_snooze', 'inventory_bulk', 'inventory_undo', 'toggle_ui_mode', 'filament_community_db', 'filament_community_db_import'],
+            endpoints: ['filaments_index', 'filament_detail', 'add', 'edit', 'use_filament', 'add_spool', 'remove_spool', 'delete', 'filament_import_csv', 'filament_export_csv', 'filament_update_meta', 'filament_toggle_reorder_snooze', 'inventory_bulk', 'inventory_undo', 'toggle_ui_mode', 'filament_community_db', 'filament_community_db_import', 'api_filaments_list'],
             title: { cs: 'Inventář filamentů', en: 'Filament Inventory' },
             tips: [
                 {

@@ -81,7 +81,7 @@
                         {% endif %}
                         {% endif %}
                         {% if can_manage_project %}
-                        <form method="POST" action="{{ url_for('project_remove_filament', id=project.id, pf_id=pf.id) }}" onsubmit="return confirm('{{ t('delete') }}?')">
+                        <form method="POST" action="{{ url_for('project_remove_filament', id=project.id, pf_id=pf.id) }}" data-confirm="{{ t('delete') }}">
                             <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-xmark"></i> {{ t('delete') }}</button>
                         </form>
                         {% endif %}

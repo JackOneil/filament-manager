@@ -206,7 +206,7 @@
                         <i class="fa-solid fa-link"></i> {{ t('prusa_map_filament') }}
                     </button>
                     <form method="POST" action="{{ url_for('prusa_job_delete', job_id=job.id) }}"
-                        onsubmit="return confirm('{{ t('prusa_delete_confirm') }}');">
+                        data-confirm="{{ t('prusa_delete_confirm') }}">
                         <button type="submit"
                             class="text-xs text-red-400 hover:text-red-600 transition-colors px-3 py-1.5 rounded-lg">
                             <i class="fa-solid fa-trash-can"></i> {{ t('delete') }}
@@ -543,7 +543,7 @@ async function doSync(printerId, printerName) {
     res.classList.add('hidden');
 
     try {
-        const r = await fetch(`/prusa/printer/${printerId}/sync`, { method: 'POST' });
+        const r = await fetch('{{ url_for("prusa_printer_sync", printer_id=999999999) }}'.replace('999999999', printerId), { method: 'POST' });
         const data = await r.json();
         res.classList.remove('hidden');
         if (data.ok) {

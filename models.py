@@ -155,10 +155,10 @@ class MovementHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     created_at = db.Column(db.DateTime, default=_utc_now, index=True)
     filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='SET NULL'), nullable=True, index=True)
-    project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='SET NULL'), nullable=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='SET NULL'), nullable=True, index=True)
     bambu_job_id = db.Column(db.Integer, db.ForeignKey('bambu_print_job.id', ondelete='SET NULL'), nullable=True)
-    filament_name = db.Column(db.String(255), nullable=False)
-    action_type = db.Column(db.String(50), nullable=False)
+    filament_name = db.Column(db.String(255), nullable=False, index=True)
+    action_type = db.Column(db.String(50), nullable=False, index=True)
     weight = db.Column(db.Float, nullable=False)
     cost = db.Column(db.Float, nullable=False)
     currency = db.Column(db.String(10), nullable=False)
@@ -280,9 +280,9 @@ class Project(db.Model):
     priority = db.Column(db.String(10), nullable=False, default='medium')  # low, medium, high, urgent
     tag_text = db.Column(db.Text, nullable=True)
     share_token = db.Column(db.String(64), unique=True, nullable=True, index=True)
-    owner_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, index=True)
+    owner_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True, index=True)
     owner_name = db.Column(db.String(120), nullable=True)
-    created_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, index=True)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True, index=True)
 
     owner = db.relationship('User', foreign_keys=[owner_user_id], backref=db.backref('owned_projects', lazy=True))
     created_by = db.relationship('User', foreign_keys=[created_by_user_id], backref=db.backref('created_projects', lazy=True))
@@ -493,7 +493,7 @@ class BambuPrintJob(db.Model):
     cost_time = db.Column(db.Integer, nullable=True)   # print duration in seconds
     raw_payload = db.Column(db.Text, nullable=True)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='SET NULL'), nullable=True, index=True)
-    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='SET NULL'), nullable=True)
+    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='SET NULL'), nullable=True, index=True)
     deducted = db.Column(db.Boolean, default=False)
     synced_at = db.Column(db.DateTime, default=_utc_now)
 
@@ -507,13 +507,13 @@ class BambuPrintJob(db.Model):
 class BambuJobMaterial(db.Model):
     """Per-AMS-slot material consumption for a Bambu print job."""
     id = db.Column(db.Integer, primary_key=True)
-    job_id = db.Column(db.Integer, db.ForeignKey('bambu_print_job.id', ondelete='CASCADE'), nullable=False)
+    job_id = db.Column(db.Integer, db.ForeignKey('bambu_print_job.id', ondelete='CASCADE'), nullable=False, index=True)
     ams_id = db.Column(db.Integer, nullable=True)
     tray_id = db.Column(db.Integer, nullable=True)
     color_hex = db.Column(db.String(10), nullable=True)
     material_name = db.Column(db.String(100), nullable=True)
     weight_grams = db.Column(db.Float, nullable=True)
-    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='SET NULL'), nullable=True)
+    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='SET NULL'), nullable=True, index=True)
     deducted = db.Column(db.Boolean, default=False)
 
     job = db.relationship('BambuPrintJob', backref=db.backref('materials', lazy=True, cascade='all, delete-orphan'))
@@ -550,7 +550,7 @@ class PrusaPrintJob(db.Model):
     weight_grams = db.Column(db.Float, nullable=True)         # from g-code metadata
     cost_time = db.Column(db.Integer, nullable=True)          # print duration in seconds
     progress = db.Column(db.Float, nullable=True)             # 0.0–1.0
-    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='SET NULL'), nullable=True)
+    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='SET NULL'), nullable=True, index=True)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='SET NULL'), nullable=True)
     deducted = db.Column(db.Boolean, nullable=False, default=False)
     raw_payload = db.Column(db.Text, nullable=True)

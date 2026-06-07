@@ -40,7 +40,7 @@
                                 </button>
                                 <a href="{{ url_for('project_download_file', id=project.id, file_id=file.id) }}" class="ui-badge"><i class="fa-solid fa-download"></i></a>
                                 {% if can_edit_project %}
-                                <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=file.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');">
+                                <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=file.id) }}" data-confirm="{{ t('project_delete_confirm') }}">
                                     <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-trash"></i></button>
                                 </form>
                                 {% endif %}
@@ -62,7 +62,7 @@
                                     <div class="flex gap-2 flex-shrink-0">
                                         <a href="{{ url_for('project_download_file', id=project.id, file_id=ver.id) }}" class="ui-badge text-xs"><i class="fa-solid fa-download"></i></a>
                                         {% if can_edit_project %}
-                                        <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=ver.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');">
+                                        <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=ver.id) }}" data-confirm="{{ t('project_delete_confirm') }}">
                                             <button type="submit" class="ui-badge ui-badge-critical text-xs"><i class="fa-solid fa-trash"></i></button>
                                         </form>
                                         {% endif %}
@@ -105,7 +105,7 @@
                         <div class="flex gap-2 flex-shrink-0">
                             <a href="{{ url_for('project_download_file', id=project.id, file_id=file.id) }}" class="ui-badge"><i class="fa-solid fa-download"></i> {{ t('download') }}</a>
                             {% if can_edit_project %}
-                            <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=file.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');">
+                            <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=file.id) }}" data-confirm="{{ t('project_delete_confirm') }}">
                                 <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-trash"></i></button>
                             </form>
                             {% endif %}
@@ -128,7 +128,7 @@
                     <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
                         <div class="text-white hover:text-blue-300 transition"><i class="fa-solid fa-expand text-2xl"></i></div>
                         {% if can_edit_project %}
-                        <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=img.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');" @click.stop>
+                        <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=img.id) }}" data-confirm="{{ t('project_delete_confirm') }}" @click.stop>
                             <button type="submit" class="text-white hover:text-red-400 transition ml-2"><i class="fa-solid fa-trash text-xl"></i></button>
                         </form>
                         {% endif %}

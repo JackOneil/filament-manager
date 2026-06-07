@@ -223,7 +223,7 @@
                     <i x-show="brand == opt.id" class="fa-solid fa-check text-blue-500 text-xs"></i>
                 </div>
             </template>
-            <div x-show="filteredBrands.length === 0" class="px-3 py-2 text-gray-400 italic text-xs text-center">–</div>
+            <div x-show="filteredBrands.length === 0" x-cloak class="px-3 py-2 text-gray-400 italic text-xs text-center">–</div>
         </div>
     </div>
 
@@ -253,7 +253,7 @@
                     <i x-show="material == opt.id" class="fa-solid fa-check text-blue-500 text-xs"></i>
                 </div>
             </template>
-            <div x-show="filteredMaterials.length === 0" class="px-3 py-2 text-gray-400 italic text-xs text-center">–</div>
+            <div x-show="filteredMaterials.length === 0" x-cloak class="px-3 py-2 text-gray-400 italic text-xs text-center">–</div>
         </div>
     </div>
 
@@ -284,7 +284,7 @@
                     <i x-show="color == opt.id" class="fa-solid fa-check text-blue-500 text-xs"></i>
                 </div>
             </template>
-            <div x-show="filteredColors.length === 0" class="px-3 py-2 text-gray-400 italic text-xs text-center">–</div>
+            <div x-show="filteredColors.length === 0" x-cloak class="px-3 py-2 text-gray-400 italic text-xs text-center">–</div>
         </div>
     </div>
     <div class="flex-1 min-w-[150px] relative" @click.outside="tagOpen = false">
@@ -312,7 +312,7 @@
                     <i x-show="tagQ === opt" class="fa-solid fa-check text-blue-500 text-xs"></i>
                 </div>
             </template>
-            <div x-show="filteredTagOptions.length === 0" class="px-3 py-2 text-gray-400 italic text-xs text-center">–</div>
+            <div x-show="filteredTagOptions.length === 0" x-cloak class="px-3 py-2 text-gray-400 italic text-xs text-center">–</div>
         </div>
     </div>
     <div class="flex gap-2">
@@ -478,7 +478,7 @@
                         </form>
                         <a href="{{ url_for('filament_detail', id=fil.id) }}" title="{{ t('spool_life_timeline') }}" class="text-indigo-400 hover:text-indigo-600 transition-colors"><i class="fa-solid fa-wave-square"></i></a>
                         <a href="{{ url_for('edit', id=fil.id) }}" title="{{ t('edit') }}" class="text-gray-400 hover:text-blue-500 transition-colors"><i class="fa-solid fa-edit"></i></a>
-                        <form action="{{ url_for('delete', id=fil.id) }}" method="POST" onsubmit="return confirm('{{ t('delete_confirm') }}');">
+                        <form action="{{ url_for('delete', id=fil.id) }}" method="POST" data-confirm="{{ t('delete_confirm') }}">
                             <button type="submit" class="text-gray-400 hover:text-red-500 transition-colors"><i class="fa-solid fa-trash"></i></button>
                         </form>
                         {% if fil.shop_url %}
@@ -500,7 +500,7 @@
     </div>
     {% endfor %}
 {% else %}
-    <form id="bulkDeleteForm" method="POST" action="{{ url_for('inventory_bulk') }}" onsubmit="return confirm('{{ t('bulk_delete_confirm') }}');" class="bg-white p-2.5 rounded-t-lg shadow-sm border border-gray-100 border-b-0 mb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+    <form id="bulkDeleteForm" method="POST" action="{{ url_for('inventory_bulk') }}" data-confirm="{{ t('bulk_delete_confirm') }}" class="bg-white p-2.5 rounded-t-lg shadow-sm border border-gray-100 border-b-0 mb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div class="flex items-center gap-3">
             <label class="inline-flex items-center gap-2 cursor-pointer select-none">
                 <input type="checkbox" id="selectAllFilaments" class="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
@@ -638,7 +638,7 @@
                 </form>
                 <a href="{{ url_for('filament_detail', id=fil.id) }}" title="{{ t('spool_life_timeline') }}" class="text-indigo-400 hover:text-indigo-600 transition-colors text-sm sm:text-base"><i class="fa-solid fa-wave-square"></i></a>
                 <a href="{{ url_for('edit', id=fil.id) }}" title="{{ t('edit') }}" class="text-gray-400 hover:text-blue-500 transition-colors text-sm sm:text-base"><i class="fa-solid fa-edit"></i></a>
-                <form action="{{ url_for('delete', id=fil.id) }}" method="POST" onsubmit="return confirm('{{ t('delete_confirm') }}');">
+                <form action="{{ url_for('delete', id=fil.id) }}" method="POST" data-confirm="{{ t('delete_confirm') }}">
                     <button type="submit" title="{{ t('delete') }}" class="text-gray-400 hover:text-red-500 transition-colors text-sm sm:text-base"><i class="fa-solid fa-trash"></i></button>
                 </form>
                 {% if fil.shop_url %}
@@ -1057,7 +1057,7 @@ function buildListHeaderHtml() {
 
 function buildListBulkToolbarHtml() {
     return `
-        <form id="bulkDeleteForm" method="POST" action="{{ url_for('inventory_bulk') }}" onsubmit="return confirm('{{ t('bulk_delete_confirm') }}');"
+        <form id="bulkDeleteForm" method="POST" action="{{ url_for('inventory_bulk') }}" data-confirm="{{ t('bulk_delete_confirm') }}"
             class="bg-white p-2.5 rounded-t-lg shadow-sm border border-gray-100 border-b-0 mb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div class="flex items-center gap-3">
                 <label class="inline-flex items-center gap-2 cursor-pointer select-none">

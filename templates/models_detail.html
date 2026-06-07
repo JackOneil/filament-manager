@@ -36,7 +36,7 @@
             <a href="{{ url_for('models.model_download_latest', root_id=root.id) }}" class="ui-badge ui-badge-success h-10 px-4 justify-center gap-1.5 font-bold">
                 <i class="fa-solid fa-download"></i> {{ t('models_download_latest') }}
             </a>
-            <form method="POST" action="{{ url_for('models.model_delete', root_id=root.id) }}" onsubmit="return confirm('{{ t('models_delete_confirm') }}');" class="inline-flex">
+            <form method="POST" action="{{ url_for('models.model_delete', root_id=root.id) }}" data-confirm="{{ t('models_delete_confirm') }}" class="inline-flex">
                 <button type="submit" class="ui-badge ui-badge-critical h-10 px-4 justify-center gap-1.5 font-bold">
                     <i class="fa-solid fa-trash"></i> {{ t('models_delete_model') }}
                 </button>
@@ -49,7 +49,7 @@
                 <input type="text" readonly
                        value="{{ request.host_url.rstrip('/') }}{{ url_for('models.model_public_share', token=root.share_token) }}"
                        class="bg-transparent text-xs font-mono text-emerald-700 dark:text-emerald-300 outline-none w-64 truncate"
-                       onclick="this.select(); document.execCommand('copy');"
+                       onclick="this.select(); navigator.clipboard.writeText(this.value).catch(function(err){console.error('Copy failed:',err);});"
                        title="{{ t('models_share_copy_hint') }}">
                 <form method="POST" action="{{ url_for('models.model_revoke_share', root_id=root.id) }}" class="inline-flex">
                     <button type="submit" class="text-red-400 hover:text-red-600 transition text-xs font-semibold whitespace-nowrap">
@@ -295,7 +295,7 @@
                         <a href="{{ url_for('models.model_download_version', file_id=ver.id) }}" class="ui-badge h-8 w-8 justify-center" title="Download version file">
                             <i class="fa-solid fa-download text-xs"></i>
                         </a>
-                        <form method="POST" action="{{ url_for('models.model_delete_version', file_id=ver.id) }}" onsubmit="return confirm('{{ t('models_delete_confirm_version') }}');" class="inline-flex">
+                        <form method="POST" action="{{ url_for('models.model_delete_version', file_id=ver.id) }}" data-confirm="{{ t('models_delete_confirm_version') }}" class="inline-flex">
                             <button type="submit" class="ui-badge ui-badge-critical h-8 w-8 justify-center" title="{{ t('models_delete_version') }}">
                                 <i class="fa-solid fa-trash text-xs"></i>
                             </button>
@@ -329,7 +329,7 @@
                             <span class="text-[10px] text-gray-400">{{ c.created_at | fmt_dt('%d.%m.%Y %H:%M') }}</span>
                             {% if current_user and (auth_is_admin(current_user) or c.user_id == current_user.id) %}
                             <form method="POST" action="{{ url_for('models.model_delete_comment', root_id=root.id, comment_id=c.id) }}"
-                                  onsubmit="return confirm('{{ t('models_comment_delete_confirm') }}');" class="inline-flex">
+                                  data-confirm="{{ t('models_comment_delete_confirm') }}" class="inline-flex">
                                 <button type="submit" class="text-gray-300 hover:text-red-500 transition text-xs">
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>

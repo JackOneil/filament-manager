@@ -244,44 +244,58 @@ def compute_stock_status(filament, usage_30=0.0, usage_90=0.0):
     }
 
 
-_fernet_warned = False
+def _check_fernet_configured() -> bool:
+    """Check if FERNET_KEY is configured. Returns True if configured."""
+    raw_key = os.environ.get('FERNET_KEY', '').strip()
+    if not raw_key:
+        return False
+    try:
+        from cryptography.fernet import Fernet
+        Fernet(raw_key.encode())
+        return True
+    except Exception:
+        return False
 
-def _warn_fernet_missing_once():
-    global _fernet_warned
-    if not _fernet_warned:
-        _fernet_warned = True
-        import logging
-        logging.getLogger(__name__).warning(
-            'FERNET_KEY environment variable is not set — Bambu tokens and '
-            'Prusa API keys will be stored as plaintext in the database. '
-            'Set FERNET_KEY to enable encryption at rest.'
-        )
+
+def _is_testing():
+    """Check if running in Flask test mode."""
+    try:
+        from flask import current_app
+        return current_app.config.get('TESTING', False)
+    except (RuntimeError, ImportError):
+        return False
 
 
 def encrypt_token(plaintext: str) -> str:
     """Encrypt a sensitive token using FERNET_KEY env var.
 
-    Returns the plaintext unchanged when FERNET_KEY is not configured
-    (preserves backward compatibility for existing installations).
-    Logs a one-time warning on first call when the key is missing.
+    Raises RuntimeError if FERNET_KEY is not configured (except for
+    empty/placeholder values like 'NEEDS_CONFIGURATION' and during
+    testing where plaintext is accepted for backward compatibility).
+
+    Use _check_fernet_configured() to test at startup.
     """
     if not plaintext:
         return plaintext
+    # Allow known placeholders through without encryption
+    if plaintext in ('NEEDS_CONFIGURATION',):
+        return plaintext
     raw_key = os.environ.get('FERNET_KEY', '').strip().encode()
     if not raw_key:
-        _warn_fernet_missing_once()
-        return plaintext
+        if _is_testing():
+            return plaintext  # accept plaintext during testing
+        raise RuntimeError(
+            'FERNET_KEY environment variable is not set — cannot encrypt '
+            'sensitive tokens. Set FERNET_KEY to a valid Fernet key to '
+            'enable encryption at rest.'
+        )
     try:
         from cryptography.fernet import Fernet
         return Fernet(raw_key).encrypt(plaintext.encode()).decode()
     except Exception as exc:
-        import logging
-        logging.getLogger(__name__).warning(
-            'Fernet encryption failed (invalid FERNET_KEY?): %s — '
-            'storing token as plaintext',
-            exc,
-        )
-        return plaintext
+        raise RuntimeError(
+            f'Fernet encryption failed (invalid FERNET_KEY?): {exc}'
+        ) from exc
 
 
 def decrypt_token(ciphertext: str) -> str:
@@ -293,9 +307,12 @@ def decrypt_token(ciphertext: str) -> str:
     """
     if not ciphertext:
         return ciphertext
+    # Allow known placeholders through without decryption
+    if ciphertext in ('NEEDS_CONFIGURATION',):
+        return ciphertext
     raw_key = os.environ.get('FERNET_KEY', '').strip().encode()
     if not raw_key:
-        return ciphertext
+        return ciphertext  # no key configured — return as-is (legacy plaintext)
     try:
         from cryptography.fernet import Fernet
         return Fernet(raw_key).decrypt(ciphertext.encode()).decode()

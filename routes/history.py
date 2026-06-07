@@ -4,6 +4,7 @@ from flask import render_template, request, redirect, url_for, make_response, Bl
 from database import db
 from models import MovementHistory
 from utils import escape_like
+from auth import require_admin
 
 
 _VALID_PER_PAGE = [10, 20, 50, 100]
@@ -107,6 +108,7 @@ def register(app):
         return resp
 
     @bp.route('/history/clear', methods=['POST'])
+    @require_admin
     def clear_history():
         """Delete all movement history records."""
         try:

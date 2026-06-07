@@ -3,8 +3,8 @@
 
 {# Filament + project data as JSON for Alpine dropdowns #}
 <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
-const _WF = {{ filaments_json | tojson | safe }};
-const _WP = {{ projects_json | tojson | safe }};
+const _WF = {{ filaments_json | tojson }};
+const _WP = {{ projects_json | tojson }};
 </script>
 
 <div class="max-w-7xl mx-auto space-y-6">
@@ -121,7 +121,7 @@ const _WP = {{ projects_json | tojson | safe }};
                             </div>
                             {# div closes: 3 #}
                             <form method="POST" action="{{ url_for('waste_delete_file', file_id=wf.id, page=paginated.page, reason=filter_reason, filament=filter_filament, project=filter_project) }}"
-                                  onsubmit="return confirm('{{ t('waste_file_delete_confirm') }}')"
+                                  data-confirm="{{ t('waste_file_delete_confirm') }}"
                                   @click.stop class="absolute top-0.5 right-0.5">
                                 <button type="submit" class="w-5 h-5 rounded-full bg-red-600 text-white text-xs opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
                                     <i class="fa-solid fa-times"></i>
@@ -147,12 +147,12 @@ const _WP = {{ projects_json | tojson | safe }};
                 </div>
                 <div class="flex items-center gap-2 flex-shrink-0">
                     <button type="button"
-                            data-waste-edit="{{ {'id': rec.id, 'filament_id': rec.filament_id, 'filament_name': (rec.filament.name if rec.filament else ''), 'project_id': rec.project_id, 'project_name': (rec.project.name if rec.project else ''), 'reason': rec.reason, 'weight': rec.weight_grams, 'notes': (rec.notes or '')} | tojson | forceescape }}"
+                             data-waste-edit="{{ {'id': rec.id, 'filament_id': rec.filament_id, 'filament_name': (rec.filament.name if rec.filament else ''), 'project_id': rec.project_id, 'project_name': (rec.project.name if rec.project else ''), 'reason': rec.reason, 'weight': rec.weight_grams, 'notes': (rec.notes or '')} | tojson }}"
                             class="text-gray-300 hover:text-blue-500 transition" title="{{ t('edit') }}">
                         <i class="fa-solid fa-pen-to-square"></i>
                     </button>
                     <form method="POST" action="{{ url_for('waste_delete', rec_id=rec.id) }}"
-                          onsubmit="return confirm('{{ t('waste_delete_confirm') }}')" class="inline">
+                          data-confirm="{{ t('waste_delete_confirm') }}" class="inline">
                         <button type="submit" class="text-gray-300 hover:text-red-500 transition" title="{{ t('delete') }}">
                             <i class="fa-solid fa-trash-can"></i>
                         </button>

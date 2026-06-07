@@ -206,6 +206,7 @@ SECTION_BY_ENDPOINT = {
     'notification_delete': SECTION_NOTIFICATIONS,
     'notification_delete_read': SECTION_NOTIFICATIONS,
     'audit_logs': SECTION_USERS,
+    'overview_user': SECTION_OVERVIEW,
 }
 
 
@@ -276,6 +277,16 @@ def has_section_access(section, write=False, user=None):
     if write:
         return False
     return bool(user_permissions(user).get(section, False))
+
+
+def validate_password_strength(password):
+    """Validate password meets minimum strength requirements.
+    Returns (is_valid: bool, error_key: str|None)."""
+    if not password or len(password) < 8:
+        return False, 'auth_password_too_short'
+    if len(password) > 256:
+        return False, 'auth_password_too_long'
+    return True, None
 
 
 def hash_password(password):
@@ -362,7 +373,7 @@ def ensure_endpoint_access():
     endpoint = request.endpoint or ''
     if '.' in endpoint:
         endpoint = endpoint.split('.')[-1]
-    if endpoint in PUBLIC_ENDPOINTS or endpoint.startswith('pwa.'):
+    if endpoint in PUBLIC_ENDPOINTS:
         return None
     if request.method == 'OPTIONS':
         return None

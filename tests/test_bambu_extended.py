@@ -139,7 +139,9 @@ class BambuJobManagementTests(_BaseBambuExtTests):
         response = self.client.post('/bambu/job/99999/delete',
                                      follow_redirects=False)
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json, {'ok': False, 'error': 'not found'})
+        data = response.json or {}
+        self.assertFalse(data.get('ok'))
+        self.assertIn('error', data)
 
     def test_job_map_assigns_filament(self):
         with self.app.app_context():

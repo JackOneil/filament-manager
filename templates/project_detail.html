@@ -86,7 +86,7 @@
                 <form method="POST" action="{{ url_for('project_template_save', id=project.id) }}">
                     <button type="submit" class="ui-badge" title="{{ t('project_template_save_as') }}"><i class="fa-solid fa-layer-group"></i> {{ t('project_template_save_as') }}</button>
                 </form>
-                <form method="POST" action="{{ url_for('project_delete', id=project.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');">
+                <form method="POST" action="{{ url_for('project_delete', id=project.id) }}" data-confirm="{{ t('project_delete_confirm') }}">
                     <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-trash"></i> {{ t('delete') }}</button>
                 </form>
                 {% endif %}
@@ -348,7 +348,8 @@
                                 class="ui-badge ui-badge-brand w-full sm:w-auto justify-center sm:justify-start"
                                 :aria-expanded="addOpen">
                             <i class="fa-solid fa-plus transition-transform duration-200" :class="addOpen ? 'rotate-45' : ''"></i>
-                            <span x-text="addOpen ? '{{ t('cancel') }}' : '{{ t('project_add_filament_btn') }}'"></span>
+                            <span x-show="addOpen" x-text="'{{ t('cancel') }}'"></span>
+                            <span x-show="!addOpen" x-text="'{{ t('project_add_filament_btn') }}'"></span>
                         </button>
                         <form x-show="addOpen" x-cloak x-transition
                               method="POST" action="{{ url_for('project_add_filament', id=project.id) }}"
@@ -415,7 +416,7 @@
                                     {% endif %}
                                     {% endif %}
                                     {% if can_manage_project %}
-                                    <form method="POST" action="{{ url_for('project_remove_filament', id=project.id, pf_id=pf.id) }}" onsubmit="return confirm('{{ t('delete') }}?')">
+                                    <form method="POST" action="{{ url_for('project_remove_filament', id=project.id, pf_id=pf.id) }}" data-confirm="{{ t('delete') }}">
                                         <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-xmark"></i> {{ t('delete') }}</button>
                                     </form>
                                     {% endif %}
@@ -560,12 +561,12 @@
                                             <div class="text-xs text-gray-500">{{ file.filename.rsplit('.', 1)[-1].upper() if '.' in file.filename else 'FILE' }}</div>
                                         </div>
                                         <div class="flex gap-2 flex-shrink-0">
-                                            <button type="button" @click="modelViewerOpen = true; modelViewerTitle = '{{ file.filename|escape }}'; modelViewerDownload = '{{ url_for('project_download_file', id=project.id, file_id=file.id) }}'; modelViewerUrl = '{{ url_for('project_view_file', id=project.id, file_id=file.id, filename=file.filename) }}'; open3DViewer(modelViewerUrl, modelViewerColor)" class="ui-badge ui-badge-brand">
+                                            <button type="button" data-filename="{{ file.filename }}" data-download="{{ url_for('project_download_file', id=project.id, file_id=file.id) }}" data-viewer="{{ url_for('project_view_file', id=project.id, file_id=file.id, filename=file.filename) }}" @click="modelViewerOpen = true; modelViewerTitle = $el.dataset.filename; modelViewerDownload = $el.dataset.download; modelViewerUrl = $el.dataset.viewer; open3DViewer(modelViewerUrl, modelViewerColor)" class="ui-badge ui-badge-brand">
                                                 <i class="fa-solid fa-cube"></i> {{ t('project_preview_3d') }}
                                             </button>
                                             <a href="{{ url_for('project_download_file', id=project.id, file_id=file.id) }}" class="ui-badge"><i class="fa-solid fa-download"></i></a>
                                             {% if can_edit_project %}
-                                            <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=file.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');">
+                                            <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=file.id) }}" data-confirm="{{ t('project_delete_confirm') }}">
                                                 <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-trash"></i></button>
                                             </form>
                                             {% endif %}
@@ -587,7 +588,7 @@
                                                 <div class="flex gap-2 flex-shrink-0">
                                                     <a href="{{ url_for('project_download_file', id=project.id, file_id=ver.id) }}" class="ui-badge text-xs"><i class="fa-solid fa-download"></i></a>
                                                     {% if can_edit_project %}
-                                                    <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=ver.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');">
+                                                    <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=ver.id) }}" data-confirm="{{ t('project_delete_confirm') }}">
                                                         <button type="submit" class="ui-badge ui-badge-critical text-xs"><i class="fa-solid fa-trash"></i></button>
                                                     </form>
                                                     {% endif %}
@@ -616,7 +617,7 @@
                                     <div class="flex gap-2">
                                         <a href="{{ url_for('project_download_file', id=project.id, file_id=file.id) }}" class="ui-badge"><i class="fa-solid fa-download"></i> {{ t('download') }}</a>
                                         {% if can_edit_project %}
-                                        <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=file.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');">
+                                        <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=file.id) }}" data-confirm="{{ t('project_delete_confirm') }}">
                                             <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-trash"></i></button>
                                         </form>
                                         {% endif %}
@@ -633,13 +634,13 @@
                         <div class="ui-label mb-3">{{ t('image_gallery') }}</div>
                         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                             {% for img in images %}
-                            <div class="relative group aspect-square rounded-xl border border-gray-200 overflow-hidden bg-gray-100 flex items-center justify-center cursor-pointer"
-                                 @click="lightboxOpen = true; lightboxImg = '{{ url_for('project_image_file', id=project.id, file_id=img.id) }}'; lightboxTitle = '{{ img.filename | escape }}'; lightboxDownload = '{{ url_for('project_download_file', id=project.id, file_id=img.id) }}'">
+                             <div class="relative group aspect-square rounded-xl border border-gray-200 overflow-hidden bg-gray-100 flex items-center justify-center cursor-pointer"
+                                 data-viewer-img="{{ url_for('project_image_file', id=project.id, file_id=img.id) }}" data-viewer-filename="{{ img.filename }}" data-viewer-download="{{ url_for('project_download_file', id=project.id, file_id=img.id) }}" @click="lightboxOpen = true; lightboxImg = $el.dataset.viewerImg; lightboxTitle = $el.dataset.viewerFilename; lightboxDownload = $el.dataset.viewerDownload">
                                 <img src="{{ url_for('project_image_file', id=project.id, file_id=img.id) }}" alt="{{ img.filename }}" class="object-cover w-full h-full">
                                 <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
                                     <div class="text-white hover:text-blue-300 transition"><i class="fa-solid fa-expand text-2xl"></i></div>
                                     {% if can_edit_project %}
-                                    <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=img.id) }}" onsubmit="return confirm('{{ t('project_delete_confirm') }}');" @click.stop>
+                                    <form method="POST" action="{{ url_for('project_delete_file', id=project.id, file_id=img.id) }}" data-confirm="{{ t('project_delete_confirm') }}" @click.stop>
                                         <button type="submit" class="text-white hover:text-red-400 transition ml-2"><i class="fa-solid fa-trash text-xl"></i></button>
                                     </form>
                                     {% endif %}

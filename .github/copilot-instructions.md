@@ -389,7 +389,7 @@ The `/export` and `/import` functions in `routes/backup.py` must cover the **ent
 ### Rule 19 — Testing
 - Security-sensitive helpers require automated regression tests under `tests/`.
 - Use `unittest` with `unittest.mock` for HTTP mocking.
-- Run: `python -m pytest tests/ -v`
+- Run: `python -m pytest tests/ -v -n auto` (parallel execution via pytest-xdist)
 
 ### Rule 20 — Error Handling
 - Use `request.form.get()` with `type=` conversion + `try/except (TypeError, ValueError)`.

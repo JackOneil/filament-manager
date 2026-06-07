@@ -110,7 +110,7 @@
                     </form>
                     <a href="{{ url_for('filament_detail', id=fil.id) }}" title="{{ t('spool_life_timeline') }}" class="text-indigo-400 hover:text-indigo-600 transition-colors"><i class="fa-solid fa-wave-square"></i></a>
                     <a href="{{ url_for('edit', id=fil.id) }}" title="{{ t('edit') }}" class="text-gray-400 hover:text-blue-500 transition-colors"><i class="fa-solid fa-edit"></i></a>
-                    <form action="{{ url_for('delete', id=fil.id) }}" method="POST" onsubmit="return confirm('{{ t('delete_confirm') }}');">
+                    <form action="{{ url_for('delete', id=fil.id) }}" method="POST" data-confirm="{{ t('delete_confirm') }}">
                         <button type="submit" class="text-gray-400 hover:text-red-500 transition-colors"><i class="fa-solid fa-trash"></i></button>
                     </form>
                     {% if fil.shop_url %}

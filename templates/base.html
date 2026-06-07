@@ -8,7 +8,7 @@
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
     <title>{{ t('title') }}</title>
     <style>[x-cloak]{display:none!important}</style>
-    <script defer src="{{ url_for('static', filename='js/alpine.min.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/alpine.min.js') }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
     <link rel="preload" href="{{ url_for('static', filename='fonts/files/plus-jakarta-sans-latin-wght-normal.woff2') }}" as="font" type="font/woff2" crossorigin fetchpriority="high">
     <link rel="preload" href="{{ url_for('static', filename='fonts/files/plus-jakarta-sans-latin-ext-wght-normal.woff2') }}" as="font" type="font/woff2" crossorigin fetchpriority="high">
     <link rel="stylesheet" href="{{ url_for('static', filename='fonts/plus-jakarta-sans.css') }}">
@@ -370,40 +370,46 @@
                 {% endif %}
             </div>
         </header>
-    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/tour.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/help.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
+    <script src="{{ url_for('static', filename='js/tour.js') }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
+    <script src="{{ url_for('static', filename='js/help.js') }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
     <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
         window.__helpLang = {{ current_lang | tojson }};
         window.__helpEndpoint = {{ (request.endpoint or '').split('.').pop() | tojson }};
         window.__firstLoginTour = {{ ('1' if request.args.get('welcome') == '1' else '0') | tojson }};
         {# Client-side toast i18n: a curated subset of keys used by JS code
            (reactions, upload stepper, etc.). Keep this list small — the
-           full dictionary is large and not needed on the client. #}
-        window.__i18n = {
-            cs: {
-                'reaction_failed': 'Nepodařilo se uložit reakci. Zkuste to prosím znovu.',
-                'upload_validating': 'Ověřuji soubor…',
-                'upload_uploading': 'Nahrávám soubor…',
-                'upload_preview': 'Generuji 3D náhled…',
-                'upload_done': 'Hotovo!',
-                'upload_failed': 'Nahrání selhalo. Zkuste to prosím znovu.',
-                'upload_invalid_type': 'Nepodporovaný typ souboru.',
-                'upload_too_large': 'Soubor je příliš velký (max. {max} MB).',
-            },
-            en: {
-                'reaction_failed': 'Could not save your reaction. Please try again.',
-                'upload_validating': 'Validating file…',
-                'upload_uploading': 'Uploading file…',
-                'upload_preview': 'Generating 3D preview…',
-                'upload_done': 'Done!',
-                'upload_failed': 'Upload failed. Please try again.',
-                'upload_invalid_type': 'Unsupported file type.',
-                'upload_too_large': 'File is too large (max. {max} MB).',
-            }
-        };
+           full dictionary is large and not needed on the client.
+
+           IMPORTANT: Must be kept in sync with translations in messages.py
+           (Rule 1). Changes here require corresponding updates in messages.py
+           and vice versa. #}
+        window.__i18n = {{
+            {
+                'cs': {
+                    'reaction_failed': 'Nepodařilo se uložit reakci. Zkuste to prosím znovu.',
+                    'upload_validating': 'Ověřuji soubor…',
+                    'upload_uploading': 'Nahrávám soubor…',
+                    'upload_preview': 'Generuji 3D náhled…',
+                    'upload_done': 'Hotovo!',
+                    'upload_failed': 'Nahrání selhalo. Zkuste to prosím znovu.',
+                    'upload_invalid_type': 'Nepodporovaný typ souboru.',
+                    'upload_too_large': 'Soubor je příliš velký (max. {max} MB).',
+                },
+                'en': {
+                    'reaction_failed': 'Could not save your reaction. Please try again.',
+                    'upload_validating': 'Validating file…',
+                    'upload_uploading': 'Uploading file…',
+                    'upload_preview': 'Generating 3D preview…',
+                    'upload_done': 'Done!',
+                    'upload_failed': 'Upload failed. Please try again.',
+                    'upload_invalid_type': 'Unsupported file type.',
+                    'upload_too_large': 'File is too large (max. {max} MB).',
+                },
+            } | tojson
+        }};
     </script>
-    <script src="{{ url_for('static', filename='js/app-shell.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app-shell.js') }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
     {% if current_user %}
     <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>[
         {% set comma = joiner(',') %}
@@ -577,10 +583,22 @@
             });
         }
     </script>
-    <script src="{{ url_for('static', filename='js/bambu-filter.js') }}"></script>
+    {# ═══════════════════════════════════════════════════════════════
+       data-confirm handler — replaces onsubmit="return confirm('...')"
+       to prevent JS injection via translated strings (BUG-404).
+       ═══════════════════════════════════════════════════════════════ #}
+    <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
+        document.addEventListener('submit', function(e) {
+            var msg = e.target.getAttribute('data-confirm');
+            if (msg && !confirm(msg)) {
+                e.preventDefault();
+            }
+        });
+    </script>
+    <script src="{{ url_for('static', filename='js/bambu-filter.js') }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
     <!-- Mobile UX Enhancements: Scroll collapsable topbar, Swipe gestures, Pull-to-refresh -->
-    <script src="{{ url_for('static', filename='js/mobile-ux.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/markdown-editor.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/mobile-ux.js') }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
+    <script src="{{ url_for('static', filename='js/markdown-editor.js') }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
 
     {# ═══════════════════════════════════════════════════════════════
        HELP PANEL — accessible on every page

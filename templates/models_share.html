@@ -36,7 +36,7 @@
         #3d-viewer-container:fullscreen iframe { width: 100%; height: 100%; }
         [x-cloak] { display: none !important; }
     </style>
-    <script defer src="{{ url_for('static', filename='js/alpine.min.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/alpine.min.js') }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
     <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
         // Apply saved theme before page renders to prevent FOUC
         (function() {

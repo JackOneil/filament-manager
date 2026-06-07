@@ -29,8 +29,8 @@
                     :class="filterBrand === '' ? 'ui-badge ui-badge-brand' : 'ui-badge'"
                     class="text-xs">{{ t('community_db_filter_all') }}</button>
             {% for brand in brands %}
-            <button type="button" @click="filterBrand = {{ brand|tojson }}"
-                    :class="filterBrand === {{ brand|tojson }} ? 'ui-badge ui-badge-brand' : 'ui-badge'"
+            <button type="button" @click='filterBrand = {{ brand|tojson }}'
+                    :class='filterBrand === {{ brand|tojson }} ? "ui-badge ui-badge-brand" : "ui-badge"'
                     class="text-xs">{{ brand }}</button>
             {% endfor %}
         </div>
@@ -70,9 +70,9 @@
             {% for p in profiles %}
             {% set key = p.brand ~ '|' ~ p.material ~ '|' ~ p.color %}
             <div class="ui-card-soft p-3 cursor-pointer select-none transition-all hover:shadow-md"
-                 :class="selected.has({{ key|tojson }}) ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20' : ''"
-                 @click="toggleSelect({{ key|tojson }})"
-                 x-show="matches({{ p.brand|tojson }}, {{ p.material|tojson }}, {{ p.color|tojson }})">
+                 :class='selected.has({{ key|tojson }}) ? "ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20" : ""'
+                 @click='toggleSelect({{ key|tojson }})'
+                 x-show='matches({{ p.brand|tojson }}, {{ p.material|tojson }}, {{ p.color|tojson }})'>
                 <div class="flex items-center gap-2 mb-2">
                     <div class="w-6 h-6 rounded-full border border-gray-200 shrink-0"
                          style="background-color: {{ p.hex }}"></div>

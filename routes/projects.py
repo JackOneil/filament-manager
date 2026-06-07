@@ -980,12 +980,12 @@ def register(app):
     def project_comment_react(id, cid):
         user = get_current_user()
         if not user:
-            return jsonify({'error': 'unauthorized'}), 401
+            return jsonify({'error': translate('error_unauthorized')}), 401
         comment = ProjectComment.query.filter_by(id=cid, project_id=id).first_or_404()
         emoji = request.form.get('emoji', '').strip()
         ALLOWED_EMOJIS = {'👍', '✅', '🔄', '🎉', '❤️'}
         if emoji not in ALLOWED_EMOJIS:
-            return jsonify({'error': 'invalid emoji'}), 400
+            return jsonify({'error': translate('error_invalid_emoji')}), 400
         existing = ProjectCommentReaction.query.filter_by(comment_id=cid, user_id=user.id, emoji=emoji).first()
         if existing:
             db.session.delete(existing)
@@ -1074,16 +1074,16 @@ def register(app):
     def project_toggle_comment_checkbox(id, comment_id):
         project = _project_or_404(id)
         if not _project_write_allowed(project):
-            return jsonify({'error': 'Forbidden'}), 403
+            return jsonify({'error': translate('error_forbidden')}), 403
         comment = db.get_or_404(ProjectComment, comment_id)
         if comment.project_id != id:
             abort(404)
         try:
             checkbox_index = int(request.form.get('checkbox_index', -1))
         except (TypeError, ValueError):
-            return jsonify({'error': 'Invalid index'}), 400
+            return jsonify({'error': translate('error_invalid_index')}), 400
         if checkbox_index < 0:
-            return jsonify({'error': 'Invalid index'}), 400
+            return jsonify({'error': translate('error_invalid_index')}), 400
         comment.body = _toggle_markdown_checkbox(comment.body, checkbox_index)
         comment.updated_at = utc_now()
         db.session.commit()
@@ -1093,13 +1093,13 @@ def register(app):
     def project_toggle_description_checkbox(id):
         project = _project_or_404(id)
         if not _project_write_allowed(project):
-            return jsonify({'error': 'Forbidden'}), 403
+            return jsonify({'error': translate('error_forbidden')}), 403
         try:
             checkbox_index = int(request.form.get('checkbox_index', -1))
         except (TypeError, ValueError):
-            return jsonify({'error': 'Invalid index'}), 400
+            return jsonify({'error': translate('error_invalid_index')}), 400
         if checkbox_index < 0:
-            return jsonify({'error': 'Invalid index'}), 400
+            return jsonify({'error': translate('error_invalid_index')}), 400
         project.description = _toggle_markdown_checkbox(project.description or '', checkbox_index)
         db.session.commit()
         return jsonify({'html': render_markdown(project.description)})

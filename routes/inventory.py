@@ -1,6 +1,4 @@
 """Inventory routes: listing, CRUD, spool management, and filament detail."""
-import csv
-import io
 import math
 import os
 import secrets
@@ -742,7 +740,7 @@ def register(app):
 
     @bp.route('/filaments/export-csv', methods=['GET'])
     def filament_export_csv():
-        import flask
+        import flask, io, csv
         _require_inventory_admin()
         filaments = Filament.query.options(joinedload(Filament.brand), joinedload(Filament.material), joinedload(Filament.color)).order_by(Filament.name).all()
 

@@ -163,7 +163,7 @@
                 <i class="fa-solid fa-link"></i> {{ t('bambu_map_filament') }}
             </button>
             <form method="POST" action="{{ url_for('bambu_job_delete', job_id=job.id) }}"
-                onsubmit="return confirm('{{ t('bambu_delete_confirm') }}');">
+                data-confirm="{{ t('bambu_delete_confirm') }}">
                 <button type="submit"
                     class="text-xs text-red-400 hover:text-red-600 transition-colors px-3 py-1.5 rounded-lg">
                     <i class="fa-solid fa-trash-can"></i> {{ t('delete') }}

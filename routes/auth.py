@@ -1,5 +1,6 @@
 from datetime import datetime
 from utils import utc_now
+import time
 
 from flask import abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for, Blueprint
 from sqlalchemy import or_
@@ -22,11 +23,41 @@ from auth import (
     safe_redirect_target,
     serialize_permissions,
     user_permissions,
+    validate_password_strength,
     verify_password,
 )
 from database import db
 from models import AuditLog, Notification, Project, User, UserInvite, UserSession
 from sqlalchemy import func
+
+
+# ── Rate limiting (in-memory, safe with 1 Gunicorn worker) ─────────────
+_LOGIN_ATTEMPT_WINDOW = 300  # 5 minutes
+_LOGIN_MAX_ATTEMPTS = 10     # max attempts per window
+_login_attempts = {}  # ip -> [timestamp, ...]
+
+
+def _check_login_rate_limit(ip_addr: str) -> bool:
+    """Return True if request is allowed, False if rate-limited.
+
+    Bypasses rate limiting during testing.
+    """
+    from flask import current_app
+    if current_app.config.get('TESTING'):
+        return True
+    now = time.time()
+    # Prune old entries
+    if ip_addr in _login_attempts:
+        _login_attempts[ip_addr] = [
+            ts for ts in _login_attempts[ip_addr]
+            if now - ts < _LOGIN_ATTEMPT_WINDOW
+        ]
+        if len(_login_attempts[ip_addr]) >= _LOGIN_MAX_ATTEMPTS:
+            return False
+    else:
+        _login_attempts[ip_addr] = []
+    _login_attempts[ip_addr].append(now)
+    return True
 
 
 def _bool_field(name):
@@ -94,6 +125,12 @@ def register(app):
         if get_current_user():
             return redirect(url_for('index'))
         if request.method == 'POST':
+            # Rate limiting
+            client_ip = request.access_route[0] if request.access_route else request.remote_addr or 'unknown'
+            if not _check_login_rate_limit(client_ip):
+                flash('auth_login_rate_limited', 'error')
+                return render_template('auth_login.html', user_count=User.query.count())
+
             email = request.form.get('email', '').strip().lower()
             password = request.form.get('password', '')
             user = User.query.filter_by(email=email).first()
@@ -138,8 +175,9 @@ def register(app):
             name = request.form.get('name', '').strip()
             email = request.form.get('email', '').strip().lower()
             password = request.form.get('password', '')
-            if not name or not email or len(password) < 8:
-                flash('auth_register_invalid', 'error')
+            pwd_valid, pwd_error = validate_password_strength(password)
+            if not name or not email or not pwd_valid:
+                flash(pwd_error or 'auth_register_invalid', 'error')
                 return render_template('auth_register.html', bootstrap_admin=(existing_users == 0))
             if User.query.filter_by(email=email).first():
                 flash('auth_email_exists', 'error')
@@ -172,8 +210,9 @@ def register(app):
             name = request.form.get('name', '').strip()
             email = request.form.get('email', '').strip().lower() or (invite.email or '').strip().lower()
             password = request.form.get('password', '')
-            if not name or not email or len(password) < 8:
-                flash('auth_register_invalid', 'error')
+            pwd_valid, pwd_error = validate_password_strength(password)
+            if not name or not email or not pwd_valid:
+                flash(pwd_error or 'auth_register_invalid', 'error')
                 return render_template('auth_activate.html', invite=invite)
             if User.query.filter_by(email=email).first():
                 flash('auth_email_exists', 'error')
@@ -410,8 +449,9 @@ def register(app):
                 elif action == 'password':
                     current_password = request.form.get('current_password', '')
                     new_password = request.form.get('new_password', '')
-                    if not verify_password(user, current_password) or len(new_password) < 8:
-                        flash('account_password_invalid', 'error')
+                    pwd_valid, pwd_error = validate_password_strength(new_password)
+                    if not verify_password(user, current_password) or not pwd_valid:
+                        flash(pwd_error or 'account_password_invalid', 'error')
                     else:
                         user.password_hash = hash_password(new_password)
                         db.session.commit()
@@ -439,18 +479,21 @@ def register(app):
         # Project stats for this user
         if is_admin(user):
             project_query = Project.query
+            status_counts = dict(
+                db.session.query(Project.status, func.count(Project.id))
+                .group_by(Project.status)
+                .all()
+            )
         else:
             from sqlalchemy import or_
-            project_query = Project.query.filter(
-                or_(Project.owner_user_id == user.id, Project.created_by_user_id == user.id)
+            user_condition = or_(Project.owner_user_id == user.id, Project.created_by_user_id == user.id)
+            project_query = Project.query.filter(user_condition)
+            status_counts = dict(
+                db.session.query(Project.status, func.count(Project.id))
+                .filter(user_condition)
+                .group_by(Project.status)
+                .all()
             )
-
-        status_counts = dict(
-            db.session.query(Project.status, func.count(Project.id))
-            .filter(project_query.whereclause)
-            .group_by(Project.status)
-            .all()
-        )
         total_projects = project_query.count()
         recent_projects = (
             project_query

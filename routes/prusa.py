@@ -25,7 +25,7 @@ from models import (
     AppSetting, PrusaPrinter, PrusaPrintJob,
     Filament, Project, PrintHistory, ProjectFilament,
 )
-from utils import deduct_filament_stock, encrypt_token, decrypt_token, log_movement, utc_now, format_duration
+from utils import deduct_filament_stock, encrypt_token, decrypt_token, log_movement, utc_now, format_duration, translate
 from utils import validate_printer_host, prusa_request, prusa_test_connection
 
 _LOG = logging.getLogger(__name__)
@@ -273,7 +273,7 @@ def register(app):
     def prusa_printer_sync(printer_id):
         printer = db.session.get(PrusaPrinter, printer_id)
         if not printer:
-            return jsonify({'ok': False, 'error': 'Printer not found'}), 404
+            return jsonify({'ok': False, 'error': translate('error_printer_not_found')}), 404
         result = do_poll(printer)
         return jsonify({'ok': result['error'] is None, **result})
 
@@ -283,7 +283,7 @@ def register(app):
     def prusa_printer_test(printer_id):
         printer = db.session.get(PrusaPrinter, printer_id)
         if not printer:
-            return jsonify({'ok': False, 'error': 'Printer not found'}), 404
+            return jsonify({'ok': False, 'error': translate('error_printer_not_found')}), 404
         result = prusa_test_connection(printer)
         # Backfill model if discovered
         if result.get('ok') and result.get('model') and not printer.printer_model:
@@ -299,7 +299,7 @@ def register(app):
         job = db.session.get(PrusaPrintJob, job_id)
         if not job:
             if is_ajax:
-                return jsonify({'ok': False, 'error': 'not found'}), 404
+                return jsonify({'ok': False, 'error': translate('error_job_not_found')}), 404
             return redirect(url_for('prusa_jobs'))
 
         filament_id = request.form.get('filament_id', type=int)

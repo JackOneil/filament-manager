@@ -71,6 +71,7 @@ def run_migrations(app: Flask) -> None:
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_prusa_print_job_status ON prusa_print_job (status)')
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_prusa_print_job_printer_id ON prusa_print_job (printer_id)')
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_movement_history_project_id ON movement_history (project_id)')
+        # Redundant for new DBs (columns have index=True in models.py) but kept for legacy migration compatibility
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_audit_log_created_at ON audit_log (created_at)')
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_audit_log_user_id ON audit_log (user_id)')
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_audit_log_endpoint ON audit_log (endpoint)')
@@ -187,7 +188,7 @@ def run_migrations(app: Flask) -> None:
 
         # ── Project File central model browser fields ─────────────────────────
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN display_name VARCHAR(255) DEFAULT NULL")
-        _safe_alter(app, "ALTER TABLE project_file ADD COLUMN file_size_bytes INTEGER DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE project_file ADD COLUMN file_size_bytes BIGINT DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN mime_type VARCHAR(120) DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN checksum_sha256 VARCHAR(64) DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN thumbnail_path VARCHAR(255) DEFAULT NULL")
@@ -321,17 +322,17 @@ def _migrate_nullable_project_id(app: Flask) -> None:
                 version INTEGER NOT NULL DEFAULT 1,
                 parent_file_id INTEGER,
                 display_name VARCHAR(255),
-                file_size_bytes INTEGER,
+                file_size_bytes BIGINT,
                 mime_type VARCHAR(120),
                 checksum_sha256 VARCHAR(64),
                 thumbnail_path VARCHAR(255),
                 version_note TEXT,
-                uploaded_by_user_id INTEGER,
                 model_note TEXT,
+                uploaded_by_user_id INTEGER,
                 share_token VARCHAR(64),
                 PRIMARY KEY (id),
                 FOREIGN KEY (project_id) REFERENCES project (id) ON DELETE CASCADE,
-                FOREIGN KEY (parent_file_id) REFERENCES project_file (id) ON DELETE SET NULL,
+                FOREIGN KEY (parent_file_id) REFERENCES project_file (id) ON DELETE CASCADE,
                 FOREIGN KEY (uploaded_by_user_id) REFERENCES user (id) ON DELETE SET NULL
             )
         """))
@@ -411,3 +412,7 @@ def _migrate_waste_record_fk(app: Flask) -> None:
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"Error migrating waste_record FK: {e}")
+        try:
+            db.session.execute(text("PRAGMA foreign_keys=ON"))
+        except Exception:
+            pass

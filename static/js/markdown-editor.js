@@ -91,7 +91,7 @@
                     }
                     if (action === 'link') {
                         var url = window.prompt('URL', 'https://');
-                        if (url) document.execCommand('createLink', false, url);
+                        if (url && /^https?:\/\//i.test(url)) document.execCommand('createLink', false, url);
                     }
                     if (action === 'code') {
                         document.execCommand('insertHTML', false, '<code>' + this.escapeHtml(window.getSelection().toString() || 'code') + '</code>');
@@ -138,7 +138,7 @@
                     if (action === 'checkbox') replaceRange('- [ ] ', '', '');
                     if (action === 'link') {
                         var href = window.prompt('URL', 'https://');
-                        if (href) {
+                        if (href && /^https?:\/\//i.test(href)) {
                             var text = selected || 'link';
                             var insert = '[' + text + '](' + href + ')';
                             result = result.slice(0, start) + insert + result.slice(end);

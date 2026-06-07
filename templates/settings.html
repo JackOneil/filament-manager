@@ -277,7 +277,7 @@
                         </button>
                         <span class="text-gray-400 text-xs {% if b.filaments|length == 0 %}group-hover:hidden{% endif %}">{{ b.filaments|length }}</span>
                         {% if b.filaments|length == 0 %}
-                        <form method="POST" class="hidden group-hover:block" onsubmit="return confirm('{{ t('delete_confirm') }}');">
+                        <form method="POST" class="hidden group-hover:block" data-confirm="{{ t('delete_confirm') }}">
                             <input type="hidden" name="action" value="delete_brand">
                             <input type="hidden" name="id" value="{{ b.id }}">
                             <button type="submit" class="text-red-400 hover:text-red-600 transition-colors" title="{{ t('delete') }}"><i class="fa-solid fa-trash-can text-xs"></i></button>
@@ -318,7 +318,7 @@
                     </form>
                     <span class="text-gray-400 text-xs whitespace-nowrap pt-1 ml-1 {% if m.filaments|length == 0 %}group-hover:hidden{% endif %}">{{ m.filaments|length }}</span>
                     {% if m.filaments|length == 0 %}
-                    <form method="POST" class="absolute right-3 top-2 hidden group-hover:block" onsubmit="return confirm('{{ t('delete_confirm') }}');">
+                    <form method="POST" class="absolute right-3 top-2 hidden group-hover:block" data-confirm="{{ t('delete_confirm') }}">
                         <input type="hidden" name="action" value="delete_material">
                         <input type="hidden" name="id" value="{{ m.id }}">
                         <button type="submit" class="text-red-400 hover:text-red-600" title="{{ t('delete') }}"><i class="fa-solid fa-trash-can"></i></button>
@@ -359,7 +359,7 @@
                     </form>
                     <span class="text-gray-400 text-xs whitespace-nowrap ml-1 {% if c.filaments|length == 0 %}group-hover:hidden{% endif %}">{{ c.filaments|length }}</span>
                     {% if c.filaments|length == 0 %}
-                    <form method="POST" class="absolute right-3 top-2 hidden group-hover:block" onsubmit="return confirm('{{ t('delete_confirm') }}');">
+                    <form method="POST" class="absolute right-3 top-2 hidden group-hover:block" data-confirm="{{ t('delete_confirm') }}">
                         <input type="hidden" name="action" value="delete_color">
                         <input type="hidden" name="id" value="{{ c.id }}">
                         <button type="submit" class="text-red-400 hover:text-red-600" title="{{ t('delete') }}"><i class="fa-solid fa-trash-can"></i></button>
@@ -846,7 +846,7 @@
                                 class="text-xs text-blue-500 hover:text-blue-700 transition-colors flex-shrink-0">
                                 <i class="fa-solid fa-pen"></i> {{ t('bambu_printer_rename') }}
                             </button>
-                            <form method="POST" onsubmit="return confirm('{{ t('bambu_delete_printer_confirm') }}');" class="flex-shrink-0">
+                            <form method="POST" data-confirm="{{ t('bambu_delete_printer_confirm') }}" class="flex-shrink-0">
                                 <input type="hidden" name="action" value="delete_bambu_printer">
                                 <input type="hidden" name="id" value="{{ p.id }}">
                                 <button type="submit" class="text-xs text-red-400 hover:text-red-600 transition-colors" title="{{ t('delete') }}">
@@ -1006,7 +1006,7 @@
                                     class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-3 py-1.5 rounded-lg transition-colors">
                                     <i class="fa-solid fa-pen"></i> {{ t('edit') }}
                                 </button>
-                                <form method="POST" onsubmit="return confirm('{{ t('prusa_delete_printer_confirm') }}');">
+                                <form method="POST" data-confirm="{{ t('prusa_delete_printer_confirm') }}">
                                     <input type="hidden" name="action" value="delete_prusa_printer">
                                     <input type="hidden" name="id" value="{{ pp.id }}">
                                     <button type="submit" class="text-xs text-red-400 hover:text-red-600 transition-colors px-2 py-1.5 rounded-lg">
@@ -1100,7 +1100,7 @@
                            class="px-3 py-1 hover:bg-slate-200 transition-colors">
                             {{ tag }} <span class="text-xs text-slate-500">{{ count }}</span>
                         </a>
-                        <form method="POST" onsubmit="return confirm('{{ t('delete_confirm') }}');">
+                        <form method="POST" data-confirm="{{ t('delete_confirm') }}">
                             <input type="hidden" name="action" value="delete_filament_tag">
                             <input type="hidden" name="tag" value="{{ tag }}">
                             <button type="submit" class="px-2.5 py-1 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors" title="{{ t('delete') }}">
@@ -1121,7 +1121,7 @@
                         <span class="px-3 py-1">
                             {{ tag }} <span class="text-xs text-blue-400">{{ count }}</span>
                         </span>
-                        <form method="POST" onsubmit="return confirm('{{ t('delete_confirm') }}');">
+                        <form method="POST" data-confirm="{{ t('delete_confirm') }}">
                             <input type="hidden" name="action" value="delete_project_tag">
                             <input type="hidden" name="tag" value="{{ tag }}">
                             <button type="submit" class="px-2.5 py-1 text-blue-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="{{ t('delete') }}">
@@ -1372,7 +1372,7 @@
                                         <a :href="'{{ url_for('backup.backup_download_file', filename='__NAME__') }}'.replace('__NAME__', f.filename)" class="text-blue-600 hover:text-blue-800" title="{{ t('download') }}">
                                             <i class="fa-solid fa-download"></i>
                                         </a>
-                                        <form method="POST" :action="'{{ url_for('backup.backup_delete_file', filename='__NAME__') }}'.replace('__NAME__', f.filename)" class="inline" onsubmit="return confirm('{{ t('backup_auto_delete_confirm') }}')">
+                                        <form method="POST" :action="'{{ url_for('backup.backup_delete_file', filename='__NAME__') }}'.replace('__NAME__', f.filename)" class="inline" data-confirm="{{ t('backup_auto_delete_confirm') }}">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <button type="submit" class="text-red-500 hover:text-red-700" title="{{ t('delete') }}">
                                                 <i class="fa-solid fa-trash-can"></i>

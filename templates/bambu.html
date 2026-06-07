@@ -110,7 +110,7 @@
         'initFilter': job_filter or '',
         'initHideFailed': 'true' if hide_failed else 'false',
     } %}
-    <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>window._bambuSearchInit = {{ _bs_init_data|tojson|safe }};</script>
+    <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>window._bambuSearchInit = {{ _bs_init_data|tojson }};</script>
     <div x-data="bambuSearch(window._bambuSearchInit)" class="bg-white border border-gray-200 rounded-xl p-3 flex flex-wrap items-end gap-3">
 
         {# Project dropdown #}
@@ -141,7 +141,7 @@
                         <i x-show="projectId === opt.id" class="fa-solid fa-check text-blue-500 text-xs"></i>
                     </div>
                 </template>
-                <div x-show="filteredProjects.length === 0" class="px-3 py-2 text-gray-400 italic text-xs text-center">—</div>
+                <div x-show="filteredProjects.length === 0" x-cloak class="px-3 py-2 text-gray-400 italic text-xs text-center">—</div>
             </div>
         </div>
 
@@ -176,7 +176,7 @@
                         <i x-show="filamentId === opt.id" class="fa-solid fa-check text-blue-500 text-xs"></i>
                     </div>
                 </template>
-                <div x-show="filteredFilaments.length === 0" class="px-3 py-2 text-gray-400 italic text-xs text-center">—</div>
+                <div x-show="filteredFilaments.length === 0" x-cloak class="px-3 py-2 text-gray-400 italic text-xs text-center">—</div>
             </div>
         </div>
 
@@ -650,7 +650,7 @@ function bambuMap(jobId) {
             fd.append('project_name', this.createProjectName.trim());
             if (csrfToken) fd.append('csrf_token', csrfToken.getAttribute('content'));
             try {
-                const r = await fetch(`/bambu/job/${jobId}/create_project`, { method: 'POST', body: fd });
+                const r = await fetch('{{ url_for("bambu_create_project", job_id=999999999) }}'.replace('999999999', jobId), { method: 'POST', body: fd });
                 const data = await r.json();
                 if (!data.ok) return;
                 this.selectedProjectId = data.project_id;
@@ -751,7 +751,7 @@ function bambuSlotMap(jobId, slotId, initFilamentId, initFilamentLabel, initDedu
             fd.append('slot_id', slotId);
             fd.append('filament_id', this.slotFilamentId);
             try {
-                const r = await fetch(`/bambu/job/${jobId}/deduct-slot?ajax=1`, {
+                const r = await fetch('{{ url_for("bambu_job_deduct_slot", job_id=999999999) }}?ajax=1'.replace('999999999', jobId), {
                     method: 'POST',
                     body: fd,
                 });
@@ -803,7 +803,7 @@ function bambuSlotMap(jobId, slotId, initFilamentId, initFilamentLabel, initDedu
             fd.append('slot_id', slotId);
             fd.append('filament_id', this.remapFilamentId);
             try {
-                const r = await fetch(`/bambu/job/${jobId}/remap-slot?ajax=1`, {
+                const r = await fetch('{{ url_for("bambu_job_remap_slot", job_id=999999999) }}?ajax=1'.replace('999999999', jobId), {
                     method: 'POST',
                     body: fd,
                 });

@@ -359,7 +359,7 @@ def register(app):
         job = db.session.get(BambuPrintJob, job_id)
         if not job:
             if is_ajax:
-                return jsonify({'ok': False, 'error': 'not found'}), 404
+                return jsonify({'ok': False, 'error': translate('error_job_not_found')}), 404
             return redirect(url_for('bambu_jobs'))
 
         filament_id = request.form.get('filament_id', type=int)
@@ -490,7 +490,7 @@ def register(app):
         job = db.session.get(BambuPrintJob, job_id)
         if not job:
             if is_ajax:
-                return jsonify({'ok': False, 'error': 'not found'}), 404
+                return jsonify({'ok': False, 'error': translate('error_job_not_found')}), 404
             return redirect(url_for('bambu_jobs'))
 
         slot_id = request.form.get('slot_id', type=int)
@@ -546,7 +546,7 @@ def register(app):
         job = db.session.get(BambuPrintJob, job_id)
         if not job:
             if is_ajax:
-                return jsonify({'ok': False, 'error': 'not found'}), 404
+                return jsonify({'ok': False, 'error': translate('error_job_not_found')}), 404
             return redirect(url_for('bambu_jobs'))
 
         slot_id = request.form.get('slot_id', type=int)
@@ -610,7 +610,7 @@ def register(app):
     def bambu_job_delete(job_id):
         job = db.session.get(BambuPrintJob, job_id)
         if not job:
-            return jsonify({'ok': False, 'error': 'not found'}), 404
+            return jsonify({'ok': False, 'error': translate('error_job_not_found')}), 404
         db.session.delete(job)
         db.session.commit()
         return redirect(url_for('bambu_jobs'))
@@ -623,7 +623,7 @@ def register(app):
         user = get_current_user()
         job = db.session.get(BambuPrintJob, job_id)
         if not job:
-            return jsonify({'ok': False, 'error': 'not found'}), 404
+            return jsonify({'ok': False, 'error': translate('error_job_not_found')}), 404
         project_name = request.form.get('project_name', '').strip()
         if not project_name:
             return jsonify({'ok': False, 'error': translate('bambu_name_required')}), 400
@@ -670,7 +670,7 @@ def register(app):
             except Exception:
                 db.session.rollback()
                 _LOG.warning('History auto-map commit error')
-                return jsonify({'ok': False, 'error': 'commit failed'}), 500
+                return jsonify({'ok': False, 'error': translate('error_commit_failed')}), 500
 
         return jsonify({'ok': True, 'mapped': total_mapped, 'jobs_scanned': len(unmapped_jobs)})
 

@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.110.0***
+*Current version: **v1.111.0***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -228,8 +228,10 @@ python -m pytest tests/ -n auto -v
 # Run a single file
 python -m pytest tests/test_bambu.py -v
 
-# Run sequential (slower but easier to debug)
-python -m pytest tests/ -v
+Run the full suite in parallel (via pytest-xdist):
+
+```bash
+python -m pytest tests/ -v -n auto
 ```
 
 Tests cover: authentication flows, Bambu sync idempotency, stock deduction logic, backup/restore integrity, SSRF protection, calculator, statistics routes, waste record CRUD, printer maintenance CRUD and ICS export, `_clean_title` helper, thumbnail MIME-type caching (S3 binary/octet-stream fallback), settings CRUD (dictionaries, Bambu Cloud, company, auto-backup), extended inventory CRUD and bulk ops, project status workflow and templates, undo system, model integrity, security (XSS/SSRF/path traversal), and performance benchmarks.

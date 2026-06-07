@@ -29,15 +29,16 @@ class EncryptDecryptTests(unittest.TestCase):
         import shutil
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    def test_encrypt_returns_plaintext_without_key(self):
+    def test_encrypt_raises_without_key(self):
         with patch.dict(os.environ, {}, clear=True):
             from utils import encrypt_token
-            result = encrypt_token('secret-token')
-            self.assertEqual(result, 'secret-token')
+            with self.assertRaises(RuntimeError):
+                encrypt_token('secret-token')
 
-    def test_decrypt_returns_plaintext_without_key(self):
+    def test_decrypt_returns_as_is_without_key(self):
         with patch.dict(os.environ, {}, clear=True):
             from utils import decrypt_token
+            # decrypt_token still returns as-is for legacy plaintext
             result = decrypt_token('secret-token')
             self.assertEqual(result, 'secret-token')
 

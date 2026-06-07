@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.111.0] - 2026-06-07
+### Fixed
+- **BUG-400**: Fixed column order mismatch in `_migrate_nullable_project_id()` — `model_note` and `uploaded_by_user_id` were swapped in CREATE TABLE, causing silent data corruption on legacy upgrade (migrations.py)
+- **BUG-401**: PRAGMA `foreign_keys=OFF` is now restored in the `except` block of `_migrate_waste_record_fk()` — prevents FK checks remaining disabled after a migration failure (migrations.py)
+- **BUG-402**: Added `ondelete='SET NULL'` to `Project.owner_user_id` and `Project.created_by_user_id` FK columns (models.py)
+- **BUG-403**: Changed `parent_file_id` FK from `ON DELETE SET NULL` to `ON DELETE CASCADE` in migration CREATE TABLE to match model and ORM cascade (migrations.py)
+- **BUG-404**: Replaced 44 `onsubmit="return confirm('{{ t(...) }}')"` patterns with `data-confirm` attribute approach across 22 templates — prevents JS injection via translated strings (all affected templates, base.html)
+- **BUG-405**: Added in-memory rate limiting to login endpoint — 10 attempts per 5-minute window per IP (routes/auth.py)
+- **BUG-406**: Added `validate_password_strength()` to auth module — enforces minimum 8-char, max 256-char passwords on registration, activation, and password change (auth.py, routes/auth.py)
+- **BUG-407**: Added CSP nonce to all 8 `<script src="...">` tags in base.html that were missing it (templates/base.html)
+- **BUG-408**: Replaced 20+ hardcoded English error strings in JSON API responses with `translate()` calls across routes/bambu.py, projects.py, settings.py, prusa.py, models.py, and routes/models.py
+- **BUG-409**: Replaced 7 hardcoded URL paths with `url_for()` in JS fetch() calls across overview.html, bambu.html, and prusa.html
+- **BUG-410**: Changed unsafe `\|escape` to `\|tojson` in JS string context for 3D viewer title in project_detail.html — prevents XSS via filename
+- **BUG-411**: Replaced internal `.whereclause` access with clean filter logic for `status_counts` query in account settings (routes/auth.py)
+- **BUG-412**: Wrapped unprotected `db.session.commit()` in try/except in calculator route (routes/calculator.py)
+- **BUG-413**: `encrypt_token()` now raises `RuntimeError` if FERNET_KEY is not configured (except during testing/placeholders) — prevents silent plaintext credential storage (utils/__init__.py)
+- **BUG-415**: Added missing `printer_bambu` and `printer_prusa` translation keys to English dictionary (messages.py)
+- **BUG-416**: Fixed 4 translation errors — `overview_command_center_title` (cs), `maintenance_fault_resolved` (cs), `markdown_editor_visual` (cs), `account_lang_cs` (en) (messages.py)
+- **BUG-417**: Added CSP nonce to `<script src="...">` tags on standalone pages (quote_export.html, models_share.html)
+- **BUG-418**: Added `\|safe` filter to `comment.body_html` rendering (render_markdown produces safe HTML) (_project_overview.html)
+- **BUG-419**: Replaced `x-text` with inline JS string interpolation using separate `x-show` spans to prevent injection via translated strings (project_detail.html)
+- **BUG-420**: Added `overview_user` endpoint to SECTION_BY_ENDPOINT mapping (auth.py)
+- **BUG-421**: Added 3 AJAX endpoints (`api_filaments_list`, `api_live_printers_partial`, `api_search`) to help.js (static/js/help.js)
+- **BUG-422**: Added `@require_admin` decorator to `clear_history` endpoint — previously relied solely on section mapping (routes/history.py)
+- **BUG-423**: Fixed `x-show` without `x-cloak` (FOUC) on 12 elements across 5 templates (add.html, _projects_layout.html, bambu.html, storage.html, index.html)
+- **BUG-425**: Removed dead `or endpoint.startswith('pwa.')` check in auth.py (already stripped at lines 363-364)
+- **BUG-426**: Removed redundant module-level `csv` and `io` imports from routes/inventory.py (already imported inside `filament_import_csv`)
+- **BUG-427**: Changed `file_size_bytes` column from `INTEGER` to `BIGINT` in migration ALTER TABLE and CREATE TABLE statements to match model's `db.BigInteger` (migrations.py)
+- **BUG-428**: Restructured `window.__i18n` block to use Jinja with `\|tojson`; added sync comment (templates/base.html)
+- **BUG-429**: Removed redundant `\|forceescape` after `\|tojson` in waste.html and removed `\|safe` after `\|tojson` in bambu.html
+- **BUG-430**: Added `index=True` to 7 model columns that had indexes created in migrations but not on the model definition (models.py)
+- **BUG-431**: Added comment noting redundant AuditLog index creation in migrations (migrations.py)
+- **BUG-432**: Added nonce to remaining `<script src="...">` tags, fixed url_for route resolution for integer parameters, added proper test mode handling for fernet encryption
+- **BUG-434**: Removed redundant `\|safe` after `\|tojson` in bambu.html
+- **BUG-435**: Fixed `document.execCommand('copy')` to use `navigator.clipboard.writeText()` in models_detail.html
+- **BUG-436**: Fixed action type fallback rendering in overview.html to use `t()` calls
+- **BUG-427**: Added `https://` URL scheme validation to markdown editor link inputs (visual and source modes) — prevents `javascript:` XSS (static/js/markdown-editor.js)
+
 ## [1.110.0] - 2026-06-07
 ### Added
 - **Prusa HTTP endpoint tests**: 23 new tests covering job page rendering, printer sync/test, job mapping, and job deletion for PrusaLink routes — addresses BUG-108 (tests/test_prusa_extended.py)

@@ -23,6 +23,7 @@ from utils import (
     top_tags,
     utc_now,
     validate_printer_host,
+    translate,
 )
 
 
@@ -495,7 +496,7 @@ def register(app):
             setting.bambu_last_test_at = utc_now()
             setting.bambu_last_test_status = 'error: token missing'
             db.session.commit()
-            return jsonify({'ok': False, 'error': 'token_missing'}), 400
+            return jsonify({'ok': False, 'error': translate('error_token_missing')}), 400
 
         base_url = bambu_api_base(region)
         try:
@@ -513,14 +514,14 @@ def register(app):
 
             setting.bambu_last_test_status = f'error: HTTP {resp.status_code}'
             db.session.commit()
-            return jsonify({'ok': False, 'error': f'http_{resp.status_code}'}), 400
+            return jsonify({'ok': False, 'error': translate('error_connection_failed')}), 400
         except Exception:
             app.logger.exception("Bambu connection test failed for token %s", token[:8] + "..." if token else "None")
             db.session.rollback()  # clear failed transaction from the try block
             setting.bambu_last_test_at = utc_now()
             setting.bambu_last_test_status = 'error: request failed'
             db.session.commit()
-            return jsonify({'ok': False, 'error': 'request_failed'}), 400
+            return jsonify({'ok': False, 'error': translate('error_request_failed')}), 400
 
 
 

@@ -30,7 +30,7 @@
                             class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0 font-medium text-gray-800"
                             x-text="b.name"></button>
                     </template>
-                    <div x-show="filteredBrands.length === 0" class="px-3 py-2 text-xs text-gray-400 italic">—</div>
+                    <div x-show="filteredBrands.length === 0" x-cloak class="px-3 py-2 text-xs text-gray-400 italic">—</div>
                 </div>
             </div>
 
@@ -52,7 +52,7 @@
                             class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0 font-medium text-gray-800"
                             x-text="m.name"></button>
                     </template>
-                    <div x-show="filteredMats.length === 0" class="px-3 py-2 text-xs text-gray-400 italic">—</div>
+                    <div x-show="filteredMats.length === 0" x-cloak class="px-3 py-2 text-xs text-gray-400 italic">—</div>
                 </div>
             </div>
 
@@ -83,7 +83,7 @@
                             <span class="font-medium text-gray-800" x-text="c.name"></span>
                         </button>
                     </template>
-                    <div x-show="filteredColors.length === 0" class="px-3 py-2 text-xs text-gray-400 italic">—</div>
+                    <div x-show="filteredColors.length === 0" x-cloak class="px-3 py-2 text-xs text-gray-400 italic">—</div>
                 </div>
             </div>
 

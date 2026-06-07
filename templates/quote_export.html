@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='fonts/plus-jakarta-sans.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tailwind.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fontawesome.min.css') }}">
-    <script defer src="{{ url_for('static', filename='js/alpine.min.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/alpine.min.js') }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
     <style>
         @media print {
             body { background: white !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}

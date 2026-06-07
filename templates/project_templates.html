@@ -44,7 +44,7 @@
                     </a>
                     {% if can_manage_project %}
                     <form method="POST" action="{{ url_for('project_template_delete', tid=tpl.id) }}"
-                          onsubmit="return confirm('{{ t('project_template_delete_confirm') }}');">
+                          data-confirm="{{ t('project_template_delete_confirm') }}">
                         <button type="submit" class="w-full ui-badge ui-badge-critical text-xs justify-center">
                             <i class="fa-solid fa-trash"></i> {{ t('delete') }}
                         </button>
