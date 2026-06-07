@@ -21,6 +21,14 @@
                     {% else %}
                     <span class="italic">—</span>
                     {% endif %}
+                    {% if root.category %}
+                    <span class="text-gray-300 dark:text-slate-700">|</span>
+                    <span class="font-bold uppercase tracking-wider text-gray-400">{{ t('model_category') }}:</span>
+                    <span class="inline-flex items-center gap-1.5 font-semibold text-gray-600 dark:text-slate-300">
+                        <span class="w-2.5 h-2.5 rounded-full flex-shrink-0 border border-gray-200 dark:border-slate-600" style="background-color: {{ root.category.color or '#6b7280' }}"></span>
+                        {{ root.category.name }}
+                    </span>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -420,6 +428,42 @@
                         </div>
                     </div>
                 </div>
+                <!-- Category Selector -->
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">
+                        {{ t('model_category') }}
+                    </label>
+                    <input type="hidden" name="category_id" :value="editCategoryId">
+                    <div class="relative" @click.outside="editCategoryOpen = false">
+                        <div class="relative">
+                            <input type="text" x-model="editCategoryQ" @focus="editCategoryOpen = true" @input="editCategoryOpen = true"
+                                placeholder="{{ t('model_category_filter') }}" autocomplete="off"
+                                :class="editCategoryId ? 'border-blue-400 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-600' : ''"
+                                class="ui-input pr-8">
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400">
+                                <i class="fa-solid fa-chevron-down text-xs transition-transform duration-150" :class="editCategoryOpen ? 'rotate-180' : ''"></i>
+                            </div>
+                        </div>
+                        <div x-show="editCategoryOpen" x-cloak class="absolute z-40 w-full mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                            <div @click="clearEditCategory()"
+                                class="px-3 py-2 cursor-pointer text-sm italic border-b border-gray-100 dark:border-slate-700"
+                                :class="!editCategoryId ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-400 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-700/50'">
+                                — {{ t('models_no_category') }} —
+                            </div>
+                            <template x-for="opt in filteredEditCategories" :key="opt.id">
+                                <div @click="selectEditCategory(opt.id, opt.name)"
+                                    class="px-3 py-2 cursor-pointer text-sm border-b border-gray-50 dark:border-slate-700/50 last:border-b-0 flex items-center justify-between">
+                                    <span class="flex items-center gap-2">
+                                        <span class="w-3 h-3 rounded-full flex-shrink-0 border border-gray-200 dark:border-slate-600" :style="'background-color:' + (opt.color || '#6b7280')"></span>
+                                        <span x-text="opt.name"></span>
+                                    </span>
+                                    <i x-show="editCategoryId == opt.id" class="fa-solid fa-check text-blue-500 text-xs"></i>
+                                </div>
+                            </template>
+                            <div x-show="filteredEditCategories.length === 0" class="px-3 py-2 text-gray-400 dark:text-slate-500 italic text-xs text-center">–</div>
+                        </div>
+                    </div>
+                </div>
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" @click="editModalOpen = false" class="ui-badge h-10 px-4">
                         {{ t('cancel') }}
@@ -735,6 +779,29 @@ function modelDetailApp() {
             this.editProjectId = '';
             this.editProjectQ = '';
             this.editProjectOpen = false;
+        },
+
+        // Edit modal — interactive category selector
+        editCategoryId: {% if root.category_id %}{{ root.category_id }}{% else %}''{% endif %},
+        editCategoryQ: '{% if root.category %}{{ root.category.name }}{% endif %}',
+        editCategoryOpen: false,
+        editCategoryOptions: [{% for c in categories %}{"id":{{ c.id }},"name":{{ c.name|tojson }},"color":{{ (c.color or '#6b7280')|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}],
+        get filteredEditCategories() {
+            const q = ((this.editCategoryQ || '').toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            if (!q) return this.editCategoryOptions;
+            return this.editCategoryOptions.filter(o =>
+                o.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(q)
+            );
+        },
+        selectEditCategory(id, name) {
+            this.editCategoryId = id;
+            this.editCategoryQ = name;
+            this.editCategoryOpen = false;
+        },
+        clearEditCategory() {
+            this.editCategoryId = '';
+            this.editCategoryQ = '';
+            this.editCategoryOpen = false;
         },
 
         // Active Version metadata state

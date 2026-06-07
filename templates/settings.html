@@ -388,6 +388,62 @@
         </div>
     </div>
 
+    <!-- Model Categories (BL-004) -->
+    <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center gap-2 mb-4 border-b pb-3">
+            <i class="fa-solid fa-tags text-cyan-500"></i>
+            <h2 class="text-xl font-bold text-gray-800">{{ t('settings_model_categories') }}</h2>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Category list -->
+            <div class="space-y-2 overflow-y-auto pr-2" style="max-height: 400px;">
+                {% for cat in model_categories %}
+                <div class="py-2 px-3 bg-gray-50 border border-gray-100 rounded flex justify-between items-center group relative">
+                    <form method="POST" class="flex items-center gap-2 w-full pr-6">
+                        <input type="hidden" name="action" value="edit_model_category">
+                        <input type="hidden" name="id" value="{{ cat.id }}">
+                        {% if cat.color %}
+                        <input type="color" name="color" value="{{ cat.color }}" class="w-6 h-6 rounded cursor-pointer border-0 p-0 block bg-transparent flex-shrink-0">
+                        {% else %}
+                        <input type="color" name="color" value="#6b7280" class="w-6 h-6 rounded cursor-pointer border-0 p-0 block bg-transparent flex-shrink-0">
+                        {% endif %}
+                        <input type="text" name="name" value="{{ cat.name }}" class="bg-transparent border-b border-transparent focus:border-cyan-300 outline-none font-medium text-gray-700 w-full text-sm">
+                        <button type="submit" class="hidden group-hover:block text-cyan-500 hover:text-cyan-700 mx-1" title="{{ t('edit') }}"><i class="fa-solid fa-save"></i></button>
+                    </form>
+                    <span class="text-gray-400 text-xs whitespace-nowrap ml-1 {% if cat.models|length == 0 %}group-hover:hidden{% endif %}">{{ cat.models|length }}</span>
+                    {% if cat.models|length == 0 %}
+                    <form method="POST" class="absolute right-3 top-2 hidden group-hover:block" data-confirm="{{ t('delete_confirm') }}">
+                        <input type="hidden" name="action" value="delete_model_category">
+                        <input type="hidden" name="id" value="{{ cat.id }}">
+                        <button type="submit" class="text-red-400 hover:text-red-600" title="{{ t('delete') }}"><i class="fa-solid fa-trash-can"></i></button>
+                    </form>
+                    {% else %}
+                    <div class="absolute right-3 top-2 hidden group-hover:block text-gray-300 cursor-not-allowed" title="{{ t('model_category_cant_delete') }}">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-400 italic text-center py-4">{{ t('models_no_category') }}</p>
+                {% endfor %}
+            </div>
+            <!-- Add category form -->
+            <div class="bg-gray-50 p-4 rounded-lg border border-dashed border-gray-200 self-start">
+                <form method="POST">
+                    <input type="hidden" name="action" value="model_category">
+                    <label class="text-xs font-bold text-gray-500 mb-1 block">{{ t('model_category_add') }}</label>
+                    <input type="text" name="name" class="w-full border rounded-lg px-3 py-2 text-sm mb-2 focus:ring-2 focus:ring-cyan-500 outline-none" required placeholder="{{ t('model_category') }}">
+                    <div class="flex items-center gap-2 mb-3">
+                        <input type="color" name="color" value="#3b82f6" class="h-10 w-full border-0 rounded cursor-pointer bg-transparent">
+                    </div>
+                    <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-700 transition-colors text-white font-semibold py-2 rounded-lg text-sm shadow">
+                        <i class="fa-solid fa-plus"></i> {{ t('save') }}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Printer / Energy Settings -->
     <div id="printer-energy" class="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div class="flex items-center gap-2 mb-4 border-b pb-3">

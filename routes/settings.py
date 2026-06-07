@@ -9,7 +9,7 @@ from database import db
 from auth import get_current_user
 from models import (
     Brand, Color, Material, AppSetting, Filament, Project,
-    BambuPrinter, PrusaPrinter, User,
+    BambuPrinter, PrusaPrinter, User, ModelCategory,
 )
 from utils import (
     bambu_api_base,
@@ -41,6 +41,7 @@ def _tab_for_action(action):
         'brand', 'color', 'material',
         'edit_brand', 'edit_material', 'edit_color',
         'delete_brand', 'delete_material', 'delete_color',
+        'model_category', 'edit_model_category', 'delete_model_category',
     }
     printers_actions = {
         'printer_energy_settings',
@@ -189,6 +190,33 @@ def register(app):
                     if col and len(col.filaments) == 0:
                         db.session.delete(col)
                         app.logger.debug(f"Color deleted: {col.name}")
+
+                elif action == 'model_category':
+                    cat_name = request.form.get('name', '').strip()
+                    cat_color = request.form.get('color', '').strip() or None
+                    if not cat_name:
+                        raise ValueError('model_category_name_required')
+                    if ModelCategory.query.filter_by(name=cat_name).first():
+                        raise ValueError('model_category_exists')
+                    db.session.add(ModelCategory(name=cat_name, color=cat_color))
+                    app.logger.debug(f"Added model category: {cat_name}")
+                    success_key = 'model_category_saved'
+
+                elif action == 'edit_model_category':
+                    cat = db.session.get(ModelCategory, request.form.get('id', 0, type=int))
+                    if cat:
+                        old = cat.name
+                        cat.name = request.form.get('name', cat.name).strip() or cat.name
+                        cat.color = request.form.get('color', '').strip() or None
+                        app.logger.debug(f"Model category edited: {old} -> {cat.name}")
+                        success_key = 'model_category_saved'
+
+                elif action == 'delete_model_category':
+                    cat = db.session.get(ModelCategory, request.form.get('id', 0, type=int))
+                    if cat and len(cat.models) == 0:
+                        db.session.delete(cat)
+                        app.logger.debug(f"Model category deleted: {cat.name}")
+                        success_key = 'model_category_deleted'
 
                 elif action == 'delete_filament_tag':
                     tag_name = request.form.get('tag', '').strip()
@@ -420,6 +448,7 @@ def register(app):
         brands = Brand.query.order_by(Brand.name).all()
         colors = Color.query.order_by(Color.name).all()
         materials = Material.query.order_by(Material.name).all()
+        model_categories = ModelCategory.query.order_by(ModelCategory.name).all()
         app_settings = AppSetting.query.first()
         printers = BambuPrinter.query.order_by(BambuPrinter.name).all()
         prusa_printers = PrusaPrinter.query.order_by(PrusaPrinter.name).all()
@@ -472,6 +501,7 @@ def register(app):
         return render_template(
             'settings.html',
             brands=brands, colors=colors, materials=materials,
+            model_categories=model_categories,
             app_settings=app_settings, printers=printers,
             prusa_printers=prusa_printers,
             filament_tag_cloud=filament_tag_cloud, project_tag_cloud=project_tag_cloud,

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.114.0] - 2026-06-07
+### Added
+- **BL-004**: Model Categories — categorize 3D models into user-defined categories (e.g. Kitchen accessories, Cosplay, Technical parts)
+  - New `ModelCategory` model with `name`, `color`, `created_at` fields (models.py)
+  - New `category_id` FK on `ProjectFile` with `ON DELETE SET NULL` (models.py, migrations.py)
+  - Category CRUD in Settings → Dictionaries tab — add, edit (inline), delete with color picker (routes/settings.py, templates/settings.html)
+  - Interactive fulltext search dropdown filter on Models index page — same UX as existing filters (templates/models_index.html)
+  - "Uncategorized" quick-filter option to show models without a category
+  - Category badge with color dot displayed on model cards and in table rows (templates/_models_cards.html, templates/_models_rows.html)
+  - Category selector in model detail edit modal — interactive dropdown with color swatches (templates/models_detail.html)
+  - Category display in model detail header alongside project link
+  - Full export/import support — `model_categories` section + `category_name` on project files (routes/backup_helpers.py, routes/backup.py)
+  - 13 new i18n keys in both `cs` and `en` (messages.py)
+  - Help tip added to models section in both languages (static/js/help.js)
+
 ## [1.113.0] - 2026-06-07
 ### Fixed
 - **BUG-500, BUG-501**: Fixed UserSession backup export/import crash — `last_activity` → `last_activity_at`, removed non-existent `expires_at` column (routes/backup_helpers.py, routes/backup.py)

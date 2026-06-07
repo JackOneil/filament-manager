@@ -764,6 +764,13 @@
                         en: 'Upload new 3D models using the "Upload model" button top-right. Drag a file into the drop zone or click "Browse". Select a project (interactive searchable dropdown), add a version note, and optionally a persistent model note. After upload, you\'re redirected to the model detail.'
                     }
                 },
+                {
+                    title: { cs: 'Kategorie modelů', en: 'Model Categories' },
+                    text: {
+                        cs: 'Každý model lze zařadit do kategorie (např. Kuchyňské doplňky, Cosplay, Technické díly). Kategorie se spravují v Nastavení → Složníky → Kategorie modelů. Na stránce modelů lze filtrovat podle kategorie pomocí interaktivního vyhledávacího dropdownu. Výchozí stav je „Nezařazeno". Kategorii lze nastavit nebo změnit v editačním modalu detailu modelu.',
+                        en: 'Each model can be assigned to a category (e.g. Kitchen accessories, Cosplay, Technical parts). Categories are managed in Settings → Dictionaries → Model Categories. On the models page, filter by category using the interactive search dropdown. The default state is "Uncategorized". Set or change the category in the model detail edit modal.'
+                    }
+                },
             ]
         },
         {

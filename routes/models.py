@@ -15,7 +15,7 @@ from werkzeug.utils import secure_filename
 
 from database import db
 from auth import get_current_user, is_admin
-from models import Project, ProjectFile, AppSetting, User, ModelComment
+from models import Project, ProjectFile, AppSetting, User, ModelComment, ModelCategory
 from utils import escape_like, utc_now, translate
 
 logger = logging.getLogger(__name__)
@@ -160,6 +160,7 @@ def _get_file_size_and_checksum(filepath):
 def models_index():
     projects = _get_projects()
     setting = AppSetting.query.first()
+    categories = ModelCategory.query.order_by(ModelCategory.name).all()
 
     # Stats bar
     user = get_current_user()
@@ -189,6 +190,7 @@ def models_index():
         setting=setting,
         model_extensions=sorted(list(MODEL_EXTENSIONS)),
         models_stats=models_stats,
+        categories=categories,
     )
 
 @bp.route('/models/upload', methods=['POST'])
@@ -284,6 +286,13 @@ def api_models_list():
     if file_type:
         query = query.filter(ProjectFile.filename.like(f'%.{file_type}'))
 
+    category_id = request.args.get('category_id', type=int)
+    no_category = request.args.get('no_category') == '1'
+    if no_category:
+        query = query.filter(ProjectFile.category_id.is_(None))
+    elif category_id:
+        query = query.filter(ProjectFile.category_id == category_id)
+
     models_list = query.all()
 
     # Enrich models for sorting
@@ -299,6 +308,8 @@ def api_models_list():
             'uploaded_at': latest.uploaded_at or datetime.min,
             'version_count': len([root] + root.versions),
             'model_note': root.model_note or '',
+            'category_name': root.category.name if root.category else '',
+            'category_color': root.category.color if root.category else '',
         })
 
     # Sort
@@ -380,6 +391,7 @@ def model_detail(root_id):
         same_checksum=same_checksum,
         projects=_get_projects(),
         comments=comments,
+        categories=ModelCategory.query.order_by(ModelCategory.name).all(),
     )
 
 @bp.route('/models/<int:root_id>/edit', methods=['POST'])
@@ -389,6 +401,7 @@ def model_edit(root_id):
     version_note = request.form.get('version_note', '').strip()
     model_note   = request.form.get('model_note', '').strip() or None
     project_id   = request.form.get('project_id', type=int) or None
+    category_id  = request.form.get('category_id', type=int) or None
 
     if not display_name:
         flash(translate('models_error_edit_name_required'), 'error')
@@ -402,6 +415,7 @@ def model_edit(root_id):
     root_file.display_name = display_name
     root_file.model_note   = model_note
     root_file.project_id   = project_id
+    root_file.category_id  = category_id
     # Update note specifically on the latest version
     latest.version_note = version_note
 

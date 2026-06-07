@@ -15,7 +15,7 @@ from models import (
     BambuPrinter, BambuPrintJob, BambuJobMaterial, StoragePlacement, StorageShelf,
     PrusaPrinter, PrusaPrintJob, ProjectComment, ProjectCommentReaction,
     ProjectTodo, ProjectPrintItem, User, UserInvite, UserSession,
-    Notification, AuditLog, ModelComment,
+    Notification, AuditLog, ModelComment, ModelCategory,
     PrinterMaintenance, WasteRecord, WasteFile, FilamentUndoLog, ProjectTemplate,
 )
 from utils import encrypt_token, format_tags, utc_now, translate
@@ -82,6 +82,7 @@ def _project_file_payload(project_file):
         'model_note': project_file.model_note,
         'uploaded_by': _user_ref(project_file.uploaded_by) if getattr(project_file, 'uploaded_by', None) else None,
         'share_token': project_file.share_token,
+        'category_name': project_file.category.name if getattr(project_file, 'category', None) else None,
         'archive_path': None,
         'content_b64': None,
     }
@@ -379,6 +380,12 @@ def _build_export_data(app, include_files=True):
                 'created_at': s.created_at.isoformat() if s.created_at else None,
                 'last_activity_at': s.last_activity_at.isoformat() if s.last_activity_at else None,
             } for s in UserSession.query.order_by(UserSession.created_at).all()],
+
+            'model_categories': [{
+                'name': cat.name,
+                'color': cat.color,
+                'created_at': cat.created_at.isoformat() if cat.created_at else None,
+            } for cat in ModelCategory.query.order_by(ModelCategory.name).all()],
 
             'model_comments': [{
                 'project_name': mc.root_file.project.name if mc.root_file and mc.root_file.project else None,

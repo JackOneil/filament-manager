@@ -487,6 +487,20 @@ This is already applied to `projects_index.html` and overrides any stale localSt
 - `.outerHTML` swap preserves the container element; `.innerHTML` replaces only contents. Use `.outerHTML` for pagination wrappers and `.innerHTML` for items lists.
 - This pattern is documented in section 3.3 (Projects AJAX flow) and already implemented on the Projects index page.
 
+### Rule 32 — Backlog Tracking (`.kilo/BACKLOG.md`)
+- **MANDATORY**: Every time a bug is fixed or a feature is implemented, the `.kilo/BACKLOG.md` file **MUST** be updated.
+- When fixing a bug from the backlog:
+  1. Change the status column from `**Open**` to `Fixed in vX.Y.Z` (where X.Y.Z is the version being released)
+  2. Ensure the description includes `**Fix:**` followed by a summary of what was changed
+- When adding a new bug or feature request:
+  1. Add a new row with a unique ID (BUG-XXX for bugs, BL-XXX for feature requests)
+  2. Set status to `**Open**`
+  3. Include file paths and line numbers where applicable
+  4. Assign appropriate criticality (🔴 Critical, 🟠 High, 🟡 Medium, 🟢 Low) and effort (XS, S, M, L, XL)
+- Update the **Summary Statistics** section at the bottom to reflect the current state
+- Add completed items to the **📋 Completed** table with version and date
+- This rule applies to ALL implementations — no exceptions. Even small fixes must update the backlog.
+
 ### Rule 29 — Architecture Documentation Updates
 - **After implementing new features, refactoring, or structural changes, always update architecture documentation:**
   - `.kilo/ARCHITECTURE.md` — canonical source of truth; update file structure, data flow, key dependencies, or rules if they changed
@@ -536,6 +550,11 @@ After every set of feature additions or structural fixes, **always** complete AL
     - Add new endpoint names to the relevant section's `endpoints[]` array
     - Add a new tip describing the feature in both `cs` and `en`
     - If entirely new page → add a new section to `HELP_SECTIONS`
+20. ✅ **BACKLOG UPDATE** — Update `.kilo/BACKLOG.md` (Rule 32):
+    - Mark fixed bugs as `Fixed in vX.Y.Z`
+    - Add new findings with `**Open**` status
+    - Update summary statistics and completed table
 
 **CRITICAL: Step 5 (Docker build) is mandatory after ANY code change. Never skip it.**
 **CRITICAL: Step 17 (Architecture update) is mandatory after any feature/refactoring. Keep docs in sync.**
+**CRITICAL: Step 20 (Backlog update) is mandatory after ANY bugfix or feature. No exceptions.**

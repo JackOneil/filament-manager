@@ -9,6 +9,7 @@
                         <th class="py-3 px-4 w-16"></th>
                         <th class="py-3 px-4">{{ t('models_edit_display_name') }}</th>
                         <th class="py-3 px-4">{{ t('project') }}</th>
+                        <th class="py-3 px-4">{{ t('model_category') }}</th>
                         <th class="py-3 px-4">{{ t('models_version') }}</th>
                         <th class="py-3 px-4 text-right">{{ t('models_model_size') }}</th>
                         <th class="py-3 px-4">{{ t('models_uploaded_at') }}</th>
@@ -67,6 +68,18 @@
                             <a href="{{ url_for('project_detail', id=root_file.project.id) }}" class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-semibold block truncate">
                                 {{ root_file.project.name }}
                             </a>
+                            {% else %}
+                            <span class="text-xs text-gray-400 italic">—</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Category Column -->
+                        <td class="py-3 px-4">
+                            {% if item.category_name %}
+                            <span class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-slate-300">
+                                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0 border border-gray-200 dark:border-slate-600" style="background-color: {{ item.category_color or '#6b7280' }}"></span>
+                                {{ item.category_name }}
+                            </span>
                             {% else %}
                             <span class="text-xs text-gray-400 italic">—</span>
                             {% endif %}

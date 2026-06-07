@@ -54,7 +54,7 @@
 
     <!-- Quick-filter pills -->
     <div class="flex flex-wrap gap-2">
-        <button type="button" @click="noProject = false; projectId = ''; projectQ = ''"
+        <button type="button" @click="noProject = false; projectId = ''; projectQ = ''; noCategory = false; categoryId = ''; categoryQ = ''"
             :class="!noProject && !projectId ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
             class="px-3 py-1.5 rounded-full text-xs font-semibold transition-all border-0 cursor-pointer">
             <i class="fa-solid fa-cubes"></i> {{ t('filter_all') }}
@@ -68,7 +68,7 @@
 
     <!-- Filters & Sorting Panel -->
     <div class="ui-panel relative z-20">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 items-end">
             <!-- Fulltext search -->
             <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">{{ t('search_filament') }}</label>
@@ -137,6 +137,44 @@
                         </div>
                     </template>
                     <div x-show="filteredFileTypes.length === 0" class="px-3 py-2 text-gray-400 dark:text-slate-500 italic text-xs text-center">–</div>
+                </div>
+            </div>
+
+            <!-- Category interactive dropdown -->
+            <div class="relative" @click.outside="categoryOpen = false">
+                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">{{ t('model_category') }}</label>
+                <div class="relative">
+                    <input type="text" x-model="categoryQ" @focus="categoryOpen = true" @input="categoryOpen = true"
+                        placeholder="{{ t('model_category_filter') }}" autocomplete="off"
+                        :class="categoryId ? 'border-blue-400 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-600' : ''"
+                        class="ui-input pr-8">
+                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400">
+                        <i class="fa-solid fa-chevron-down text-xs transition-transform duration-150" :class="categoryOpen ? 'rotate-180' : ''"></i>
+                    </div>
+                </div>
+                <div x-show="categoryOpen" x-cloak class="absolute z-30 w-full mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                    <div @click="selectCategory('', ''); categoryOpen = false"
+                        class="px-3 py-2 cursor-pointer text-sm italic border-b border-gray-100 dark:border-slate-700"
+                        :class="categoryId === '' && !noCategory ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-400 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-700/50'">
+                        — {{ t('filter_all') }} —
+                    </div>
+                    <div @click="noCategory = true; categoryId = ''; categoryQ = ''; categoryOpen = false"
+                        class="px-3 py-2 cursor-pointer text-sm italic border-b border-gray-100 dark:border-slate-700 flex items-center justify-between"
+                        :class="noCategory ? 'bg-violet-50 dark:bg-violet-950/30 text-violet-600 font-semibold' : 'text-gray-400 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-700/50'">
+                        <span>{{ t('model_category_uncategorized') }}</span>
+                        <i x-show="noCategory" class="fa-solid fa-check text-violet-500 text-xs"></i>
+                    </div>
+                    <template x-for="opt in filteredCategories" :key="opt.id">
+                        <div @click="selectCategory(opt.id, opt.name); categoryOpen = false"
+                            class="px-3 py-2 cursor-pointer text-sm border-b border-gray-50 dark:border-slate-700/50 last:border-b-0 flex items-center justify-between">
+                            <span class="flex items-center gap-2">
+                                <span class="w-3 h-3 rounded-full flex-shrink-0 border border-gray-200 dark:border-slate-600" :style="'background-color:' + (opt.color || '#6b7280')"></span>
+                                <span x-text="opt.name"></span>
+                            </span>
+                            <i x-show="categoryId == opt.id" class="fa-solid fa-check text-blue-500 text-xs"></i>
+                        </div>
+                    </template>
+                    <div x-show="filteredCategories.length === 0" class="px-3 py-2 text-gray-400 dark:text-slate-500 italic text-xs text-center">–</div>
                 </div>
             </div>
 
@@ -355,9 +393,16 @@ function modelsApp() {
         fileTypeOpen: false,
         fileTypeOptions: {{ model_extensions|tojson }},
 
+        // Category filter
+        categoryId: '',
+        categoryQ: '',
+        categoryOpen: false,
+        categoryOptions: [{% for c in categories %}{"id":{{ c.id }},"name":{{ c.name|tojson }},"color":{{ (c.color or '#6b7280')|tojson }}}{% if not loop.last %},{% endif %}{% endfor %}],
+
         fulltext: '',
         page: 1,
         noProject: false,
+        noCategory: false,
         uploadModalOpen: false,
         selectedIds: [],
         _fetchPending: false,
@@ -371,6 +416,13 @@ function modelsApp() {
             const q = (this.fileTypeQ || '').toLowerCase();
             return q ? this.fileTypeOptions.filter(e => e.toLowerCase().includes(q)) : this.fileTypeOptions;
         },
+        get filteredCategories() {
+            const q = ((this.categoryQ || '').toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            if (!q) return this.categoryOptions;
+            return this.categoryOptions.filter(o =>
+                o.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(q)
+            );
+        },
 
         selectProject(id, name) {
             this.projectId = id;
@@ -381,6 +433,12 @@ function modelsApp() {
         selectFileType(val) {
             this.fileType = val;
             this.fileTypeQ = val ? val.toUpperCase() : '';
+            this.page = 1;
+        },
+        selectCategory(id, name) {
+            this.categoryId = id;
+            this.categoryQ = name;
+            this.noCategory = false;
             this.page = 1;
         },
         selectSort(val, label) {
@@ -400,6 +458,7 @@ function modelsApp() {
             this.$watch('sortBy', () => { this.fetchContent(); });
             this.$watch('projectId', () => { this.fetchContent(); });
             this.$watch('fileType', () => { this.fetchContent(); });
+            this.$watch('categoryId', () => { this.fetchContent(); });
             this.$watch('fulltext', () => { this.page = 1; this.fetchContent(); });
             this.$watch('noProject', () => { this.page = 1; this.fetchContent(); });
             window.__models = this;
@@ -421,10 +480,12 @@ function modelsApp() {
                     sort_by: this.sortBy,
                     project_id: this.projectId,
                     file_type: this.fileType,
+                    category_id: this.categoryId,
                     fulltext: this.fulltext,
                     page: this.page
                 });
                 if (this.noProject) params.append('no_project', '1');
+                if (this.noCategory) params.append('no_category', '1');
 
                 const res = await fetch(`/api/models-list?${params.toString()}`, {
                     signal: this._abortController.signal
@@ -473,8 +534,11 @@ function modelsApp() {
             this.projectQ = '';
             this.fileType = '';
             this.fileTypeQ = '';
+            this.categoryId = '';
+            this.categoryQ = '';
             this.fulltext = '';
             this.noProject = false;
+            this.noCategory = false;
             this.sortBy = 'uploaded';
             const defaultSort = this.sortOptions.find(o => o.value === 'uploaded');
             this.sortQ = defaultSort ? defaultSort.label : '';

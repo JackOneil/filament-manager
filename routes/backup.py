@@ -15,7 +15,7 @@ from models import (
     BambuPrinter, BambuPrintJob, BambuJobMaterial, StoragePlacement, StorageShelf,
     PrusaPrinter, PrusaPrintJob, ProjectComment, ProjectCommentReaction,
     ProjectTodo, ProjectPrintItem, User, UserInvite, UserSession,
-    Notification, AuditLog, ModelComment,
+    Notification, AuditLog, ModelComment, ModelCategory,
     PrinterMaintenance, WasteRecord, WasteFile, FilamentUndoLog, ProjectTemplate,
 )
 from utils import encrypt_token, format_tags, utc_now, translate
@@ -489,6 +489,14 @@ def register(app):
                                 if resolved_user:
                                     uploaded_by_id = resolved_user.id
 
+                            # Resolve category by name
+                            resolved_category_id = None
+                            cat_name = file_data.get('category_name')
+                            if cat_name:
+                                cat = ModelCategory.query.filter_by(name=cat_name).first()
+                                if cat:
+                                    resolved_category_id = cat.id
+
                             new_file = ProjectFile(
                                 project_id=proj.id,
                                 filename=file_data.get('filename', ''),
@@ -504,6 +512,7 @@ def register(app):
                                 model_note=file_data.get('model_note'),
                                 uploaded_by_user_id=uploaded_by_id,
                                 share_token=file_data.get('share_token'),
+                                category_id=resolved_category_id,
                             )
                             db.session.add(new_file)
                             imported_files_map[(proj.id, file_data.get('filename', ''), file_data.get('version', 1))] = new_file
@@ -977,6 +986,21 @@ def register(app):
                         created_at=datetime.fromisoformat(us_data['created_at']) if us_data.get('created_at') else utc_now(),
                         last_activity_at=datetime.fromisoformat(us_data['last_activity_at']) if us_data.get('last_activity_at') else None,
                     ))
+
+                # ── 14b. Model categories ─────────────────────────────
+                for cat_data in data.get('model_categories', []):
+                    cat_name = cat_data.get('name', '').strip()
+                    if not cat_name:
+                        continue
+                    exists_cat = ModelCategory.query.filter_by(name=cat_name).first()
+                    if exists_cat:
+                        continue
+                    db.session.add(ModelCategory(
+                        name=cat_name,
+                        color=cat_data.get('color'),
+                        created_at=datetime.fromisoformat(cat_data['created_at']) if cat_data.get('created_at') else utc_now(),
+                    ))
+                db.session.flush()  # Ensure categories are available for FK resolution
 
                 # ── 15. Model comments ────────────────────────────────
                 for mc_data in data.get('model_comments', []):

@@ -201,6 +201,14 @@ def run_migrations(app: Flask) -> None:
         # ── Project File model-level note ─────────────────────────────────────
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN model_note TEXT")
 
+        # ── Model categories (BL-004) ────────────────────────────────────────
+        _safe_alter(app, "ALTER TABLE project_file ADD COLUMN category_id INTEGER DEFAULT NULL REFERENCES model_category(id) ON DELETE SET NULL")
+        try:
+            db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_project_file_category_id ON project_file (category_id)"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
         # ── Allow project_file.project_id to be NULL (unassigned models) ─────
         _migrate_nullable_project_id(app)
 

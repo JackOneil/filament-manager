@@ -85,6 +85,14 @@
                         {% endif %}
                     </div>
 
+                    <!-- Category Badge -->
+                    {% if item.category_name %}
+                    <div class="flex items-center gap-1.5 text-xs mt-1">
+                        <span class="w-2.5 h-2.5 rounded-full flex-shrink-0 border border-gray-200 dark:border-slate-600" style="background-color: {{ item.category_color or '#6b7280' }}"></span>
+                        <span class="text-gray-500 dark:text-slate-400 truncate">{{ item.category_name }}</span>
+                    </div>
+                    {% endif %}
+
                     <!-- Model note -->
                     {% if item.model_note %}
                     <div class="mt-2 pt-2 border-t border-[var(--ui-border)]/50">

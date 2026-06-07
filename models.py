@@ -333,6 +333,17 @@ class ProjectTodo(db.Model):
     user = db.relationship('User', backref=db.backref('project_todos', lazy=True))
 
 
+class ModelCategory(db.Model):
+    __tablename__ = 'model_category'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    color = db.Column(db.String(20), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utc_now)
+
+    def __repr__(self):
+        return f'<ModelCategory {self.name}>'
+
+
 class ProjectFile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='CASCADE'), nullable=True)
@@ -350,10 +361,12 @@ class ProjectFile(db.Model):
     model_note = db.Column(db.Text, nullable=True)
     uploaded_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     share_token = db.Column(db.String(64), nullable=True, unique=True)
+    category_id = db.Column(db.Integer, db.ForeignKey('model_category.id', ondelete='SET NULL'), nullable=True, index=True)
 
     project = db.relationship('Project', backref=db.backref('files', lazy=True, cascade="all, delete-orphan"))
     versions = db.relationship('ProjectFile', backref=db.backref('parent', remote_side='ProjectFile.id'), lazy=True, cascade='all, delete-orphan')
     uploaded_by = db.relationship('User', backref=db.backref('uploaded_files', lazy=True))
+    category = db.relationship('ModelCategory', backref=db.backref('models', lazy=True))
 
 
 class ModelComment(db.Model):
