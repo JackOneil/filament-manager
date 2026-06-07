@@ -228,6 +228,7 @@ def model_upload():
     display = original_filename.rsplit('.', 1)[0] if '.' in original_filename else original_filename
     user = get_current_user()
     version_note = request.form.get('version_note', '').strip() or None
+    category_id = request.form.get('category_id', type=int) or None
     new_file = ProjectFile(
         project_id=project.id if project else None,
         filename=original_filename,
@@ -239,7 +240,8 @@ def model_upload():
         mime_type=mime,
         checksum_sha256=checksum,
         version_note=version_note,
-        uploaded_by_user_id=user.id if user else None
+        uploaded_by_user_id=user.id if user else None,
+        category_id=category_id,
     )
     db.session.add(new_file)
     db.session.commit()
