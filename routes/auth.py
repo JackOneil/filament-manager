@@ -13,6 +13,7 @@ from auth import (
     get_user_sessions,
     hash_password,
     invalidate_all_other_sessions,
+    invalidate_all_user_sessions,
     invite_is_valid,
     is_admin,
     login_user,
@@ -172,6 +173,11 @@ def register(app):
             return redirect(url_for('index'))
         existing_users = User.query.count()
         if request.method == 'POST':
+            # Rate limit registration attempts
+            client_ip = request.remote_addr
+            if not _check_login_rate_limit(client_ip):
+                flash('auth_rate_limited', 'error')
+                return render_template('auth_register.html', bootstrap_admin=(existing_users == 0))
             name = request.form.get('name', '').strip()
             email = request.form.get('email', '').strip().lower()
             password = request.form.get('password', '')
@@ -327,6 +333,9 @@ def register(app):
             user.notify_project_created = _bool_field('notify_project_created')
             user.notify_project_status_changed = _bool_field('notify_project_status_changed')
             user.notify_project_comment = _bool_field('notify_project_comment')
+            db.session.commit()
+            # Invalidate all sessions for this user to enforce new permissions immediately
+            invalidate_all_user_sessions(user)
             db.session.commit()
             flash('users_user_updated', 'success')
             return redirect(url_for('user_detail', user_id=user.id))

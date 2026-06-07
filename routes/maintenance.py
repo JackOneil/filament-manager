@@ -441,6 +441,16 @@ def register(app):
         def _fmt_dt(dt):
             return dt.strftime('%Y%m%dT%H%M%SZ')
 
+        def _ics_escape(text):
+            """Escape special iCalendar characters and strip newlines to prevent injection."""
+            if not text:
+                return ''
+            # Strip all newline variants to prevent CRLF injection
+            text = text.replace('\r\n', ' ').replace('\r', ' ').replace('\n', ' ')
+            # Escape iCalendar special characters (backslash first to avoid double-escaping)
+            text = text.replace('\\', '\\\\').replace(';', '\\;').replace(',', '\\:')
+            return text
+
         lines = [
             'BEGIN:VCALENDAR',
             'VERSION:2.0',
@@ -454,14 +464,14 @@ def register(app):
             uid = f'filament-maint-{rec.id}@filament-manager'
             dtstart = _fmt_dt(rec.next_service_at)
             dtend = _fmt_dt(rec.next_service_at + timedelta(hours=1))
-            summary = f"{translate('maintenance_type_' + rec.maintenance_type)} — {rec.printer_name}"
+            summary = _ics_escape(f"{translate('maintenance_type_' + rec.maintenance_type)} — {rec.printer_name}")
             lines.extend([
                 'BEGIN:VEVENT',
                 f'UID:{uid}',
                 f'DTSTART:{dtstart}',
                 f'DTEND:{dtend}',
                 f'SUMMARY:{summary}',
-                f'DESCRIPTION:{rec.notes or ""}',
+                f'DESCRIPTION:{_ics_escape(rec.notes)}',
                 f'CATEGORIES:3D Printer Maintenance',
                 'END:VEVENT',
             ])

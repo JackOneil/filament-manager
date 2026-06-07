@@ -909,9 +909,9 @@ function createWidgetLayoutManager(config) {
             var id    = item.dataset.widgetId;
             if (!id) return;
             var lim   = (layout.limits && layout.limits[id] !== undefined) ? layout.limits[id] : null;
-            var limit = (lim === 'all' || lim === null) ? Infinity : parseInt(lim);
+            var limit = (lim === 'all' || lim === null) ? Infinity : parseInt(lim, 10);
             item.querySelectorAll('[data-row-index]').forEach(function(row) {
-                row.style.display = parseInt(row.dataset.rowIndex) >= limit ? 'none' : '';
+                row.style.display = parseInt(row.dataset.rowIndex, 10) >= limit ? 'none' : '';
             });
             var sel = item.querySelector('.widget-limit-select');
             if (sel && lim !== null) sel.value = String(lim);
@@ -1023,9 +1023,9 @@ function createCardResizeManager(config) {
     function applyLimit(cardId, limit) {
         var card = document.querySelector('[data-card-id="' + cardId + '"]');
         if (!card) return;
-        var lim = (limit === 'all') ? Infinity : parseInt(limit);
+        var lim = (limit === 'all') ? Infinity : parseInt(limit, 10);
         card.querySelectorAll('[data-row-index]').forEach(function(row) {
-            row.style.display = parseInt(row.dataset.rowIndex) >= lim ? 'none' : '';
+            row.style.display = parseInt(row.dataset.rowIndex, 10) >= lim ? 'none' : '';
         });
     }
 

@@ -126,8 +126,8 @@
                             <i class="fa-solid" :class="isFullscreen ? 'fa-compress' : 'fa-expand'"></i>
                             <span x-text="isFullscreen ? '{{ t('models_viewer_exit_fullscreen') }}' : '{{ t('models_viewer_fullscreen') }}'"></span>
                         </button>
-                        <button type="button" @click="captureThumbnail()" class="bg-white/90 hover:bg-white text-slate-900 h-9 px-3 rounded-xl transition font-bold text-xs flex items-center gap-1.5 shadow" title="Save this camera viewpoint as the main thumbnail">
-                            <i class="fa-solid fa-camera"></i> Save Thumbnail
+                        <button type="button" @click="captureThumbnail()" class="bg-white/90 hover:bg-white text-slate-900 h-9 px-3 rounded-xl transition font-bold text-xs flex items-center gap-1.5 shadow" title="{{ t('models_save_thumbnail_title') }}">
+                            <i class="fa-solid fa-camera"></i> {{ t('models_save_thumbnail') }}
                         </button>
                     </div>
                 </div>
@@ -149,7 +149,7 @@
                     <div class="flex items-center gap-3">
                         <input type="color" x-model="viewerColor" @input="updateViewerColor()" class="h-9 w-12 rounded-xl border border-[var(--ui-border)] bg-transparent p-0.5 cursor-pointer flex-shrink-0">
                         <div class="text-xs text-gray-500 dark:text-slate-400 leading-tight">
-                            <span>Adjust the preview material tint. Drag the picker to dynamically paint the 3D canvas mesh.</span>
+                            <span>{{ t('models_color_picker_hint') }}</span>
                         </div>
                     </div>
                 </div>
@@ -196,7 +196,7 @@
                     <!-- Version Note / Changelog -->
                     <div class="pt-2 border-t border-[var(--ui-border)] space-y-1">
                         <span class="block text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">{{ t('models_note') }}</span>
-                        <p class="text-xs text-gray-500 dark:text-slate-400 leading-relaxed italic" x-text="activeVersionNote || 'No description provided for this version.'"></p>
+                        <p class="text-xs text-gray-500 dark:text-slate-400 leading-relaxed italic" x-text="activeVersionNote || '{{ t('models_no_version_note') }}'"></p>
                     </div>
 
                     <!-- Model-level Note (persistent across versions) -->
@@ -879,13 +879,13 @@ function modelDetailApp() {
                 .then(function(res) { return res.json(); })
                 .then(function(data) {
                     if (data.success) {
-                        showToast('Model thumbnail successfully captured!', 'success');
+                        showToast('{{ t('models_thumbnail_captured') }}', 'success');
                     } else {
-                        showToast('Failed to save captured thumbnail.', 'error');
+                        showToast('{{ t('models_thumbnail_failed') }}', 'error');
                     }
                 })
                 .catch(function(err) {
-                    showToast('Error sending thumbnail to server.', 'error');
+                    showToast('{{ t('models_thumbnail_error') }}', 'error');
                 });
             });
         },

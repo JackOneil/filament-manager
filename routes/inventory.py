@@ -273,7 +273,7 @@ def register(app):
                 weight_total = request.form.get('weight_total', type=float)
                 quantity = request.form.get('quantity', 1, type=int) or 1
                 price = request.form.get('price', type=float)
-                if not all([brand_id, color_id, material_id, weight_total, price is not None]):
+                if brand_id is None or color_id is None or material_id is None or weight_total is None or price is None:
                     return redirect(url_for('add'))
                 weight_remaining = float(
                     request.form.get('weight_remaining') or weight_total * quantity

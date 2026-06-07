@@ -975,8 +975,7 @@ def register(app):
                         ip_address=us_data.get('ip_address'),
                         user_agent=us_data.get('user_agent'),
                         created_at=datetime.fromisoformat(us_data['created_at']) if us_data.get('created_at') else utc_now(),
-                        last_activity=datetime.fromisoformat(us_data['last_activity']) if us_data.get('last_activity') else None,
-                        expires_at=datetime.fromisoformat(us_data['expires_at']) if us_data.get('expires_at') else None,
+                        last_activity_at=datetime.fromisoformat(us_data['last_activity_at']) if us_data.get('last_activity_at') else None,
                     ))
 
                 # ── 15. Model comments ────────────────────────────────

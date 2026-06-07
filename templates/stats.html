@@ -723,7 +723,7 @@ html.dark .widget-color-picker > div {
 </div>
 
 <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
-const statsData = {{ chart_data|safe }};
+const statsData = {{ chart_data|tojson }};
 
 function statsDashboard() {
     return {

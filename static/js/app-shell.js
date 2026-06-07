@@ -112,15 +112,24 @@ function appShell() {
             });
         },
         async fetchResults(q) {
+            // Cancel previous in-flight request to prevent race conditions
+            if (this._abortController) {
+                this._abortController.abort();
+            }
+            this._abortController = new AbortController();
             this.loading = true;
             try {
-                const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+                const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`, {
+                    signal: this._abortController.signal
+                });
                 if (res.ok) {
                     const data = await res.json();
                     this.results = data.results || [];
                 }
             } catch (e) {
-                 console.error(e);
+                if (e.name !== 'AbortError') {
+                    console.error(e);
+                }
             } finally {
                 this.loading = false;
                 this.scrollToSelected();

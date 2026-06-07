@@ -149,7 +149,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     await window.__inv.fetchContent(window.__inv.currentPage || 1);
                 }
             } catch (e) {
-                alert((window._filCtxT && window._filCtxT.addSpoolError) || 'Error adding spool.');
+                if (window.showToast) {
+                    showToast((window._filCtxT && window._filCtxT.addSpoolError) || 'add_spool_error', 'error');
+                }
             } finally {
                 if (submitButton) submitButton.disabled = false;
             }

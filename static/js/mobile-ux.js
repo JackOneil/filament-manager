@@ -77,9 +77,10 @@
             const ptrWrap = document.getElementById('ptr-wrap');
             const ptrIcon = document.getElementById('ptr-icon');
             const ptrText = document.getElementById('ptr-text');
-            const ptrLabelPull    = ptrWrap ? (ptrWrap.dataset.pull    || 'Pull down to refresh') : 'Pull down to refresh';
-            const ptrLabelRelease = ptrWrap ? (ptrWrap.dataset.release || 'Release to refresh')   : 'Release to refresh';
-            const ptrLabelLoading = ptrWrap ? (ptrWrap.dataset.loading || 'Loading...')            : 'Loading...';
+            const L = (window.__helpLang || document.documentElement.lang || 'en').substring(0, 2);
+            const ptrLabelPull    = ptrWrap ? (ptrWrap.dataset.pull    || (window.__i18n && window.__i18n[L] && window.__i18n[L].ptr_pull)    || 'Pull down to refresh') : 'Pull down to refresh';
+            const ptrLabelRelease = ptrWrap ? (ptrWrap.dataset.release || (window.__i18n && window.__i18n[L] && window.__i18n[L].ptr_release) || 'Release to refresh')   : 'Release to refresh';
+            const ptrLabelLoading = ptrWrap ? (ptrWrap.dataset.loading || (window.__i18n && window.__i18n[L] && window.__i18n[L].ptr_loading) || 'Loading…')            : 'Loading…';
             
             if (mainEl && ptrWrap && ptrIcon && ptrText) {
                 let startY = 0;

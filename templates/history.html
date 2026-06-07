@@ -25,9 +25,8 @@
                         <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
                     </select>
                 </label>
-                <form action="{{ url_for('clear_history') }}" method="POST">
+                <form action="{{ url_for('clear_history') }}" method="POST" data-confirm="{{ t('clear_history_confirm') }}">
                     <button type="submit"
-                        onclick="return confirm('{{ t('clear_history_confirm') }}')"
                         class="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded-lg text-sm transition-colors shadow-sm">
                         <i class="fa-solid fa-trash"></i>
                         {{ t('clear_history') }}

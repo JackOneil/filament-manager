@@ -377,8 +377,7 @@ def _build_export_data(app, include_files=True):
                 'ip_address': s.ip_address,
                 'user_agent': s.user_agent,
                 'created_at': s.created_at.isoformat() if s.created_at else None,
-                'last_activity': s.last_activity.isoformat() if s.last_activity else None,
-                'expires_at': s.expires_at.isoformat() if s.expires_at else None,
+                'last_activity_at': s.last_activity_at.isoformat() if s.last_activity_at else None,
             } for s in UserSession.query.order_by(UserSession.created_at).all()],
 
             'model_comments': [{

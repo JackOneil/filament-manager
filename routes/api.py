@@ -5,7 +5,7 @@ from sqlalchemy.orm import joinedload
 from auth import get_current_user, is_admin
 from database import db
 from models import Filament, Brand, Project, PrusaPrinter, BambuPrinter
-from utils import collect_usage_windows, collect_sparkline_data, compute_stock_status, escape_like, generate_sparkline_svg_path, get_filament_tags, get_live_printers, get_settings
+from utils import collect_usage_windows, collect_sparkline_data, compute_stock_status, escape_like, generate_sparkline_svg_path, get_filament_tags, get_live_printers, get_settings, translate
 
 
 def register(app):
@@ -200,7 +200,7 @@ def register(app):
         for p in proj_query.limit(10).all():
             results.append({
                 'id': f'proj_{p.id}', 'type': 'project', 'title': p.name,
-                'subtitle': p.client_name or '... klienta neuveden',
+                'subtitle': p.client_name or translate('project_client_missing_label'),
                 'url': url_for('project_detail', id=p.id),
                 'icon': 'fa-solid fa-diagram-project', 'color': '#3b82f6'
             })

@@ -206,7 +206,6 @@ SECTION_BY_ENDPOINT = {
     'notification_delete': SECTION_NOTIFICATIONS,
     'notification_delete_read': SECTION_NOTIFICATIONS,
     'audit_logs': SECTION_USERS,
-    'overview_user': SECTION_OVERVIEW,
 }
 
 
@@ -409,7 +408,8 @@ def ensure_endpoint_access():
     if section == SECTION_NOTIFICATIONS:
         return None
     if not section:
-        return None
+        # Unmapped endpoint — default deny for security
+        abort(403)
     if request.method in ('GET', 'HEAD'):
         if not has_section_access(section, write=False, user=user):
             abort(403)
@@ -706,6 +706,17 @@ def invalidate_all_other_sessions(user, keep_session_key):
         .delete(synchronize_session='fetch')
     )
     db.session.commit()
+    return deleted
+
+
+def invalidate_all_user_sessions(user):
+    """Delete ALL sessions for the user, forcing re-login.
+    Used when role/permissions change to enforce immediate effect."""
+    deleted = (
+        UserSession.query
+        .filter(UserSession.user_id == user.id)
+        .delete(synchronize_session='fetch')
+    )
     return deleted
 
 

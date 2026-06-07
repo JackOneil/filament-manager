@@ -18,18 +18,18 @@
                     <span>{{ t('calculator_title') }}</span>
                 </h1>
                 <p class="text-sm text-[var(--ui-text-muted)] mt-1">
-                    {{ t('calc_project_mode_desc') if t('calc_project_mode_desc') != 'calc_project_mode_desc' else 'Kalkulace z projektu — materiály, váhy i čas jsou načteny automaticky.' }}
+                    {{ t('calc_project_mode_desc') }}
                 </p>
                 {# Data source badge #}
                 {% if project_result.data_source == 'jobs' %}
                 <div class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 text-xs font-bold">
                     <i class="fa-solid fa-print text-[10px]"></i>
-                    Reálná data z tiskových jobů (Bambu / Prusa)
+                    {{ t('calc_data_source_jobs') }}
                 </div>
                 {% else %}
                 <div class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-bold">
                     <i class="fa-solid fa-triangle-exclamation text-[10px]"></i>
-                    Plánovaná data (žádné joby nenalezeny)
+                    {{ t('calc_data_source_planned') }}
                 </div>
                 {% endif %}
             </div>
@@ -40,16 +40,16 @@
     {# ── No data warning ───────────────────────────────────────────────────── #}
     <div class="app-surface p-10 text-center text-[var(--ui-text-muted)]">
         <i class="fa-solid fa-triangle-exclamation text-4xl mb-3 text-amber-400 block"></i>
-        <p class="font-semibold text-lg">Projekt nemá žádná data pro kalkulaci</p>
-        <p class="text-sm mt-2">Přidejte filamenty do projektu nebo přiřaďte tiskové joby (Bambu / Prusa).</p>
+        <p class="font-semibold text-lg">{{ t('calc_no_data_title') }}</p>
+        <p class="text-sm mt-2">{{ t('calc_no_data_desc') }}</p>
         <div class="flex gap-3 justify-center mt-5">
             <a href="{{ url_for('project_detail', id=project.id, tab='materials') }}"
                class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold transition text-sm">
-                <i class="fa-solid fa-spool"></i> Materiály projektu
+                <i class="fa-solid fa-spool"></i> {{ t('calc_project_materials_btn') }}
             </a>
             <a href="{{ url_for('project_detail', id=project.id, tab='jobs') }}"
                class="inline-flex items-center gap-2 border border-[var(--ui-border)] hover:border-[var(--ui-brand)] text-[var(--ui-text)] px-5 py-2.5 rounded-xl font-semibold transition text-sm">
-                <i class="fa-solid fa-print"></i> Tiskové joby
+                <i class="fa-solid fa-print"></i> {{ t('calc_project_jobs_btn') }}
             </a>
         </div>
     </div>
@@ -78,7 +78,7 @@
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div class="bg-[var(--ui-surface-strong)] rounded-xl p-3">
                         <div class="text-xs text-[var(--ui-text-muted)] font-medium uppercase tracking-wide">
-                            {% if project_result.data_source == 'jobs' %}Joby{% else %}{{ t('project_summary_materials') }}{% endif %}
+                            {% if project_result.data_source == 'jobs' %}{{ t('calc_jobs_label') }}{% else %}{{ t('project_summary_materials') }}{% endif %}
                         </div>
                         <div class="text-xl font-bold mt-1 text-[var(--ui-text)]">
                             {% if project_result.data_source == 'jobs' %}
@@ -99,7 +99,7 @@
                         {% set tm = ((project_result.print_time_hours - th) * 60) | int %}
                         <div class="text-xl font-bold mt-1 text-[var(--ui-text)]">
                             {% if th %}{{ th }}h {% endif %}{{ tm }}min
-                            <span class="text-xs text-teal-600 font-semibold ml-1">reálný</span>
+                            <span class="text-xs text-teal-600 font-semibold ml-1">{{ t('calc_time_real') }}</span>
                         </div>
                         {% else %}
                         {% set h = (project.estimated_print_time or 0) // 60 %}
@@ -124,7 +124,7 @@
                             <i class="fa-solid fa-spool text-teal-600 text-sm"></i>
                         </span>
                         <span class="font-bold text-[var(--ui-text)]">
-                            {% if project_result.data_source == 'jobs' %}Reálná spotřeba materiálu{% else %}{{ t('project_filaments') }}{% endif %}
+                            {% if project_result.data_source == 'jobs' %}{{ t('calc_real_consumption') }}{% else %}{{ t('project_filaments') }}{% endif %}
                         </span>
                     </div>
                 </div>
@@ -134,7 +134,7 @@
                             <tr class="bg-[var(--ui-surface-strong)] border-b border-[var(--ui-border)]">
                                 <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-[var(--ui-text-muted)]">{{ t('quote_filament') }}</th>
                                 <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-[var(--ui-text-muted)] text-right">{{ t('print_weight') }}</th>
-                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-[var(--ui-text-muted)] text-right">{{ t('quote_unit_price') if t('quote_unit_price') != 'quote_unit_price' else 'Cena / g' }}</th>
+                                <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-[var(--ui-text-muted)] text-right">{{ t('quote_unit_price') }}</th>
                                 <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-[var(--ui-text-muted)] text-right">{{ t('material_price') }}</th>
                             </tr>
                         </thead>
@@ -150,7 +150,7 @@
                                                 {{ line.name }}
                                                 {% if line.unmapped %}
                                                 <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-bold">
-                                                    <i class="fa-solid fa-link-slash text-[8px]"></i> Nepřiřazen
+                                                    <i class="fa-solid fa-link-slash text-[8px]"></i> {{ t('calc_unmapped') }}
                                                 </span>
                                                 {% endif %}
                                             </div>
@@ -218,7 +218,7 @@
                                oninput="updateLiveResult(this.value)">
                         <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-[var(--ui-text-muted)] font-bold">%</div>
                     </div>
-                    <p class="text-xs text-[var(--ui-text-muted)] mt-2">{{ t('calc_project_margin_hint') if t('calc_project_margin_hint') != 'calc_project_margin_hint' else 'Změňte marži a klikněte na Přepočítat nebo rovnou Uložit.' }}</p>
+                    <p class="text-xs text-[var(--ui-text-muted)] mt-2">{{ t('calc_project_margin_hint') }}</p>
                 </div>
 
                 {# Live result card #}
@@ -247,20 +247,20 @@
                        href="{{ url_for('calculator_project', project_id=project.id) }}?margin={{ margin_percent }}"
                        class="w-full flex items-center justify-center gap-2 bg-[var(--ui-surface)] border border-[var(--ui-border)] hover:border-[var(--ui-brand)] text-[var(--ui-text)] font-semibold px-5 py-3 rounded-xl transition text-sm">
                         <i class="fa-solid fa-rotate text-[var(--ui-brand)]"></i>
-                        {{ t('calc_btn') if t('calc_btn') != 'calc_btn' else 'Přepočítat' }}
+                        {{ t('calc_btn') }}
                     </a>
 
                     {# Save & return to project #}
                     <button type="submit"
                             class="w-full flex items-center justify-center gap-2 bg-[var(--ui-brand)] hover:bg-[var(--ui-brand-strong)] text-white font-bold px-5 py-3.5 rounded-xl transition shadow-lg text-sm">
                         <i class="fa-solid fa-file-signature"></i>
-                        {{ t('quote_save_btn') if t('quote_save_btn') != 'quote_save_btn' else 'Uložit kalkulaci do projektu' }}
+                        {{ t('quote_save_btn') }}
                     </button>
 
                     <a href="{{ url_for('project_detail', id=project.id, tab='materials') }}"
                        class="w-full flex items-center justify-center gap-2 text-[var(--ui-text-muted)] hover:text-[var(--ui-text)] text-sm transition">
                         <i class="fa-solid fa-arrow-left text-xs"></i>
-                        {{ t('cancel') if t('cancel') != 'cancel' else 'Zpět bez uložení' }}
+                        {{ t('cancel') }}
                     </a>
                 </div>
             </form>
@@ -269,7 +269,7 @@
             <div class="app-surface p-4 text-sm text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 flex flex-col gap-1">
                 <div class="flex items-center gap-2 font-semibold">
                     <i class="fa-solid fa-bolt text-amber-500"></i>
-                    {{ t('calc_energy_settings') if t('calc_energy_settings') != 'calc_energy_settings' else 'Nastavení energie' }}
+                    {{ t('calc_energy_settings') }}
                 </div>
                 <div class="flex justify-between text-xs mt-1">
                     <span>{{ t('kwh_price') }}:</span>

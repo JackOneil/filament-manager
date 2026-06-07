@@ -747,12 +747,13 @@
         // text
         this._tip.querySelector('#fm-tour-title').textContent = this._t(step.title);
         this._tip.querySelector('#fm-tour-text').textContent = this._t(step.text);
-        this._tip.querySelector('#fm-tour-label').textContent = L === 'cs' ? 'Průvodce' : 'Tour';
+        var _i18n = (window.__i18n && window.__i18n[L]) || {};
+        this._tip.querySelector('#fm-tour-label').textContent = _i18n.tour_label || (L === 'cs' ? 'Průvodce' : 'Tour');
         this._tip.querySelector('#fm-tour-progress').textContent = (this.current + 1) + ' / ' + total;
 
         // labels
-        this._tip.querySelector('#fm-tour-prev-lbl').textContent = L === 'cs' ? 'Zpět' : 'Back';
-        this._tip.querySelector('#fm-tour-next-lbl').textContent = isLast ? (L === 'cs' ? 'Dokončit' : 'Finish') : (L === 'cs' ? 'Dále' : 'Next');
+        this._tip.querySelector('#fm-tour-prev-lbl').textContent = _i18n.tour_back || (L === 'cs' ? 'Zpět' : 'Back');
+        this._tip.querySelector('#fm-tour-next-lbl').textContent = isLast ? (_i18n.tour_finish || (L === 'cs' ? 'Dokončit' : 'Finish')) : (_i18n.tour_next || (L === 'cs' ? 'Dále' : 'Next'));
 
         // prev disabled
         var prevBtn = this._tip.querySelector('#fm-tour-prev');

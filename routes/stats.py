@@ -430,7 +430,7 @@ def register(app):
             date_to_str=date_to_str,
             today_str=today.isoformat(),
             summary=summary,
-            chart_data=json.dumps(chart_data),
+            chart_data=chart_data,
             top_materials=top_materials,
             project_rows=project_rows[:20],
             purchase_rows=purchase_filament_rows[:30],

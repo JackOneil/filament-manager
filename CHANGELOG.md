@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.113.0] - 2026-06-07
+### Fixed
+- **BUG-500, BUG-501**: Fixed UserSession backup export/import crash — `last_activity` → `last_activity_at`, removed non-existent `expires_at` column (routes/backup_helpers.py, routes/backup.py)
+- **BUG-502**: Fixed XSS vulnerability in stats page — changed `{{ chart_data|safe }}` to `{{ chart_data|tojson }}` and removed `json.dumps()` from route to prevent script injection via filament names (templates/stats.html, routes/stats.py)
+- **BUG-503**: Fixed RBAC bypass — unmapped endpoints now default to `abort(403)` instead of allowing all authenticated users (auth.py)
+- **BUG-504**: Replaced 15+ hardcoded Czech strings in calculator_project.html with `{{ t("key") }}` — added 10 new i18n keys to messages.py (templates/calculator_project.html, messages.py)
+- **BUG-505**: Fixed zero-price/weight filament creation bug — `all([..., 0.0, ...])` returned False; now uses explicit `is None` checks (routes/inventory.py)
+- **BUG-506, BUG-507**: Added `nullable=False` to `BambuPrintJob.deducted`, `BambuJobMaterial.deducted`, and `ProjectFilament.is_used` boolean columns (models.py)
+- **BUG-508**: Fixed ICS injection in maintenance calendar export — added `_ics_escape()` to sanitize newlines and special characters in printer_name and notes (routes/maintenance.py)
+- **BUG-509**: Added rate limiting to `/register` endpoint — reuses login rate limiter (10 attempts per 5-minute window per IP) (routes/auth.py)
+- **BUG-510**: Added session invalidation on role/permission change — all user sessions are now deleted when admin updates user role/permissions, forcing re-login (auth.py, routes/auth.py)
+- **BUG-517**: Replaced `alert()` with `showToast()` in inventory.js context menu error handler (static/js/inventory.js)
+- **BUG-519**: Added AbortController to command palette search — prevents race conditions when typing quickly (static/js/app-shell.js)
+- **BUG-520**: Added radix parameter `, 10` to all `parseInt()` calls in dashboard.js (static/js/dashboard.js)
+- **BUG-521**: Replaced hardcoded Czech/English tour labels with `window.__i18n` dictionary lookups — added 4 new keys to base.html i18n block (static/js/tour.js, templates/base.html)
+- **BUG-522**: Replaced hardcoded English fallbacks in mobile-ux.js with `window.__i18n` lookups — added 3 new keys (ptr_pull, ptr_release, ptr_loading) to base.html (static/js/mobile-ux.js, templates/base.html)
+- **BUG-523**: Added `nullable=False` to 4 timestamp columns: `PrintHistory.created_at`, `ProjectComment.created_at`, `ProjectFile.uploaded_at`, `WasteFile.uploaded_at` (models.py)
+- **BUG-524**: Removed stale `overview_user` entry from `SECTION_BY_ENDPOINT` — endpoint does not exist (auth.py)
+- **BUG-528**: Added `index=True` to `PrusaPrintJob.project_id` FK column (models.py)
+- **BUG-529**: Added `index=True` to `MovementHistory.bambu_job_id` FK column (models.py)
+- **BUG-532**: Replaced `onclick="return confirm('{{ t(...) }}')"` with `data-confirm` attribute in history.html — prevents JS injection via translated strings (templates/history.html)
+- **BUG-533**: Replaced 5 hardcoded English strings in models_detail.html with `{{ t("key") }}` — added 7 new i18n keys (templates/models_detail.html, messages.py)
+- **BUG-534**: Replaced hardcoded Czech fallback in api.py search results with `translate('project_client_missing_label')` (routes/api.py)
+- **BUG-536**: Replaced `sum(r.weight_grams for r in WasteRecord.query.all())` with DB aggregate `db.session.query(db.func.sum(...)).scalar()` — avoids loading all records into memory (routes/waste.py)
+
 ## [1.112.1] - 2026-06-07
 ### Fixed
 - **Tour wizard**: Fixed off-by-one error in `startFirstLoginTour()` redirect — the `first_login` URL parameter was set to `i+1` (next step index) instead of `i` (current step index), causing the wizard to redirect through all pages without ever showing the tour overlay (static/js/tour.js)

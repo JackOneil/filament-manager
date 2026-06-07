@@ -92,7 +92,7 @@ def register(app):
         ]
         projects_json = [{'id': p.id, 'name': p.name} for p in projects]
 
-        total_waste = sum(r.weight_grams for r in WasteRecord.query.all())
+        total_waste = db.session.query(db.func.sum(WasteRecord.weight_grams)).scalar() or 0
 
         return render_template(
             'waste.html',
