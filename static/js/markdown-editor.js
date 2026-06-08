@@ -20,6 +20,53 @@
                     if (this.mode === 'preview') {
                         this.syncPreview();
                     }
+                    // Inject URL prompt modal (replaces window.prompt — BUG-518)
+                    if (!this.$el.querySelector('.md-url-modal-overlay')) {
+                        var self = this;
+                        var t = window.__i18n || {};
+                        var overlay = document.createElement('div');
+                        overlay.className = 'md-url-modal-overlay';
+                        overlay.setAttribute('style', 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:9999;align-items:center;justify-content:center;');
+                        var inputId = 'md-url-input-' + Math.random().toString(36).slice(2);
+                        overlay.innerHTML =
+                            '<div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">' +
+                            '<h3 class="text-lg font-bold mb-3 text-gray-900 dark:text-white">' + (t.md_url_prompt_title || 'Insert URL') + '</h3>' +
+                            '<input id="' + inputId + '" class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg px-3 py-2 text-sm mb-4" value="https://">' +
+                            '<div class="flex justify-end gap-2">' +
+                            '<button class="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 rounded-lg dark:text-white md-url-cancel">' + (t.md_url_prompt_cancel || 'Cancel') + '</button>' +
+                            '<button class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg md-url-ok">' + (t.md_url_prompt_ok || 'Insert') + '</button>' +
+                            '</div></div>';
+                        this.$el.appendChild(overlay);
+                        var input = overlay.querySelector('input');
+                        var close = function() { overlay.style.display = 'none'; self._urlModalCallback = null; };
+                        var submit = function() {
+                            var val = input.value.trim();
+                            if (val && self._urlModalCallback) self._urlModalCallback(val);
+                            else self._urlModalCallback = null;
+                            close();
+                        };
+                        overlay.querySelector('.md-url-cancel').onclick = close;
+                        overlay.querySelector('.md-url-ok').onclick = submit;
+                        input.onkeydown = function(e) {
+                            if (e.key === 'Enter') { e.preventDefault(); submit(); }
+                            if (e.key === 'Escape') close();
+                        };
+                        overlay.onclick = function(e) { if (e.target === overlay) close(); };
+                        this._urlModalOverlay = overlay;
+                        this._urlModalInput = input;
+                    }
+                },
+                openUrlPrompt(defaultValue) {
+                    var self = this;
+                    return new Promise(function(resolve) {
+                        self._urlModalInput.value = defaultValue || 'https://';
+                        self._urlModalCallback = resolve;
+                        self._urlModalOverlay.style.display = 'flex';
+                        self.$nextTick(function() {
+                            self._urlModalInput.focus();
+                            self._urlModalInput.select();
+                        });
+                    });
                 },
                 setMode(nextMode) {
                     if (this.mode === nextMode) return;
@@ -76,25 +123,112 @@
                         this.syncPreview();
                     }
                 },
+                // ── Modern formatting helpers (replaces document.execCommand — BUG-516) ──
+                _toggleInlineTag(tagNames) {
+                    var sel = window.getSelection();
+                    if (!sel || !sel.rangeCount) return;
+                    var range = sel.getRangeAt(0);
+                    if (range.collapsed) return;
+                    // Check if already inside one of these tags → unwrap
+                    var node = range.commonAncestorContainer;
+                    if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+                    while (node && node !== this.$refs.visual) {
+                        if (tagNames.includes((node.tagName || '').toLowerCase())) {
+                            var parent = node.parentNode;
+                            while (node.firstChild) parent.insertBefore(node.firstChild, node);
+                            parent.removeChild(node);
+                            parent.normalize();
+                            return;
+                        }
+                        node = node.parentElement;
+                    }
+                    // Not inside — wrap with the first tag name
+                    var el = document.createElement(tagNames[0]);
+                    try { range.surroundContents(el); }
+                    catch(e) { var f = range.extractContents(); el.appendChild(f); range.insertNode(el); }
+                },
+                _wrapInline(tagName, attrs) {
+                    var sel = window.getSelection();
+                    if (!sel || !sel.rangeCount) return;
+                    var range = sel.getRangeAt(0);
+                    if (range.collapsed) return;
+                    var el = document.createElement(tagName);
+                    if (attrs) for (var k in attrs) el.setAttribute(k, attrs[k]);
+                    try { range.surroundContents(el); }
+                    catch(e) { var f = range.extractContents(); el.appendChild(f); range.insertNode(el); }
+                },
+                _execBlockTag(tagName) {
+                    var sel = window.getSelection();
+                    if (!sel || !sel.rangeCount) return;
+                    var range = sel.getRangeAt(0);
+                    var block = range.commonAncestorContainer;
+                    if (block.nodeType === Node.TEXT_NODE) block = block.parentElement;
+                    while (block && block !== this.$refs.visual && !/^(p|div|h[1-6]|blockquote|li|pre)$/i.test(block.tagName || '')) {
+                        block = block.parentElement;
+                    }
+                    if (!block || block === this.$refs.visual) return;
+                    // Replace the block's outer tag
+                    var newBlock = document.createElement(tagName);
+                    while (block.firstChild) newBlock.appendChild(block.firstChild);
+                    block.parentNode.replaceChild(newBlock, block);
+                    // Place cursor at start of new block
+                    range.selectNodeContents(newBlock);
+                    range.collapse(true);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                },
+                _execList(listTag) {
+                    var sel = window.getSelection();
+                    if (!sel || !sel.rangeCount) return;
+                    var range = sel.getRangeAt(0);
+                    if (range.collapsed) return;
+                    var list = document.createElement(listTag);
+                    var items = [];
+                    // Get selected text, split by newlines, create <li> for each
+                    var text = range.toString().trim();
+                    if (!text) return;
+                    text.split(/\n+/).forEach(function(line) {
+                        var li = document.createElement('li');
+                        li.textContent = line.trim() || '\u00a0';
+                        list.appendChild(li);
+                    });
+                    range.deleteContents();
+                    range.insertNode(list);
+                },
+                // ── End modern formatting helpers ──
                 applyVisual(action) {
                     if (!this.$refs.visual) return;
                     this.$refs.visual.focus();
                     this.restoreVisualSelection();
-                    if (action === 'bold') document.execCommand('bold');
-                    if (action === 'italic') document.execCommand('italic');
-                    if (action === 'h2') document.execCommand('formatBlock', false, 'h2');
-                    if (action === 'ul') document.execCommand('insertUnorderedList');
-                    if (action === 'ol') document.execCommand('insertOrderedList');
-                    if (action === 'quote') document.execCommand('formatBlock', false, 'blockquote');
+                    if (action === 'bold') this._toggleInlineTag(['strong', 'b']);
+                    if (action === 'italic') this._toggleInlineTag(['em', 'i']);
+                    if (action === 'h2') this._execBlockTag('h2');
+                    if (action === 'ul') this._execList('ul');
+                    if (action === 'ol') this._execList('ol');
+                    if (action === 'quote') this._execBlockTag('blockquote');
+                    if (action === 'code') this._wrapInline('code');
                     if (action === 'checkbox') {
                         this.insertTaskCheckbox();
                     }
                     if (action === 'link') {
-                        var url = window.prompt('URL', 'https://');
-                        if (url && /^https?:\/\//i.test(url)) document.execCommand('createLink', false, url);
-                    }
-                    if (action === 'code') {
-                        document.execCommand('insertHTML', false, '<code>' + this.escapeHtml(window.getSelection().toString() || 'code') + '</code>');
+                        // Capture selection before async modal
+                        var sel = window.getSelection();
+                        var range = sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+                        var self = this;
+                        this.$refs.visual.focus();
+                        this.restoreVisualSelection();
+                        this.openUrlPrompt('https://').then(function(url) {
+                            if (!url || !/^https?:\/\//i.test(url)) return;
+                            if (range) {
+                                var s = window.getSelection();
+                                s.removeAllRanges();
+                                s.addRange(range);
+                            }
+                            self.$refs.visual.focus();
+                            self._wrapInline('a', {href: url, target: '_blank', rel: 'noopener'});
+                            self.saveVisualSelection();
+                        });
+                        return; // skip saveVisualSelection — handled in callback
                     }
                     this.saveVisualSelection();
                 },
@@ -137,13 +271,19 @@
                     if (action === 'ol') replaceRange('1. ', '', 'List item');
                     if (action === 'checkbox') replaceRange('- [ ] ', '', '');
                     if (action === 'link') {
-                        var href = window.prompt('URL', 'https://');
-                        if (href && /^https?:\/\//i.test(href)) {
-                            var text = selected || 'link';
-                            var insert = '[' + text + '](' + href + ')';
-                            result = result.slice(0, start) + insert + result.slice(end);
-                            nextCursor = start + insert.length;
-                        }
+                        var mStart = start, mEnd = end, mSel = selected;
+                        var self = this;
+                        this.openUrlPrompt('https://').then(function(url) {
+                            if (!url || !/^https?:\/\//i.test(url)) return;
+                            var text = mSel || 'link';
+                            var ins = '[' + text + '](' + url + ')';
+                            self.value = self.value.slice(0, mStart) + ins + self.value.slice(mEnd);
+                            self.$nextTick(function() {
+                                var ta = self.$refs.markdown;
+                                if (ta) { ta.focus(); ta.setSelectionRange(mStart + ins.length, mStart + ins.length); }
+                            });
+                        });
+                        return; // skip standard replacement flow
                     }
 
                     this.value = result;

@@ -236,6 +236,17 @@
                     </label>
                 </form>
             </div>
+
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <form method="POST" class="flex items-center justify-between max-w-xs">
+                    <input type="hidden" name="action" value="link_preview_reader">
+                    <label class="font-semibold text-gray-600 text-sm flex items-center gap-2" title="{{ t('link_preview_reader_desc') }}"><i class="fa-solid fa-globe text-indigo-400 w-4 text-center"></i> {{ t('link_preview_reader') }}</label>
+                    <label class="relative inline-flex items-center cursor-pointer ml-4">
+                        <input type="checkbox" name="link_preview_reader_enabled" onchange="this.form.submit()" class="sr-only peer" {% if app_settings and app_settings.link_preview_reader_enabled %}checked{% endif %}>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
+                    </label>
+                </form>
+            </div>
     </div>
     </div> <!-- end tab: general -->
 
@@ -1390,9 +1401,12 @@
                         <button type="submit" class="bg-blue-600 hover:bg-blue-700 transition-colors text-white font-semibold py-2 px-5 rounded-lg text-sm shadow">
                             <i class="fa-solid fa-save"></i> {{ t('save') }}
                         </button>
-                        <button type="button" onclick="if(confirm('{{ t('backup_auto_trigger_confirm') }}')){ var f=document.createElement('form'); f.method='POST'; f.action='{{ url_for('backup.backup_trigger_now') }}'; var csrf=document.querySelector('input[name=csrf_token]'); if(csrf){ var c=document.createElement('input'); c.type='hidden'; c.name='csrf_token'; c.value=csrf.value; f.appendChild(c); } document.body.appendChild(f); f.submit(); }" class="bg-amber-600 hover:bg-amber-700 transition-colors text-white font-semibold py-2 px-5 rounded-lg text-sm shadow">
-                            <i class="fa-solid fa-play"></i> {{ t('backup_auto_trigger_now') }}
-                        </button>
+                        <form method="POST" action="{{ url_for('backup.backup_trigger_now') }}" data-confirm="{{ t('backup_auto_trigger_confirm') }}" class="inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="bg-amber-600 hover:bg-amber-700 transition-colors text-white font-semibold py-2 px-5 rounded-lg text-sm shadow">
+                                <i class="fa-solid fa-play"></i> {{ t('backup_auto_trigger_now') }}
+                            </button>
+                        </form>
                     </div>
                     {% if app_settings and app_settings.backup_auto_last_run_at %}
                     <div class="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -1442,7 +1456,7 @@
                 </div>
             </form>
             
-            <form action="{{ url_for('import_data') }}" method="POST" enctype="multipart/form-data" class="bg-gray-50 rounded-lg p-5 border border-dashed border-gray-200 text-center flex flex-col justify-center items-center mt-4">
+            <form action="{{ url_for('import_data') }}" method="POST" enctype="multipart/form-data" data-confirm="{{ t('import_confirm') }}" class="bg-gray-50 rounded-lg p-5 border border-dashed border-gray-200 text-center flex flex-col justify-center items-center mt-4">
                 <input type="file" name="file" accept=".tar.gz,.json,.json.gz,.gz" class="mb-4 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer" required title="{{ t('import_hint') }}">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 w-full mb-4 text-left">
                     <label class="flex items-center gap-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2">
@@ -1461,7 +1475,7 @@
                 <div x-show="conflictMode === 'overwrite'" x-cloak class="w-full mb-4 text-left text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                     {{ t('settings_import_overwrite_warning') }}
                 </div>
-                <button type="submit" class="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 transition-colors text-white font-bold py-3 px-6 rounded-lg text-sm shadow" onclick="return confirm('{{ t('import_confirm') }}');">
+                <button type="submit" class="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 transition-colors text-white font-bold py-3 px-6 rounded-lg text-sm shadow">
                     <i class="fa-solid fa-upload mr-1"></i> {{ t('import_db') }}
                 </button>
             </form>

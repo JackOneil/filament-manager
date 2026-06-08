@@ -144,7 +144,7 @@
                         <span class="text-sm text-gray-500" x-text="selectedCount + ' ' + (selectedCount == 1 ? '{{ t('users_selected_suffix') }}' : '{{ t('users_selected_plural_suffix') }}')" x-show="selectedCount > 0" x-cloak></span>
                         <template x-if="selectedCount > 0">
                             <div class="flex items-center gap-1">
-                                <form method="POST" class="inline-flex items-center gap-1" @submit.prevent="if (bulkAction === 'delete') { if (!confirm('{{ t('users_bulk_delete_confirm')|e }}')) return; }">
+                                <form method="POST" class="inline-flex items-center gap-1" data-confirm-msg="{{ t('users_bulk_delete_confirm') }}" @submit.prevent="if (bulkAction === 'delete') { if (!confirm($el.dataset.confirmMsg)) return; }">
                                     <input type="hidden" name="action" value="bulk">
                                     <input type="hidden" name="bulk_action" x-model="bulkAction">
                                     <template x-for="uid in selectedUsers" :key="uid">

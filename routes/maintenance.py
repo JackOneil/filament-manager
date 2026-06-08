@@ -5,7 +5,7 @@ from flask import abort, redirect, render_template, request, url_for, Response, 
 
 from database import db
 from models import BambuPrinter, BambuPrintJob, PrinterMaintenance, PrusaPrinter, PrusaPrintJob
-from utils import translate, utc_now
+from utils import translate, utc_now, safe_commit
 
 
 MAINTENANCE_TYPES = ('nozzle_change', 'calibration', 'service', 'fault', 'other')
@@ -348,7 +348,7 @@ def register(app):
         rec = PrinterMaintenance()
         _apply_form_to_record(rec)
         db.session.add(rec)
-        db.session.commit()
+        safe_commit()
         return redirect(url_for('maintenance_index'))
 
     @bp.route('/maintenance/<int:rec_id>/edit', methods=['POST'])
@@ -361,7 +361,7 @@ def register(app):
 
         _apply_form_to_record(rec)
 
-        db.session.commit()
+        safe_commit()
         return redirect(url_for('maintenance_index'))
 
     @bp.route('/maintenance/<int:rec_id>/duplicate', methods=['POST'])
@@ -399,7 +399,7 @@ def register(app):
             fault_resolved=False,
             fault_resolved_at=None,
         ))
-        db.session.commit()
+        safe_commit()
         return redirect(url_for('maintenance_index'))
 
     @bp.route('/maintenance/<int:rec_id>/schedule-30', methods=['POST'])
@@ -412,7 +412,7 @@ def register(app):
         rec = db.get_or_404(PrinterMaintenance, rec_id)
         base = rec.next_service_at or utc_now()
         rec.next_service_at = base + timedelta(days=30)
-        db.session.commit()
+        safe_commit()
         return redirect(url_for('maintenance_index'))
 
     @bp.route('/maintenance/<int:rec_id>/resolve-fault', methods=['POST'])
@@ -426,7 +426,7 @@ def register(app):
         if rec.maintenance_type == 'fault':
             rec.fault_resolved = True
             rec.fault_resolved_at = utc_now()
-            db.session.commit()
+            safe_commit()
         return redirect(url_for('maintenance_index'))
 
     @bp.route('/maintenance/calendar.ics')
@@ -489,6 +489,6 @@ def register(app):
             abort(403)
         rec = db.get_or_404(PrinterMaintenance, rec_id)
         db.session.delete(rec)
-        db.session.commit()
+        safe_commit()
         return redirect(url_for('maintenance_index'))
     app.register_blueprint(bp)

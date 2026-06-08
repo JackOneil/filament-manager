@@ -34,6 +34,7 @@ from utils import (
     parse_tags,
     restore_filament_from_snapshot,
     restore_bulk_from_snapshot,
+    safe_commit,
     translate,
     utc_now,
 )
@@ -213,7 +214,7 @@ def register(app):
         filament.quality_drying = request.form.get('quality_drying', '').strip() or None
         filament.quality_profile = request.form.get('quality_profile', '').strip() or None
         filament.quality_notes = request.form.get('quality_notes', '').strip() or None
-        db.session.commit()
+        safe_commit()
         return redirect(url_for('filament_detail', id=filament.id))
 
     @bp.route('/filament/<int:id>/toggle-reorder-snooze', methods=['POST'])
@@ -221,7 +222,7 @@ def register(app):
         _require_inventory_admin()
         filament = db.get_or_404(Filament, id)
         filament.reorder_alert_snoozed = not bool(filament.reorder_alert_snoozed)
-        db.session.commit()
+        safe_commit()
         return redirect(request.referrer or url_for('filament_detail', id=filament.id))
 
     @bp.route('/inventory/bulk', methods=['POST'])
@@ -258,7 +259,7 @@ def register(app):
             log_movement(filament, 'bulk_delete', filament.weight_remaining, note='Bulk delete')
             db.session.delete(filament)
 
-        db.session.commit()
+        safe_commit()
         return redirect(url_for('filaments_index'))
 
     @bp.route('/add', methods=['GET', 'POST'])
@@ -306,7 +307,7 @@ def register(app):
             db.session.add(new_fil)
             db.session.flush()
             log_movement(new_fil, 'add', weight_remaining, note='Initial stock')
-            db.session.commit()
+            safe_commit()
             return redirect(url_for('filaments_index'))
 
         brands = Brand.query.order_by(Brand.name).all()
@@ -338,7 +339,7 @@ def register(app):
             elif weight_diff < 0:
                 log_movement(filament, 'remove', abs(weight_diff), note='Manual edit')
 
-            db.session.commit()
+            safe_commit()
             return redirect(url_for('filaments_index'))
 
         return render_template('edit.html', filament=filament, formatted_tags=format_tags(filament.tag_text))
@@ -355,7 +356,7 @@ def register(app):
         filament = db.get_or_404(Filament, id)
         actual_amount = deduct_filament_stock(filament, amount)
         log_movement(filament, 'remove', actual_amount, note='Manual usage')
-        db.session.commit()
+        safe_commit()
         return redirect(url_for('filaments_index'))
 
     @bp.route('/add_spool/<int:id>', methods=['POST'])
@@ -377,7 +378,7 @@ def register(app):
             added_weight,
             note=translate('movement_note_added_spools').format(count=spool_count),
         )
-        db.session.commit()
+        safe_commit()
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.accept_mimetypes.best == 'application/json':
             return jsonify({
                 'ok': True,
@@ -399,7 +400,7 @@ def register(app):
             actual_amount = deduct_filament_stock(filament, filament.weight_total)
             log_movement(filament, 'remove', actual_amount, note='Removed spool')
             removed_weight = float(actual_amount or 0.0)
-        db.session.commit()
+        safe_commit()
         if removed_weight > 0:
             # Create DB-backed undo snapshot
             user = get_current_user()
@@ -449,7 +450,7 @@ def register(app):
             }
 
         db.session.delete(filament)
-        db.session.commit()
+        safe_commit()
         return redirect(url_for('filaments_index'))
 
     @bp.route('/inventory/undo', methods=['POST'])
@@ -491,7 +492,7 @@ def register(app):
                     max(restore_weight, 0.0),
                     note=translate('movement_note_undo_remove_spool'),
                 )
-                db.session.commit()
+                safe_commit()
 
             elif action_type == 'delete_filament':
                 # Use the DB-backed restore function
@@ -516,7 +517,7 @@ def register(app):
             else:
                 raise ValueError('unsupported_undo_type')
 
-            db.session.commit()
+            safe_commit()
             flash('undo_toast_applied', 'success')
         except Exception:
             db.session.rollback()
@@ -731,7 +732,7 @@ def register(app):
                     quality_notes=row.get('quality_notes', '').strip() or None,
                 ))
                 imported += 1
-            db.session.commit()
+            safe_commit()
             return redirect(url_for('filaments_index',
                                     _anchor='import_ok',
                                     imported=imported))
@@ -879,7 +880,7 @@ def register(app):
             imported += 1
 
         try:
-            db.session.commit()
+            safe_commit()
         except Exception:
             db.session.rollback()
             app.logger.exception("Community DB import commit failed")

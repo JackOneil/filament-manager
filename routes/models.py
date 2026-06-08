@@ -16,7 +16,7 @@ from werkzeug.utils import secure_filename
 from database import db
 from auth import get_current_user, is_admin
 from models import Project, ProjectFile, AppSetting, User, ModelComment, ModelCategory
-from utils import escape_like, utc_now, translate
+from utils import escape_like, utc_now, translate, safe_commit
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +138,7 @@ def render_stl_thumbnail_for_file(project_file, commit=True):
         if ok:
             project_file.thumbnail_path = f'thumbnails/{thumb_name}'
             if commit:
-                db.session.commit()
+                safe_commit()
             logger.info('Auto-rendered STL thumbnail for ProjectFile id=%s', project_file.id)
             return True
     except Exception as exc:
@@ -244,12 +244,12 @@ def model_upload():
         category_id=category_id,
     )
     db.session.add(new_file)
-    db.session.commit()
+    safe_commit()
     # Auto-render STL thumbnail or extract 3MF thumbnail
     try:
         if not render_stl_thumbnail_for_file(new_file, commit=True):
             _extract_3mf_thumbnail(new_file)
-            db.session.commit()
+            safe_commit()
     except Exception as exc:
         logger.warning('Auto-thumbnail trigger failed for new model id=%s: %s', new_file.id, exc)
     flash(translate('models_upload_success'), 'success')
@@ -260,7 +260,8 @@ def api_models_list():
     query = ProjectFile.query.outerjoin(Project).filter(ProjectFile.parent_file_id.is_(None))
     
     if not is_admin():
-        query = query.filter(Project.owner_user_id == get_current_user().id)
+        user = get_current_user()
+        query = query.filter(Project.owner_user_id == (user.id if user else None))
         
     conditions = []
     for ext in MODEL_EXTENSIONS:
@@ -421,7 +422,7 @@ def model_edit(root_id):
     # Update note specifically on the latest version
     latest.version_note = version_note
 
-    db.session.commit()
+    safe_commit()
     flash(translate('models_success_edit'), 'success')
     return redirect(url_for('models.model_detail', root_id=root_file.id))
 
@@ -485,13 +486,13 @@ def model_upload_version(root_id):
     )
     
     db.session.add(new_file)
-    db.session.commit()
+    safe_commit()
 
     # Auto-render STL thumbnail or extract 3MF thumbnail (non-blocking for the user)
     try:
         if not render_stl_thumbnail_for_file(new_file, commit=True):
             _extract_3mf_thumbnail(new_file)
-            db.session.commit()
+            safe_commit()
     except Exception as exc:
         logger.warning('Auto-thumbnail trigger failed for new version id=%s: %s', new_file.id, exc)
 
@@ -511,7 +512,7 @@ def _delete_model_chain(root_file):
 def model_delete(root_id):
     root_file = _check_file_access(root_id)
     _delete_model_chain(root_file)
-    db.session.commit()
+    safe_commit()
     flash(translate('models_success_deleted'), 'success')
     return redirect(url_for('models.models_index'))
 
@@ -532,7 +533,7 @@ def model_delete_version(file_id):
             # Delete the old root from DB and disk
             _delete_file_on_disk(pf)
             db.session.delete(pf)
-            db.session.commit()
+            safe_commit()
             flash(translate('models_success_version_deleted'), 'success')
             return redirect(url_for('models.model_detail', root_id=new_root.id))
         # No children — delete the only version (entire model gone)
@@ -540,7 +541,7 @@ def model_delete_version(file_id):
     root_file = pf if is_root else db.session.get(ProjectFile, pf.parent_file_id)
     _delete_file_on_disk(pf)
     db.session.delete(pf)
-    db.session.commit()
+    safe_commit()
     if is_root:
         flash(translate('models_success_deleted'), 'success')
         return redirect(url_for('models.models_index'))
@@ -592,6 +593,10 @@ def model_upload_thumbnail(file_id):
     img_data = request.form.get('image')
     if not img_data:
         return jsonify({'error': translate('error_invalid_data')}), 400
+    
+    # Reject payloads larger than 10 MB before decoding
+    if len(img_data) > 10 * 1024 * 1024:
+        return jsonify({'error': translate('error_image_too_large')}), 413
         
     is_jpeg = img_data.startswith('data:image/jpeg;base64,')
     is_png = img_data.startswith('data:image/png;base64,')
@@ -617,7 +622,7 @@ def model_upload_thumbnail(file_id):
         handle.write(raw_data)
         
     f.thumbnail_path = f'thumbnails/{thumb_name}'
-    db.session.commit()
+    safe_commit()
     
     return jsonify({'success': True, 'path': f.thumbnail_path})
 
@@ -660,18 +665,20 @@ def model_add_comment(root_id):
     user = get_current_user()
     comment = ModelComment(root_file_id=root_id, user_id=user.id if user else None, body=body)
     db.session.add(comment)
-    db.session.commit()
+    safe_commit()
     return redirect(url_for('models.model_detail', root_id=root_id) + '#model-comments')
 
 
 @bp.route('/models/<int:root_id>/comments/<int:comment_id>/delete', methods=['POST'])
 def model_delete_comment(root_id, comment_id):
     comment = ModelComment.query.get_or_404(comment_id)
+    if comment.root_file_id != root_id:
+        abort(404)
     user = get_current_user()
     if not is_admin(user) and (not user or comment.user_id != user.id):
         abort(403)
     db.session.delete(comment)
-    db.session.commit()
+    safe_commit()
     return redirect(url_for('models.model_detail', root_id=root_id) + '#model-comments')
 
 
@@ -680,7 +687,7 @@ def model_generate_share(root_id):
     root_file = _check_file_access(root_id)
     if not root_file.share_token:
         root_file.share_token = secrets.token_urlsafe(32)
-        db.session.commit()
+        safe_commit()
     return redirect(url_for('models.model_detail', root_id=root_id))
 
 
@@ -688,7 +695,7 @@ def model_generate_share(root_id):
 def model_revoke_share(root_id):
     root_file = _check_file_access(root_id)
     root_file.share_token = None
-    db.session.commit()
+    safe_commit()
     return redirect(url_for('models.model_detail', root_id=root_id))
 
 
@@ -749,7 +756,7 @@ def model_bulk_delete():
         if root_file and root_file.parent_file_id is None:
             _delete_model_chain(root_file)
             deleted += 1
-    db.session.commit()
+    safe_commit()
     flash(translate('models_bulk_deleted').format(n=deleted), 'success')
     return redirect(url_for('models.models_index'))
 
@@ -769,7 +776,7 @@ def model_bulk_move():
         if root_file and root_file.parent_file_id is None:
             root_file.project_id = project_id
             moved += 1
-    db.session.commit()
+    safe_commit()
     flash(translate('models_bulk_moved').format(n=moved), 'success')
     return redirect(url_for('models.models_index'))
 

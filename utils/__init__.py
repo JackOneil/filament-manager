@@ -7,7 +7,7 @@ import socket
 import threading
 import time
 from collections import Counter
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from urllib.parse import urljoin, urlparse, urlunparse
 
@@ -94,7 +94,37 @@ def translate(key):
     return TRANSLATIONS.get(lang, TRANSLATIONS['cs']).get(key, key)
 
 
-from time_utils import utc_now, utc_now_aware  # noqa: F811 — re-exported from leaf module to avoid circular imports
+def safe_commit(error_key='error_general', flash_msg=None):
+    """Commit the current DB transaction, rolling back and flashing on error.
+
+    Returns True on success, False on failure (caller should redirect/return).
+    If flash_msg is given it is flashed as 'error'; otherwise error_key is
+    translated and flashed.
+
+    Usage::
+
+        if not safe_commit('project_save_failed'):
+            return redirect(...)
+    """
+    from database import db
+    try:
+        db.session.commit()
+        return True
+    except Exception:
+        db.session.rollback()
+        try:
+            from flask import flash, current_app
+            msg = flash_msg or translate(error_key)
+            flash(msg, 'error')
+        except Exception:
+            # If flash itself fails (no request context), silently pass
+            pass
+        import logging
+        logging.getLogger('filament').exception('DB commit failed, rolled back')
+        return False
+
+
+from time_utils import utc_now, utc_now_aware, utc_now_naive  # noqa: F811 — re-exported from leaf module to avoid circular imports; utc_now() is now aware (BUG-514)
 
 # ── Markdown renderer (Refactor B: extracted to utils/markdown.py) ──────
 # Re-exported for backward compatibility — new code should import directly
@@ -106,11 +136,10 @@ from utils.markdown import (  # noqa: E402,F401  (re-exports)
 )
 
 # ── Sort-key sentinel for mixed tz-aware/naive datetimes ───────────────
-# Using ``datetime.min`` here would crash on Python 3.12+ when the list
-# contains timezone-aware datetimes (e.g. recent records inserted via
-# ``utc_now_aware()``).  A naive 1970-01-01 epoch works for both.  See
-# 5.1 in the code-review report.
-_SORT_EPOCH = datetime(1970, 1, 1)
+# Sentinel used for sorting list of objects that share a datetime field that
+# may be ``None``.  With the UtcDateTime type decorator (BUG-514), all values
+# read from the database are now timezone-aware, so the sentinel must match.
+_SORT_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 
 def get_current_currency():
@@ -1335,6 +1364,22 @@ def _strip_fragment(url):
     return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, parsed.query, ''))
 
 
+def _validate_peer_ip(response):
+    """Validate that the actually-connected peer IP is public.
+
+    Guards against DNS rebinding attacks where the DNS A record changes
+    between the pre-connect safety check and the actual TCP handshake.
+    """
+    try:
+        # Access the underlying urllib3 socket to get the real peer address
+        sock = response.raw._connection.sock
+        peer_ip = sock.getpeername()[0]
+        if not _is_public_ip(peer_ip):
+            raise ValueError('Peer IP {} is not public — possible DNS rebinding'.format(peer_ip))
+    except (AttributeError, TypeError, IndexError):
+        pass  # Cannot access socket — skip validation
+
+
 def _follow_safe_redirects(url, headers, timeout, max_redirects=5):
     current_url = url
 
@@ -1349,6 +1394,9 @@ def _follow_safe_redirects(url, headers, timeout, max_redirects=5):
             allow_redirects=False,
             stream=False,
         )
+
+        # Defend against DNS rebinding: validate the actual peer IP
+        _validate_peer_ip(response)
 
         if 300 <= response.status_code < 400:
             location = response.headers.get('Location')
@@ -1586,8 +1634,9 @@ def _extract_markdown_preview(markdown, base_url):
 
 
 def _fetch_reader_fallback(url, headers, timeout):
-    reader_url = f"https://r.jina.ai/http://{_strip_fragment(url).replace('https://', '').replace('http://', '')}"
+    reader_url = f"https://r.jina.ai/http://{re.sub(r'^https?://', '', _strip_fragment(url))}"
     response = requests.get(reader_url, headers=headers, timeout=timeout)
+    _validate_peer_ip(response)
     if response.status_code != 200 or 'text/plain' not in response.headers.get('Content-Type', ''):
         return None
     return _extract_markdown_preview(response.text, _strip_fragment(url))
@@ -1660,14 +1709,16 @@ def fetch_link_metadata(url):
                 meta['og_image'] = meta['og_image'] or json_preview['image']
 
         if not (meta['og_title'] and meta['og_image']):
-            markdown_preview = _fetch_reader_fallback(clean_url, headers=headers, timeout=10)
-            if markdown_preview:
-                if markdown_preview['title'] and _is_weak_preview_value(meta['og_title'], 'title'):
-                    meta['og_title'] = markdown_preview['title']
-                if markdown_preview['description'] and _is_weak_preview_value(meta['og_description'], 'description'):
-                    meta['og_description'] = markdown_preview['description']
-                if markdown_preview['image'] and _is_weak_preview_value(meta['og_image'], 'image'):
-                    meta['og_image'] = markdown_preview['image']
+            settings = get_settings()
+            if settings and settings.link_preview_reader_enabled:
+                markdown_preview = _fetch_reader_fallback(clean_url, headers=headers, timeout=10)
+                if markdown_preview:
+                    if markdown_preview['title'] and _is_weak_preview_value(meta['og_title'], 'title'):
+                        meta['og_title'] = markdown_preview['title']
+                    if markdown_preview['description'] and _is_weak_preview_value(meta['og_description'], 'description'):
+                        meta['og_description'] = markdown_preview['description']
+                    if markdown_preview['image'] and _is_weak_preview_value(meta['og_image'], 'image'):
+                        meta['og_image'] = markdown_preview['image']
 
     except Exception:
         return meta
@@ -1699,6 +1750,7 @@ def validate_printer_host(host):
 
     Returns the cleaned URL or None if the value is clearly invalid.
     Only http:// and https:// are allowed. Empty string is treated as invalid.
+    Localhost/loopback addresses are rejected.
     """
     host = (host or '').strip().rstrip('/')
     if not host:
@@ -1708,6 +1760,20 @@ def validate_printer_host(host):
     parsed = re.sub(r'^https?://', '', host, flags=re.IGNORECASE)
     if not parsed:
         return None
+    # Strip port and path for hostname validation
+    hostname = parsed.split(':')[0].split('/')[0]
+    if not hostname:
+        return None
+    # Reject localhost / loopback
+    if hostname.lower() in ('localhost', '127.0.0.1', '::1', '0.0.0.0'):
+        return None
+    if hostname.lower().startswith('127.') or hostname == '[::1]':
+        return None
+    # Validate hostname format (basic: no spaces, at least one dot or is IP)
+    if not re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9\-\.]*[a-zA-Z0-9])?$', hostname):
+        # Also allow IPv6 addresses in brackets
+        if not re.match(r'^\[[0-9a-fA-F:]+\]$', hostname):
+            return None
     return host
 
 

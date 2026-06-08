@@ -1,5 +1,5 @@
 from datetime import datetime
-from utils import utc_now
+from utils import utc_now, safe_commit
 import time
 
 from flask import abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for, Blueprint
@@ -36,6 +36,7 @@ from sqlalchemy import func
 _LOGIN_ATTEMPT_WINDOW = 300  # 5 minutes
 _LOGIN_MAX_ATTEMPTS = 10     # max attempts per window
 _login_attempts = {}  # ip -> [timestamp, ...]
+_login_lock = __import__('threading').Lock()
 
 
 def _check_login_rate_limit(ip_addr: str) -> bool:
@@ -47,18 +48,24 @@ def _check_login_rate_limit(ip_addr: str) -> bool:
     if current_app.config.get('TESTING'):
         return True
     now = time.time()
-    # Prune old entries
-    if ip_addr in _login_attempts:
-        _login_attempts[ip_addr] = [
-            ts for ts in _login_attempts[ip_addr]
-            if now - ts < _LOGIN_ATTEMPT_WINDOW
-        ]
-        if len(_login_attempts[ip_addr]) >= _LOGIN_MAX_ATTEMPTS:
-            return False
-    else:
-        _login_attempts[ip_addr] = []
-    _login_attempts[ip_addr].append(now)
-    return True
+    with _login_lock:
+        # Prune old entries
+        if ip_addr in _login_attempts:
+            _login_attempts[ip_addr] = [
+                ts for ts in _login_attempts[ip_addr]
+                if now - ts < _LOGIN_ATTEMPT_WINDOW
+            ]
+            if not _login_attempts[ip_addr]:
+                del _login_attempts[ip_addr]
+            elif len(_login_attempts[ip_addr]) >= _LOGIN_MAX_ATTEMPTS:
+                return False
+        else:
+            _login_attempts[ip_addr] = []
+        _login_attempts[ip_addr].append(now)
+        # Periodic cleanup of stale IP entries (probabilistic, ~1% chance per call)
+        if len(_login_attempts) > 1000:
+            _login_attempts.clear()
+        return True
 
 
 def _bool_field(name):
@@ -126,8 +133,8 @@ def register(app):
         if get_current_user():
             return redirect(url_for('index'))
         if request.method == 'POST':
-            # Rate limiting
-            client_ip = request.access_route[0] if request.access_route else request.remote_addr or 'unknown'
+            # Rate limiting — use remote_addr (not spoofable via X-Forwarded-For)
+            client_ip = request.remote_addr or 'unknown'
             if not _check_login_rate_limit(client_ip):
                 flash('auth_login_rate_limited', 'error')
                 return render_template('auth_login.html', user_count=User.query.count())
@@ -198,7 +205,7 @@ def register(app):
                 section_permissions=serialize_permissions(permissions, role=role),
             )
             db.session.add(user)
-            db.session.commit()
+            safe_commit()
             login_user(user, plain_password=password)
             flash('auth_register_success', 'success')
             return redirect(url_for('index'))
@@ -232,7 +239,7 @@ def register(app):
             )
             invite.is_used = True
             db.session.add(user)
-            db.session.commit()
+            safe_commit()
             login_user(user, plain_password=password)
             flash('auth_register_success', 'success')
             return redirect(url_for('index'))
@@ -251,7 +258,7 @@ def register(app):
                     role=role,
                     permissions=permissions,
                 )
-                db.session.commit()
+                safe_commit()
                 flash('users_invite_created', 'success')
                 return redirect(url_for('users_index', invite=invite.code))
             elif action == 'bulk':
@@ -319,7 +326,7 @@ def register(app):
                 for project in user.created_projects:
                     project.created_by_user_id = current.id
                 db.session.delete(user)
-                db.session.commit()
+                safe_commit()
                 flash('users_user_deleted', 'success')
                 return redirect(url_for('users_index'))
 
@@ -333,10 +340,10 @@ def register(app):
             user.notify_project_created = _bool_field('notify_project_created')
             user.notify_project_status_changed = _bool_field('notify_project_status_changed')
             user.notify_project_comment = _bool_field('notify_project_comment')
-            db.session.commit()
+            safe_commit()
             # Invalidate all sessions for this user to enforce new permissions immediately
             invalidate_all_user_sessions(user)
-            db.session.commit()
+            safe_commit()
             flash('users_user_updated', 'success')
             return redirect(url_for('user_detail', user_id=user.id))
 
@@ -387,7 +394,7 @@ def register(app):
             flash('users_invite_already_used', 'error')
         else:
             db.session.delete(invite)
-            db.session.commit()
+            safe_commit()
             flash('users_invite_deleted', 'success')
         return redirect(url_for('users_index'))
 
@@ -415,13 +422,13 @@ def register(app):
                 for project in target_user.created_projects:
                     project.created_by_user_id = current_user.id
                 db.session.delete(target_user)
-            db.session.commit()
+            safe_commit()
             flash('users_bulk_deleted', 'success')
         elif action == 'activate':
             User.query.filter(User.id.in_(selected), User.is_active.is_(False)).update(
                 {'is_active': True}, synchronize_session=False
             )
-            db.session.commit()
+            safe_commit()
             flash('users_bulk_activated', 'success')
         elif action == 'deactivate':
             # Prevent deactivating self
@@ -430,7 +437,12 @@ def register(app):
                 User.query.filter(User.id.in_(safe_selected), User.is_active.is_(True)).update(
                     {'is_active': False}, synchronize_session=False
                 )
-                db.session.commit()
+                safe_commit()
+                # Invalidate sessions for deactivated users
+                for uid in safe_selected:
+                    user_obj = db.session.get(User, uid)
+                    if user_obj:
+                        invalidate_all_user_sessions(user_obj)
             flash('users_bulk_deactivated', 'success')
         return redirect(url_for('users_index'))
 
@@ -446,14 +458,14 @@ def register(app):
                     user.notify_project_created = _bool_field('notify_project_created')
                     user.notify_project_status_changed = _bool_field('notify_project_status_changed')
                     user.notify_project_comment = _bool_field('notify_project_comment')
-                    db.session.commit()
+                    safe_commit()
                     flash('account_updated', 'success')
                 elif action == 'preferences':
                     lang = request.form.get('preferred_language', '')
                     user.preferred_language = lang if lang in ('cs', 'en') else None
                     theme = request.form.get('preferred_theme', '')
                     user.preferred_theme = theme if theme in ('light', 'dark', 'auto') else None
-                    db.session.commit()
+                    safe_commit()
                     flash('account_preferences_updated', 'success')
                 elif action == 'password':
                     current_password = request.form.get('current_password', '')
@@ -463,7 +475,7 @@ def register(app):
                         flash(pwd_error or 'account_password_invalid', 'error')
                     else:
                         user.password_hash = hash_password(new_password)
-                        db.session.commit()
+                        safe_commit()
                         # Invalidate all other sessions so old passwords are unusable
                         session_key = session.get('_session_key', '')
                         if session_key:
@@ -567,7 +579,7 @@ def register(app):
         if not notification or notification.user_id != user.id:
             abort(404)
         notification.is_read = True
-        db.session.commit()
+        safe_commit()
         next_page = request.form.get('page', 1, type=int)
         kind_filter = request.form.get('kind', '')
         return redirect(url_for('notifications_index', page=next_page, kind=kind_filter or None))
@@ -581,7 +593,7 @@ def register(app):
         if kind_filter and kind_filter in _VALID_NOTIFICATION_KINDS:
             q = q.filter(Notification.kind == kind_filter)
         q.update({'is_read': True})
-        db.session.commit()
+        safe_commit()
         next_page = request.form.get('page', 1, type=int)
         return redirect(url_for('notifications_index', page=next_page, kind=kind_filter or None))
 
@@ -593,7 +605,7 @@ def register(app):
         if not notification or notification.user_id != user.id:
             abort(404)
         db.session.delete(notification)
-        db.session.commit()
+        safe_commit()
         next_page = request.form.get('page', 1, type=int)
         kind_filter = request.form.get('kind', '')
         return redirect(url_for('notifications_index', page=next_page, kind=kind_filter or None))
@@ -607,7 +619,7 @@ def register(app):
         if kind_filter and kind_filter in _VALID_NOTIFICATION_KINDS:
             q = q.filter(Notification.kind == kind_filter)
         q.delete()
-        db.session.commit()
+        safe_commit()
         return redirect(url_for('notifications_index', kind=kind_filter or None))
 
     @bp.route('/audit')

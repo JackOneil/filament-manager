@@ -4,7 +4,7 @@ from sqlalchemy.orm import joinedload
 
 from database import db
 from models import Brand, Color, Filament, Material, StoragePlacement, StorageShelf
-from utils import get_filament_tags, parse_tags
+from utils import get_filament_tags, parse_tags, safe_commit
 
 
 def _placement_fill_percent(filament):
@@ -172,7 +172,7 @@ def register(app):
         if name and not StorageShelf.query.filter_by(name=name).first():
             sort_order = (db.session.query(db.func.max(StorageShelf.sort_order)).scalar() or 0) + 1
             db.session.add(StorageShelf(name=name, columns=columns, slots_count=slots_count, sort_order=sort_order))
-            db.session.commit()
+            safe_commit()
         return redirect(url_for('storage'))
 
     @bp.route('/storage/shelf/<int:shelf_id>/update', methods=['POST'])
@@ -187,7 +187,7 @@ def register(app):
             shelf.columns = columns
             shelf.slots_count = slots_count
             _repack_shelf_slots(shelf, slots_count)
-            db.session.commit()
+            safe_commit()
         return _storage_redirect_for_shelf(shelf)
 
     @bp.route('/storage/shelf/<int:shelf_id>/delete', methods=['POST'])
@@ -195,7 +195,7 @@ def register(app):
         shelf = db.session.get(StorageShelf, shelf_id)
         if shelf:
             db.session.delete(shelf)
-            db.session.commit()
+            safe_commit()
         return redirect(url_for('storage'))
 
     @bp.route('/storage/shelf/reorder', methods=['POST'])
@@ -206,7 +206,7 @@ def register(app):
             shelf = db.session.get(StorageShelf, int(shelf_id))
             if shelf:
                 shelf.sort_order = i
-        db.session.commit()
+        safe_commit()
         return jsonify({'ok': True})
 
     @bp.route('/storage/slot/assign', methods=['POST'])
@@ -223,7 +223,7 @@ def register(app):
                     slot_index=slot_index,
                     orientation='standing',
                 ))
-                db.session.commit()
+                safe_commit()
         return redirect(url_for('storage'))
 
     @bp.route('/storage/placement/<int:placement_id>/move', methods=['POST'])
@@ -246,7 +246,7 @@ def register(app):
             placement.shelf_id = target_shelf.id
             placement.slot_index = target_slot_index
 
-        db.session.commit()
+        safe_commit()
         return jsonify({'ok': True})
 
     @bp.route('/storage/placement/<int:placement_id>/orientation', methods=['POST'])
@@ -256,7 +256,7 @@ def register(app):
             return redirect(url_for('storage'))
         orientation = request.form.get('orientation', placement.orientation).strip() or placement.orientation
         placement.orientation = orientation
-        db.session.commit()
+        safe_commit()
         return _storage_redirect_for_shelf(placement.shelf)
 
     @bp.route('/storage/placement/<int:placement_id>/delete', methods=['POST'])
@@ -265,7 +265,7 @@ def register(app):
         if placement:
             shelf = placement.shelf
             db.session.delete(placement)
-            db.session.commit()
+            safe_commit()
             return _storage_redirect_for_shelf(shelf)
         return redirect(url_for('storage'))
     app.register_blueprint(bp)

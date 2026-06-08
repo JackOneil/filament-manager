@@ -367,7 +367,8 @@
 
         <!-- Bulk delete form -->
         <form method="POST" action="{{ url_for('models.model_bulk_delete') }}"
-              @submit.prevent="if(confirm('{{ t('models_bulk_delete_confirm') }}')) submitBulk($el)">
+              data-confirm-msg="{{ t('models_bulk_delete_confirm') }}"
+              @submit.prevent="if($el.dataset.confirmMsg && !confirm($el.dataset.confirmMsg)) return; submitBulk($el)">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="ids" :value="selectedIds.join(',')">
             <button type="submit" class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition">

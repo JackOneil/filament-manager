@@ -10,7 +10,7 @@ from auth import require_admin
 from sqlalchemy.orm import joinedload
 from database import db
 from models import Filament, Project, WasteFile, WasteRecord, AppSetting
-from utils import utc_now
+from utils import utc_now, safe_commit
 
 
 _DEFAULT_WASTE_REASONS = ['stringing', 'warping', 'bed_adhesion', 'clogging', 'layer_shift', 'spaghetti', 'broken_support', 'other']
@@ -141,7 +141,7 @@ def register(app):
             notes=notes,
             recorded_by_user_id=user.id if user else None,
         ))
-        db.session.commit()
+        safe_commit()
         return redirect(url_for('waste_index'))
 
     @bp.route('/waste/<int:rec_id>/edit', methods=['POST'])
@@ -174,7 +174,7 @@ def register(app):
 
         rec.notes = request.form.get('notes', '').strip() or None
 
-        db.session.commit()
+        safe_commit()
         return redirect(url_for('waste_index'))
 
     @bp.route('/waste/<int:rec_id>/delete', methods=['POST'])
@@ -191,7 +191,7 @@ def register(app):
             except OSError:
                 pass
         db.session.delete(rec)
-        db.session.commit()
+        safe_commit()
         return redirect(url_for('waste_index'))
 
     @bp.route('/waste/<int:rec_id>/upload', methods=['POST'])
@@ -218,7 +218,7 @@ def register(app):
                 filename=original_filename,
                 filepath=filepath,
             ))
-        db.session.commit()
+        safe_commit()
         page = request.args.get('page', 1)
         reason = request.args.get('reason', '')
         filament = request.args.get('filament', '')
@@ -263,7 +263,7 @@ def register(app):
         except OSError:
             pass
         db.session.delete(wf)
-        db.session.commit()
+        safe_commit()
         page = request.args.get('page', 1)
         reason = request.args.get('reason', '')
         filament = request.args.get('filament', '')

@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.115.0] - 2026-06-08
+### Changed
+- **BUG-514**: Standardised datetime handling on timezone-aware UTC throughout the entire stack
+  - Added `UtcDateTime` SQLAlchemy TypeDecorator that normalises all DateTime columns to aware UTC on read/write — legacy naive rows are automatically upgraded on read (models.py)
+  - Changed `utc_now()` to return timezone-aware datetime (was naive); `utc_now_naive()` added for explicit legacy use (time_utils.py)
+  - `_SORT_EPOCH` sentinel updated to aware UTC for compatibility with UtcDateTime read values (utils/__init__.py)
+  - `_parse_ts()` in Bambu helpers now returns aware datetimes (routes/bambu_helpers.py)
+  - All ~40 `db.DateTime` columns in models.py migrated to `UtcDateTime` type
+  - Eliminates Python 3.12+ `TypeError` when comparing aware vs. naive datetimes
+- **BUG-516**: Replaced all deprecated `document.execCommand()` calls in markdown editor with modern Selection/Range API
+  - Added `_toggleInlineTag()`, `_wrapInline()`, `_execBlockTag()`, `_execList()` helpers (static/js/markdown-editor.js)
+  - Handles bold, italic, code, link, heading, blockquote, bullet/numbered lists — all without deprecated API
+  - Link creation now uses `_wrapInline('a', {...})` instead of `execCommand('createLink', ...)`
+- **BUG-515**: Added global `safe_commit()` utility that wraps `db.session.commit()` in try/except/rollback with flash error message
+  - Applied to ~115 commit sites across routes/inventory.py, routes/projects.py, routes/auth.py, routes/settings.py, routes/waste.py, routes/maintenance.py, routes/storage.py, routes/calculator.py, routes/history.py, routes/models.py, and 3 helper modules
+  - Prevents bare HTTP 500 from `IntegrityError`/`OperationalError` on DB write failures; user sees translated error toast instead
+  - Added `error_general` and `error_db_commit` i18n keys to both cs/en (messages.py)
+  - Background workers (bambu/prusa sync, auto-backup) are excluded — no user to flash to
+
+## [1.114.2] - 2026-06-08
+### Fixed
+- **BUG-512**: Made Jina Reader link preview fallback opt-in via `link_preview_reader_enabled` AppSetting (default: off). Added toggle in Settings → General tab. Prevents unintended third-party data leak when OpenGraph metadata is insufficient. (models.py, migrations.py, templates/settings.html, routes/settings.py, utils/__init__.py, messages.py)
+- **BUG-518**: Replaced blocking `window.prompt()` with an inline modal for URL input in the markdown editor. No longer blocks the main thread, works with restrictive CSP policies, and supports dark mode. Added `md_url_prompt_title`/`cancel`/`ok` i18n keys to `window.__i18n`. (static/js/markdown-editor.js, templates/base.html)
+- **BUG-513**: Added DNS rebinding defense — `_validate_peer_ip()` checks the actually-connected socket IP after each HTTP request in `_follow_safe_redirects()` and `_fetch_reader_fallback()`. Prevents attackers from switching DNS A records to private IPs between the safety check and TCP handshake. (utils/__init__.py)
+
+## [1.114.1] - 2026-06-08
+### Fixed
+- **BUG-539**: Replaced 2 remaining `onclick="confirm(...)"` patterns in settings.html with `data-confirm` attribute — backup trigger now button converted to proper form, import confirm moved to form attribute (templates/settings.html)
+- **BUG-540**: Replaced inline `confirm()` in Alpine `@submit.prevent` with `$el.dataset.confirmMsg` data attribute pattern in models_index.html bulk delete form (templates/models_index.html)
+- **BUG-541**: Fixed 6 instances of `abort(401)` → `abort(403)` in projects.py file ownership checks — HTTP 403 (Forbidden) is the correct status for authorization failures when the user IS authenticated (routes/projects.py)
+- **BUG-542**: Added server-side empty name validation in `project_create` and `project_edit` — prevents empty project names from being stored; displays flash error and redirects back (routes/projects.py, messages.py)
+- **BUG-511**: Added hostname format validation and localhost/loopback blocking to `validate_printer_host()` — rejects empty hosts, spaces, non-standard characters, and loopback addresses (utils/__init__.py)
+- **BUG-543**: Fixed login rate limiter to use `request.remote_addr` instead of spoofable `request.access_route[0]` (X-Forwarded-For) — consistent with registration endpoint (routes/auth.py)
+- **BUG-544**: Added `root_id` ownership check in `model_delete_comment` — comment must belong to the specified root model, preventing minor IDOR (routes/models.py)
+- **BUG-545**: Added 10 MB payload size check in `model_upload_thumbnail` before base64 decode — prevents memory exhaustion from large uploads (routes/models.py, messages.py)
+- **BUG-546**: Added None guard for `get_current_user()` in `api_models_list` — prevents `AttributeError` if auth middleware edge case returns None (routes/models.py)
+- **BUG-547**: Fixed URL corruption in `_fetch_reader_fallback` — replaced fragile `.replace('https://', '').replace('http://', '')` chaining with `re.sub(r'^https?://', '', ...)` to avoid mangling URLs with `http://` in query strings (utils/__init__.py)
+- **BUG-548**: Added session invalidation for users deactivated in bulk — now calls `invalidate_all_user_sessions()` for each deactivated user, consistent with single-user deactivation (routes/auth.py)
+- **BUG-549**: Added periodic cleanup of `_login_attempts` dict — pruned IP entries are now deleted from the dict when empty, and a hard reset triggers at 1000+ entries to prevent unbounded growth (routes/auth.py)
+- **BUG-550**: Replaced `{{ t(...)|e }}` (HTML-escape) in JS string context with `data-confirm-msg` attribute pattern in users.html bulk delete form — HTML-escaping does not protect against single-quote breakout in JavaScript (templates/users.html)
+- **BUG-551**: Added `threading.Lock()` protection to `_login_attempts` dict — prevents logical race condition between multiple Gunicorn threads on rate limit checks (routes/auth.py)
+
 ## [1.114.0] - 2026-06-07
 ### Added
 - **BL-004**: Model Categories — categorize 3D models into user-defined categories (e.g. Kitchen accessories, Cosplay, Technical parts)

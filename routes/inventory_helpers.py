@@ -36,6 +36,7 @@ from utils import (
     parse_tags,
     restore_filament_from_snapshot,
     restore_bulk_from_snapshot,
+    safe_commit,
     translate,
     utc_now,
 )
@@ -375,12 +376,12 @@ def _inventory_page_context():
     if not setting:
         setting = AppSetting()
         db.session.add(setting)
-        db.session.commit()
+        safe_commit()
 
     view_mode_param = request.args.get('view', None)
     if view_mode_param and view_mode_param in ['card', 'list', 'compact']:
         setting.view_mode = view_mode_param
-        db.session.commit()
+        safe_commit()
 
     view_mode = setting.view_mode
 

@@ -1,5 +1,30 @@
 from database import db
-from time_utils import utc_now as _utc_now  # naive UTC — switching to utc_now_aware requires updating all comparison sites first
+from time_utils import utc_now_aware as _utc_now  # aware UTC — UtcDateTime normalises legacy naive → aware on read
+from datetime import timezone
+
+
+class UtcDateTime(db.TypeDecorator):
+    """SQLAlchemy type that normalises all datetimes to timezone-aware UTC.
+
+    - On write: if naive, assumes UTC and attaches ``+00:00``.
+    - On read:  if naive (from pre-v1.115 legacy rows), attaches ``+00:00``.
+
+    This ensures that the entire application layer always works with
+    aware datetime objects, eliminating the Python 3.12+ ``TypeError``
+    when comparing naive vs. aware datetimes (BUG-514).
+    """
+    impl = db.DateTime
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value
 
 
 class User(db.Model):
@@ -15,8 +40,8 @@ class User(db.Model):
     notify_project_comment = db.Column(db.Boolean, nullable=False, default=True)
     preferred_language = db.Column(db.String(10), nullable=True)  # cs, en, or NULL (app default)
     preferred_theme = db.Column(db.String(10), nullable=True)  # light, dark, auto, or NULL (app default)
-    created_at = db.Column(db.DateTime, default=_utc_now)
-    last_login_at = db.Column(db.DateTime, nullable=True, index=True)
+    created_at = db.Column(UtcDateTime, default=_utc_now)
+    last_login_at = db.Column(UtcDateTime, nullable=True, index=True)
 
     def __repr__(self):
         return f'<User {self.id} {self.email!r} role={self.role}>'
@@ -29,8 +54,8 @@ class UserInvite(db.Model):
     role = db.Column(db.String(20), nullable=False, default='user')
     section_permissions = db.Column(db.Text, nullable=True)
     is_used = db.Column(db.Boolean, nullable=False, default=False)
-    created_at = db.Column(db.DateTime, default=_utc_now)
-    expires_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(UtcDateTime, default=_utc_now)
+    expires_at = db.Column(UtcDateTime, nullable=True)
 
     def __repr__(self):
         return f'<UserInvite {self.id} code={self.code!r}>'
@@ -44,7 +69,7 @@ class Notification(db.Model):
     body = db.Column(db.Text, nullable=True)
     link = db.Column(db.String(500), nullable=True)
     is_read = db.Column(db.Boolean, nullable=False, default=False)
-    created_at = db.Column(db.DateTime, default=_utc_now, index=True)
+    created_at = db.Column(UtcDateTime, default=_utc_now, index=True)
 
     user = db.relationship('User', backref=db.backref('notifications', lazy=True, cascade='all, delete-orphan'))
 
@@ -59,8 +84,8 @@ class UserSession(db.Model):
     session_key = db.Column(db.String(64), unique=True, nullable=False, index=True)
     ip_address = db.Column(db.String(64), nullable=True)
     user_agent = db.Column(db.String(255), nullable=True)
-    created_at = db.Column(db.DateTime, default=_utc_now)
-    last_activity_at = db.Column(db.DateTime, default=_utc_now, index=True)
+    created_at = db.Column(UtcDateTime, default=_utc_now)
+    last_activity_at = db.Column(UtcDateTime, default=_utc_now, index=True)
 
     user = db.relationship('User', backref=db.backref('sessions', lazy=True, cascade='all, delete-orphan'))
 
@@ -71,7 +96,7 @@ class UserSession(db.Model):
 class AuditLog(db.Model):
     """Admin action audit trail with request and before/after snapshots."""
     id = db.Column(db.Integer, primary_key=True)
-    created_at = db.Column(db.DateTime, default=_utc_now, index=True)
+    created_at = db.Column(UtcDateTime, default=_utc_now, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True, index=True)
     user_email = db.Column(db.String(255), nullable=True)
     user_name = db.Column(db.String(120), nullable=True)
@@ -153,7 +178,7 @@ class Filament(db.Model):
 
 class MovementHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    created_at = db.Column(db.DateTime, default=_utc_now, index=True)
+    created_at = db.Column(UtcDateTime, default=_utc_now, index=True)
     filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='SET NULL'), nullable=True, index=True)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='SET NULL'), nullable=True, index=True)
     bambu_job_id = db.Column(db.Integer, db.ForeignKey('bambu_print_job.id', ondelete='SET NULL'), nullable=True, index=True)
@@ -188,14 +213,14 @@ class AppSetting(db.Model):
     bambu_region = db.Column(db.String(10), default='global')
     bambu_auto_sync_enabled = db.Column(db.Boolean, default=False)
     bambu_auto_sync_interval_minutes = db.Column(db.Integer, default=60)
-    bambu_last_sync_at = db.Column(db.DateTime, nullable=True)
+    bambu_last_sync_at = db.Column(UtcDateTime, nullable=True)
     bambu_last_sync_status = db.Column(db.String(255), nullable=True)
-    bambu_last_test_at = db.Column(db.DateTime, nullable=True)
+    bambu_last_test_at = db.Column(UtcDateTime, nullable=True)
     bambu_last_test_status = db.Column(db.String(255), nullable=True)
     reorder_shop_url = db.Column(db.Text, nullable=True)
 
     # Backup metadata
-    backup_last_export_at = db.Column(db.DateTime, nullable=True)
+    backup_last_export_at = db.Column(UtcDateTime, nullable=True)
     backup_last_export_meta = db.Column(db.Text, nullable=True)
     
     # Billing / Invoice Details
@@ -229,12 +254,15 @@ class AppSetting(db.Model):
     backup_auto_time = db.Column(db.String(5), default='03:00')  # HH:MM in app timezone
     backup_auto_day = db.Column(db.Integer, default=1)  # day of week (0=Mon) for weekly, day of month (1) for monthly
     backup_auto_include_files = db.Column(db.Boolean, default=True)
-    backup_auto_last_run_at = db.Column(db.DateTime, nullable=True)
+    backup_auto_last_run_at = db.Column(UtcDateTime, nullable=True)
     backup_auto_keep_count = db.Column(db.Integer, default=10)  # max backup files to retain (0 = unlimited)
     backup_auto_keep_days = db.Column(db.Integer, default=0)    # max age in days to retain (0 = unlimited)
 
     # Customizable waste reasons (JSON array; defaults to hardcoded list if empty)
     waste_reasons_json = db.Column(db.Text, default='')
+
+    # Link preview: Jina Reader fallback (off by default — opt-in)
+    link_preview_reader_enabled = db.Column(db.Boolean, default=False)
 
 
 class PrintHistory(db.Model):
@@ -242,7 +270,7 @@ class PrintHistory(db.Model):
     filament_name = db.Column(db.String(200), nullable=False)
     weight = db.Column(db.Float, nullable=False)
     total_cost = db.Column(db.Float, nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, default=_utc_now)
+    created_at = db.Column(UtcDateTime, nullable=False, default=_utc_now)
 
 
 class ProjectQuote(db.Model):
@@ -260,7 +288,7 @@ class ProjectQuote(db.Model):
     final_price = db.Column(db.Float, nullable=False, default=0.0)
     currency = db.Column(db.String(10), nullable=False, default='CZK')
     invoice_number = db.Column(db.String(50), nullable=True)
-    created_at = db.Column(db.DateTime, default=_utc_now)
+    created_at = db.Column(UtcDateTime, default=_utc_now)
 
     project = db.relationship('Project', backref=db.backref('quotes', lazy=True, cascade='all, delete-orphan'))
     filament = db.relationship('Filament')
@@ -270,8 +298,8 @@ class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, default=_utc_now, index=True)
-    due_date = db.Column(db.DateTime, nullable=True, index=True)
+    created_at = db.Column(UtcDateTime, default=_utc_now, index=True)
+    due_date = db.Column(UtcDateTime, nullable=True, index=True)
     client_name = db.Column(db.String(100), nullable=True)
     client_email = db.Column(db.String(255), nullable=True)
     client_phone = db.Column(db.String(50), nullable=True)
@@ -312,8 +340,8 @@ class ProjectComment(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='CASCADE'), nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True, index=True)
     body = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, default=_utc_now, index=True)
-    updated_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(UtcDateTime, nullable=False, default=_utc_now, index=True)
+    updated_at = db.Column(UtcDateTime, nullable=True)
 
     project = db.relationship('Project', backref=db.backref('comments', lazy=True, cascade='all, delete-orphan'))
     user = db.relationship('User', backref=db.backref('project_comments', lazy=True))
@@ -326,8 +354,8 @@ class ProjectTodo(db.Model):
     body = db.Column(db.String(255), nullable=False)
     is_done = db.Column(db.Boolean, nullable=False, default=False)
     due_date = db.Column(db.Date, nullable=True)
-    created_at = db.Column(db.DateTime, default=_utc_now, index=True)
-    completed_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(UtcDateTime, default=_utc_now, index=True)
+    completed_at = db.Column(UtcDateTime, nullable=True)
 
     project = db.relationship('Project', backref=db.backref('todos', lazy=True, cascade='all, delete-orphan'))
     user = db.relationship('User', backref=db.backref('project_todos', lazy=True))
@@ -338,7 +366,7 @@ class ModelCategory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
     color = db.Column(db.String(20), nullable=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=_utc_now)
+    created_at = db.Column(UtcDateTime, nullable=False, default=_utc_now)
 
     def __repr__(self):
         return f'<ModelCategory {self.name}>'
@@ -349,7 +377,7 @@ class ProjectFile(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='CASCADE'), nullable=True)
     filename = db.Column(db.String(255), nullable=False)
     filepath = db.Column(db.String(255), nullable=False)
-    uploaded_at = db.Column(db.DateTime, nullable=False, default=_utc_now)
+    uploaded_at = db.Column(UtcDateTime, nullable=False, default=_utc_now)
     version = db.Column(db.Integer, nullable=False, default=1)
     parent_file_id = db.Column(db.Integer, db.ForeignKey('project_file.id', ondelete='CASCADE'), nullable=True)
     display_name = db.Column(db.String(255), nullable=True)
@@ -376,7 +404,7 @@ class ModelComment(db.Model):
                              nullable=False, index=True)
     user_id      = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     body         = db.Column(db.Text, nullable=False)
-    created_at   = db.Column(db.DateTime, default=_utc_now, index=True)
+    created_at   = db.Column(UtcDateTime, default=_utc_now, index=True)
 
     root_file = db.relationship('ProjectFile',
                                 backref=db.backref('model_comments', lazy=True,
@@ -416,7 +444,7 @@ class ProjectPrintItem(db.Model):
     quantity_done = db.Column(db.Integer, nullable=False, default=0)
     notes = db.Column(db.Text, nullable=True)
     sort_order = db.Column(db.Integer, nullable=False, default=0)
-    created_at = db.Column(db.DateTime, default=_utc_now)
+    created_at = db.Column(UtcDateTime, default=_utc_now)
 
     project = db.relationship('Project', backref=db.backref('print_items', lazy=True, cascade='all, delete-orphan'))
 
@@ -432,7 +460,7 @@ class ProjectTemplate(db.Model):
     estimated_print_time = db.Column(db.Integer, default=0)
     tag_text = db.Column(db.Text, nullable=True)
     created_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
-    created_at = db.Column(db.DateTime, default=_utc_now)
+    created_at = db.Column(UtcDateTime, default=_utc_now)
 
     created_by = db.relationship('User', foreign_keys=[created_by_user_id])
 
@@ -446,7 +474,7 @@ class ProjectCommentReaction(db.Model):
     comment_id = db.Column(db.Integer, db.ForeignKey('project_comment.id', ondelete='CASCADE'), nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False, index=True)
     emoji = db.Column(db.String(10), nullable=False)
-    created_at = db.Column(db.DateTime, default=_utc_now)
+    created_at = db.Column(UtcDateTime, default=_utc_now)
 
     comment = db.relationship('ProjectComment', backref=db.backref('reactions', lazy=True, cascade='all, delete-orphan'))
     user = db.relationship('User', backref=db.backref('comment_reactions', lazy=True))
@@ -487,7 +515,7 @@ class BambuPrinter(db.Model):
     notes = db.Column(db.Text, nullable=True)
     pre_job_time_minutes = db.Column(db.Integer, default=0)  # calibration/warmup time before print
     power_draw_watts = db.Column(db.Integer, nullable=True)
-    created_at = db.Column(db.DateTime, default=_utc_now)
+    created_at = db.Column(UtcDateTime, default=_utc_now)
 
 
 
@@ -500,15 +528,15 @@ class BambuPrintJob(db.Model):
     device_id = db.Column(db.String(100), nullable=True)
     model_name = db.Column(db.String(300), nullable=True)
     status = db.Column(db.String(50), nullable=True, index=True)
-    started_at = db.Column(db.DateTime, nullable=True)
-    finished_at = db.Column(db.DateTime, nullable=True)
+    started_at = db.Column(UtcDateTime, nullable=True)
+    finished_at = db.Column(UtcDateTime, nullable=True)
     weight_grams = db.Column(db.Float, nullable=True)
     cost_time = db.Column(db.Integer, nullable=True)   # print duration in seconds
     raw_payload = db.Column(db.Text, nullable=True)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='SET NULL'), nullable=True, index=True)
     filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='SET NULL'), nullable=True, index=True)
     deducted = db.Column(db.Boolean, nullable=False, default=False)
-    synced_at = db.Column(db.DateTime, default=_utc_now)
+    synced_at = db.Column(UtcDateTime, default=_utc_now)
 
     project = db.relationship('Project', backref=db.backref('bambu_jobs', lazy=True))
     filament = db.relationship('Filament', backref=db.backref('bambu_jobs', lazy=True))
@@ -542,11 +570,11 @@ class PrusaPrinter(db.Model):
     printer_model = db.Column(db.String(100), nullable=True)  # filled from /api/v1/info
     notes = db.Column(db.Text, nullable=True)
     enabled = db.Column(db.Boolean, nullable=False, default=True)
-    last_sync_at = db.Column(db.DateTime, nullable=True)
-    last_success_at = db.Column(db.DateTime, nullable=True)
+    last_sync_at = db.Column(UtcDateTime, nullable=True)
+    last_success_at = db.Column(UtcDateTime, nullable=True)
     last_sync_status = db.Column(db.String(255), nullable=True)
     power_draw_watts = db.Column(db.Integer, nullable=True)
-    created_at = db.Column(db.DateTime, default=_utc_now)
+    created_at = db.Column(UtcDateTime, default=_utc_now)
 
 
 
@@ -558,8 +586,8 @@ class PrusaPrintJob(db.Model):
     file_name = db.Column(db.String(300), nullable=True)      # raw filename from printer
     display_name = db.Column(db.String(300), nullable=True)   # human-readable name
     status = db.Column(db.String(50), nullable=True, index=True)          # PRINTING, FINISHED, STOPPED, IDLE
-    started_at = db.Column(db.DateTime, nullable=True)
-    finished_at = db.Column(db.DateTime, nullable=True)
+    started_at = db.Column(UtcDateTime, nullable=True)
+    finished_at = db.Column(UtcDateTime, nullable=True)
     weight_grams = db.Column(db.Float, nullable=True)         # from g-code metadata
     cost_time = db.Column(db.Integer, nullable=True)          # print duration in seconds
     progress = db.Column(db.Float, nullable=True)             # 0.0–1.0
@@ -567,7 +595,7 @@ class PrusaPrintJob(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='SET NULL'), nullable=True, index=True)
     deducted = db.Column(db.Boolean, nullable=False, default=False)
     raw_payload = db.Column(db.Text, nullable=True)
-    synced_at = db.Column(db.DateTime, default=_utc_now)
+    synced_at = db.Column(UtcDateTime, default=_utc_now)
 
     printer = db.relationship('PrusaPrinter', backref=db.backref('jobs', lazy=True))
     filament = db.relationship('Filament', backref=db.backref('prusa_jobs', lazy=True))
@@ -587,21 +615,21 @@ class PrinterMaintenance(db.Model):
     # nozzle_change, calibration, service, fault, other
     notes = db.Column(db.Text, nullable=True)
     notes_is_markdown = db.Column(db.Boolean, nullable=False, default=False)
-    performed_at = db.Column(db.DateTime, nullable=False, default=_utc_now)
-    next_service_at = db.Column(db.DateTime, nullable=True)
+    performed_at = db.Column(UtcDateTime, nullable=False, default=_utc_now)
+    next_service_at = db.Column(UtcDateTime, nullable=True)
     recurrence_type = db.Column(db.String(20), nullable=False, default='none')
     # none, hours, days, months
     recurrence_value = db.Column(db.Integer, nullable=False, default=0)
     recurrence_enabled = db.Column(db.Boolean, nullable=False, default=False)
     fault_resolved = db.Column(db.Boolean, nullable=False, default=False)
-    fault_resolved_at = db.Column(db.DateTime, nullable=True)
+    fault_resolved_at = db.Column(UtcDateTime, nullable=True)
     predictive_enabled = db.Column(db.Boolean, nullable=False, default=False)
     predictive_runtime_hours = db.Column(db.Float, nullable=False, default=0.0)
     predictive_jobs_count = db.Column(db.Integer, nullable=False, default=0)
     predictive_filament_grams = db.Column(db.Float, nullable=False, default=0.0)
     predictive_window_days = db.Column(db.Integer, nullable=False, default=30)
-    last_renewed_at = db.Column(db.DateTime, nullable=True)
-    created_at = db.Column(db.DateTime, default=_utc_now)
+    last_renewed_at = db.Column(UtcDateTime, nullable=True)
+    created_at = db.Column(UtcDateTime, default=_utc_now)
 
     def __repr__(self):
         return f'<PrinterMaintenance {self.id} {self.printer_name!r} {self.maintenance_type!r}>'
@@ -618,7 +646,7 @@ class WasteRecord(db.Model):
     # stringing, warping, bed_adhesion, clogging, layer_shift, spaghetti, broken_support, other
     weight_grams = db.Column(db.Float, nullable=False, default=0.0)
     notes = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=_utc_now)
+    created_at = db.Column(UtcDateTime, nullable=False, default=_utc_now)
     recorded_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     recorded_by = db.relationship('User', backref=db.backref('waste_records', lazy=True))
 
@@ -632,7 +660,7 @@ class WasteFile(db.Model):
     waste_record_id = db.Column(db.Integer, db.ForeignKey('waste_record.id', ondelete='CASCADE'), nullable=False, index=True)
     filename = db.Column(db.String(255), nullable=False)
     filepath = db.Column(db.String(255), nullable=False)
-    uploaded_at = db.Column(db.DateTime, nullable=False, default=_utc_now)
+    uploaded_at = db.Column(UtcDateTime, nullable=False, default=_utc_now)
     record = db.relationship('WasteRecord', backref=db.backref('files', lazy=True, cascade='all, delete-orphan'))
 
 
@@ -643,14 +671,14 @@ class FilamentUndoLog(db.Model):
     providing durability across restarts and better audit trail.
     """
     id = db.Column(db.Integer, primary_key=True)
-    created_at = db.Column(db.DateTime, default=_utc_now, index=True)
+    created_at = db.Column(UtcDateTime, default=_utc_now, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False, index=True)
     action_type = db.Column(db.String(50), nullable=False)  # delete_filament, bulk_delete, remove_spool
     filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='CASCADE'), nullable=True, index=True)
     snapshot_data = db.Column(db.Text, nullable=False)  # JSON of filament state and relations
-    expires_at = db.Column(db.DateTime, nullable=False, index=True)
+    expires_at = db.Column(UtcDateTime, nullable=False, index=True)
     is_consumed = db.Column(db.Boolean, nullable=False, default=False)
-    consumed_at = db.Column(db.DateTime, nullable=True)
+    consumed_at = db.Column(UtcDateTime, nullable=True)
 
     user = db.relationship('User', backref=db.backref('filament_undo_logs', lazy=True))
     filament = db.relationship('Filament', backref=db.backref('undo_logs', lazy=True))

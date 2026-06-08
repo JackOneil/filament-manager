@@ -32,7 +32,7 @@ from models import (
     PrusaPrinter,
     User,
 )
-from utils import build_project_metrics, clean_bambu_title, escape_like, format_tags, parse_tags, render_markdown, translate, utc_now, _toggle_markdown_checkbox
+from utils import build_project_metrics, clean_bambu_title, escape_like, format_tags, parse_tags, render_markdown, safe_commit, translate, utc_now, _toggle_markdown_checkbox
 
 
 from routes.projects_helpers import (
@@ -260,6 +260,9 @@ def register(app):
         user = get_current_user()
         if request.method == 'POST':
             name = request.form.get('name', '').strip()
+            if not name:
+                flash('project_name_required', 'error')
+                return redirect(url_for('projects_index'))
             description = request.form.get('description', '').strip()
             client_name = user.name if user and not is_admin(user) else request.form.get('client_name', '').strip()
             client_email = request.form.get('client_email', '').strip()
@@ -294,7 +297,7 @@ def register(app):
             db.session.flush()
             if not is_admin(user):
                 _notify_project_created(project)
-            db.session.commit()
+            safe_commit()
             return redirect(url_for('project_detail', id=project.id))
 
         # Query unmapped Bambu print jobs for naming suggestion
@@ -431,6 +434,9 @@ def register(app):
             abort(403)
         if request.method == 'POST':
             project.name = request.form.get('name', '').strip()
+            if not project.name:
+                flash('project_name_required', 'error')
+                return redirect(url_for('project_edit', id=id))
             project.description = request.form.get('description', '').strip()
             project.client_name = request.form.get('client_name', '').strip()
             project.client_email = request.form.get('client_email', '').strip() or None
@@ -449,7 +455,7 @@ def register(app):
                 owner_user_id, owner_name = _resolve_project_owner_from_form(user)
                 project.owner_user_id = owner_user_id
                 project.owner_name = owner_name
-            db.session.commit()
+            safe_commit()
             return redirect(url_for('project_detail', id=project.id))
         return render_template('project_edit.html', project=project, project_tags=format_tags(project.tag_text), can_manage_project=is_admin())
 
@@ -469,7 +475,7 @@ def register(app):
             except OSError:
                 pass
         db.session.delete(project)
-        db.session.commit()
+        safe_commit()
         from flask import session
         _store_pending_undo(
             session,
@@ -562,7 +568,7 @@ def register(app):
                 newly_added_files.append(new_pf)
             uploaded_any = True
         if uploaded_any:
-            db.session.commit()
+            safe_commit()
             # Auto-render STL thumbnails for newly uploaded model files
             # (non-blocking).
             try:
@@ -581,7 +587,7 @@ def register(app):
         _project_or_404(id)
         project_file = db.get_or_404(ProjectFile, file_id)
         if project_file.project_id is None or project_file.project_id != id:
-            abort(401)
+            abort(403)
         real_path = os.path.realpath(project_file.filepath)
         real_folder = os.path.realpath(upload_folder)
         if not real_path.startswith(real_folder + os.sep):
@@ -598,7 +604,7 @@ def register(app):
         _project_or_404(id)
         project_file = db.get_or_404(ProjectFile, file_id)
         if project_file.project_id is None or project_file.project_id != id:
-            abort(401)
+            abort(403)
         real_path = os.path.realpath(project_file.filepath)
         real_folder = os.path.realpath(upload_folder)
         if not real_path.startswith(real_folder + os.sep):
@@ -610,7 +616,7 @@ def register(app):
         _project_or_404(id)
         project_file = db.get_or_404(ProjectFile, file_id)
         if project_file.project_id is None or project_file.project_id != id or _get_extension(project_file.filename) not in IMAGE_EXTENSIONS:
-            abort(401)
+            abort(403)
         real_path = os.path.realpath(project_file.filepath)
         real_folder = os.path.realpath(upload_folder)
         if not real_path.startswith(real_folder + os.sep):
@@ -624,7 +630,7 @@ def register(app):
         project = Project.query.filter_by(share_token=token).first_or_404()
         project_file = db.get_or_404(ProjectFile, file_id)
         if project_file.project_id is None or project_file.project_id != project.id:
-            abort(401)
+            abort(403)
         real_path = os.path.realpath(project_file.filepath)
         real_folder = os.path.realpath(upload_folder)
         if not real_path.startswith(real_folder + os.sep):
@@ -641,7 +647,7 @@ def register(app):
         project = Project.query.filter_by(share_token=token).first_or_404()
         project_file = db.get_or_404(ProjectFile, file_id)
         if project_file.project_id is None or project_file.project_id != project.id:
-            abort(401)
+            abort(403)
         real_path = os.path.realpath(project_file.filepath)
         real_folder = os.path.realpath(upload_folder)
         if not real_path.startswith(real_folder + os.sep):
@@ -653,7 +659,7 @@ def register(app):
         project = Project.query.filter_by(share_token=token).first_or_404()
         project_file = db.get_or_404(ProjectFile, file_id)
         if project_file.project_id is None or project_file.project_id != project.id or _get_extension(project_file.filename) not in IMAGE_EXTENSIONS:
-            abort(401)
+            abort(403)
         real_path = os.path.realpath(project_file.filepath)
         real_folder = os.path.realpath(upload_folder)
         if not real_path.startswith(real_folder + os.sep):
@@ -679,7 +685,7 @@ def register(app):
             except OSError:
                 pass
             db.session.delete(project_file)
-            db.session.commit()
+            safe_commit()
             from flask import session
             _store_pending_undo(
                 session,
@@ -715,13 +721,13 @@ def register(app):
         try:
             if kind == 'project':
                 new_project = restore_project_from_undo(undo_id)
-                db.session.commit()
+                safe_commit()
                 flash('undo_toast_applied', 'success')
                 _cleanup_undo_artifacts(slot)
                 return redirect(url_for('project_detail', id=new_project.id))
             elif kind == 'file':
                 new_file = restore_file_from_undo(undo_id)
-                db.session.commit()
+                safe_commit()
                 flash('undo_toast_applied', 'success')
                 _cleanup_undo_artifacts(slot)
                 return _project_detail_redirect(project_id, 'files') if project_id else redirect(url_for('projects_index'))
@@ -763,7 +769,7 @@ def register(app):
                 domain=domain,
             )
             db.session.add(new_link)
-            db.session.commit()
+            safe_commit()
             _schedule_link_preview_refresh(current_app._get_current_object(), new_link.id, url)
         return _project_detail_redirect(id, 'files')
 
@@ -775,7 +781,7 @@ def register(app):
         link = db.get_or_404(ProjectLink, link_id)
         if link.project_id == id:
             db.session.delete(link)
-            db.session.commit()
+            safe_commit()
         return _project_detail_redirect(id, 'files')
 
     @bp.route('/projects/<int:id>/refresh_link/<int:link_id>', methods=['POST'])
@@ -792,7 +798,7 @@ def register(app):
             link.og_image = meta['og_image']
             link.og_description = meta['og_description']
             link.domain = meta['domain']
-            db.session.commit()
+            safe_commit()
         return _project_detail_redirect(id, 'files')
 
     @bp.route('/projects/<int:id>/add_filament', methods=['POST'])
@@ -803,7 +809,7 @@ def register(app):
         estimated_weight = request.form.get('estimated_weight', 0.0, type=float)
         if filament_id and estimated_weight > 0:
             db.session.add(ProjectFilament(project_id=project.id, filament_id=filament_id, estimated_weight=estimated_weight))
-            db.session.commit()
+            safe_commit()
         return _project_detail_redirect(id, 'materials')
 
     @bp.route('/projects/<int:id>/remove_filament/<int:pf_id>', methods=['POST'])
@@ -813,7 +819,7 @@ def register(app):
         project_filament = db.get_or_404(ProjectFilament, pf_id)
         if project_filament.project_id == id:
             db.session.delete(project_filament)
-            db.session.commit()
+            safe_commit()
         return _project_detail_redirect(id, 'materials')
 
     @bp.route('/projects/<int:id>/update_filament/<int:pf_id>', methods=['POST'])
@@ -825,7 +831,7 @@ def register(app):
             new_weight = request.form.get('estimated_weight', 0.0, type=float)
             if new_weight > 0:
                 project_filament.estimated_weight = new_weight
-                db.session.commit()
+                safe_commit()
         return _project_detail_redirect(id, 'materials')
 
     @bp.route('/projects/<int:id>/status', methods=['POST'])
@@ -838,7 +844,7 @@ def register(app):
             return redirect(url_for('project_detail', id=id))
         project.status = new_status
         _notify_project_status(project)
-        db.session.commit()
+        safe_commit()
         return redirect(url_for('project_detail', id=id))
 
     @bp.route('/projects/<int:id>/advance_status', methods=['POST'])
@@ -851,7 +857,7 @@ def register(app):
             old_status = project.status
             project.status = flow[current_idx + 1]
             _notify_project_status(project)
-            db.session.commit()
+            safe_commit()
         else:
             flash(translate('project_advance_status_no_next'), 'info')
         return redirect(url_for('project_detail', id=id))
@@ -892,7 +898,7 @@ def register(app):
                 quantity_done=0,
                 notes=pi.notes,
             ))
-        db.session.commit()
+        safe_commit()
         flash(translate('project_clone_success'), 'success')
         return redirect(url_for('project_detail', id=clone.id))
 
@@ -902,7 +908,7 @@ def register(app):
         project = _project_or_404(id)
         import secrets as _secrets
         project.share_token = _secrets.token_urlsafe(32)
-        db.session.commit()
+        safe_commit()
         flash(translate('project_share_link_generated'), 'success')
         return redirect(url_for('project_detail', id=id))
 
@@ -911,7 +917,7 @@ def register(app):
         _require_project_admin()
         project = _project_or_404(id)
         project.share_token = None
-        db.session.commit()
+        safe_commit()
         flash(translate('project_share_link_revoked'), 'success')
         return redirect(url_for('project_detail', id=id))
 
@@ -950,7 +956,7 @@ def register(app):
             created_by_user_id=user.id if user else None,
         )
         db.session.add(tpl)
-        db.session.commit()
+        safe_commit()
         flash(translate('project_template_saved'), 'success')
         return redirect(url_for('project_detail', id=id))
 
@@ -959,7 +965,7 @@ def register(app):
         _require_project_admin()
         tpl = ProjectTemplate.query.get_or_404(tid)
         db.session.delete(tpl)
-        db.session.commit()
+        safe_commit()
         flash(translate('project_template_deleted'), 'success')
         return redirect(url_for('project_templates_index'))
 
@@ -993,7 +999,7 @@ def register(app):
         else:
             db.session.add(ProjectCommentReaction(comment_id=cid, user_id=user.id, emoji=emoji))
             reacted = True
-        db.session.commit()
+        safe_commit()
         count = ProjectCommentReaction.query.filter_by(comment_id=cid, emoji=emoji).count()
         return jsonify({'reacted': reacted, 'count': count, 'emoji': emoji})
 
@@ -1023,7 +1029,7 @@ def register(app):
                 project_id=project_filament.project_id,
                 note=f'Project consume: {project_filament.project.name if project_filament.project else ""}'.strip(),
             )
-            db.session.commit()
+            safe_commit()
         return _project_detail_redirect(id, 'materials')
 
     @bp.route('/projects/<int:id>/comments', methods=['POST'])
@@ -1036,7 +1042,7 @@ def register(app):
         if user and body:
             db.session.add(ProjectComment(project_id=project.id, user_id=user.id, body=body))
             _notify_project_comment(project, user)
-            db.session.commit()
+            safe_commit()
         return _project_detail_redirect(id, 'overview')
 
     @bp.route('/projects/<int:id>/comments/<int:comment_id>/edit', methods=['POST'])
@@ -1053,7 +1059,7 @@ def register(app):
             return _project_detail_redirect(id, 'overview')
         comment.body = body
         comment.updated_at = utc_now()
-        db.session.commit()
+        safe_commit()
         return _project_detail_redirect(id, 'overview')
 
     @bp.route('/projects/<int:id>/comments/<int:comment_id>/delete', methods=['POST'])
@@ -1067,7 +1073,7 @@ def register(app):
         if not _comment_delete_allowed(comment):
             abort(403)
         db.session.delete(comment)
-        db.session.commit()
+        safe_commit()
         return _project_detail_redirect(id, 'overview')
 
     @bp.route('/projects/<int:id>/comments/<int:comment_id>/toggle-checkbox', methods=['POST'])
@@ -1086,7 +1092,7 @@ def register(app):
             return jsonify({'error': translate('error_invalid_index')}), 400
         comment.body = _toggle_markdown_checkbox(comment.body, checkbox_index)
         comment.updated_at = utc_now()
-        db.session.commit()
+        safe_commit()
         return jsonify({'html': render_markdown(comment.body)})
 
     @bp.route('/projects/<int:id>/toggle-description-checkbox', methods=['POST'])
@@ -1101,7 +1107,7 @@ def register(app):
         if checkbox_index < 0:
             return jsonify({'error': translate('error_invalid_index')}), 400
         project.description = _toggle_markdown_checkbox(project.description or '', checkbox_index)
-        db.session.commit()
+        safe_commit()
         return jsonify({'html': render_markdown(project.description)})
 
     @bp.route('/projects/<int:id>/todos', methods=['POST'])
@@ -1125,7 +1131,7 @@ def register(app):
                 body=body[:255],
                 due_date=due_date,
             ))
-            db.session.commit()
+            safe_commit()
         return _project_detail_redirect(id, 'todos')
 
     @bp.route('/projects/<int:id>/todos/<int:todo_id>/toggle', methods=['POST'])
@@ -1138,7 +1144,7 @@ def register(app):
             abort(404)
         todo.is_done = not todo.is_done
         todo.completed_at = utc_now() if todo.is_done else None
-        db.session.commit()
+        safe_commit()
         return _project_detail_redirect(id, 'todos')
 
     @bp.route('/projects/<int:id>/todos/<int:todo_id>/delete', methods=['POST'])
@@ -1150,7 +1156,7 @@ def register(app):
         if todo.project_id != id:
             abort(404)
         db.session.delete(todo)
-        db.session.commit()
+        safe_commit()
         return _project_detail_redirect(id, 'todos')
 
     @bp.route('/projects/<int:id>/todos/<int:todo_id>/edit', methods=['POST'])
@@ -1172,7 +1178,7 @@ def register(app):
                 pass
         elif 'due_date' in request.form:
             todo.due_date = None
-        db.session.commit()
+        safe_commit()
         return _project_detail_redirect(id, 'todos')
 
     # ── Print items (pieces tracking) ─────────────────────────────────────────
@@ -1199,7 +1205,7 @@ def register(app):
             notes=notes,
         )
         db.session.add(item)
-        db.session.commit()
+        safe_commit()
         return _project_detail_redirect(id, 'overview')
 
     @bp.route('/projects/<int:id>/printitems/<int:item_id>/edit', methods=['POST'])
@@ -1224,7 +1230,7 @@ def register(app):
         except (TypeError, ValueError):
             pass
         item.notes = (request.form.get('notes', '') or '').strip() or None
-        db.session.commit()
+        safe_commit()
         return _project_detail_redirect(id, 'overview')
 
     @bp.route('/projects/<int:id>/printitems/<int:item_id>/delete', methods=['POST'])
@@ -1236,7 +1242,7 @@ def register(app):
         if item.project_id != id:
             abort(404)
         db.session.delete(item)
-        db.session.commit()
+        safe_commit()
         return _project_detail_redirect(id, 'overview')
 
     @bp.route('/projects/<int:id>/printitems/<int:item_id>/increment', methods=['POST'])
@@ -1249,7 +1255,7 @@ def register(app):
             abort(404)
         if item.quantity_done < item.quantity_total:
             item.quantity_done += 1
-            db.session.commit()
+            safe_commit()
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             pct = int(item.quantity_done / item.quantity_total * 100) if item.quantity_total > 0 else 0
             return jsonify({'quantity_done': item.quantity_done, 'quantity_total': item.quantity_total, 'pct': pct})
@@ -1265,7 +1271,7 @@ def register(app):
             abort(404)
         if item.quantity_done > 0:
             item.quantity_done -= 1
-            db.session.commit()
+            safe_commit()
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             pct = int(item.quantity_done / item.quantity_total * 100) if item.quantity_total > 0 else 0
             return jsonify({'quantity_done': item.quantity_done, 'quantity_total': item.quantity_total, 'pct': pct})

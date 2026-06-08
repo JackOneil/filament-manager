@@ -11,7 +11,7 @@ import re
 import logging
 import os
 import mimetypes
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import requests
 from flask import current_app, render_template, request, redirect, url_for, jsonify, Blueprint, send_file, abort
@@ -23,7 +23,7 @@ from models import (
 )
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import joinedload
-from utils import bambu_api_base, clean_bambu_title, deduct_filament_stock, decrypt_token, get_settings, log_movement, utc_now, try_auto_map_filament, invalidate_kpi_cache, format_duration, normalize_hex
+from utils import bambu_api_base, clean_bambu_title, deduct_filament_stock, decrypt_token, get_settings, log_movement, safe_commit, utc_now, try_auto_map_filament, invalidate_kpi_cache, format_duration, normalize_hex
 
 
 _LOG = logging.getLogger(__name__)
@@ -67,20 +67,19 @@ _FINISHED_STATUSES = {'FINISH'}
 
 def _parse_ts(value):
     """Parse Bambu Cloud timestamp (epoch ms/s int or ISO-8601 string) →
-    UTC-naive datetime, or None if unparseable."""
+    timezone-aware UTC datetime, or None if unparseable."""
     if value is None:
         return None
     if isinstance(value, (int, float)):
         ts = float(value) / 1000 if value > 1_000_000_000_000 else float(value)
         try:
-            from datetime import timezone as _tz
-            return datetime.fromtimestamp(ts, tz=_tz.utc).replace(tzinfo=None)
+            return datetime.fromtimestamp(ts, tz=timezone.utc)
         except (OSError, OverflowError, ValueError):
             return None
     s = re.sub(r'Z$|[+-]\d{2}:?\d{2}$', '', str(value).strip())
     for fmt in ('%Y-%m-%dT%H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M'):
         try:
-            return datetime.strptime(s, fmt)
+            return datetime.strptime(s, fmt).replace(tzinfo=timezone.utc)
         except ValueError:
             continue
     return None
@@ -599,7 +598,7 @@ def do_sync(token: str, region: str) -> dict:
         added += 1
 
     try:
-        db.session.commit()
+        safe_commit()
     except Exception as exc:
         db.session.rollback()
         _LOG.exception('Bambu sync commit error: %s', exc)
@@ -620,7 +619,7 @@ def do_sync(token: str, region: str) -> dict:
             if not orphan.finished_at:
                 orphan.finished_at = utc_now()
         if orphans:
-            db.session.commit()
+            safe_commit()
             orphans_reconciled = len(orphans)
             _LOG.info('Bambu sync: auto-reconciled %d orphan RUNNING job(s) to FINISH', orphans_reconciled)
     except Exception as exc:
@@ -751,7 +750,7 @@ def _auto_map_new_jobs(job_ids: list) -> int:
 
     if mapped_count:
         try:
-            db.session.commit()
+            safe_commit()
             invalidate_kpi_cache()
         except Exception:
             db.session.rollback()

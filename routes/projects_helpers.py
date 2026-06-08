@@ -34,7 +34,7 @@ from models import (
     PrusaPrinter,
     User,
 )
-from utils import build_project_metrics, clean_bambu_title, escape_like, format_tags, normalize_hex, parse_tags, render_markdown, translate, utc_now, _toggle_markdown_checkbox
+from utils import build_project_metrics, clean_bambu_title, escape_like, format_tags, normalize_hex, parse_tags, render_markdown, safe_commit, translate, utc_now, _toggle_markdown_checkbox
 
 
 ALLOWED_PROJECT_FILE_EXTENSIONS = {
@@ -518,7 +518,7 @@ def _schedule_link_preview_refresh(flask_app, link_id, url, max_attempts=3, retr
                         link.og_image = meta['og_image']
                         link.og_description = meta['og_description']
                         link.domain = meta['domain'] or link.domain
-                        db.session.commit()
+                        safe_commit()
                     return  # success
             except Exception:
                 flask_app.logger.exception(
@@ -742,7 +742,7 @@ def restore_project_from_undo(snapshot_id):
             domain=l.get('domain'),
         ))
 
-    db.session.commit()
+    safe_commit()
     return new_project
 
 
@@ -824,6 +824,6 @@ def restore_file_from_undo(snapshot_id):
         except OSError as exc:
             current_app.logger.warning('Undo restore: file copy failed: %s', exc)
     db.session.add(project_file)
-    db.session.commit()
+    safe_commit()
     return project_file
 

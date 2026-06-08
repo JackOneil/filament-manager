@@ -157,6 +157,9 @@ def run_migrations(app: Flask) -> None:
         # ── Customizable waste reasons (JSON array) ──────────────────────────
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN waste_reasons_json TEXT DEFAULT ''")
 
+        # ── Link preview reader fallback (opt-in) ──────────────────────────
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN link_preview_reader_enabled BOOLEAN NOT NULL DEFAULT 0")
+
         # ── Project file versioning ──────────────────────────────────────────
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN parent_file_id INTEGER DEFAULT NULL")

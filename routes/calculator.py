@@ -2,7 +2,7 @@
 from flask import render_template, request, redirect, url_for, abort, Blueprint
 from database import db
 from models import Filament, AppSetting, PrintHistory, Project, ProjectQuote
-from utils import get_current_currency, translate, utc_now
+from utils import get_current_currency, translate, utc_now, safe_commit
 
 
 def _build_filament_label(filament):
@@ -241,7 +241,7 @@ def register(app):
                             db.session.add(saved_quote)
 
                     try:
-                        db.session.commit()
+                        safe_commit()
                         app.logger.debug(
                             f"Print calculated: {filament.name}, weight={weight}g, "
                             f"material={result['material_cost']:.2f}, elec={result['electricity_cost']:.2f}, total={result['total_cost']:.2f}"
@@ -315,7 +315,7 @@ def register(app):
             db.session.add(q)
             saved_quotes = [q]
 
-            db.session.commit()
+            safe_commit()
             app.logger.info(
                 f"Project quote saved: project_id={project.id}, lines={len(saved_quotes)}, "
                 f"total={project_result['total_cost']:.2f} {project_result['currency']}"
@@ -335,7 +335,7 @@ def register(app):
         record = db.get_or_404(PrintHistory, id)
         app.logger.debug(f"Deleted print history: {record.filament_name}, cost: {record.total_cost}")
         db.session.delete(record)
-        db.session.commit()
+        safe_commit()
         return redirect(url_for('calculator'))
 
     @bp.route('/calculator/quote/<int:id>/delete', methods=['POST'])
@@ -343,7 +343,7 @@ def register(app):
         quote = db.get_or_404(ProjectQuote, id)
         project_id = quote.project_id
         db.session.delete(quote)
-        db.session.commit()
+        safe_commit()
         return redirect(url_for('project_detail', id=project_id, tab='materials'))
 
     @bp.route('/calculator/quote/<int:id>/export')
@@ -358,7 +358,7 @@ def register(app):
             quote.invoice_number = f'{prefix}-{utc_now().year}{counter:04d}'
             if settings:
                 settings.invoice_counter = counter
-            db.session.commit()
+            safe_commit()
 
         # Provide the next suggested number for display (not yet claimed)
         prefix = (settings.invoice_prefix or 'FV') if settings else 'FV'

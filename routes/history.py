@@ -3,7 +3,7 @@ from datetime import datetime
 from flask import render_template, request, redirect, url_for, make_response, Blueprint
 from database import db
 from models import MovementHistory
-from utils import escape_like
+from utils import escape_like, safe_commit
 from auth import require_admin
 
 
@@ -113,7 +113,7 @@ def register(app):
         """Delete all movement history records."""
         try:
             db.session.query(MovementHistory).delete()
-            db.session.commit()
+            safe_commit()
             app.logger.info("All movement history was cleared.")
         except Exception:
             db.session.rollback()

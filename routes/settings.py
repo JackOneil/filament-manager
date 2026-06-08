@@ -20,6 +20,7 @@ from utils import (
     parse_sync_status,
     prusa_test_connection,
     remove_tag,
+    safe_commit,
     top_tags,
     utc_now,
     validate_printer_host,
@@ -150,6 +151,10 @@ def register(app):
                 elif action == 'audit_logging':
                     setting.audit_logging_enabled = request.form.get('audit_logging_enabled') == 'on'
                     app.logger.debug(f"Audit logging {'enabled' if setting.audit_logging_enabled else 'disabled'}.")
+
+                elif action == 'link_preview_reader':
+                    setting.link_preview_reader_enabled = request.form.get('link_preview_reader_enabled') == 'on'
+                    app.logger.debug(f"Link preview reader {'enabled' if setting.link_preview_reader_enabled else 'disabled'}.")
 
                 elif action == 'edit_brand':
                     brand = db.session.get(Brand, request.form.get('id', 0, type=int))
@@ -433,7 +438,7 @@ def register(app):
                 else:
                     raise ValueError('settings_unknown_action')
 
-                db.session.commit()
+                safe_commit()
                 flash(success_key, 'success')
             except ValueError as e:
                 db.session.rollback()
@@ -525,7 +530,7 @@ def register(app):
         if not token:
             setting.bambu_last_test_at = utc_now()
             setting.bambu_last_test_status = 'error: token missing'
-            db.session.commit()
+            safe_commit()
             return jsonify({'ok': False, 'error': translate('error_token_missing')}), 400
 
         base_url = bambu_api_base(region)
@@ -539,18 +544,18 @@ def register(app):
             setting.bambu_last_test_at = utc_now()
             if resp.ok:
                 setting.bambu_last_test_status = f'ok: HTTP {resp.status_code}'
-                db.session.commit()
+                safe_commit()
                 return jsonify({'ok': True, 'status': f'HTTP {resp.status_code}'})
 
             setting.bambu_last_test_status = f'error: HTTP {resp.status_code}'
-            db.session.commit()
+            safe_commit()
             return jsonify({'ok': False, 'error': translate('error_connection_failed')}), 400
         except Exception:
             app.logger.exception("Bambu connection test failed for token %s", token[:8] + "..." if token else "None")
             db.session.rollback()  # clear failed transaction from the try block
             setting.bambu_last_test_at = utc_now()
             setting.bambu_last_test_status = 'error: request failed'
-            db.session.commit()
+            safe_commit()
             return jsonify({'ok': False, 'error': translate('error_request_failed')}), 400
 
 
@@ -565,14 +570,14 @@ def register(app):
                 'dark': 'light',
                 'auto': 'light',
             }.get(user.preferred_theme, 'light')
-            db.session.commit()
+            safe_commit()
             app.logger.debug(f"User theme changed to: {user.preferred_theme}")
         else:
             setting = AppSetting.query.first()
             if setting:
                 new_theme = 'light' if setting.theme == 'dark' else 'dark'
                 setting.theme = new_theme
-                db.session.commit()
+                safe_commit()
                 app.logger.debug(f"Global theme changed to: {new_theme}")
         return redirect(request.referrer or url_for('index'))
 
@@ -581,6 +586,6 @@ def register(app):
         setting = AppSetting.query.first()
         if setting:
             setting.onboarding_dismissed = True
-            db.session.commit()
+            safe_commit()
         return redirect(request.referrer or url_for('index'))
     app.register_blueprint(bp)
