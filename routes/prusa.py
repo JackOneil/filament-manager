@@ -25,7 +25,7 @@ from models import (
     AppSetting, PrusaPrinter, PrusaPrintJob,
     Filament, Project, PrintHistory, ProjectFilament,
 )
-from utils import deduct_filament_stock, encrypt_token, decrypt_token, log_movement, utc_now, format_duration, translate
+from utils import deduct_filament_stock, encrypt_token, decrypt_token, log_movement, utc_now, format_duration, translate, safe_commit
 from utils import validate_printer_host, prusa_request, prusa_test_connection
 
 _LOG = logging.getLogger(__name__)
@@ -58,7 +58,7 @@ def do_poll(printer: PrusaPrinter) -> dict:
     if status_data is None:
         printer.last_sync_at = now
         printer.last_sync_status = f'error: Cannot reach {printer.host}'
-        db.session.commit()
+        safe_commit()
         return {'added': 0, 'updated': 0, 'error': f'Cannot reach {printer.host}'}
 
     job_status = status_data.get('job') or {}
@@ -169,13 +169,13 @@ def do_poll(printer: PrusaPrinter) -> dict:
             'updated': updated,
             'skipped': 0,
         })
-        db.session.commit()
+        safe_commit()
     except Exception as exc:
         db.session.rollback()
         try:
             printer.last_sync_at = now
             printer.last_sync_status = f'error: {str(exc)[:220]}'
-            db.session.commit()
+            safe_commit()
         except Exception:
             db.session.rollback()
             _LOG.exception('PrusaLink nested error-status commit failed for printer %s', printer.name)
@@ -288,7 +288,7 @@ def register(app):
         # Backfill model if discovered
         if result.get('ok') and result.get('model') and not printer.printer_model:
             printer.printer_model = result['model']
-            db.session.commit()
+            safe_commit()
         return jsonify(result)
 
     # ── Job mapping (filament + project) ─────────────────────────────────
@@ -352,7 +352,7 @@ def register(app):
                         if project_obj:
                             project_obj.mark_planned_filament_used(filament_id)
 
-        db.session.commit()
+        safe_commit()
 
         if is_ajax:
             unassigned = PrusaPrintJob.query.filter(PrusaPrintJob.filament_id.is_(None)).count()
@@ -382,6 +382,6 @@ def register(app):
         job = db.session.get(PrusaPrintJob, job_id)
         if job:
             db.session.delete(job)
-            db.session.commit()
+            safe_commit()
         return redirect(url_for('prusa_jobs'))
     app.register_blueprint(bp)

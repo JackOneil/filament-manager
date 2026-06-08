@@ -1,7 +1,7 @@
 import json
 import secrets
 from datetime import datetime, timedelta
-from utils import utc_now
+from utils import safe_commit, utc_now
 from functools import wraps
 from urllib.parse import urljoin, urlsplit
 
@@ -334,7 +334,7 @@ def login_user(user, plain_password=None):
         user_agent=(request.headers.get('User-Agent') or '')[:255] or None,
     )
     db.session.add(user_session)
-    db.session.commit()
+    safe_commit()
     session['user_id'] = user.id
     session['_session_key'] = session_key
     session.permanent = True
@@ -346,7 +346,7 @@ def logout_user():
         user_session = UserSession.query.filter_by(session_key=session_key).first()
         if user_session:
             db.session.delete(user_session)
-            db.session.commit()
+            safe_commit()
     session.clear()
 
 
@@ -396,7 +396,7 @@ def ensure_endpoint_access():
             if not user_session.last_activity_at or (now_ts - user_session.last_activity_at).total_seconds() > 60:
                 user_session.last_activity_at = now_ts
                 try:
-                    db.session.commit()
+                    safe_commit()
                 except Exception:
                     db.session.rollback()
         else:
@@ -678,7 +678,7 @@ def _audit_finish_request(response):
             after_data=_audit_json_dumps(after_payload),
         )
         db.session.add(row)
-        db.session.commit()
+        safe_commit()
     except Exception as exc:
         db.session.rollback()
         # Promote to error level so audit-write failures are visible in
@@ -705,7 +705,7 @@ def invalidate_all_other_sessions(user, keep_session_key):
         .filter(UserSession.user_id == user.id, UserSession.session_key != keep_session_key)
         .delete(synchronize_session='fetch')
     )
-    db.session.commit()
+    safe_commit()
     return deleted
 
 

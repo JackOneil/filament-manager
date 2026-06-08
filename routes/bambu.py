@@ -23,7 +23,7 @@ from models import (
 )
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import joinedload
-from utils import bambu_api_base, clean_bambu_title, deduct_filament_stock, decrypt_token, get_settings, log_movement, utc_now, try_auto_map_filament, invalidate_kpi_cache, format_duration, normalize_hex, translate
+from utils import bambu_api_base, clean_bambu_title, deduct_filament_stock, decrypt_token, get_settings, log_movement, safe_commit, utc_now, try_auto_map_filament, invalidate_kpi_cache, format_duration, normalize_hex, translate
 
 
 from routes.bambu_helpers import (
@@ -294,7 +294,7 @@ def register(app):
                 'updated': result.get('updated', 0),
                 'skipped': result.get('skipped', 0),
             })
-        db.session.commit()
+        safe_commit()
         return jsonify({'ok': result['error'] is None, **result})
 
     @bp.route('/bambu/refetch-thumbnails', methods=['POST'])
@@ -342,7 +342,7 @@ def register(app):
                         try:
                             payload['cover'] = fresh_url
                             job.raw_payload = json.dumps(payload, ensure_ascii=False)
-                            db.session.commit()
+                            safe_commit()
                         except Exception:
                             db.session.rollback()
                             _LOG.warning('Failed to persist fresh cover URL for job %d', job_id)
@@ -463,7 +463,7 @@ def register(app):
             if single_slot:
                 single_slot.deducted = True
 
-        db.session.commit()
+        safe_commit()
         if is_ajax:
             state = _job_display_state(job)
             return jsonify({
@@ -522,7 +522,7 @@ def register(app):
                     if job.project:
                         job.project.mark_planned_filament_used(filament_id)
 
-        db.session.commit()
+        safe_commit()
 
         if is_ajax:
             return jsonify({
@@ -600,7 +600,7 @@ def register(app):
             if len(materials) == 1:
                 job.filament_id = filament_id
 
-        db.session.commit()
+        safe_commit()
 
         if is_ajax:
             return jsonify({'ok': True, 'filament_id': filament_id, 'filament_name': filament_name})
@@ -612,7 +612,7 @@ def register(app):
         if not job:
             return jsonify({'ok': False, 'error': translate('error_job_not_found')}), 404
         db.session.delete(job)
-        db.session.commit()
+        safe_commit()
         return redirect(url_for('bambu_jobs'))
 
     @bp.route('/bambu/job/<int:job_id>/create_project', methods=['POST'])
@@ -635,7 +635,7 @@ def register(app):
         db.session.add(project)
         db.session.flush()
         job.project_id = project.id
-        db.session.commit()
+        safe_commit()
         return jsonify({'ok': True, 'project_id': project.id, 'project_name': project.name})
 
     @bp.route('/bambu/auto-map-history', methods=['POST'])
@@ -665,7 +665,7 @@ def register(app):
 
         if total_mapped:
             try:
-                db.session.commit()
+                safe_commit()
                 invalidate_kpi_cache()
             except Exception:
                 db.session.rollback()

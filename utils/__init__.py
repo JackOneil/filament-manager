@@ -809,7 +809,7 @@ def build_action_center(now=None):
             'weight_grams': job.weight_grams,
             'detail_url': '/prusa',
         })
-    # Use a tz-naive epoch sentinel (see _SORT_EPOCH docstring) to avoid the
+    # Use a tz-aware epoch sentinel (UtcDateTime normalises all DB reads to aware).
     # Python 3.12+ "can't compare aware and naive" TypeError.  Job timestamps
     # may be aware (newer records) or naive (legacy rows).
     recent_prints.sort(key=lambda x: x['timestamp'] or _SORT_EPOCH, reverse=True)
@@ -987,14 +987,14 @@ def log_movement(filament, action_type, weight, project_id=None, bambu_job_id=No
 
         This function **only** adds a ``MovementHistory`` row to the
         current SQLAlchemy session.  It does **not** call
-        ``db.session.commit()``.  The **caller is responsible** for
+        ``safe_commit()``.  The **caller is responsible** for
         committing the transaction; otherwise the movement record is
         silently lost when the session closes without a commit.
 
         Example::
 
             log_movement(filament, 'use', 12.5, note='Benchy')
-            db.session.commit()
+            safe_commit()
     """
     if weight <= 0:
         return
@@ -1106,7 +1106,7 @@ def create_undo_snapshot(user_id, action_type, filament, project_filaments=None,
         is_consumed=False,
     )
     db.session.add(undo_log)
-    db.session.commit()
+    safe_commit()
     return undo_log
 
 
@@ -1172,7 +1172,7 @@ def create_bulk_undo_snapshot(user_id, entries):
         is_consumed=False,
     )
     db.session.add(undo_log)
-    db.session.commit()
+    safe_commit()
     return undo_log
 
 
@@ -1218,7 +1218,7 @@ def consume_undo_log(undo_log_id, user_id):
 
     undo_log.is_consumed = True
     undo_log.consumed_at = utc_now()
-    db.session.commit()
+    safe_commit()
 
     return json.loads(undo_log.snapshot_data)
 
@@ -1229,7 +1229,7 @@ def purge_expired_undo_logs():
     expired = FilamentUndoLog.query.filter(
         FilamentUndoLog.expires_at < utc_now()
     ).delete()
-    db.session.commit()
+    safe_commit()
     return expired
 
 

@@ -18,7 +18,7 @@ from models import (
     Notification, AuditLog, ModelComment, ModelCategory,
     PrinterMaintenance, WasteRecord, WasteFile, FilamentUndoLog, ProjectTemplate,
 )
-from utils import encrypt_token, format_tags, utc_now, translate
+from utils import encrypt_token, format_tags, safe_commit, utc_now, translate
 
 
 from routes.backup_helpers import (
@@ -82,7 +82,7 @@ def register(app):
         if setting:
             setting.backup_last_export_at = utc_now()
             setting.backup_last_export_meta = json.dumps(data['backup_meta'], ensure_ascii=False)
-            db.session.commit()
+            safe_commit()
 
         archive_bytes = _build_backup_archive_bytes(app, include_files=include_files)
         response = Response(archive_bytes, mimetype='application/gzip')
@@ -123,7 +123,7 @@ def register(app):
             setting.backup_auto_last_run_at = now
             setting.backup_last_export_at = now
             setting.backup_last_export_meta = json.dumps(data['backup_meta'], ensure_ascii=False)
-            db.session.commit()
+            safe_commit()
 
             # Clean up old backups according to retention settings
             keep_count = getattr(setting, 'backup_auto_keep_count', 10) or 10
