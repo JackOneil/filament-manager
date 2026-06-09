@@ -72,7 +72,7 @@ def _job_timestamp(job):
 
 
 def _job_cost_parts(job, setting, bambu_powers=None, prusa_powers=None):
-    kwh_price = setting.kwh_price if setting else 5.0
+    kwh_price = float(setting.kwh_price) if setting else 5.0
     printer_power = setting.printer_power if setting else 150
 
     job_power = printer_power
@@ -94,14 +94,14 @@ def _job_cost_parts(job, setting, bambu_powers=None, prusa_powers=None):
         for slot in job.materials:
             slot_weight += float(slot.weight_grams or 0.0)
             if slot.filament and slot.filament.weight_total > 0 and slot.weight_grams:
-                slot_cost += (slot.filament.price / slot.filament.weight_total) * slot.weight_grams
+                slot_cost += (float(slot.filament.price) / slot.filament.weight_total) * slot.weight_grams
         if slot_weight > 0:
             weight_grams = slot_weight
         if slot_cost > 0:
             material_cost = slot_cost
 
     if material_cost == 0.0 and job.filament and job.filament.weight_total > 0 and weight_grams > 0:
-        material_cost = (job.filament.price / job.filament.weight_total) * weight_grams
+        material_cost = (float(job.filament.price) / job.filament.weight_total) * weight_grams
 
     return round(weight_grams, 1), round(material_cost, 2), round(energy_cost, 2)
 

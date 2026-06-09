@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.116.1] - 2026-06-09
+### Fixed
+- **HTTP 500 on /projects and /stats**: `db.Numeric(10,2)` columns (`Filament.price`, `AppSetting.kwh_price`, `ProjectQuote.final_price`) return `Decimal` objects, which cannot be multiplied/divided with `float`. Added `float()` casts at all arithmetic sites in `utils/__init__.py` (`build_project_metrics`), `routes/stats.py` (profitable projects), and `routes/projects_helpers.py` (`_job_cost_parts`). Regression from BUG-423 (v1.116.0) which changed monetary fields from `db.Float` to `db.Numeric`. (utils/__init__.py, routes/stats.py, routes/projects_helpers.py)
+
 ## [1.116.0] - 2026-06-09
 ### Fixed
 - **BUG-423**: Changed monetary fields from `db.Float` to `db.Numeric(10,2)` in models.py — eliminates IEEE 754 floating-point precision errors for currency values (`price`, `cost`, `kwh_price`, `total_cost`, `material_cost`, `electricity_cost`, `base_cost`, `margin_amount`, `final_price`). Added `float()` casts in `log_movement()`, `_calculate_quote()`, and `_calculate_project_quote()` for Decimal/Float arithmetic compatibility. Added `_json_default` helper and `decimal.Decimal` import for JSON serialization of Decimal values in backup export, undo system, and calculator. (models.py, utils/__init__.py, routes/calculator.py, routes/backup_helpers.py, tests/test_settings.py)

@@ -323,7 +323,7 @@ def register(app):
 
         profitable_projects = []
         setting = AppSetting.query.first()
-        kwh_price = setting.kwh_price if setting else 5.0
+        kwh_price = float(setting.kwh_price) if setting else 5.0
         printer_power = setting.printer_power if setting else 150
 
         from models import BambuPrinter
@@ -351,19 +351,19 @@ def register(app):
                 if job.materials:
                     for slot in job.materials:
                         if slot.filament and slot.weight_grams and slot.filament.weight_total > 0:
-                            actual_cost += (slot.filament.price / slot.filament.weight_total) * slot.weight_grams
+                            actual_cost += (float(slot.filament.price) / slot.filament.weight_total) * slot.weight_grams
                 elif job.filament and job.weight_grams and job.filament.weight_total > 0:
-                    actual_cost += (job.filament.price / job.filament.weight_total) * job.weight_grams
+                    actual_cost += (float(job.filament.price) / job.filament.weight_total) * job.weight_grams
 
                 job_power = printer_power
                 if job.device_id and job.device_id in bambu_powers and bambu_powers[job.device_id] is not None:
                     job_power = bambu_powers[job.device_id]
                 actual_cost += ((job.cost_time or 0) / 3600.0) * (job_power / 1000.0) * kwh_price
-            profit = round(quote.final_price - actual_cost, 2)
+            profit = round(float(quote.final_price) - actual_cost, 2)
             profitable_projects.append({
                 'project_id': project.id,
                 'project_name': project.name,
-                'quote_price': round(quote.final_price, 2),
+                'quote_price': round(float(quote.final_price), 2),
                 'actual_cost': round(actual_cost, 2),
                 'profit': profit,
             })

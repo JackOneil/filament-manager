@@ -569,7 +569,7 @@ def parse_sync_status(raw_value):
 
 def build_project_metrics(project, setting=None, bambu_powers=None, prusa_powers=None):
     setting = setting or get_settings()
-    kwh_price = setting.kwh_price if setting else 5.0
+    kwh_price = float(setting.kwh_price) if setting else 5.0
     printer_power = setting.printer_power if setting else 150
 
     if bambu_powers is None:
@@ -587,7 +587,7 @@ def build_project_metrics(project, setting=None, bambu_powers=None, prusa_powers
         if item.is_used:
             completed_plans += 1
         if item.filament and item.filament.weight_total > 0:
-            estimated_material_cost += (item.filament.price / item.filament.weight_total) * (item.estimated_weight or 0.0)
+            estimated_material_cost += (float(item.filament.price) / item.filament.weight_total) * (item.estimated_weight or 0.0)
 
     actual_material_cost = 0.0
     actual_weight = 0.0
@@ -609,14 +609,14 @@ def build_project_metrics(project, setting=None, bambu_powers=None, prusa_powers
                 if slot.weight_grams:
                     actual_weight += float(slot.weight_grams or 0.0)
                 if slot.filament and slot.filament.weight_total > 0 and slot.weight_grams:
-                    slot_total += (slot.filament.price / slot.filament.weight_total) * slot.weight_grams
+                    slot_total += (float(slot.filament.price) / slot.filament.weight_total) * slot.weight_grams
             if slot_total > 0:
                 actual_material_cost += slot_total
             elif job.filament and job.filament.weight_total > 0 and job.weight_grams:
-                actual_material_cost += (job.filament.price / job.filament.weight_total) * job.weight_grams
+                actual_material_cost += (float(job.filament.price) / job.filament.weight_total) * job.weight_grams
         elif job.filament and job.filament.weight_total > 0 and job.weight_grams:
             actual_weight += float(job.weight_grams or 0.0)
-            actual_material_cost += (job.filament.price / job.filament.weight_total) * job.weight_grams
+            actual_material_cost += (float(job.filament.price) / job.filament.weight_total) * job.weight_grams
         elif job.weight_grams:
             actual_weight += float(job.weight_grams or 0.0)
 
@@ -632,7 +632,7 @@ def build_project_metrics(project, setting=None, bambu_powers=None, prusa_powers
         if job.weight_grams:
             actual_weight += float(job.weight_grams or 0.0)
         if job.filament and job.filament.weight_total > 0 and job.weight_grams:
-            actual_material_cost += (job.filament.price / job.filament.weight_total) * job.weight_grams
+            actual_material_cost += (float(job.filament.price) / job.filament.weight_total) * job.weight_grams
 
     actual_total_cost = actual_material_cost + energy_cost
     latest_quote = None
