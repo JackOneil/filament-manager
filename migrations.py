@@ -86,6 +86,7 @@ def run_migrations(app: Flask) -> None:
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_project_quote_project_filament ON project_quote (project_id, filament_id)')
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_project_file_project_parent ON project_file (project_id, parent_file_id)')
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_storage_placement_shelf_filament ON storage_placement (shelf_id, filament_id)')
+        _safe_alter(app, 'CREATE UNIQUE INDEX IF NOT EXISTS uq_shelf_slot ON storage_placement (shelf_id, slot_index)')
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_bambu_job_material_filament_id ON bambu_job_material (filament_id)')
         _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_waste_record_filament_project ON waste_record (filament_id, project_id)')
 
@@ -416,6 +417,10 @@ def _migrate_waste_record_fk(app: Flask) -> None:
         db.session.execute(text("INSERT INTO waste_record_new SELECT * FROM waste_record"))
         db.session.execute(text("DROP TABLE waste_record"))
         db.session.execute(text("ALTER TABLE waste_record_new RENAME TO waste_record"))
+
+        # Restore indexes that were dropped when the original tables were recreated
+        db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_waste_record_filament_project ON waste_record (filament_id, project_id)"))
+        db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_waste_file_waste_record_id ON waste_file (waste_record_id)"))
 
         db.session.execute(text("PRAGMA foreign_keys=ON"))
         db.session.commit()

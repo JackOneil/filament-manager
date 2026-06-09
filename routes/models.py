@@ -174,7 +174,7 @@ def models_index():
     total_size = db.session.query(
         db.func.sum(ProjectFile.file_size_bytes)
     ).filter(
-        ProjectFile.id.in_([f.id for f in base_q.with_entities(ProjectFile.id).all()])
+        ProjectFile.id.in_(base_q.with_entities(ProjectFile.id).subquery())
     ).scalar() or 0
     no_thumb = base_q.filter(ProjectFile.thumbnail_path.is_(None)).count()
 
@@ -296,9 +296,60 @@ def api_models_list():
     elif category_id:
         query = query.filter(ProjectFile.category_id == category_id)
 
+    # Pagination params (parse early for DB-level limit)
+    page = request.args.get('page', 1, type=int)
+    setting = AppSetting.query.first()
+    per_page = setting.items_per_page if setting and setting.items_per_page in [12, 24, 48, 96] else 12
+
+    # Build a subquery for the latest version of each root file
+    max_version_sq = (
+        db.session.query(
+            ProjectFile.parent_file_id,
+            db.func.max(ProjectFile.version).label('max_version')
+        )
+        .filter(ProjectFile.parent_file_id.isnot(None))
+        .group_by(ProjectFile.parent_file_id)
+        .subquery()
+    )
+    latest_info_sq = (
+        db.session.query(
+            ProjectFile.parent_file_id,
+            ProjectFile.uploaded_at.label('latest_uploaded'),
+            ProjectFile.file_size_bytes.label('latest_size')
+        )
+        .join(max_version_sq, db.and_(
+            ProjectFile.parent_file_id == max_version_sq.c.parent_file_id,
+            ProjectFile.version == max_version_sq.c.max_version
+        ))
+        .subquery()
+    )
+    query = query.outerjoin(latest_info_sq, latest_info_sq.c.parent_file_id == ProjectFile.id)
+
+    # DB-level sorting
+    sort_by = request.args.get('sort_by', 'uploaded')
+    if sort_by == 'name_asc':
+        query = query.order_by(ProjectFile.display_name.asc().nullslast(), ProjectFile.filename.asc())
+    elif sort_by == 'name_desc':
+        query = query.order_by(ProjectFile.display_name.desc().nullslast(), ProjectFile.filename.desc())
+    elif sort_by == 'project':
+        query = query.order_by(Project.name.asc().nullslast())
+    elif sort_by == 'size_desc':
+        query = query.order_by(db.func.coalesce(latest_info_sq.c.latest_size, ProjectFile.file_size_bytes).desc().nullslast())
+    elif sort_by == 'uploaded_asc':
+        query = query.order_by(db.func.coalesce(latest_info_sq.c.latest_uploaded, ProjectFile.uploaded_at).asc().nullslast())
+    else:  # uploaded (newest first)
+        query = query.order_by(db.func.coalesce(latest_info_sq.c.latest_uploaded, ProjectFile.uploaded_at).desc().nullslast())
+
+    # Get total count (before offset/limit)
+    total = query.count()
+    pages = max(1, math.ceil(total / per_page))
+    page = min(max(page, 1), pages)
+
+    # Apply DB-level pagination
+    query = query.offset((page - 1) * per_page).limit(per_page)
     models_list = query.all()
 
-    # Enrich models for sorting
+    # Enrich models (only the paginated set — sorting and pagination done at DB level)
     enriched = []
     for root in models_list:
         latest = _get_latest_version(root)
@@ -315,33 +366,7 @@ def api_models_list():
             'category_color': root.category.color if root.category else '',
         })
 
-    # Sort
-    sort_by = request.args.get('sort_by', 'uploaded')
-    if sort_by == 'name_asc':
-        enriched.sort(key=lambda x: x['display_name'].lower())
-    elif sort_by == 'name_desc':
-        enriched.sort(key=lambda x: x['display_name'].lower(), reverse=True)
-    elif sort_by == 'project':
-        enriched.sort(key=lambda x: x['project_name'].lower())
-    elif sort_by == 'size_desc':
-        enriched.sort(key=lambda x: x['size'], reverse=True)
-    elif sort_by == 'uploaded_asc':
-        enriched.sort(key=lambda x: x['uploaded_at'])
-    else:  # uploaded (newest first)
-        enriched.sort(key=lambda x: x['uploaded_at'], reverse=True)
-
-    # Paginate
-    page = request.args.get('page', 1, type=int)
-    setting = AppSetting.query.first()
-    per_page = setting.items_per_page if setting and setting.items_per_page in [12, 24, 48, 96] else 12
-    
-    total = len(enriched)
-    pages = max(1, math.ceil(total / per_page))
-    page = min(max(page, 1), pages)
-    start_idx = (page - 1) * per_page
-    end_idx = start_idx + per_page
-    
-    paginated_items = enriched[start_idx:end_idx]
+    paginated_items = enriched
     
     # Custom pagination pages generator for safety
     page_list = list(range(1, pages + 1))

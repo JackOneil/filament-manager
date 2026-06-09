@@ -164,6 +164,8 @@ document.addEventListener('DOMContentLoaded', function () {
 // Right-click context menu
 (function() {
     'use strict';
+    if (window.__filCtxMenuInit) return;
+    window.__filCtxMenuInit = true;
     var _menu = null;
     function getCSRF() {
         var el = document.querySelector('input[name="csrf_token"]');

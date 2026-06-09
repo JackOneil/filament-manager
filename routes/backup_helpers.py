@@ -18,7 +18,7 @@ from models import (
     Notification, AuditLog, ModelComment, ModelCategory,
     PrinterMaintenance, WasteRecord, WasteFile, FilamentUndoLog, ProjectTemplate,
 )
-from utils import encrypt_token, format_tags, utc_now, translate
+from utils import encrypt_token, format_tags, utc_now, translate, _json_default
 
 
 
@@ -600,7 +600,7 @@ def _build_backup_archive_from_data(data, include_files=True):
     avoid a second full ``_build_export_data`` pass and its DB walk.
     """
     archive_buffer = io.BytesIO()
-    manifest_bytes = json.dumps(data, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+    manifest_bytes = json.dumps(data, ensure_ascii=False, separators=(',', ':'), default=_json_default).encode('utf-8')
     with tarfile.open(fileobj=archive_buffer, mode='w:gz') as archive:
         manifest_info = tarfile.TarInfo('manifest.json')
         manifest_info.size = len(manifest_bytes)

@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.116.0] - 2026-06-09
+### Fixed
+- **BUG-423**: Changed monetary fields from `db.Float` to `db.Numeric(10,2)` in models.py — eliminates IEEE 754 floating-point precision errors for currency values (`price`, `cost`, `kwh_price`, `total_cost`, `material_cost`, `electricity_cost`, `base_cost`, `margin_amount`, `final_price`). Added `float()` casts in `log_movement()`, `_calculate_quote()`, and `_calculate_project_quote()` for Decimal/Float arithmetic compatibility. Added `_json_default` helper and `decimal.Decimal` import for JSON serialization of Decimal values in backup export, undo system, and calculator. (models.py, utils/__init__.py, routes/calculator.py, routes/backup_helpers.py, tests/test_settings.py)
+- **BUG-552**: Replaced in-memory list comprehension with SQL subquery in `models_index` stats — `ProjectFile.id.in_(base_q.with_entities(ProjectFile.id).subquery())` instead of loading all IDs into Python memory for total size computation. (routes/models.py)
+- **BUG-553**: Added past due date validation with flash warning in `project_create` and `project_edit` — users are warned when setting a due date in the past. Added `project_due_date_past` i18n key to both cs/en. (routes/projects.py, messages.py)
+- **BUG-531**: Restored dropped indexes after `_migrate_waste_record_fk` table recreation — added `CREATE INDEX IF NOT EXISTS ix_waste_record_filament_project` and `ix_waste_file_waste_record_id` after migrating waste tables. (migrations.py)
+- **BUG-538**: Removed 4 stale `TODO(security)` comments — origin validation is already implemented (same-origin check on postMessage handlers in project_detail.html and viewer.html). Replaced with descriptive comments confirming the existing validation. (templates/project_detail.html, static/viewer.html)
+- **BUG-424**: Added `_keydownBound` guard to prevent duplicate keydown listener registration in command palette (app-shell.js). Re-initialization of the Alpine component no longer stacks listeners. (static/js/app-shell.js)
+- **BUG-425**: Added `window.__filCtxMenuInit` guard to prevent duplicate context menu listener registration (inventory.js). The IIFE that adds document-level listeners (click, keydown, contextmenu) now only runs once. (static/js/inventory.js)
+- **BUG-426**: Added `container.__dashLayoutManager` guard + `destroy()` method to `createWidgetLayoutManager` — prevents duplicate manager instances on the same container after AJAX reloads. Added `_dashDragInitDone` module-level guard. (static/js/dashboard.js)
+- **BUG-526**: Added `aria-label` attributes to 14+ icon-only buttons across `_filament_cards.html`, `_filament_list_rows.html`, `_project_files.html`, and `project_detail.html` for screen reader accessibility. All labels mirror existing `title` translations. (templates/*.html)
+- **BUG-527**: Added `x-cloak` to flash toast (`base.html`) and undo toast (`_toast_undo.html`) to prevent brief visible flash on page load before Alpine initializes. (templates/base.html, templates/_toast_undo.html)
+
+### Changed
+- Minor release — 10 low-priority bugs resolved in a single batch, completing all open 🟢 Low items from audits #1, #2, and #3.
+
+## [1.115.1] - 2026-06-09
+### Fixed
+- **BUG-525**: Added `UniqueConstraint('shelf_id', 'slot_index')` to `StoragePlacement` model — prevents two filaments from being placed in the same shelf slot at DB level. Added `CREATE UNIQUE INDEX IF NOT EXISTS uq_shelf_slot` migration for legacy databases. Updated `storage_move_placement` to use a 3-step swap with temporary slot (-1) to avoid transient UNIQUE violation during placement moves. (models.py, migrations.py, routes/storage.py)
+- **BUG-530**: Added `nullable=False` to 27 `AppSetting` model columns that already had `NOT NULL` in migrations — resolves inconsistency between `db.create_all()` (which produced NULLABLE columns) and migrations (which produced NOT NULL). Affected columns: lang, kwh_price, printer_power, currency, debug_logging, theme, nav_palette, view_mode, items_per_page, bambu_region, bambu_auto_sync_enabled, bambu_auto_sync_interval_minutes, invoice_prefix, invoice_counter, app_timezone, onboarding_dismissed, audit_logging_enabled, auto_filament_mapping_enabled, backup_auto_enabled, backup_auto_frequency, backup_auto_time, backup_auto_day, backup_auto_include_files, backup_auto_keep_count, backup_auto_keep_days, waste_reasons_json, link_preview_reader_enabled. (models.py)
+- **BUG-535**: Replaced 15 hardcoded English/Czech strings in `log_movement()` notes across inventory.py, projects.py, bambu.py, prusa.py with translatable i18n keys using `translate()`. All notes now respect the user's language setting. Added 12 new `movement_note_*` i18n keys to both cs and en dictionaries. (routes/inventory.py, routes/projects.py, routes/bambu.py, routes/prusa.py, messages.py)
+- **BUG-537**: Applied DB-level pagination to `api_models_list()` — replaced `query.all()` (loading all models into memory) with proper `query.offset().limit()` after a COUNT query. Added subquery joins for complex sort modes (uploaded, size_desc) that need latest-version attributes, enabling ORDER BY at DB level. Enrichment now only processes the paginated page instead of all records. (routes/models.py)
+
+### Changed
+- Updated 4 tests in test_inventory_extended.py that filtered movement history by hardcoded English note strings — now filter by `action_type` instead, which is language-independent. (tests/test_inventory_extended.py)
+- Fixed `test_move_placement` in storage tests to work with the new UNIQUE constraint — the swap logic now uses a 3-step approach with a temporary slot index. (routes/storage.py)
+
 ## [1.115.0] - 2026-06-08
 ### Changed
 - **BUG-514**: Standardised datetime handling on timezone-aware UTC throughout the entire stack

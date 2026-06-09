@@ -183,7 +183,7 @@ class ImportAtomicityTests(unittest.TestCase):
         with self.app.app_context():
             quote = ProjectQuote.query.first()
             self.assertIsNotNone(quote)
-            self.assertEqual(quote.final_price, 80.6)
+            self.assertEqual(float(quote.final_price), 80.6)
 
     def test_export_and_import_preserve_audit_logs(self):
         with self.app.app_context():

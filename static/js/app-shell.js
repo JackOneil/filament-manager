@@ -63,34 +63,37 @@ function appShell() {
                     this.results = [];
                 }
             });
-            document.addEventListener('keydown', (event) => {
-                const state = Alpine.store('appState');
-                if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-                    event.preventDefault();
-                    this.openCommand();
-                }
-                if (event.key === 'Escape') {
-                    state.commandOpen = false;
-                }
-                if (state.commandOpen) {
-                    if (event.key === 'ArrowDown') {
+            if (!this._keydownBound) {
+                this._keydownBound = true;
+                document.addEventListener('keydown', (event) => {
+                    const state = Alpine.store('appState');
+                    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
                         event.preventDefault();
-                        if (this.selectedIndex < this.displayItems.length - 1) this.selectedIndex++;
-                        this.scrollToSelected();
+                        this.openCommand();
                     }
-                    if (event.key === 'ArrowUp') {
-                        event.preventDefault();
-                        if (this.selectedIndex > 0) this.selectedIndex--;
-                        this.scrollToSelected();
+                    if (event.key === 'Escape') {
+                        state.commandOpen = false;
                     }
-                    if (event.key === 'Enter') {
-                        event.preventDefault();
-                        const item = this.displayItems[this.selectedIndex];
-                        if (item && item.url) window.location.href = item.url;
-                        else if (item && item.href) window.location.href = item.href;
+                    if (state.commandOpen) {
+                        if (event.key === 'ArrowDown') {
+                            event.preventDefault();
+                            if (this.selectedIndex < this.displayItems.length - 1) this.selectedIndex++;
+                            this.scrollToSelected();
+                        }
+                        if (event.key === 'ArrowUp') {
+                            event.preventDefault();
+                            if (this.selectedIndex > 0) this.selectedIndex--;
+                            this.scrollToSelected();
+                        }
+                        if (event.key === 'Enter') {
+                            event.preventDefault();
+                            const item = this.displayItems[this.selectedIndex];
+                            if (item && item.url) window.location.href = item.url;
+                            else if (item && item.href) window.location.href = item.href;
+                        }
                     }
-                }
-            });
+                });
+            }
         },
         openCommand() {
             const state = Alpine.store('appState');

@@ -401,7 +401,7 @@ def register(app):
                         actual_amount,
                         project_id=project_id or job.project_id,
                         bambu_job_id=job.id,
-                        note=f'Bambu job: {job_label}',
+                        note=translate('movement_note_bambu_job').format(label=job_label),
                     )
                     db.session.add(PrintHistory(
                         filament_name=(
@@ -447,7 +447,7 @@ def register(app):
                     job.weight_grams,
                     project_id=project_id or job.project_id,
                     bambu_job_id=job.id,
-                    note=f'Bambu remap (vrácení): {job_label}',
+                    note=translate('movement_note_bambu_remap_return').format(label=job_label),
                 )
             if new_filament:
                 actual_amount = deduct_filament_stock(new_filament, job.weight_grams)
@@ -458,7 +458,7 @@ def register(app):
                         actual_amount,
                         project_id=project_id or job.project_id,
                         bambu_job_id=job.id,
-                        note=f'Bambu remap: {job_label}',
+                        note=translate('movement_note_bambu_remap').format(label=job_label),
                     )
             if single_slot:
                 single_slot.deducted = True
@@ -514,7 +514,7 @@ def register(app):
                         actual_amount,
                         project_id=job.project_id,
                         bambu_job_id=job.id,
-                        note=f'Bambu slot: {job.model_name or job.external_id}',
+                        note=translate('movement_note_bambu_slot').format(label=job.model_name or job.external_id),
                     )
                     slot.deducted = True
                     actually_deducted = True
@@ -576,7 +576,7 @@ def register(app):
                         weight,
                         project_id=job.project_id,
                         bambu_job_id=job.id,
-                        note=f'Bambu remap (vrácení): {job_label}',
+                        note=translate('movement_note_bambu_remap_return').format(label=job_label),
                     )
                 if new_filament:
                     actual = deduct_filament_stock(new_filament, weight)
@@ -587,7 +587,7 @@ def register(app):
                             actual,
                             project_id=job.project_id,
                             bambu_job_id=job.id,
-                            note=f'Bambu remap: {job_label}',
+                            note=translate('movement_note_bambu_remap').format(label=job_label),
                         )
 
             # Update the FK on the slot

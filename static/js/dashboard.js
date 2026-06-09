@@ -15,6 +15,10 @@
 // ── Shared resize corner SVG icon ─────────────────────────────────────────────
 var _DASH_RESIZE_SVG = '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" style="pointer-events:none;opacity:.7"><path d="M0 10 L10 0 L10 2 L2 10 Z M4 10 L10 4 L10 6 L6 10 Z M8 10 L10 8 L10 10 Z"/></svg>';
 
+// Prevent duplicate listener registrations when createWidgetLayoutManager /
+// createCardResizeManager is called multiple times (e.g. after AJAX reloads).
+var _dashDragInitDone = false;
+
 // ── Widget colour palette ─────────────────────────────────────────────────────
 // 9 accent tints (+ empty id = no colour). Stored as id string in layout.colors.
 var _DASH_COLORS = [
@@ -199,6 +203,13 @@ function createWidgetLayoutManager(config) {
     if (!container) {
         return { toggleEditMode: function(){}, moveUp: function(){}, moveDown: function(){}, reset: function(){} };
     }
+
+    // Prevent duplicate manager instances on the same container (e.g. after AJAX reload)
+    if (container.__dashLayoutManager) {
+        container.__dashLayoutManager.destroy();
+    }
+    var self = {};
+    container.__dashLayoutManager = self;
 
     var itemSelector = config.itemSelector || '[data-widget-id]';
     var defaultOrder = config.defaultOrder || [];
@@ -943,7 +954,12 @@ function createWidgetLayoutManager(config) {
         syncVisibility();
     }
 
-    return { toggleEditMode: toggleEditMode, moveUp: moveUp, moveDown: moveDown, reset: reset };
+    function destroy() {
+        disableDrag();
+        container.__dashLayoutManager = null;
+    }
+
+    return { toggleEditMode: toggleEditMode, moveUp: moveUp, moveDown: moveDown, reset: reset, destroy: destroy };
 }
 
 

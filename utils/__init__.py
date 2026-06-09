@@ -8,6 +8,7 @@ import threading
 import time
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from types import SimpleNamespace
 from urllib.parse import urljoin, urlparse, urlunparse
 
@@ -21,6 +22,14 @@ from models import (
     Project, ProjectTodo, PrusaPrintJob, PrusaPrinter, FilamentUndoLog, ProjectFilament,
     Filament, Material, Color,
 )
+
+
+def _json_default(obj):
+    """JSON encoder default for Decimal objects (convert to float)."""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    raise TypeError(f'Object of type {obj.__class__.__name__} is not JSON serializable')
+
 
 # ---------------------------------------------------------------------------
 # Short-lived in-process KPI cache (single-worker; invalidated on writes)
@@ -998,7 +1007,7 @@ def log_movement(filament, action_type, weight, project_id=None, bambu_job_id=No
     """
     if weight <= 0:
         return
-    cost_per_gram = filament.price / filament.weight_total if filament.weight_total > 0 else 0
+    cost_per_gram = float(filament.price) / filament.weight_total if filament.weight_total > 0 else 0
     total_cost = cost_per_gram * weight
     currency = get_current_currency()
 
@@ -1101,7 +1110,7 @@ def create_undo_snapshot(user_id, action_type, filament, project_filaments=None,
         user_id=user_id,
         action_type=action_type,
         filament_id=filament.id,
-        snapshot_data=json.dumps(snapshot_data),
+        snapshot_data=json.dumps(snapshot_data, default=_json_default),
         expires_at=utc_now() + timedelta(minutes=_UNDO_TTL_MINUTES),
         is_consumed=False,
     )
@@ -1167,7 +1176,7 @@ def create_bulk_undo_snapshot(user_id, entries):
         user_id=user_id,
         action_type='bulk_delete',
         filament_id=None,  # Multiple filaments
-        snapshot_data=json.dumps(snapshot_data),
+        snapshot_data=json.dumps(snapshot_data, default=_json_default),
         expires_at=utc_now() + timedelta(minutes=_UNDO_TTL_MINUTES),
         is_consumed=False,
     )

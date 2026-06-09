@@ -240,8 +240,19 @@ def register(app):
 
         existing = StoragePlacement.query.filter_by(shelf_id=target_shelf.id, slot_index=target_slot_index).first()
         if existing and existing.id != placement.id:
-            existing.shelf_id, placement.shelf_id = placement.shelf_id, existing.shelf_id
-            existing.slot_index, placement.slot_index = placement.slot_index, existing.slot_index
+            # Three-step swap to avoid transient UNIQUE constraint violation:
+            # 1. Move existing to a temporary slot
+            # 2. Move placement to the target slot
+            # 3. Move existing to placement's old slot
+            old_shelf_id = placement.shelf_id
+            old_slot_index = placement.slot_index
+            existing.slot_index = -1  # temporary, safe from constraint
+            db.session.flush()
+            placement.shelf_id = target_shelf.id
+            placement.slot_index = target_slot_index
+            db.session.flush()
+            existing.shelf_id = old_shelf_id
+            existing.slot_index = old_slot_index
         else:
             placement.shelf_id = target_shelf.id
             placement.slot_index = target_slot_index

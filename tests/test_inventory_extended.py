@@ -187,7 +187,7 @@ class FilamentEditTests(_BaseInventoryTests):
         }, follow_redirects=False)
 
         with self.app.app_context():
-            movement = MovementHistory.query.filter_by(note='Manual edit').first()
+            movement = MovementHistory.query.filter_by(action_type='add').order_by(MovementHistory.id.desc()).first()
             self.assertIsNotNone(movement)
             self.assertEqual(movement.weight, 300)  # 800 - 500 = 300 added
             self.assertEqual(movement.action_type, 'add')
@@ -250,8 +250,7 @@ class FilamentUseTests(_BaseInventoryTests):
         self.client.post(f'/use/{self.filament_id}', data={'amount': '50'})
 
         with self.app.app_context():
-            movement = MovementHistory.query.filter_by(action_type='remove',
-                                                        note='Manual usage').first()
+            movement = MovementHistory.query.filter_by(action_type='remove').order_by(MovementHistory.id.desc()).first()
             self.assertIsNotNone(movement)
             self.assertAlmostEqual(movement.weight, 50.0)
 
@@ -292,7 +291,7 @@ class FilamentDeleteTests(_BaseInventoryTests):
         self.client.post(f'/delete/{self.filament_id}')
 
         with self.app.app_context():
-            movement = MovementHistory.query.filter_by(note='Deleted filament').first()
+            movement = MovementHistory.query.filter_by(action_type='remove').order_by(MovementHistory.id.desc()).first()
             self.assertIsNotNone(movement)
             self.assertAlmostEqual(movement.weight, 500.0)
 
@@ -378,10 +377,9 @@ class FilamentRemoveSpoolTests(_BaseInventoryTests):
                           follow_redirects=False)
 
         with self.app.app_context():
-            movement = MovementHistory.query.filter_by(note='Removed spool').first()
+            movement = MovementHistory.query.filter_by(action_type='remove').order_by(MovementHistory.id.desc()).first()
             self.assertIsNotNone(movement)
             self.assertAlmostEqual(movement.weight, 1000.0)
-
 
 # ── Meta Update & Toggle ──────────────────────────────────────────────────
 

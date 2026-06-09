@@ -153,7 +153,7 @@ class Filament(db.Model):
 
     weight_total = db.Column(db.Float, nullable=False)
     weight_remaining = db.Column(db.Float, nullable=False)
-    price = db.Column(db.Float, nullable=False)
+    price = db.Column(db.Numeric(10, 2), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
     min_stock_grams = db.Column(db.Float, nullable=False, default=0.0)
     max_stock_grams = db.Column(db.Float, nullable=False, default=0.0)
@@ -185,7 +185,7 @@ class MovementHistory(db.Model):
     filament_name = db.Column(db.String(255), nullable=False, index=True)
     action_type = db.Column(db.String(50), nullable=False, index=True)
     weight = db.Column(db.Float, nullable=False)
-    cost = db.Column(db.Float, nullable=False)
+    cost = db.Column(db.Numeric(10, 2), nullable=False)
     currency = db.Column(db.String(10), nullable=False)
     note = db.Column(db.Text, nullable=True)
 
@@ -199,20 +199,20 @@ class MovementHistory(db.Model):
 
 class AppSetting(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    lang = db.Column(db.String(10), default='cs')
-    kwh_price = db.Column(db.Float, default=5.0)
-    printer_power = db.Column(db.Integer, default=150)
-    currency = db.Column(db.String(10), default='CZK')
-    debug_logging = db.Column(db.Boolean, default=False)
-    theme = db.Column(db.String(10), default='light')
-    nav_palette = db.Column(db.String(20), default='teal')
-    view_mode = db.Column(db.String(10), default='card')
-    items_per_page = db.Column(db.Integer, default=12)
+    lang = db.Column(db.String(10), nullable=False, default='cs')
+    kwh_price = db.Column(db.Numeric(10, 2), nullable=False, default=5.0)
+    printer_power = db.Column(db.Integer, nullable=False, default=150)
+    currency = db.Column(db.String(10), nullable=False, default='CZK')
+    debug_logging = db.Column(db.Boolean, nullable=False, default=False)
+    theme = db.Column(db.String(10), nullable=False, default='light')
+    nav_palette = db.Column(db.String(20), nullable=False, default='teal')
+    view_mode = db.Column(db.String(10), nullable=False, default='card')
+    items_per_page = db.Column(db.Integer, nullable=False, default=12)
     # Bambu Lab Cloud integration
     bambu_token = db.Column(db.Text, nullable=True)
-    bambu_region = db.Column(db.String(10), default='global')
-    bambu_auto_sync_enabled = db.Column(db.Boolean, default=False)
-    bambu_auto_sync_interval_minutes = db.Column(db.Integer, default=60)
+    bambu_region = db.Column(db.String(10), nullable=False, default='global')
+    bambu_auto_sync_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    bambu_auto_sync_interval_minutes = db.Column(db.Integer, nullable=False, default=60)
     bambu_last_sync_at = db.Column(UtcDateTime, nullable=True)
     bambu_last_sync_status = db.Column(db.String(255), nullable=True)
     bambu_last_test_at = db.Column(UtcDateTime, nullable=True)
@@ -233,43 +233,43 @@ class AppSetting(db.Model):
     company_bank_account = db.Column(db.String(100), nullable=True)
 
     # Invoice / document number sequence
-    invoice_prefix = db.Column(db.String(20), default='FV')
-    invoice_counter = db.Column(db.Integer, default=0)
+    invoice_prefix = db.Column(db.String(20), nullable=False, default='FV')
+    invoice_counter = db.Column(db.Integer, nullable=False, default=0)
 
     # Display timezone
-    app_timezone = db.Column(db.String(50), default='Europe/Prague')
+    app_timezone = db.Column(db.String(50), nullable=False, default='Europe/Prague')
 
     # Onboarding
-    onboarding_dismissed = db.Column(db.Boolean, default=False)
+    onboarding_dismissed = db.Column(db.Boolean, nullable=False, default=False)
 
     # Audit logging toggle
-    audit_logging_enabled = db.Column(db.Boolean, default=True)
+    audit_logging_enabled = db.Column(db.Boolean, nullable=False, default=True)
 
     # Auto filament mapping
-    auto_filament_mapping_enabled = db.Column(db.Boolean, default=True)
+    auto_filament_mapping_enabled = db.Column(db.Boolean, nullable=False, default=True)
 
     # Automatic backup configuration
-    backup_auto_enabled = db.Column(db.Boolean, default=False)
-    backup_auto_frequency = db.Column(db.String(10), default='weekly')  # daily, weekly, monthly
-    backup_auto_time = db.Column(db.String(5), default='03:00')  # HH:MM in app timezone
-    backup_auto_day = db.Column(db.Integer, default=1)  # day of week (0=Mon) for weekly, day of month (1) for monthly
-    backup_auto_include_files = db.Column(db.Boolean, default=True)
+    backup_auto_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    backup_auto_frequency = db.Column(db.String(10), nullable=False, default='weekly')  # daily, weekly, monthly
+    backup_auto_time = db.Column(db.String(5), nullable=False, default='03:00')  # HH:MM in app timezone
+    backup_auto_day = db.Column(db.Integer, nullable=False, default=1)  # day of week (0=Mon) for weekly, day of month (1) for monthly
+    backup_auto_include_files = db.Column(db.Boolean, nullable=False, default=True)
     backup_auto_last_run_at = db.Column(UtcDateTime, nullable=True)
-    backup_auto_keep_count = db.Column(db.Integer, default=10)  # max backup files to retain (0 = unlimited)
-    backup_auto_keep_days = db.Column(db.Integer, default=0)    # max age in days to retain (0 = unlimited)
+    backup_auto_keep_count = db.Column(db.Integer, nullable=False, default=10)  # max backup files to retain (0 = unlimited)
+    backup_auto_keep_days = db.Column(db.Integer, nullable=False, default=0)    # max age in days to retain (0 = unlimited)
 
     # Customizable waste reasons (JSON array; defaults to hardcoded list if empty)
-    waste_reasons_json = db.Column(db.Text, default='')
+    waste_reasons_json = db.Column(db.Text, nullable=False, default='')
 
-    # Link preview: Jina Reader fallback (off by default — opt-in)
-    link_preview_reader_enabled = db.Column(db.Boolean, default=False)
+    # Link preview reader (Jina AI) opt-in
+    link_preview_reader_enabled = db.Column(db.Boolean, nullable=False, default=False)
 
 
 class PrintHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     filament_name = db.Column(db.String(200), nullable=False)
     weight = db.Column(db.Float, nullable=False)
-    total_cost = db.Column(db.Float, nullable=False)
+    total_cost = db.Column(db.Numeric(10, 2), nullable=False)
     created_at = db.Column(UtcDateTime, nullable=False, default=_utc_now)
 
 
@@ -280,12 +280,12 @@ class ProjectQuote(db.Model):
     filament_name = db.Column(db.String(255), nullable=False)
     weight = db.Column(db.Float, nullable=False)
     print_time = db.Column(db.Float, nullable=False)
-    material_cost = db.Column(db.Float, nullable=False, default=0.0)
-    electricity_cost = db.Column(db.Float, nullable=False, default=0.0)
-    base_cost = db.Column(db.Float, nullable=False, default=0.0)
+    material_cost = db.Column(db.Numeric(10, 2), nullable=False, default=0.0)
+    electricity_cost = db.Column(db.Numeric(10, 2), nullable=False, default=0.0)
+    base_cost = db.Column(db.Numeric(10, 2), nullable=False, default=0.0)
     margin_percent = db.Column(db.Float, nullable=False, default=0.0)
-    margin_amount = db.Column(db.Float, nullable=False, default=0.0)
-    final_price = db.Column(db.Float, nullable=False, default=0.0)
+    margin_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0.0)
+    final_price = db.Column(db.Numeric(10, 2), nullable=False, default=0.0)
     currency = db.Column(db.String(10), nullable=False, default='CZK')
     invoice_number = db.Column(db.String(50), nullable=True)
     created_at = db.Column(UtcDateTime, default=_utc_now)
@@ -496,6 +496,11 @@ class StorageShelf(db.Model):
 
 
 class StoragePlacement(db.Model):
+    __tablename__ = 'storage_placement'
+    __table_args__ = (
+        db.UniqueConstraint('shelf_id', 'slot_index', name='uq_shelf_slot'),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     shelf_id = db.Column(db.Integer, db.ForeignKey('storage_shelf.id', ondelete='CASCADE'), nullable=False)
     filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='CASCADE'), nullable=False)

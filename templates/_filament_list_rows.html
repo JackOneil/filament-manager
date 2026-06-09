@@ -67,22 +67,22 @@
         </div>
         <!-- Akční tlačítka -->
         <div class="w-32 shrink-0 flex gap-1 justify-end">
-            <button type="button" onclick='openUseFilamentModal({{ fil.id }}, {{ fil.name|tojson }}, {{ fil.weight_remaining }})' title="{{ t('subtract_usage') }}" class="text-blue-400 hover:text-blue-600 transition-colors text-sm sm:text-base"><i class="fa-solid fa-droplet"></i></button>
-            <button type="button" onclick='openAddSpoolModal({{ fil.id }}, {{ fil.name|tojson }})' title="{{ t('add_spool') }}" class="text-green-500 hover:text-green-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-plus-circle"></i></button>
+            <button type="button" onclick='openUseFilamentModal({{ fil.id }}, {{ fil.name|tojson }}, {{ fil.weight_remaining }})' title="{{ t('subtract_usage') }}" aria-label="{{ t('subtract_usage') }}" class="text-blue-400 hover:text-blue-600 transition-colors text-sm sm:text-base"><i class="fa-solid fa-droplet"></i></button>
+            <button type="button" onclick='openAddSpoolModal({{ fil.id }}, {{ fil.name|tojson }})' title="{{ t('add_spool') }}" aria-label="{{ t('add_spool') }}" class="text-green-500 hover:text-green-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-plus-circle"></i></button>
             <form action="{{ url_for('remove_spool', id=fil.id) }}" method="POST">
-                <button type="submit" title="{{ t('remove_spool') }}" class="text-yellow-500 hover:text-yellow-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-minus-circle"></i></button>
+                <button type="submit" title="{{ t('remove_spool') }}" aria-label="{{ t('remove_spool') }}" class="text-yellow-500 hover:text-yellow-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-minus-circle"></i></button>
             </form>
             <a href="{{ url_for('filament_detail', id=fil.id) }}" title="{{ t('spool_life_timeline') }}" class="text-indigo-400 hover:text-indigo-600 transition-colors text-sm sm:text-base"><i class="fa-solid fa-wave-square"></i></a>
             <a href="{{ url_for('edit', id=fil.id) }}" title="{{ t('edit') }}" class="text-gray-400 hover:text-blue-500 transition-colors text-sm sm:text-base"><i class="fa-solid fa-edit"></i></a>
             <form action="{{ url_for('delete', id=fil.id) }}" method="POST" data-confirm="{{ t('delete_confirm') }}">
-                <button type="submit" title="{{ t('delete') }}" class="text-gray-400 hover:text-red-500 transition-colors text-sm sm:text-base"><i class="fa-solid fa-trash"></i></button>
+                <button type="submit" title="{{ t('delete') }}" aria-label="{{ t('delete') }}" class="text-gray-400 hover:text-red-500 transition-colors text-sm sm:text-base"><i class="fa-solid fa-trash"></i></button>
             </form>
             {% if fil.shop_url %}
             <a href="{{ fil.shop_url }}" target="_blank" rel="noopener noreferrer" title="{{ t('stats_open_shop') }}" class="text-green-500 hover:text-green-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-cart-shopping"></i></a>
             {% elif fil.brand.shop_url %}
-            <button type="button" onclick="openReorderShop('{{ fil.name|e }}', '{{ fil.brand.shop_url|e }}')" title="{{ t('stats_search_shop') }}" class="text-green-500 hover:text-green-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-cart-shopping"></i></button>
+            <button type="button" onclick="openReorderShop('{{ fil.name|e }}', '{{ fil.brand.shop_url|e }}')" title="{{ t('stats_search_shop') }}" aria-label="{{ t('stats_search_shop') }}" class="text-green-500 hover:text-green-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-cart-shopping"></i></button>
             {% elif app_settings and app_settings.reorder_shop_url %}
-            <button type="button" onclick="openReorderShop('{{ fil.name|e }}', '{{ app_settings.reorder_shop_url|e }}')" title="{{ t('stats_search_shop') }}" class="text-green-500 hover:text-green-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-cart-shopping"></i></button>
+            <button type="button" onclick="openReorderShop('{{ fil.name|e }}', '{{ app_settings.reorder_shop_url|e }}')" title="{{ t('stats_search_shop') }}" aria-label="{{ t('stats_search_shop') }}" class="text-green-500 hover:text-green-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-cart-shopping"></i></button>
             {% endif %}
         </div>
     </div>

@@ -176,7 +176,7 @@
                             <i class="fa-solid fa-arrow-up-right-from-square text-sm"></i>
                         </a>
                         <form id="refresh-{{ link.id }}" method="POST" action="{{ url_for('project_refresh_link', id=project.id, link_id=link.id) }}"></form>
-                        <button type="submit" form="refresh-{{ link.id }}" class="bg-white p-1.5 rounded-full text-blue-500 hover:text-blue-700 hover:bg-blue-50 shadow border border-gray-200 transition" title="{{ t('refresh_preview') }}">
+                        <button type="submit" form="refresh-{{ link.id }}" class="bg-white p-1.5 rounded-full text-blue-500 hover:text-blue-700 hover:bg-blue-50 shadow border border-gray-200 transition" title="{{ t('refresh_preview') }}" aria-label="{{ t('refresh_preview') }}">
                             <i class="fa-solid fa-arrows-rotate text-sm"></i>
                         </button>
                         <form method="POST" action="{{ url_for('project_delete_link', id=project.id, link_id=link.id) }}">
@@ -196,7 +196,7 @@
                     </a>
                     <div class="flex gap-1">
                         <form method="POST" action="{{ url_for('project_refresh_link', id=project.id, link_id=link.id) }}">
-                            <button type="submit" class="ui-badge" title="{{ t('refresh_preview') }}"><i class="fa-solid fa-arrows-rotate"></i></button>
+                            <button type="submit" class="ui-badge" title="{{ t('refresh_preview') }}" aria-label="{{ t('refresh_preview') }}"><i class="fa-solid fa-arrows-rotate"></i></button>
                         </form>
                         <form method="POST" action="{{ url_for('project_delete_link', id=project.id, link_id=link.id) }}">
                             <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-trash"></i></button>

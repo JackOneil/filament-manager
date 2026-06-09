@@ -256,7 +256,7 @@ def register(app):
         ProjectFilament.query.filter(ProjectFilament.filament_id.in_(selected_ids)).delete(synchronize_session=False)
         ProjectQuote.query.filter(ProjectQuote.filament_id.in_(selected_ids)).update({'filament_id': None}, synchronize_session=False)
         for filament in selected:
-            log_movement(filament, 'bulk_delete', filament.weight_remaining, note='Bulk delete')
+            log_movement(filament, 'bulk_delete', filament.weight_remaining, note=translate('movement_note_bulk_delete'))
             db.session.delete(filament)
 
         safe_commit()
@@ -306,7 +306,7 @@ def register(app):
             )
             db.session.add(new_fil)
             db.session.flush()
-            log_movement(new_fil, 'add', weight_remaining, note='Initial stock')
+            log_movement(new_fil, 'add', weight_remaining, note=translate('movement_note_initial_stock'))
             safe_commit()
             return redirect(url_for('filaments_index'))
 
@@ -335,9 +335,9 @@ def register(app):
 
             weight_diff = filament.weight_remaining - old_weight
             if weight_diff > 0:
-                log_movement(filament, 'add', weight_diff, note='Manual edit')
+                log_movement(filament, 'add', weight_diff, note=translate('movement_note_manual_edit'))
             elif weight_diff < 0:
-                log_movement(filament, 'remove', abs(weight_diff), note='Manual edit')
+                log_movement(filament, 'remove', abs(weight_diff), note=translate('movement_note_manual_edit'))
 
             safe_commit()
             return redirect(url_for('filaments_index'))
@@ -355,7 +355,7 @@ def register(app):
             return redirect(url_for('filaments_index'))
         filament = db.get_or_404(Filament, id)
         actual_amount = deduct_filament_stock(filament, amount)
-        log_movement(filament, 'remove', actual_amount, note='Manual usage')
+        log_movement(filament, 'remove', actual_amount, note=translate('movement_note_manual_usage'))
         safe_commit()
         return redirect(url_for('filaments_index'))
 
@@ -398,7 +398,7 @@ def register(app):
         if filament.quantity > 0:
             filament.quantity -= 1
             actual_amount = deduct_filament_stock(filament, filament.weight_total)
-            log_movement(filament, 'remove', actual_amount, note='Removed spool')
+            log_movement(filament, 'remove', actual_amount, note=translate('movement_note_removed_spool'))
             removed_weight = float(actual_amount or 0.0)
         safe_commit()
         if removed_weight > 0:
@@ -425,7 +425,7 @@ def register(app):
         _require_inventory_admin()
         filament = db.get_or_404(Filament, id)
         undo_entry = _build_filament_restore_bundle(filament)
-        log_movement(filament, 'remove', filament.weight_remaining, note='Deleted filament')
+        log_movement(filament, 'remove', filament.weight_remaining, note=translate('movement_note_deleted_filament'))
         ProjectFilament.query.filter_by(filament_id=filament.id).delete()
         ProjectQuote.query.filter_by(filament_id=filament.id).update({'filament_id': None})
 

@@ -66,8 +66,7 @@
   var currentColor = '#3b82f6';
   var o3dvLoaded = false;
   var o3dvLoading = false;
-  // TODO(security): Origin validation — parentOrigin is validated against window.location.origin
-  // to ensure only same-origin parent frames can control this viewer.
+  // Origin validation — only same-origin parent frames can control this viewer
   var parentOrigin = window.location.origin;
 
   var container = document.getElementById('viewer-container');
@@ -246,7 +245,7 @@
 
   // Listen for commands from the parent frame
   window.addEventListener('message', function(event) {
-    // TODO(security): Validate origin to prevent cross-origin control
+    // Validate origin — reject cross-origin control attempts
     if (event.origin !== parentOrigin) {
       return;
     }

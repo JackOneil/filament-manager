@@ -104,9 +104,9 @@
                 </form>
                 
                 <div class="flex gap-4 pt-2 sm:pt-0">
-                    <button type="button" onclick='openAddSpoolModal({{ fil.id }}, {{ fil.name|tojson }})' title="{{ t('add_spool') }}" class="text-green-500 hover:text-green-700 transition-colors"><i class="fa-solid fa-plus-circle"></i></button>
+                    <button type="button" onclick='openAddSpoolModal({{ fil.id }}, {{ fil.name|tojson }})' title="{{ t('add_spool') }}" aria-label="{{ t('add_spool') }}" class="text-green-500 hover:text-green-700 transition-colors"><i class="fa-solid fa-plus-circle"></i></button>
                     <form action="{{ url_for('remove_spool', id=fil.id) }}" method="POST">
-                        <button type="submit" title="{{ t('remove_spool') }}" class="text-yellow-500 hover:text-yellow-700 transition-colors"><i class="fa-solid fa-minus-circle"></i></button>
+                        <button type="submit" title="{{ t('remove_spool') }}" aria-label="{{ t('remove_spool') }}" class="text-yellow-500 hover:text-yellow-700 transition-colors"><i class="fa-solid fa-minus-circle"></i></button>
                     </form>
                     <a href="{{ url_for('filament_detail', id=fil.id) }}" title="{{ t('spool_life_timeline') }}" class="text-indigo-400 hover:text-indigo-600 transition-colors"><i class="fa-solid fa-wave-square"></i></a>
                     <a href="{{ url_for('edit', id=fil.id) }}" title="{{ t('edit') }}" class="text-gray-400 hover:text-blue-500 transition-colors"><i class="fa-solid fa-edit"></i></a>
@@ -116,9 +116,9 @@
                     {% if fil.shop_url %}
                     <a href="{{ fil.shop_url }}" target="_blank" rel="noopener noreferrer" title="{{ t('stats_open_shop') }}" class="text-green-500 hover:text-green-700 transition-colors"><i class="fa-solid fa-cart-shopping"></i></a>
                     {% elif fil.brand.shop_url %}
-                    <button type="button" onclick="openReorderShop('{{ fil.name|e }}', '{{ fil.brand.shop_url|e }}')" title="{{ t('stats_search_shop') }}" class="text-green-500 hover:text-green-700 transition-colors"><i class="fa-solid fa-cart-shopping"></i></button>
+                    <button type="button" onclick="openReorderShop('{{ fil.name|e }}', '{{ fil.brand.shop_url|e }}')" title="{{ t('stats_search_shop') }}" aria-label="{{ t('stats_search_shop') }}" class="text-green-500 hover:text-green-700 transition-colors"><i class="fa-solid fa-cart-shopping"></i></button>
                     {% elif app_settings and app_settings.reorder_shop_url %}
-                    <button type="button" onclick="openReorderShop('{{ fil.name|e }}', '{{ app_settings.reorder_shop_url|e }}')" title="{{ t('stats_search_shop') }}" class="text-green-500 hover:text-green-700 transition-colors"><i class="fa-solid fa-cart-shopping"></i></button>
+                    <button type="button" onclick="openReorderShop('{{ fil.name|e }}', '{{ app_settings.reorder_shop_url|e }}')" title="{{ t('stats_search_shop') }}" aria-label="{{ t('stats_search_shop') }}" class="text-green-500 hover:text-green-700 transition-colors"><i class="fa-solid fa-cart-shopping"></i></button>
                     {% endif %}
                 </div>
             </div>

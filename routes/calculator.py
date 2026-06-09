@@ -10,9 +10,9 @@ def _build_filament_label(filament):
 
 
 def _calculate_quote(filament, weight, print_time, margin_percent, setting):
-    kwh_price = setting.kwh_price if setting else 5.0
+    kwh_price = float(setting.kwh_price) if setting else 5.0
     printer_power = setting.printer_power if setting else 150
-    cost_per_gram = filament.price / filament.weight_total if filament.weight_total > 0 else 0.0
+    cost_per_gram = float(filament.price) / filament.weight_total if filament.weight_total > 0 else 0.0
     material_cost = cost_per_gram * weight
     electricity_cost = print_time * (printer_power / 1000.0) * kwh_price
     base_cost = material_cost + electricity_cost
@@ -46,7 +46,7 @@ def _calculate_project_quote(project, margin_percent, setting):
 
     Returns a dict with per-material lines, aggregate totals, source metadata.
     """
-    kwh_price = setting.kwh_price if setting else 5.0
+    kwh_price = float(setting.kwh_price) if setting else 5.0
     printer_power = setting.printer_power if setting else 150
     currency = get_current_currency()
 
@@ -146,7 +146,7 @@ def _calculate_project_quote(project, margin_percent, setting):
             continue
 
         if f and f.weight_total > 0:
-            cost_per_gram = f.price / f.weight_total
+            cost_per_gram = float(f.price) / f.weight_total
             material_cost = cost_per_gram * weight
             name = f.name
             brand_material = f'{f.brand.name} · {f.material.name}' if f.brand and f.material else ''

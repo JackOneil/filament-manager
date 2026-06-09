@@ -272,6 +272,8 @@ def register(app):
             minutes = request.form.get('print_minutes', 0, type=int)
             estimated_print_time = hours * 60 + minutes if hours > 0 or minutes > 0 else 0
             due_date = datetime.strptime(due_date_str, '%Y-%m-%d') if due_date_str else None
+            if due_date and due_date.date() < utc_now().date():
+                flash('project_due_date_past', 'warning')
             priority = request.form.get('priority', 'medium')
             if priority not in ('low', 'medium', 'high', 'urgent'):
                 priority = 'medium'
@@ -451,6 +453,8 @@ def register(app):
             minutes = request.form.get('print_minutes', 0, type=int)
             project.estimated_print_time = hours * 60 + minutes if hours > 0 or minutes > 0 else 0
             project.due_date = datetime.strptime(due_date_str, '%Y-%m-%d') if due_date_str else None
+            if project.due_date and project.due_date.date() < utc_now().date():
+                flash('project_due_date_past', 'warning')
             if is_admin(user):
                 owner_user_id, owner_name = _resolve_project_owner_from_form(user)
                 project.owner_user_id = owner_user_id
@@ -1027,7 +1031,7 @@ def register(app):
                 'remove',
                 actual_amount,
                 project_id=project_filament.project_id,
-                note=f'Project consume: {project_filament.project.name if project_filament.project else ""}'.strip(),
+                note=translate('movement_note_project_consume').format(project=project_filament.project.name if project_filament.project else ""),
             )
             safe_commit()
         return _project_detail_redirect(id, 'materials')

@@ -334,7 +334,7 @@ def register(app):
                         'prusa_print',
                         actual_amount,
                         project_id=project_id or job.project_id,
-                        note=f'PrusaLink: {job.display_name or job.file_name or job.id}',
+                        note=translate('movement_note_prusalink').format(label=job.display_name or job.file_name or job.id),
                     )
                     db.session.add(PrintHistory(
                         filament_name=(
