@@ -622,6 +622,58 @@ def register(app):
         safe_commit()
         return redirect(url_for('notifications_index', kind=kind_filter or None))
 
+    # ── AJAX Notification API (bell dropdown) ──────────────────────────
+
+    @bp.route('/api/notifications/unread-count')
+    @require_login
+    def api_notifications_unread_count():
+        user = get_current_user()
+        count = Notification.query.filter_by(user_id=user.id, is_read=False).count()
+        return jsonify({'count': count})
+
+    @bp.route('/api/notifications/recent')
+    @require_login
+    def api_notifications_recent():
+        user = get_current_user()
+        notifs = (
+            Notification.query
+            .filter_by(user_id=user.id)
+            .order_by(Notification.created_at.desc())
+            .limit(8)
+            .all()
+        )
+        return jsonify({
+            'notifications': [{
+                'id': n.id,
+                'kind': n.kind,
+                'title': n.title,
+                'body': n.body,
+                'link': n.link,
+                'is_read': n.is_read,
+                'created_at': n.created_at.isoformat() if n.created_at else None,
+            } for n in notifs]
+        })
+
+    @bp.route('/api/notifications/<int:id>/mark-read', methods=['POST'])
+    @require_login
+    def api_notification_mark_read(id):
+        user = get_current_user()
+        notification = db.session.get(Notification, id)
+        if not notification or notification.user_id != user.id:
+            return jsonify({'ok': False, 'error': 'not found'}), 404
+        notification.is_read = True
+        safe_commit()
+        return jsonify({'ok': True})
+
+    @bp.route('/api/notifications/mark-all-read', methods=['POST'])
+    @require_login
+    def api_notification_mark_all_read():
+        user = get_current_user()
+        q = Notification.query.filter_by(user_id=user.id, is_read=False)
+        q.update({'is_read': True})
+        safe_commit()
+        return jsonify({'ok': True})
+
     @bp.route('/audit')
     @require_admin
     def audit_logs():

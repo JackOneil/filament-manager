@@ -317,4 +317,129 @@ function appShell() {
     }
     function escapeAttr(s) { return escapeHtml(s); }
     function cssEscape(s) { return String(s).replace(/[^a-zA-Z0-9_-]/g, '_'); }
+
+    // ── Notification Bell ────────────────────────────────────────────────
+    window.notificationBell = function () {
+        return {
+            open: false,
+            unreadCount: 0,
+            notifications: [],
+            loading: false,
+            pulseBadge: false,
+            _pollTimer: null,
+            _pollInterval: 30000,  // 30 seconds
+            _lastKnown: 0,
+
+            init(initialUnread) {
+                this.unreadCount = initialUnread || 0;
+                this._lastKnown = this.unreadCount;
+                this._startPolling();
+            },
+
+            _startPolling() {
+                this._pollTimer = setInterval(() => this._poll(), this._pollInterval);
+            },
+
+            _poll() {
+                fetch('/api/notifications/unread-count', { signal: AbortSignal.timeout(5000) })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (data) {
+                        if (data && data.count !== undefined) {
+                            if (data.count > this._lastKnown) {
+                                this.pulseBadge = true;
+                                setTimeout(function () { this.pulseBadge = false; }.bind(this), 1200);
+                            }
+                            this.unreadCount = data.count;
+                            this._lastKnown = data.count;
+                        }
+                    }.bind(this))
+                    .catch(function () { /* network error — silent */ });
+            },
+
+            toggle() {
+                this.open = !this.open;
+                if (this.open) {
+                    this._fetchNotifications();
+                }
+            },
+
+            close() {
+                this.open = false;
+            },
+
+            _fetchNotifications() {
+                this.loading = true;
+                fetch('/api/notifications/recent', { signal: AbortSignal.timeout(5000) })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (data) {
+                        if (data && data.notifications) {
+                            this.notifications = data.notifications;
+                        }
+                        this.loading = false;
+                    }.bind(this))
+                    .catch(function () {
+                        this.loading = false;
+                    }.bind(this));
+            },
+
+            openNotification(n) {
+                if (!n.is_read) {
+                    this._markReadAjax(n.id);
+                    n.is_read = true;
+                    this.unreadCount = Math.max(0, this.unreadCount - 1);
+                    this._lastKnown = this.unreadCount;
+                }
+                this.close();
+                if (n.link) {
+                    window.location.href = n.link;
+                }
+            },
+
+            markOneRead(n) {
+                this._markReadAjax(n.id);
+                n.is_read = true;
+                this.unreadCount = Math.max(0, this.unreadCount - 1);
+                this._lastKnown = this.unreadCount;
+            },
+
+            markAllRead() {
+                var self = this;
+                fetch('/api/notifications/mark-all-read', {
+                    method: 'POST',
+                    signal: AbortSignal.timeout(5000)
+                }).then(function (r) { return r.ok ? r.json() : null; })
+                  .then(function (data) {
+                      if (data && data.ok) {
+                          self.notifications.forEach(function (n) { n.is_read = true; });
+                          self.unreadCount = 0;
+                          self._lastKnown = 0;
+                      }
+                  })
+                  .catch(function () { /* silent */ });
+            },
+
+            _markReadAjax(id) {
+                fetch('/api/notifications/' + id + '/mark-read', {
+                    method: 'POST',
+                    signal: AbortSignal.timeout(5000)
+                }).catch(function () { /* silent */ });
+            },
+
+            formatTime(iso) {
+                if (!iso) return '';
+                var d = new Date(iso);
+                var now = new Date();
+                var diff = now - d;
+                var secs = Math.floor(diff / 1000);
+                if (secs < 60) return (window.__helpLang === 'cs' ? 'právě teď' : 'just now');
+                var mins = Math.floor(secs / 60);
+                if (mins < 60) return mins + 'm';
+                var hours = Math.floor(mins / 60);
+                if (hours < 24) return hours + 'h';
+                var days = Math.floor(hours / 24);
+                if (days < 7) return days + 'd';
+                return d.toLocaleDateString(window.__helpLang === 'cs' ? 'cs-CZ' : 'en-US', { day: 'numeric', month: 'short' });
+            },
+        };
+    };
 })();

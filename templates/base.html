@@ -361,12 +361,79 @@
                 <button type="button" @click="openCommand()" class="sm:hidden p-2 text-gray-500 hover:text-[var(--ui-brand)]">
                     <i class="fa-solid fa-magnifying-glass"></i>
                 </button>
-                <a href="{{ url_for('notifications_index') }}" class="relative p-2 text-gray-500 hover:text-blue-600 transition-colors">
-                    <i class="fa-solid fa-bell text-lg"></i>
-                    {% if nav_notifications_unread %}
-                    <span class="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[var(--ui-surface)]"></span>
-                    {% endif %}
-                </a>
+                <div class="relative" x-data="notificationBell()" x-init="init({{ nav_notifications_unread }})">
+                    <button @click="toggle()" class="relative p-2 text-gray-500 hover:text-blue-600 transition-colors" :class="open ? 'text-blue-600' : ''" :title="unreadCount > 0 ? '{{ t('notifications_nav') }} (' + unreadCount + ')' : '{{ t('notifications_nav') }}'">
+                        <i class="fa-solid fa-bell text-lg"></i>
+                        <span x-show="unreadCount > 0" x-cloak
+                            class="absolute -top-0.5 -right-0.5 min-w-[1.15rem] h-[1.15rem] flex items-center justify-center bg-red-500 text-white text-[0.6rem] font-bold rounded-full border-2 border-[var(--ui-surface)] px-0.5"
+                            :class="pulseBadge ? 'animate-bell-pulse' : ''"
+                            x-text="unreadCount > 99 ? '99+' : unreadCount"></span>
+                    </button>
+                    {# Dropdown panel #}
+                    <div x-show="open" x-cloak @click.outside="close()" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 translate-y-1 scale-95" x-transition:enter-end="opacity-100 translate-y-0 scale-100" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+                        class="notif-dropdown absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-surface-strong)] shadow-2xl z-50 overflow-hidden">
+                        {# Header #}
+                        <div class="flex items-center justify-between px-4 py-3 border-b border-[var(--ui-border)]">
+                            <span class="font-bold text-sm text-[var(--ui-text)]">{{ t('notifications_nav') }}</span>
+                            <div class="flex items-center gap-2">
+                                <button @click="markAllRead()" x-show="unreadCount > 0" class="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors">{{ t('notifications_mark_all_read') }}</button>
+                                <a href="{{ url_for('notifications_index') }}" class="text-xs font-semibold text-[var(--ui-text-muted)] hover:text-[var(--ui-text)] transition-colors">{{ t('notifications_see_all') }}</a>
+                            </div>
+                        </div>
+                        {# Loading state #}
+                        <div x-show="loading" class="flex items-center justify-center py-10">
+                            <i class="fa-solid fa-spinner fa-spin text-[var(--ui-text-muted)] text-xl"></i>
+                        </div>
+                        {# Notification list #}
+                        <div x-show="!loading" class="max-h-[360px] overflow-y-auto divide-y divide-[var(--ui-border)]">
+                            <template x-if="notifications.length === 0">
+                                <div class="flex flex-col items-center justify-center py-10 text-center px-4">
+                                    <i class="fa-solid fa-bell-slash text-3xl text-[var(--ui-text-muted)] opacity-40 mb-3"></i>
+                                    <p class="text-sm text-[var(--ui-text-muted)] font-medium">{{ t('notifications_empty') }}</p>
+                                </div>
+                            </template>
+                            <template x-for="n in notifications" :key="n.id">
+                                <div class="relative px-4 py-3 hover:bg-[var(--ui-surface-soft)] transition-colors cursor-pointer group"
+                                    :class="n.is_read ? 'opacity-75' : 'bg-[var(--ui-brand-soft)]/30'"
+                                    @click="openNotification(n)">
+                                    <div class="flex items-start gap-3">
+                                        {# Icon #}
+                                        <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                                            :class="{
+                                                'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400': n.kind === 'project_new',
+                                                'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-400': n.kind === 'project_status',
+                                                'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400': n.kind === 'project_comment',
+                                                'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400': n.kind === 'info' || n.kind === 'project',
+                                            }">
+                                            <i class="fa-solid text-xs"
+                                                :class="{
+                                                    'fa-circle-plus': n.kind === 'project_new',
+                                                    'fa-arrows-spin': n.kind === 'project_status',
+                                                    'fa-comment-dots': n.kind === 'project_comment',
+                                                    'fa-circle-info': n.kind === 'info' || n.kind === 'project',
+                                                }"></i>
+                                        </div>
+                                        {# Content #}
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-start justify-between gap-2">
+                                                <p class="text-sm font-semibold text-[var(--ui-text)] truncate" x-text="n.title"></p>
+                                                <span x-show="!n.is_read" class="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1.5"></span>
+                                            </div>
+                                            <p x-show="n.body" class="text-xs text-[var(--ui-text-muted)] mt-0.5 line-clamp-2" x-text="n.body"></p>
+                                            <p class="text-[0.65rem] text-[var(--ui-text-muted)] mt-1 opacity-60" x-text="formatTime(n.created_at)"></p>
+                                        </div>
+                                    </div>
+                                    {# Mark-read button (hover) #}
+                                    <button x-show="!n.is_read" @click.stop="markOneRead(n)"
+                                        class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full bg-white dark:bg-slate-700 border border-[var(--ui-border)] text-[var(--ui-text-muted)] hover:text-blue-600 hover:border-blue-300 shadow-sm"
+                                        :title="'{{ t('notifications_mark_read') }}'">
+                                        <i class="fa-solid fa-check text-[0.6rem]"></i>
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
                 {% endif %}
             </div>
         </header>

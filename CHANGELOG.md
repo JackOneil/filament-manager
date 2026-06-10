@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.117.0] - 2026-06-10
+### Added
+- **Interactive notification bell with live counter**: Replaced static bell icon in topbar with Alpine.js dropdown showing recent notifications, unread badge counter with pulse animation on new notifications, AJAX polling every 30s for real-time unread count updates, one-click mark-read via hover button, "Mark all read" and "See all" actions, and relative time display ("5m", "2h", "3d"). Dropdown is styled with glass-morphism consistent with the rest of the UI.
+- **4 new AJAX API endpoints**: `GET /api/notifications/unread-count`, `GET /api/notifications/recent`, `POST /api/notifications/<id>/mark-read`, `POST /api/notifications/mark-all-read` — all with auth protection and ownership checks.
+- **`notifications_see_all` i18n key** added to both Czech and English dictionaries.
+
+### Changed
+- Notification bell in topbar no longer navigates to `/notifications` directly — opens dropdown instead. Existing full-page notifications view at `/notifications` remains accessible via "See all" link.
+- Added 4 new endpoint names to `SECTION_BY_ENDPOINT` (auth.py) and `HELP_SECTIONS` endpoints array (help.js).
+
 ## [1.116.1] - 2026-06-09
 ### Fixed
 - **HTTP 500 on /projects and /stats**: `db.Numeric(10,2)` columns (`Filament.price`, `AppSetting.kwh_price`, `ProjectQuote.final_price`) return `Decimal` objects, which cannot be multiplied/divided with `float`. Added `float()` casts at all arithmetic sites in `utils/__init__.py` (`build_project_metrics`), `routes/stats.py` (profitable projects), and `routes/projects_helpers.py` (`_job_cost_parts`). Regression from BUG-423 (v1.116.0) which changed monetary fields from `db.Float` to `db.Numeric`. (utils/__init__.py, routes/stats.py, routes/projects_helpers.py)

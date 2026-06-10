@@ -552,7 +552,7 @@
             id: 'account',
             icon: 'fa-user-gear',
             hasTour: false,
-            endpoints: ['account_settings', 'notifications_index', 'notification_mark_read', 'notification_mark_all_read', 'notification_delete', 'notification_delete_read'],
+            endpoints: ['account_settings', 'notifications_index', 'notification_mark_read', 'notification_mark_all_read', 'notification_delete', 'notification_delete_read', 'api_notifications_unread_count', 'api_notifications_recent', 'api_notification_mark_read', 'api_notification_mark_all_read'],
             title: { cs: 'Účet', en: 'Account' },
             tips: [
                 {

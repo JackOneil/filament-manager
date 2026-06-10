@@ -205,6 +205,10 @@ SECTION_BY_ENDPOINT = {
     'notification_mark_all_read': SECTION_NOTIFICATIONS,
     'notification_delete': SECTION_NOTIFICATIONS,
     'notification_delete_read': SECTION_NOTIFICATIONS,
+    'api_notifications_unread_count': SECTION_NOTIFICATIONS,
+    'api_notifications_recent': SECTION_NOTIFICATIONS,
+    'api_notification_mark_read': SECTION_NOTIFICATIONS,
+    'api_notification_mark_all_read': SECTION_NOTIFICATIONS,
     'audit_logs': SECTION_USERS,
 }
 
