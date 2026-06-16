@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.117.1] - 2026-06-15
+### Fixed
+- **Makerworld link preview broken**: Cloudflare-protected sites (Makerworld, Printables, etc.) returned HTTP 403 without useful metadata when accessed with bare `User-Agent` headers. Updated `fetch_link_metadata()` in `utils/__init__.py` to send modern browser-like headers (`Sec-Ch-Ua`, `Sec-Fetch-*`, `Accept-Language`) that pass Cloudflare's bot detection and receive actual page content with `og:` meta tags.
+- **Jina reader fallback regression**: Removed opt-in gate on the Jina reader fallback introduced in v1.110.x. The reader now always attempts when direct metadata extraction fails, restoring behavior for sites that still block requests.
+- **Missing `coverUrl` key**: Added `coverUrl` to the set of image keys searched in `_extract_preview_from_json_payloads()` so Next.js `__NEXT_DATA__` payloads (used by Makerworld) yield cover images.
+
 ## [1.117.0] - 2026-06-10
 ### Added
 - **Interactive notification bell with live counter**: Replaced static bell icon in topbar with Alpine.js dropdown showing recent notifications, unread badge counter with pulse animation on new notifications, AJAX polling every 30s for real-time unread count updates, one-click mark-read via hover button, "Mark all read" and "See all" actions, and relative time display ("5m", "2h", "3d"). Dropdown is styled with glass-morphism consistent with the rest of the UI.

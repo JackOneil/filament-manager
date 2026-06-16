@@ -1563,7 +1563,7 @@ def _extract_preview_from_json_payloads(payloads, base_url):
 
     title_keys = {'headline', 'name', 'title'}
     description_keys = {'description', 'summary', 'abstract', 'text'}
-    image_keys = {'image', 'images', 'thumbnail', 'thumbnailUrl', 'cover', 'coverImage', 'banner'}
+    image_keys = {'image', 'images', 'thumbnail', 'thumbnailUrl', 'cover', 'coverImage', 'coverUrl', 'banner'}
 
     for payload in payloads:
         if not preview['title']:
@@ -1684,9 +1684,18 @@ def fetch_link_metadata(url):
         headers = {
             'User-Agent': (
                 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 '
-                '(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+                '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
             ),
-            'Accept': 'text/html,application/xhtml+xml',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Linux"',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Upgrade-Insecure-Requests': '1',
         }
         response, final_url = _follow_safe_redirects(clean_url, headers=headers, timeout=5)
         if response.status_code == 200 and 'text/html' in response.headers.get('Content-Type', ''):
@@ -1718,16 +1727,14 @@ def fetch_link_metadata(url):
                 meta['og_image'] = meta['og_image'] or json_preview['image']
 
         if not (meta['og_title'] and meta['og_image']):
-            settings = get_settings()
-            if settings and settings.link_preview_reader_enabled:
-                markdown_preview = _fetch_reader_fallback(clean_url, headers=headers, timeout=10)
-                if markdown_preview:
-                    if markdown_preview['title'] and _is_weak_preview_value(meta['og_title'], 'title'):
-                        meta['og_title'] = markdown_preview['title']
-                    if markdown_preview['description'] and _is_weak_preview_value(meta['og_description'], 'description'):
-                        meta['og_description'] = markdown_preview['description']
-                    if markdown_preview['image'] and _is_weak_preview_value(meta['og_image'], 'image'):
-                        meta['og_image'] = markdown_preview['image']
+            markdown_preview = _fetch_reader_fallback(clean_url, headers=headers, timeout=10)
+            if markdown_preview:
+                if markdown_preview['title'] and _is_weak_preview_value(meta['og_title'], 'title'):
+                    meta['og_title'] = markdown_preview['title']
+                if markdown_preview['description'] and _is_weak_preview_value(meta['og_description'], 'description'):
+                    meta['og_description'] = markdown_preview['description']
+                if markdown_preview['image'] and _is_weak_preview_value(meta['og_image'], 'image'):
+                    meta['og_image'] = markdown_preview['image']
 
     except Exception:
         return meta
