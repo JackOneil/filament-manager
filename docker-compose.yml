@@ -1,4 +1,24 @@
 services:
+  # ── PostgreSQL (optional — enable by setting DATABASE_URL in .env) ────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: filament_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-filament}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-filament}
+      POSTGRES_DB: ${POSTGRES_DB:-filament}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-filament} -d ${POSTGRES_DB:-filament}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - traefik_proxy
+
   filament_app:
     build: .
     container_name: filament_app
@@ -12,6 +32,10 @@ services:
       FERNET_KEY: ${FERNET_KEY}
       # BEHIND_PROXY: ${BEHIND_PROXY}
       TZ: Europe/Prague
+      DATABASE_URL: ${DATABASE_URL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
     labels:
       - 'traefik.enable=true'
       - 'traefik.http.routers.filament_app.tls=true'
@@ -22,6 +46,11 @@ services:
       - 'traefik.http.routers.filament_app.entrypoints=websecure'
     networks:
       - traefik_proxy
+
+volumes:
+  postgres_data:
+    driver: local
+
 networks:
   traefik_proxy:
     name: traefik_proxy

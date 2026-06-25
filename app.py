@@ -35,7 +35,7 @@ from flask_compress import Compress
 from sqlalchemy import text
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from database import db
+from database import db, detect_dialect, engine_options_for, setup_sqlite_pragmas
 from auth import init_app as init_auth, get_current_user, has_section_access, is_admin
 from models import (
     Brand, Color, Material, AppSetting, Filament, 
@@ -51,7 +51,7 @@ from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
 
-APP_VERSION = '1.117.1'
+APP_VERSION = '1.118.1'
 
 csrf = CSRFProtect()
 
@@ -70,7 +70,16 @@ def create_app(test_config=None) -> Flask:
 
     db_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data')
     os.makedirs(db_dir, exist_ok=True)
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(db_dir, "filament.db")}'
+
+    # Database URI: honour DATABASE_URL env var (PostgreSQL / external SQLite).
+    # When unset, default to local SQLite (backward-compatible).
+    _db_url = os.environ.get('DATABASE_URL', '')
+    if _db_url:
+        app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
+        app.logger.info('Using DATABASE_URL from environment (%s)', _db_url.split('@')[-1] if '@' in _db_url else _db_url)
+    else:
+        app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(db_dir, "filament.db")}'
+
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024
     app.config['PROJECT_UPLOAD_FOLDER'] = os.path.join(db_dir, 'uploads')
@@ -89,30 +98,21 @@ def create_app(test_config=None) -> Flask:
             'when running behind a TLS-terminating reverse proxy in production.'
         )
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=14)
-    # Increase SQLite busy-timeout to reduce 'database is locked' errors under load.
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'connect_args': {'timeout': 30},
-    }
+    # Dialect-aware engine options — connection pool for PostgreSQL, busy timeout for SQLite.
+    _dialect = detect_dialect(app.config['SQLALCHEMY_DATABASE_URI'])
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = engine_options_for(_dialect)
 
     if test_config:
         app.config.update(test_config)
 
     db.init_app(app)
 
-    # Enable WAL mode and synchronous=NORMAL for SQLite connections to improve concurrency
+    # SQLite-specific PRAGMA tuning (WAL mode, cache, mmap).
+    # PostgreSQL uses its own connection-pool options (set above in engine_options).
     with app.app_context():
-        if db.engine.url.drivername == 'sqlite':
+        if _dialect == 'sqlite':
             from sqlalchemy import event
-            @event.listens_for(db.engine, "connect")
-            def set_sqlite_pragma(dbapi_connection, connection_record):
-                cursor = dbapi_connection.cursor()
-                cursor.execute("PRAGMA journal_mode=WAL")
-                cursor.execute("PRAGMA synchronous=NORMAL")
-                cursor.execute("PRAGMA foreign_keys=ON")
-                cursor.execute("PRAGMA cache_size=-16000")
-                cursor.execute("PRAGMA mmap_size=268435456")
-                cursor.execute("PRAGMA temp_store=MEMORY")
-                cursor.close()
+            event.listens_for(db.engine, "connect")(setup_sqlite_pragmas)
 
     csrf.init_app(app)
     Compress(app)

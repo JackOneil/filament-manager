@@ -1,12 +1,16 @@
 import logging
 from flask import Flask
 from sqlalchemy import text
-from database import db
+from database import db, detect_dialect
 from models import Brand, Material, Color, AppSetting
 
 def run_migrations(app: Flask) -> None:
     """Create tables and run safe ALTER TABLE migrations for existing databases."""
     with app.app_context():
+        # Detect the active database dialect.
+        _uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+        _dialect = detect_dialect(_uri)
+
         db.create_all()
 
         # ── Schema migrations (must run before any ORM queries) ──────────────
@@ -108,15 +112,15 @@ def run_migrations(app: Flask) -> None:
         _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN last_sync_status VARCHAR(255) DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE prusa_print_job ADD COLUMN progress FLOAT DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE prusa_print_job ADD COLUMN raw_payload TEXT DEFAULT NULL")
-        _safe_alter(app, "ALTER TABLE user ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user'")
-        _safe_alter(app, 'ALTER TABLE user ADD COLUMN section_permissions TEXT DEFAULT NULL')
-        _safe_alter(app, 'ALTER TABLE user ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1')
-        _safe_alter(app, 'ALTER TABLE user ADD COLUMN notify_project_created BOOLEAN NOT NULL DEFAULT 1')
-        _safe_alter(app, 'ALTER TABLE user ADD COLUMN notify_project_status_changed BOOLEAN NOT NULL DEFAULT 1')
-        _safe_alter(app, 'ALTER TABLE user ADD COLUMN notify_project_comment BOOLEAN NOT NULL DEFAULT 1')
-        _safe_alter(app, 'ALTER TABLE user ADD COLUMN last_login_at DATETIME DEFAULT NULL')
-        _safe_alter(app, 'ALTER TABLE user ADD COLUMN preferred_language VARCHAR(10) DEFAULT NULL')
-        _safe_alter(app, 'ALTER TABLE user ADD COLUMN preferred_theme VARCHAR(10) DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE "user" ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT \'user\'')
+        _safe_alter(app, 'ALTER TABLE "user" ADD COLUMN section_permissions TEXT DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE "user" ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1')
+        _safe_alter(app, 'ALTER TABLE "user" ADD COLUMN notify_project_created BOOLEAN NOT NULL DEFAULT 1')
+        _safe_alter(app, 'ALTER TABLE "user" ADD COLUMN notify_project_status_changed BOOLEAN NOT NULL DEFAULT 1')
+        _safe_alter(app, 'ALTER TABLE "user" ADD COLUMN notify_project_comment BOOLEAN NOT NULL DEFAULT 1')
+        _safe_alter(app, 'ALTER TABLE "user" ADD COLUMN last_login_at DATETIME DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE "user" ADD COLUMN preferred_language VARCHAR(10) DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE "user" ADD COLUMN preferred_theme VARCHAR(10) DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE user_invite ADD COLUMN email VARCHAR(255) DEFAULT NULL')
         _safe_alter(app, "ALTER TABLE user_invite ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user'")
         _safe_alter(app, 'ALTER TABLE user_invite ADD COLUMN section_permissions TEXT DEFAULT NULL')
@@ -214,11 +218,11 @@ def run_migrations(app: Flask) -> None:
             db.session.rollback()
 
         # ── Allow project_file.project_id to be NULL (unassigned models) ─────
-        _migrate_nullable_project_id(app)
+        _migrate_nullable_project_id(app, _dialect)
 
 
         # ── Add ondelete=CASCADE to waste_record.filament_id FK ──────────────
-        _migrate_waste_record_fk(app)
+        _migrate_waste_record_fk(app, _dialect)
 
         # ── Add ondelete=SET NULL to movement_history and bambu_job_material ──
         # NOTE: SQLite cannot ALTER TABLE to add FK constraints. The model
@@ -232,6 +236,9 @@ def run_migrations(app: Flask) -> None:
 
 
         # ── Seed data (only runs once on fresh database) ─────────────────────
+        # IMPORTANT: Every read query opens an implicit transaction in SQLAlchemy.
+        # We must commit or rollback after each check to avoid idle-in-transaction
+        # connections that block DDL (PostgreSQL) and background workers.
         if not Brand.query.first():
             for name in ['Prusament', 'Hatchbox', 'eSUN', 'Sunlu', 'Polymaker', 'Overture', 'Spectrum', 'Fiberlogy']:
                 db.session.add(Brand(name=name))
@@ -245,15 +252,26 @@ def run_migrations(app: Flask) -> None:
             ]:
                 db.session.add(Color(name=name, hex_value=hex_val))
             db.session.commit()
+        else:
+            db.session.rollback()  # close implicit transaction from .first()
 
         if not AppSetting.query.first():
             db.session.add(AppSetting(lang='cs', kwh_price=5.0, printer_power=150,
                                       currency='CZK', debug_logging=False, theme='light', nav_palette='teal', view_mode='card', items_per_page=12))
+            db.session.commit()
         setting = AppSetting.query.first()
         if setting and setting.debug_logging:
             app.logger.setLevel(logging.DEBUG)
         else:
             app.logger.setLevel(logging.INFO)
+
+        # Close any implicit transaction opened by AppSetting reads above.
+        # Without this, PostgreSQL accumulates idle-in-transaction connections
+        # that hold shared locks and block ALTER TABLE / auto-backup workers.
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
         # ── Backfill missing metadata for project files ──────────────────────
         from models import ProjectFile
@@ -302,8 +320,14 @@ def run_migrations(app: Flask) -> None:
 
 
 def _safe_alter(app: Flask, sql: str) -> None:
-    """Run a schema migration SQL inside the already-active app context."""
+    """Run a schema migration SQL inside the already-active app context.
+
+    Always rolls back any pending implicit transaction before executing
+    the DDL to avoid lock contention (critical for PostgreSQL, where an
+    idle-in-transaction connection holds shared locks that block ALTER).
+    """
     try:
+        db.session.rollback()  # release any pending locks from prior reads
         db.session.execute(text(sql))
         db.session.commit()
     except Exception as e:
@@ -315,8 +339,14 @@ def _safe_alter(app: Flask, sql: str) -> None:
             app.logger.error(f"Error in _safe_alter executing '{sql}': {e}")
 
 
-def _migrate_nullable_project_id(app: Flask) -> None:
-    """Recreate project_file table with project_id nullable (SQLite-safe)."""
+def _migrate_nullable_project_id(app: Flask, dialect: str = 'sqlite') -> None:
+    """Recreate project_file table with project_id nullable (SQLite-safe).
+
+    PostgreSQL handles this via db.create_all() natively; the migration is
+    only needed for existing SQLite databases created before v1.103.0.
+    """
+    if dialect != 'sqlite':
+        return  # PostgreSQL schema already correct from db.create_all()
     try:
         # Check if already migrated
         result = db.session.execute(text("PRAGMA table_info(project_file)"))
@@ -360,7 +390,7 @@ def _migrate_nullable_project_id(app: Flask) -> None:
         app.logger.error(f"Error migrating project_file nullable project_id: {e}")
 
 
-def _migrate_waste_record_fk(app: Flask) -> None:
+def _migrate_waste_record_fk(app: Flask, dialect: str = 'sqlite') -> None:
     """Recreate waste_record table with ondelete=CASCADE on filament_id FK.
 
     The current model defines ``ondelete='CASCADE'`` on the FK, but legacy
@@ -370,7 +400,11 @@ def _migrate_waste_record_fk(app: Flask) -> None:
 
     We also rebuild ``waste_file`` (which has an FK pointing back to
     ``waste_record.id``) so the recreation is safe.
+
+    PostgreSQL handles this via db.create_all() natively.
     """
+    if dialect != 'sqlite':
+        return  # PostgreSQL schema already correct from db.create_all()
     try:
         # Check whether the FK already includes ON DELETE CASCADE.
         result = db.session.execute(text("PRAGMA foreign_key_list(waste_record)"))

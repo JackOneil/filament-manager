@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.117.1***
+*Current version: **v1.118.1***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -56,6 +56,7 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 - **Configurable Timezone** — All timestamps are displayed in the configured local timezone (default: Europe/Prague) while data is stored as UTC.
 
 ### Platform
+- **PostgreSQL or SQLite** — Local SQLite for simple single-user setups. PostgreSQL for production with better concurrency and point-in-time recovery. Auto-detected via `DATABASE_URL` env var.
 - **Progressive Web App** — Install on desktop or mobile device with offline-capable shell.
 - **Interactive Help System** — Floating `?` button on every page opens a slide-out panel with contextual tips for the current section, full-text search across all tips, and a bilingual accordion of all features. Automatically switches language with the app.
 - **Dark Mode** — Full dark theme support with per-user persistence.
@@ -74,7 +75,7 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 | Layer          | Technology                                               |
 | -------------- | -------------------------------------------------------- |
 | Backend        | Python 3.11, Flask 3.0, Gunicorn                        |
-| Database       | SQLite via Flask-SQLAlchemy                              |
+| Database       | SQLite (default) or PostgreSQL via `DATABASE_URL` env var  |
 | Templates      | Jinja2 (server-side rendering)                           |
 | Frontend       | TailwindCSS (self-hosted), Alpine.js 3.x (self-hosted)   |
 | Charts         | Chart.js (self-hosted)                                   |
@@ -90,7 +91,7 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 ```
 filament/
 ├── app.py                  # App factory, background workers
-├── database.py             # Shared SQLAlchemy instance
+├── database.py             # Shared SQLAlchemy instance + dialect detection
 ├── migrations.py           # Database migrations and seed data
 ├── models.py               # All ORM models (~24 tables)
 ├── messages.py             # i18n dictionaries (cs + en)
@@ -125,7 +126,7 @@ filament/
 ├── data/                   # Runtime data (DB + uploads, gitignored)
 │
 ├── Dockerfile              # Production image (python:3.11-slim)
-├── docker-compose.yml      # Single-service deployment
+├── docker-compose.yml      # App + PostgreSQL deployment
 ├── requirements.txt        # Python dependencies
 ├── .env                    # Environment variables
 ├── CHANGELOG.md            # Detailed version history
@@ -160,6 +161,14 @@ FERNET_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.ge
 
 # Optional — if behind a reverse proxy (nginx, Traefik):
 # BEHIND_PROXY=1
+
+# Optional — PostgreSQL (recommended for production):
+# DATABASE_URL=postgresql://filament:CHANGE_ME@postgres:5432/filament
+# POSTGRES_USER=filament
+# POSTGRES_PASSWORD=CHANGE_ME
+# POSTGRES_DB=filament
+#
+# If DATABASE_URL is not set, SQLite is used automatically (default).
 ```
 
 ### 3. Build & Run
@@ -177,7 +186,8 @@ http://localhost:5050
 ```
 
 On the first launch:
-- The SQLite database is automatically created in `./data/filament.db`.
+- If `DATABASE_URL` is not set, the SQLite database is automatically created in `./data/filament.db`.
+- If `DATABASE_URL` points to a PostgreSQL instance, the schema is created there automatically.
 - Default dictionaries (brands, materials, colors) are seeded.
 - **The first registered user automatically becomes an administrator.**
 
@@ -191,7 +201,7 @@ git pull
 docker compose up -d --build
 ```
 
-Schema migrations run automatically on startup via `_safe_alter()` — no manual migration steps needed. Your data in `./data/` is preserved across rebuilds.
+Schema migrations run automatically on startup via `_safe_alter()` — no manual migration steps needed. Your data in `./data/` (SQLite) or the PostgreSQL volume is preserved across rebuilds.
 
 ---
 
@@ -211,6 +221,65 @@ Simply back up the `./data/` directory:
 
 ```bash
 cp -r /opt/git/filament/data /path/to/backup/
+```
+
+---
+
+## 🐘 Migrating from SQLite to PostgreSQL
+
+PostgreSQL offers better concurrency, point-in-time recovery, and replication — recommended for production deployments and multi-user environments.
+
+### Migration Steps
+
+1. **Export your SQLite data**  
+   Go to **Settings → Data** and click **Export Database**. Download the `.tar.gz` backup.
+
+2. **Stop the application**  
+   ```bash
+   cd /opt/git/filament
+   docker compose down
+   ```
+
+3. **Configure PostgreSQL in `.env`**  
+   ```bash
+   DATABASE_URL=postgresql://filament:YOUR_STRONG_PASSWORD@postgres:5432/filament
+   POSTGRES_USER=filament
+   POSTGRES_PASSWORD=YOUR_STRONG_PASSWORD
+   POSTGRES_DB=filament
+   ```
+
+4. **Start with PostgreSQL**  
+   ```bash
+   docker compose up -d --build
+   ```
+   The `postgres` container starts first (healthcheck), then the app creates all tables automatically.
+
+5. **Import your backup**  
+   Go to **Settings → Data → Import** and upload your `.tar.gz` backup.  
+   Choose **Skip existing** mode to preserve the newly-created empty schema.
+
+6. **Verify**  
+   Check your inventory, projects, and settings are all present. The app is now running on PostgreSQL.
+
+### Switching Back to SQLite
+
+Remove or comment out `DATABASE_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` from `.env`, then rebuild. Export/import the data the same way.
+
+### PostgreSQL Performance Tuning
+
+The application configures optimal defaults:
+- Connection pool: 10 base + 20 overflow connections
+- Connection recycling every 1 hour
+- Pre-ping health checks before each use
+
+For large deployments, tune `postgres` service in `docker-compose.yml`:
+```yaml
+postgres:
+  command: >
+    -c shared_buffers=256MB
+    -c effective_cache_size=1GB
+    -c work_mem=16MB
+    -c maintenance_work_mem=128MB
 ```
 
 ---

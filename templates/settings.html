@@ -1301,7 +1301,7 @@
             </div>
             
             <!-- Auto Backup Configuration -->
-            <form method="POST" action="{{ url_for('settings') }}" class="mt-4 bg-white rounded-lg border border-gray-200 p-5" x-data="{
+            <form id="backup-auto-form" method="POST" action="{{ url_for('settings') }}" class="mt-4 bg-white rounded-lg border border-gray-200 p-5" x-data="{
                 autoEnabled: {{ 'true' if app_settings and app_settings.backup_auto_enabled else 'false' }},
                 autoFreq: '{{ app_settings.backup_auto_frequency if app_settings and app_settings.backup_auto_frequency else 'weekly' }}',
                 autoDay: {{ app_settings.backup_auto_day if app_settings else 1 }},
@@ -1397,18 +1397,20 @@
                         </div>
                         <p class="text-xs text-gray-400 mt-2">{{ t('backup_auto_rotation_note') }}</p>
                     </div>
-                    <div class="flex flex-wrap gap-3 items-center">
-                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 transition-colors text-white font-semibold py-2 px-5 rounded-lg text-sm shadow">
-                            <i class="fa-solid fa-save"></i> {{ t('save') }}
-                        </button>
-                        <form method="POST" action="{{ url_for('backup.backup_trigger_now') }}" data-confirm="{{ t('backup_auto_trigger_confirm') }}" class="inline">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="bg-amber-600 hover:bg-amber-700 transition-colors text-white font-semibold py-2 px-5 rounded-lg text-sm shadow">
-                                <i class="fa-solid fa-play"></i> {{ t('backup_auto_trigger_now') }}
-                            </button>
-                        </form>
-                    </div>
-                    {% if app_settings and app_settings.backup_auto_last_run_at %}
+            </form>
+            {# Buttons OUTSIDE the form to avoid nested-form HTML violation #}
+            <div class="flex flex-wrap gap-3 items-center mt-4">
+                <button type="submit" form="backup-auto-form" class="bg-blue-600 hover:bg-blue-700 transition-colors text-white font-semibold py-2 px-5 rounded-lg text-sm shadow">
+                    <i class="fa-solid fa-save"></i> {{ t('save') }}
+                </button>
+                <form method="POST" action="{{ url_for('backup.backup_trigger_now') }}" data-confirm="{{ t('backup_auto_trigger_confirm') }}" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="bg-amber-600 hover:bg-amber-700 transition-colors text-white font-semibold py-2 px-5 rounded-lg text-sm shadow">
+                        <i class="fa-solid fa-play"></i> {{ t('backup_auto_trigger_now') }}
+                    </button>
+                </form>
+            </div>
+            {% if app_settings and app_settings.backup_auto_last_run_at %}
                     <div class="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded-lg p-3">
                         {{ t('backup_auto_last_run') }}: {{ app_settings.backup_auto_last_run_at | fmt_dt('%d.%m.%Y %H:%M') }}
                     </div>
@@ -1454,8 +1456,6 @@
                         </div>
                     </div>
                 </div>
-            </form>
-            
             <form action="{{ url_for('import_data') }}" method="POST" enctype="multipart/form-data" data-confirm="{{ t('import_confirm') }}" class="bg-gray-50 rounded-lg p-5 border border-dashed border-gray-200 text-center flex flex-col justify-center items-center mt-4">
                 <input type="file" name="file" accept=".tar.gz,.json,.json.gz,.gz" class="mb-4 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer" required title="{{ t('import_hint') }}">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 w-full mb-4 text-left">

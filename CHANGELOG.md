@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.118.1] - 2026-06-25
+### Fixed
+- **Auto-backup & manual backup stuck (BUG-592)**: `run_migrations()` left idle-in-transaction database connections after reading `AppSetting` and `Brand` without committing or rolling back (migrations.py:253–260, 239–251). On PostgreSQL, these open transactions held shared locks on the tables, blocking ALL subsequent `ALTER TABLE` operations (`_safe_alter()`) and any query that needed to read those tables — including the auto-backup worker which calls `AppSetting.query.first()` to read backup settings. This caused the auto-backup to silently stop (last backup: June 6, 2026) and manual backup to hang.
+
+  **Fix:** Added explicit `db.session.commit()` (or `db.session.rollback()` when seed data already exists) after every read query in `run_migrations()`. Also added `db.session.rollback()` at the beginning of `_safe_alter()` to release any pending locks before executing DDL — critical for PostgreSQL where idle transactions block exclusive locks. (migrations.py)
+- **Manual backup button submitting wrong form (BUG-592b)**: The "Spustit zálohu teď" button was nested inside the settings `<form>`. Nested forms are invalid HTML — browsers handle them inconsistently, often submitting to the outer form's action instead. This caused the button to save settings (flash: "Nastavení automatického zálohování uloženo.") instead of triggering a backup. **Fix:** Closed the settings form before the button row, moved the "Uložit" button outside the form using the `form="backup-auto-form"` attribute, and kept the trigger button in its own independent `<form>`. (templates/settings.html)
+
+## [1.118.0] - 2026-06-25
+### Added
+- **PostgreSQL support (BL-004)**: The application now auto-detects PostgreSQL via the `DATABASE_URL` environment variable. When set, connection pooling (`pool_size=10`, `max_overflow=20`, `pool_pre_ping=True`, `pool_recycle=3600`) is configured automatically. SQLite remains the default when `DATABASE_URL` is unset, ensuring full backward compatibility.
+- **Dialect abstraction layer** in `database.py`: `detect_dialect(uri)`, `engine_options_for(dialect)`, and `setup_sqlite_pragmas()` extract dialect-specific logic from `app.py`, making the codebase cleaner and more testable.
+- **PostgreSQL Docker Compose service**: `postgres:16-alpine` container with healthcheck, persistent `postgres_data` volume, and wait-for-healthy `depends_on` in the app service. Environment variables `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` control the PostgreSQL setup.
+- **Migration guide in README**: Step-by-step instructions for migrating from SQLite to PostgreSQL (and back), including export/import workflow, `.env` configuration, and PostgreSQL performance tuning tips.
+- **`psycopg2-binary>=2.9`** added to `requirements.txt`.
+
+### Changed
+- `app.py`: Database URI now reads `DATABASE_URL` env var; engine options are dialect-aware; SQLite PRAGMA setup uses the shared helper from `database.py`.
+- `migrations.py`: `_migrate_nullable_project_id()` and `_migrate_waste_record_fk()` are now guarded with dialect checks — skipped on PostgreSQL since `db.create_all()` already creates the correct schema.
+- `database.py`: Refactored from a single `db = SQLAlchemy()` instance to include dialect detection and engine option helpers.
+- `.env`: Added commented PostgreSQL configuration examples with `DATABASE_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`.
+- `README.md`: Updated Tech Stack, Quick Start, and Platform sections to reflect PostgreSQL support. Added full migration guide.
+
 ## [1.117.1] - 2026-06-15
 ### Fixed
 - **Makerworld link preview broken**: Cloudflare-protected sites (Makerworld, Printables, etc.) returned HTTP 403 without useful metadata when accessed with bare `User-Agent` headers. Updated `fetch_link_metadata()` in `utils/__init__.py` to send modern browser-like headers (`Sec-Ch-Ua`, `Sec-Fetch-*`, `Accept-Language`) that pass Cloudflare's bot detection and receive actual page content with `og:` meta tags.
