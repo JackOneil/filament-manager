@@ -316,8 +316,8 @@
         <button onclick="resetOverviewLayout()" class="ml-auto text-xs font-semibold text-blue-600 hover:text-blue-800 underline">{{ t('stats_reset_layout') }}</button>
     </div>
 
-    <div id="overview-layout" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6">
-        <section class="dashboard-widget xl:col-span-2" data-widget-id="recent_activity">
+    <div id="overview-layout" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6" data-stagger="10">
+        <section class="dashboard-widget xl:col-span-2" data-widget-id="recent_activity" data-animate>
             <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                 <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
                 <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('overview_widget_recent_activity') }}</span>
@@ -376,7 +376,7 @@
             </div>
         </section>
 
-        <section class="dashboard-widget xl:col-span-2" data-widget-id="live_printers">
+        <section class="dashboard-widget xl:col-span-2" data-widget-id="live_printers" data-animate>
             <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                 <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
                 <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('overview_live_printers_title') }}</span>
@@ -424,7 +424,7 @@
         })();
         </script>
 
-        <section class="dashboard-widget md:col-span-2 xl:col-span-4" data-widget-id="action_center">
+        <section class="dashboard-widget md:col-span-2 xl:col-span-4" data-widget-id="action_center" data-animate>
             <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                 <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
                 <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('action_center') }}</span>
@@ -595,7 +595,7 @@
             </div>
         </section>
 
-        <section class="dashboard-widget md:col-span-2 xl:col-span-4" data-widget-id="quick_links">
+        <section class="dashboard-widget md:col-span-2 xl:col-span-4" data-widget-id="quick_links" data-animate>
             <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                 <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
                 <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('overview_quick_links_title') }}</span>
@@ -637,7 +637,7 @@
             </div>
         </section>
 
-        <section class="dashboard-widget xl:col-span-2 col-span-1" data-widget-id="upcoming_deadlines">
+        <section class="dashboard-widget xl:col-span-2 col-span-1" data-widget-id="upcoming_deadlines" data-animate>
             <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                 <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
                 <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('overview_widget_upcoming_deadlines') }}</span>
@@ -707,7 +707,7 @@
             </div>
         </section>
 
-        <section class="dashboard-widget xl:col-span-2 col-span-1" data-widget-id="usage_7d">
+        <section class="dashboard-widget xl:col-span-2 col-span-1" data-widget-id="usage_7d" data-animate>
             <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                 <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
                 <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('overview_widget_usage_7d') }}</span>
@@ -735,7 +735,7 @@
             </div>
         </section>
 
-        <section class="dashboard-widget xl:col-span-2 col-span-1" data-widget-id="top_turnover">
+        <section class="dashboard-widget xl:col-span-2 col-span-1" data-widget-id="top_turnover" data-animate>
             <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                 <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
                 <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('overview_top_turnover_title') }}</span>
@@ -762,7 +762,7 @@
         </section>
 
         {# ── Lowest Stock ─────────────────────────────────────────────── #}
-        <section class="dashboard-widget xl:col-span-2 col-span-1" data-widget-id="lowest_stock">
+        <section class="dashboard-widget xl:col-span-2 col-span-1" data-widget-id="lowest_stock" data-animate>
             <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                 <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
                 <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('overview_widget_lowest_stock') }}</span>
@@ -816,7 +816,7 @@
         </section>
 
         {# ── Activity Heatmap ──────────────────────────────────────────── #}
-        <section class="dashboard-widget md:col-span-2 xl:col-span-4" data-widget-id="activity_heatmap">
+        <section class="dashboard-widget md:col-span-2 xl:col-span-4" data-widget-id="activity_heatmap" data-animate>
             <div class="dashboard-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                 <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
                 <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('heatmap_title') }}</span>

@@ -17,6 +17,7 @@
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/skeleton.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/enhancements.css') }}">
     <style>
         {% if nav_palette == 'slate' %}
         :root {
@@ -497,6 +498,7 @@
         }};
     </script>
     <script src="{{ url_for('static', filename='js/app-shell.js') }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
+    <script src="{{ url_for('static', filename='js/enhancements.js') }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
     {% if current_user %}
     {# Command palette static items — sorted by priority (most-used first) #}
     <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %} x-ref="commandItems">[

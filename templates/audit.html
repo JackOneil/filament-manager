@@ -46,7 +46,7 @@
             <div class="text-sm text-gray-500">{{ t('audit_page_status').format(page=logs.page, pages=logs.pages, total=logs.total) }}</div>
         </div>
         <div class="overflow-x-auto">
-            <table class="min-w-full text-sm">
+            <table class="min-w-full text-sm ui-responsive-table">
                 <thead>
                     <tr class="text-left text-gray-500 border-b border-gray-200">
                         <th class="py-3 pr-4">{{ t('date') }}</th>
@@ -66,31 +66,33 @@
                 </tbody>
                     {% for row in logs.items %}
                     <tbody x-data="{ open: false }" class="border-b border-gray-100 last:border-b-0">
-                    <tr class="align-top">
-                        <td class="py-3 pr-4 whitespace-nowrap text-gray-600">{{ row.created_at | fmt_dt('%d.%m.%Y %H:%M:%S') }}</td>
-                        <td class="py-3 pr-4">
+                    <tr class="align-top enh-mobile-actions">
+                        <td data-label="{{ t('date') }}" class="py-3 pr-4 whitespace-nowrap text-gray-600">{{ row.created_at | fmt_dt('%d.%m.%Y %H:%M:%S') }}</td>
+                        <td data-label="{{ t('users_nav') }}" class="py-3 pr-4">
                             <div class="font-semibold text-gray-800">{{ row.user_name or '-' }}</div>
                             <div class="text-xs text-gray-500">{{ row.user_email or '-' }}</div>
                             <div class="text-xs text-gray-400">{{ row.ip_address or '-' }}</div>
                         </td>
-                        <td class="py-3 pr-4">
+                        <td data-label="{{ t('audit_action') }}" class="py-3 pr-4">
                             <span class="ui-badge">{{ row.action }}</span>
                             <div class="text-xs text-gray-500 mt-1">{{ row.endpoint or '-' }}</div>
                         </td>
-                        <td class="py-3 pr-4">
+                        <td data-label="{{ t('audit_object') }}" class="py-3 pr-4">
                             <div class="font-semibold text-gray-700">{{ row.object_type or '-' }}</div>
                             <div class="text-xs text-gray-500">{{ row.object_id or '-' }}</div>
                         </td>
-                        <td class="py-3 pr-4">
+                        <td data-label="{{ t('audit_request') }}" class="py-3 pr-4">
                             <div class="font-mono text-xs text-gray-600">{{ row.method }} {{ row.path }}</div>
                             <div class="text-xs text-gray-400">{{ row.session_id or '-' }}</div>
                         </td>
-                        <td class="py-3">
-                            <button type="button" @click="open = !open"
-                                    class="text-blue-600 hover:text-blue-800 font-semibold text-sm flex items-center gap-1 whitespace-nowrap">
-                                <i class="fa-solid fa-chevron-right text-xs transition-transform duration-200" :class="open ? 'rotate-90' : ''"></i>
-                                {{ t('audit_show_snapshots') }}
-                            </button>
+                        <td data-label="{{ t('detail') }}" class="py-3">
+                            <div class="enh-row-actions">
+                                <button type="button" @click="open = !open"
+                                        class="text-blue-600 hover:text-blue-800 font-semibold text-sm flex items-center gap-1 whitespace-nowrap">
+                                    <i class="fa-solid fa-chevron-right text-xs transition-transform duration-200" :class="open ? 'rotate-90' : ''"></i>
+                                    {{ t('audit_show_snapshots') }}
+                                </button>
+                            </div>
                         </td>
                     </tr>
                     <tr x-show="open" x-cloak class="bg-slate-50/60 dark:bg-slate-800/30">

@@ -7,7 +7,7 @@
     ('is_active', 'users_status'),
 ] %}
 <div class="overflow-x-auto">
-    <table class="min-w-full text-sm">
+    <table class="min-w-full text-sm ui-responsive-table">
         <thead>
             <tr class="text-left text-gray-500 border-b border-gray-200">
                 <th class="py-3 pr-2 w-8">
@@ -36,24 +36,26 @@
         </thead>
         <tbody id="users-table-body">
             {% for user in users.items %}
-            <tr class="border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors">
-                <td class="py-3 pr-2">
+            <tr class="border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors enh-mobile-actions">
+                <td data-label="" class="py-3 pr-2">
                     <input type="checkbox" name="selected_users" value="{{ user.id }}" class="user-checkbox rounded border-gray-300">
                 </td>
-                <td class="py-3 pr-4 font-semibold text-gray-800">{{ user.name }}</td>
-                <td class="py-3 pr-4 text-gray-600">{{ user.email }}</td>
-                <td class="py-3 pr-4">
+                <td data-label="{{ t('auth_name') }}" class="py-3 pr-4 font-semibold text-gray-800">{{ user.name }}</td>
+                <td data-label="{{ t('auth_email') }}" class="py-3 pr-4 text-gray-600">{{ user.email }}</td>
+                <td data-label="{{ t('users_role') }}" class="py-3 pr-4">
                     <span class="ui-badge {% if user.role == 'admin' %}ui-badge-brand{% endif %}">{{ t('users_role_admin') if user.role == 'admin' else t('users_role_user') }}</span>
                 </td>
-                <td class="py-3 pr-4 text-gray-600">{{ user.created_at | fmt_dt('%d.%m.%Y %H:%M') or '-' }}</td>
-                <td class="py-3 pr-4 text-gray-600">{{ user.last_login_at | fmt_dt('%d.%m.%Y %H:%M') or t('users_never_logged_in') }}</td>
-                <td class="py-3 pr-4">
+                <td data-label="{{ t('users_created_at') }}" class="py-3 pr-4 text-gray-600">{{ user.created_at | fmt_dt('%d.%m.%Y %H:%M') or '-' }}</td>
+                <td data-label="{{ t('users_last_login_at') }}" class="py-3 pr-4 text-gray-600">{{ user.last_login_at | fmt_dt('%d.%m.%Y %H:%M') or t('users_never_logged_in') }}</td>
+                <td data-label="{{ t('users_status') }}" class="py-3 pr-4">
                     <span class="ui-badge {% if user.is_active %}ui-badge-success{% else %}ui-badge-warning{% endif %}">
                         {{ t('users_status_active') if user.is_active else t('users_status_inactive') }}
                     </span>
                 </td>
-                <td class="py-3 text-right">
-                    <a href="{{ url_for('user_detail', user_id=user.id) }}" class="text-blue-600 hover:text-blue-800 font-semibold text-sm">{{ t('detail') }}</a>
+                <td data-label="{{ t('detail') }}" class="py-3 text-right">
+                    <div class="enh-row-actions">
+                        <a href="{{ url_for('user_detail', user_id=user.id) }}" class="text-blue-600 hover:text-blue-800 font-semibold text-sm">{{ t('detail') }}</a>
+                    </div>
                 </td>
             </tr>
             {% else %}

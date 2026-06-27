@@ -51,7 +51,7 @@ from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
 
-APP_VERSION = '1.118.1'
+APP_VERSION = '1.119.0'
 
 csrf = CSRFProtect()
 

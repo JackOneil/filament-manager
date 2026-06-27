@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.119.0] - 2026-06-27
+### Added
+- **Dark-mode Chart.js theming**: New `window.enh` API in `static/js/enhancements.js` registers every Chart.js instance and re-themes it automatically when the user toggles dark mode. Chart axes, grid, legend and tooltip colours now adapt to the theme without a page reload. (static/js/enhancements.js, templates/stats.html, static/css/enhancements.css)
+- **Consumption heatmap (day × hour)**: New draggable section on the Statistics page. A 7×24 grid of CSS-only cells visualises when you actually print, aggregated from the last 90 days of `MovementHistory`. Includes tooltip on hover with exact grams and a colour-scale legend. Computed in `routes/stats.py:heatmap_matrix` and exposed via `chart_data.heatmap`. (routes/stats.py, templates/stats.html, static/css/enhancements.css, static/js/enhancements.js)
+- **KPI animated counters**: All four executive KPIs on `/stats` now animate from 0 to the target value over 900 ms (ease-out-cubic) on first load. Uses CSS `tabular-nums` to prevent layout shift and a brief `enh-roll-in` flip on every change. (templates/stats.html, static/js/enhancements.js, static/css/enhancements.css)
+- **Inline sparklines in KPI cards**: Each KPI card now includes a 14- or 30-point SVG sparkline showing the daily trend. Pure-SVG renderer (no Chart.js dependency, sub-2KB), themed via CSS variables. (templates/stats.html, static/js/enhancements.js, static/css/enhancements.css)
+- **Responsive table-to-card transformation**: All admin tables (`/users`, `/history`, `/audit`) automatically collapse into a card-stack layout on viewports `< 768 px`. Each cell carries a `data-label` attribute that becomes the left-aligned label in card mode. Old long-press / horizontal-scroll behaviour on mobile is gone. (templates/_users_table.html, templates/history.html, templates/audit.html, static/css/enhancements.css)
+- **Mobile row actions reveal**: Long-press (≥ 280 ms) anywhere on a table row to reveal the action buttons (previously always-visible, now compact on mobile). Tap-outside dismisses. Activates only below 768 px width. (static/js/enhancements.js, static/css/enhancements.css)
+- **Staggered widget reveal**: Overview and statistics page widgets now animate in with a 20–40 ms cascade. Implemented via `data-stagger="N"` on the parent and `data-animate` on each child — pure CSS, no JS animation loops. (templates/overview.html, templates/stats.html, static/css/enhancements.css)
+- **Heart-pop reaction animation**: Clicking a project comment reaction now triggers a `enh-heart-pop` keyframe (scale + slight rotation) for a satisfying tactile feel. (templates/_project_overview.html, static/css/enhancements.css)
+- **Ripple effect on primary buttons**: Any button can opt into a Material-style ripple by adding `data-enh-ripple`. The ripple origin tracks the click position via CSS custom properties. (static/js/enhancements.js, static/css/enhancements.css)
+- **Slide-up toast animation**: Client-side `window.showToast()` toasts now slide in from below with a smooth cubic-bezier transition instead of appearing instantly. (static/js/app-shell.js, static/css/enhancements.css)
+- **Stronger focus ring for keyboard nav**: `:focus-visible` now gets a brand-coloured outline for all interactive elements — improves a11y for keyboard users. (static/css/enhancements.css)
+- **Selection colour follows theme**: Custom `::selection` colour for both light and dark modes. (static/css/enhancements.css)
+
+### Changed
+- Chart.js options on `/stats` now include `animation: { duration: 700, easing: 'easeOutCubic' }` for smoother initial render.
+- All existing dashboards now load the new `static/css/enhancements.css` and `static/js/enhancements.js` (idempotent, no breaking changes).
+- KPI group (4 cards) on `/stats` uses the new `ui-kpi-group` class which auto-collapses to 2 columns on narrow screens (≤ 767 px) and hides cards 5+ on mobile.
+
+### Fixed
+- Chart axes/grid/tooltips were hard-coded to light-mode colours and remained bright after toggling dark mode — now reactive via `MutationObserver` on `<html>` class.
+
 ## [1.118.1] - 2026-06-25
 ### Fixed
 - **Auto-backup & manual backup stuck (BUG-592)**: `run_migrations()` left idle-in-transaction database connections after reading `AppSetting` and `Brand` without committing or rolling back (migrations.py:253–260, 239–251). On PostgreSQL, these open transactions held shared locks on the tables, blocking ALL subsequent `ALTER TABLE` operations (`_safe_alter()`) and any query that needed to read those tables — including the auto-backup worker which calls `AppSetting.query.first()` to read backup settings. This caused the auto-backup to silently stop (last backup: June 6, 2026) and manual backup to hang.

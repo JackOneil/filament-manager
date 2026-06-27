@@ -209,6 +209,26 @@ def register(app):
         _label_keys_snapshot = list(label_keys)
         material_daily = defaultdict(lambda: {key: 0.0 for key in _label_keys_snapshot})
         purchase_filament_rows = []
+        # Heatmap: 7 rows (Mon..Sun) × 24 columns (hours) of total usage in grams.
+        # Uses the last 90 days of movement history (extended window) for richer
+        # patterns. Returns zero matrix when no data is available.
+        heatmap_matrix = [[0.0] * 24 for _ in range(7)]
+        heatmap_since = utc_now() - timedelta(days=90)
+        heatmap_rows = db.session.query(
+            MovementHistory.created_at,
+            MovementHistory.action_type,
+            MovementHistory.weight,
+        ).filter(
+            MovementHistory.created_at >= heatmap_since,
+            MovementHistory.action_type.in_(('remove', 'bambu_print', 'prusa_print', 'bulk_delete')),
+        ).all()
+        for hrow in heatmap_rows:
+            if not hrow.created_at or not hrow.weight:
+                continue
+            # Python weekday(): Monday=0..Sunday=6
+            weekday = hrow.created_at.weekday()
+            hour = hrow.created_at.hour
+            heatmap_matrix[weekday][hour] += float(hrow.weight or 0)
 
         for row in movement_rows:
             if not row.created_at:
@@ -220,7 +240,7 @@ def register(app):
             filament = filament_name_map.get(row.filament_name)
             material_name = filament.material.name if filament and filament.material else None
 
-            if row.action_type in ('remove', 'bambu_print'):
+            if row.action_type in ('remove', 'bambu_print', 'prusa_print', 'bulk_delete'):
                 usage_daily[day_key] += row.weight
                 if material_name:
                     material_daily[material_name][day_key] += row.weight
@@ -385,6 +405,11 @@ def register(app):
             ],
             'projectLabels': [row['project_name'] for row in project_rows],
             'projectData': [row['grams'] for row in project_rows],
+            'heatmap': {
+                'matrix': [[round(v, 1) for v in row] for row in heatmap_matrix],
+                'days': ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                'labels': ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'],
+            },
         }
 
         summary = {
@@ -396,6 +421,8 @@ def register(app):
             'critical_count': critical_count,
             'warning_count': warning_count,
             'reorder_recommendations': len(purchase_recommendations),
+            'usage_sparkline': ','.join(str(round(usage_daily[key], 1)) for key in label_keys),
+            'purchase_sparkline': ','.join(str(round(purchase_daily[key], 1)) for key in label_keys),
         }
 
         color_map = {}

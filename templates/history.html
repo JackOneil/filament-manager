@@ -155,7 +155,7 @@
 
         {# ── Desktop table (hidden on mobile) ──────────────────────────── #}
         <div class="hidden md:block overflow-x-auto overflow-y-auto max-h-[72vh]">
-            <table class="min-w-full text-left border-collapse">
+            <table class="min-w-full text-left border-collapse ui-responsive-table">
                 <thead class="sticky top-0 z-20">
                     <tr class="border-b border-[var(--ui-border)] bg-[var(--ui-surface-strong)]">
                         <th class="py-3 px-4 text-xs font-bold uppercase tracking-wider text-[var(--ui-text-muted)] sticky left-0 z-30 bg-[var(--ui-surface-strong)]">{{ t('datetime') }}</th>
@@ -170,16 +170,16 @@
                     {% for m in movements.items %}
                     {% set ab = action_badges.get(m.action_type, action_badges['remove']) %}
                     {% set cost_is_pos = is_cost_positive.get(m.action_type, false) %}
-                    <tr class="border-b border-[var(--ui-border)] hover:brightness-95 dark:hover:brightness-110 transition-colors group {{ ab.stripe }}">
+                    <tr class="border-b border-[var(--ui-border)] hover:brightness-95 dark:hover:brightness-110 transition-colors group {{ ab.stripe }} enh-mobile-actions">
 
                         {# Date/time #}
-                        <td class="py-3 px-4 text-sm text-[var(--ui-text-muted)] whitespace-nowrap sticky left-0 z-10 bg-inherit">
+                        <td data-label="{{ t('datetime') }}" class="py-3 px-4 text-sm text-[var(--ui-text-muted)] whitespace-nowrap sticky left-0 z-10 bg-inherit">
                             <span class="font-medium text-[var(--ui-text)]">{{ m.created_at | fmt_dt('%d.%m.%Y') }}</span>
                             <span class="ml-1">{{ m.created_at.strftime('%H:%M') }}</span>
                         </td>
 
                         {# Filament — clickable if filament_id exists #}
-                        <td class="py-3 px-4">
+                        <td data-label="{{ t('movement_filament') }}" class="py-3 px-4">
                             {% if m.filament_id %}
                             <a href="{{ url_for('filament_detail', id=m.filament_id) }}"
                                class="inline-flex items-center gap-1.5 font-semibold text-[var(--ui-brand-strong)] hover:underline text-sm group-hover:text-[var(--ui-brand)]">
@@ -193,25 +193,25 @@
                         </td>
 
                         {# Action badge — granular by action_type #}
-                        <td class="py-3 px-4">
+                        <td data-label="{{ t('movement_action') }}" class="py-3 px-4">
                             <span class="inline-flex items-center gap-1 {{ ab.bg }} px-2.5 py-1 rounded-full text-xs font-bold">
                                 <i class="fa-solid {{ ab.icon }}"></i> {{ t('action_type_' + m.action_type) }}
                             </span>
                         </td>
 
                         {# Weight #}
-                        <td class="py-3 px-4 text-right text-sm font-medium text-[var(--ui-text)] tabular-nums">
+                        <td data-label="{{ t('movement_amount') }}" class="py-3 px-4 text-right text-sm font-medium text-[var(--ui-text)] tabular-nums">
                             {{ '{:0.1f}'.format(m.weight) }} g
                         </td>
 
                         {# Cost #}
-                        <td class="py-3 px-4 text-right text-sm font-bold tabular-nums
+                        <td data-label="{{ t('movement_cost') }}" class="py-3 px-4 text-right text-sm font-bold tabular-nums
                             {% if cost_is_pos %}text-emerald-600 dark:text-emerald-400{% else %}text-red-600 dark:text-red-400{% endif %}">
                             {% if cost_is_pos %}+{% else %}-{% endif %}{{ '{:0.2f}'.format(m.cost) }} {{ m.currency }}
                         </td>
 
                         {# Note #}
-                        <td class="py-3 px-4 text-sm text-[var(--ui-text-muted)] max-w-[200px] truncate">
+                        <td data-label="{{ t('note') }}" class="py-3 px-4 text-sm text-[var(--ui-text-muted)] max-w-[200px] truncate">
                             {% if m.note %}
                             <span title="{{ m.note }}">{{ m.note }}</span>
                             {% else %}

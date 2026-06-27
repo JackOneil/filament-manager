@@ -274,7 +274,7 @@ function appShell() {
         }[category] || 'fa-circle-info text-slate-500';
 
         var toast = document.createElement('div');
-        toast.className = 'rounded-lg border px-4 py-3 shadow-xl flex items-start gap-3 backdrop-blur-md pointer-events-auto ' + palette;
+        toast.className = 'enh-slide-up rounded-lg border px-4 py-3 shadow-xl flex items-start gap-3 backdrop-blur-md pointer-events-auto ' + palette;
         toast.setAttribute('role', 'status');
         toast.setAttribute('aria-live', 'polite');
 

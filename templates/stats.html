@@ -126,25 +126,27 @@ html.dark .widget-color-picker > div {
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
-            <div class="ui-kpi">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-5 ui-kpi-group" data-stagger="6">
+            <div class="ui-kpi" data-animate>
                 <div class="ui-label">{{ t('stats_usage_period') }}</div>
-                <div class="text-3xl font-bold mt-2">{{ summary.usage_total_period }} g</div>
+                <div class="text-3xl font-bold mt-2"><span class="enh-kpi-value" data-enh-counter="{{ summary.usage_total_period }}" data-enh-suffix=" g">{{ summary.usage_total_period }} g</span></div>
                 <div class="text-sm text-gray-500 mt-2">{{ t('stats_usage_period_hint') }}</div>
+                <div class="mt-3" data-enh-sparkline="{{ summary.usage_sparkline | default('0,0,0,0,0,0,0,0,0,0,0,0,0,0') }}"></div>
             </div>
-            <div class="ui-kpi">
+            <div class="ui-kpi" data-animate>
                 <div class="ui-label">{{ t('stats_purchase_period') }}</div>
-                <div class="text-3xl font-bold mt-2">{{ summary.purchase_total_period }} g</div>
+                <div class="text-3xl font-bold mt-2"><span class="enh-kpi-value" data-enh-counter="{{ summary.purchase_total_period }}" data-enh-suffix=" g">{{ summary.purchase_total_period }} g</span></div>
                 <div class="text-sm text-gray-500 mt-2">{{ t('stats_purchase_period_hint') }}</div>
+                <div class="mt-3" data-enh-sparkline="{{ summary.purchase_sparkline | default('0,0,0,0,0,0,0,0,0,0,0,0,0,0') }}"></div>
             </div>
-            <div class="ui-kpi">
+            <div class="ui-kpi" data-animate>
                 <div class="ui-label">{{ t('stats_daily_average') }}</div>
-                <div class="text-3xl font-bold mt-2">{{ summary.avg_daily_usage_period }} g</div>
+                <div class="text-3xl font-bold mt-2"><span class="enh-kpi-value" data-enh-counter="{{ summary.avg_daily_usage_period }}" data-enh-suffix=" g">{{ summary.avg_daily_usage_period }} g</span></div>
                 <div class="text-sm text-gray-500 mt-2">{{ summary.active_projects }} {{ t('stats_active_projects_short') }}</div>
             </div>
-            <div class="ui-kpi">
+            <div class="ui-kpi" data-animate>
                 <div class="ui-label">{{ t('stats_reorder_alerts') }}</div>
-                <div class="text-3xl font-bold mt-2">{{ summary.critical_count + summary.warning_count }}</div>
+                <div class="text-3xl font-bold mt-2"><span class="enh-kpi-value" data-enh-counter="{{ summary.critical_count + summary.warning_count }}">{{ summary.critical_count + summary.warning_count }}</span></div>
                 <div class="text-sm mt-2">
                     <span class="text-red-500 font-semibold">{{ summary.critical_count }} {{ t('stats_critical') }}</span>
                     <span class="mx-2 text-gray-300">·</span>
@@ -330,6 +332,31 @@ html.dark .widget-color-picker > div {
                 </div>
             </div>
 
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- SECTION: heatmap (day-of-week × hour consumption pattern) -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div class="stats-section" id="section_heatmap" data-section-id="section_heatmap">
+        <div class="section-edit-bar items-center gap-2 mb-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+            <span class="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-700"><i class="fa-solid fa-grip-vertical fa-lg"></i></span>
+            <span class="text-sm font-semibold text-gray-700 ml-1">{{ t('stats_heatmap_section') }}</span>
+            <div class="ml-auto flex items-center gap-1">
+                <button onclick="moveSectionUp('section_heatmap')" title="{{ t('stats_move_up') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-up text-xs"></i></button>
+                <button onclick="moveSectionDown('section_heatmap')" title="{{ t('stats_move_down') }}" class="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition"><i class="fa-solid fa-arrow-down text-xs"></i></button>
+            </div>
+        </div>
+        <div class="stats-card bg-white rounded-2xl shadow-sm border border-gray-100 p-5" data-card-id="heatmap">
+            <div class="card-edit-bar items-center gap-2 mb-3 pb-3 border-b border-gray-100">
+                <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">{{ t('stats_heatmap_title') }}</span>
+                <button onclick="hideCard('heatmap')" class="ml-auto text-xs text-red-500 hover:text-red-700 flex items-center gap-1"><i class="fa-solid fa-eye-slash"></i> {{ t('stats_hide_widget') }}</button>
+            </div>
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-bold text-gray-800">{{ t('stats_heatmap_title') }}</h2>
+                <span class="text-xs text-gray-400">{{ t('stats_heatmap_hint') }}</span>
+            </div>
+            <div data-enh-heatmap='{{ chart_data.heatmap | tojson }}' class="overflow-x-auto"></div>
         </div>
     </div>
 
@@ -759,17 +786,43 @@ function statsDashboard() {
 
 // ── Chart.js ─────────────────────────────────────────────────────────────────
 let usageChartInstance = null;
+const _allCharts = [];
+
+function _palette() {
+    return window.enh && window.enh.palette ? window.enh.palette() : { grid: 'rgba(148,163,184,0.18)', text: '#475569', axis: 'rgba(100,116,139,0.6)', tooltipBg: '#fff', tooltipText: '#0f172a' };
+}
+
+function _registerChart(chart) {
+    if (window.enh && window.enh.registerChart) {
+        window.enh.registerChart(chart);
+    }
+    _allCharts.push(chart);
+}
 
 function initCharts() {
     function baseChartOptions() {
+        const p = _palette();
         return {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { labels: { boxWidth: 12 } } },
-            scales: { y: { beginAtZero: true, ticks: { callback: (v) => `${v} g` } } },
+            animation: { duration: 700, easing: 'easeOutCubic' },
+            plugins: {
+                legend: { labels: { boxWidth: 12, color: p.text } },
+                tooltip: {
+                    backgroundColor: p.tooltipBg,
+                    titleColor: p.tooltipText,
+                    bodyColor: p.tooltipText,
+                    borderColor: p.grid,
+                    borderWidth: 1,
+                },
+            },
+            scales: {
+                x: { grid: { color: p.grid }, ticks: { color: p.text } },
+                y: { beginAtZero: true, grid: { color: p.grid }, ticks: { color: p.text, callback: (v) => `${v} g` } },
+            },
         };
     }
-    new Chart(document.getElementById('executiveChart'), {
+    _registerChart(new Chart(document.getElementById('executiveChart'), {
         type: 'bar',
         data: {
             labels: statsData.labels,
@@ -785,7 +838,7 @@ function initCharts() {
                     label: '{{ t("stats_usage_dataset") }}',
                     data: statsData.usageDaily,
                     type: 'line',
-                    borderColor: '#2563eb',
+                    borderColor: window.enh && window.enh.isDark() ? '#60a5fa' : '#2563eb',
                     backgroundColor: 'rgba(37,99,235,0.18)',
                     fill: true,
                     tension: 0.3,
@@ -794,40 +847,41 @@ function initCharts() {
             ],
         },
         options: baseChartOptions(),
-    });
+    }));
     usageChartInstance = new Chart(document.getElementById('usageChart'), {
         type: 'line',
         data: {
             labels: statsData.labels,
             datasets: [
-                { label: '{{ t("stats_usage_dataset") }}', data: statsData.usageDaily, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.18)', fill: true, tension: 0.3 },
+                { label: '{{ t("stats_usage_dataset") }}', data: statsData.usageDaily, borderColor: window.enh && window.enh.isDark() ? '#60a5fa' : '#2563eb', backgroundColor: 'rgba(37,99,235,0.18)', fill: true, tension: 0.3 },
                 ...statsData.materialSeries.map(s => ({ ...s, fill: false, tension: 0.25, borderDash: [5, 4] })),
             ],
         },
         options: baseChartOptions(),
     });
+    _registerChart(usageChartInstance);
     initMaterialToggles();
-    new Chart(document.getElementById('purchaseChart'), {
+    _registerChart(new Chart(document.getElementById('purchaseChart'), {
         type: 'bar',
         data: { labels: statsData.labels, datasets: [{ label: '{{ t("stats_purchase_dataset") }}', data: statsData.purchaseDaily, backgroundColor: '#10b981', borderRadius: 8 }] },
         options: baseChartOptions(),
-    });
+    }));
     {% if top_materials %}
-    new Chart(document.getElementById('materialChart'), {
+    _registerChart(new Chart(document.getElementById('materialChart'), {
         type: 'doughnut',
         data: {
             labels: {{ top_materials|map(attribute='name')|list|tojson }},
             datasets: [{ data: {{ top_materials|map(attribute='grams')|list|tojson }}, backgroundColor: ['#2563eb','#10b981','#f59e0b','#ef4444','#8b5cf6'], borderWidth: 0 }],
         },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
-    });
+        options: { responsive: true, maintainAspectRatio: false, animation: { animateRotate: true, duration: 900 }, plugins: { legend: { position: 'bottom', labels: { color: _palette().text } } } },
+    }));
     {% endif %}
     {% if project_rows %}
-    new Chart(document.getElementById('projectChart'), {
+    _registerChart(new Chart(document.getElementById('projectChart'), {
         type: 'bar',
         data: { labels: statsData.projectLabels, datasets: [{ label: '{{ t("stats_project_dataset") }}', data: statsData.projectData, backgroundColor: '#8b5cf6', borderRadius: 8 }] },
-        options: { ...baseChartOptions(), indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: { callback: (v) => `${v} g` } }, y: { ticks: { callback: (v, i) => statsData.projectLabels[i] || v } } } },
-    });
+        options: { ...baseChartOptions(), indexAxis: 'y', scales: { x: { beginAtZero: true, grid: { color: _palette().grid }, ticks: { color: _palette().text, callback: (v) => `${v} g` } }, y: { grid: { color: _palette().grid }, ticks: { color: _palette().text, callback: (v, i) => statsData.projectLabels[i] || v } } } },
+    }));
     {% endif %}
 }
 
