@@ -1,10 +1,11 @@
 """Printer maintenance routes — service records, nozzle changes, calibration, fault history."""
+import json
 from datetime import datetime, timedelta
 
 from flask import abort, redirect, render_template, request, url_for, Response, Blueprint
 
 from database import db
-from models import BambuPrinter, BambuPrintJob, PrinterMaintenance, PrusaPrinter, PrusaPrintJob
+from models import BambuPrinter, BambuPrintJob, FilamentUndoLog, PrinterMaintenance, PrusaPrinter, PrusaPrintJob
 from utils import translate, utc_now, safe_commit
 
 
@@ -488,7 +489,63 @@ def register(app):
         if not is_admin(user):
             abort(403)
         rec = db.get_or_404(PrinterMaintenance, rec_id)
+
+        # Create undo log
+        undo_data = json.dumps({
+            'printer_type': rec.printer_type,
+            'printer_id': rec.printer_id,
+            'printer_name': rec.printer_name,
+            'maintenance_type': rec.maintenance_type,
+            'notes': rec.notes,
+            'notes_is_markdown': rec.notes_is_markdown,
+            'performed_at': rec.performed_at.isoformat() if rec.performed_at else None,
+            'next_service_at': rec.next_service_at.strftime('%Y-%m-%d') if rec.next_service_at else None,
+            'recurrence_type': rec.recurrence_type,
+            'recurrence_value': rec.recurrence_value,
+            'recurrence_enabled': rec.recurrence_enabled,
+            'predictive_enabled': rec.predictive_enabled,
+            'predictive_runtime_hours': rec.predictive_runtime_hours,
+            'predictive_jobs_count': rec.predictive_jobs_count,
+            'predictive_filament_grams': rec.predictive_filament_grams,
+            'predictive_window_days': rec.predictive_window_days,
+        })
+        db.session.add(FilamentUndoLog(
+            user_id=user.id,
+            action_type='delete_maintenance',
+            target_type='maintenance',
+            target_key=undo_data,
+            snapshot_data=None,
+            expires_at=utc_now() + timedelta(seconds=14),
+        ))
+        safe_commit()
+
         db.session.delete(rec)
         safe_commit()
         return redirect(url_for('maintenance_index'))
+
+    @bp.route('/maintenance/<int:rec_id>/data')
+    def maintenance_data(rec_id):
+        from auth import get_current_user, is_admin
+        user = get_current_user()
+        if not is_admin(user):
+            abort(403)
+        rec = db.get_or_404(PrinterMaintenance, rec_id)
+        return {
+            'printer_type': rec.printer_type,
+            'printer_id': rec.printer_id,
+            'printer_name': rec.printer_name,
+            'maintenance_type': rec.maintenance_type,
+            'notes': rec.notes or '',
+            'notes_is_markdown': rec.notes_is_markdown or False,
+            'performed_at': rec.performed_at.strftime('%Y-%m-%dT%H:%M') if rec.performed_at else '',
+            'next_service_at': rec.next_service_at.strftime('%Y-%m-%d') if rec.next_service_at else '',
+            'recurrence_type': rec.recurrence_type or 'none',
+            'recurrence_value': rec.recurrence_value or 1,
+            'recurrence_enabled': rec.recurrence_enabled or False,
+            'predictive_enabled': rec.predictive_enabled or False,
+            'predictive_runtime_hours': rec.predictive_runtime_hours or 0,
+            'predictive_jobs_count': rec.predictive_jobs_count or 0,
+            'predictive_filament_grams': rec.predictive_filament_grams or 0,
+            'predictive_window_days': rec.predictive_window_days or 30,
+        }
     app.register_blueprint(bp)

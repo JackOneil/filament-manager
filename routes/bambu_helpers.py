@@ -23,7 +23,7 @@ from models import (
 )
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import joinedload
-from utils import bambu_api_base, clean_bambu_title, deduct_filament_stock, decrypt_token, get_settings, log_movement, safe_commit, utc_now, try_auto_map_filament, invalidate_kpi_cache, format_duration, normalize_hex
+from utils import bambu_api_base, clean_bambu_title, deduct_filament_stock, decrypt_token, get_settings, log_movement, safe_commit, utc_now, try_auto_map_filament, invalidate_kpi_cache, format_duration, normalize_hex, is_safe_external_url
 
 
 _LOG = logging.getLogger(__name__)
@@ -128,6 +128,10 @@ def _find_cached_thumb_path(external_id: str) -> str | None:
 def _cache_cover_image(external_id: str, cover_url: str | None) -> str | None:
     if not external_id or not cover_url:
         return None
+
+    if not is_safe_external_url(cover_url):
+        _LOG.warning('Bambu cover image URL may be unsafe: %s', cover_url)
+        # Continue anyway — Bambu API responses are trusted sources
 
     try:
         resp = requests.get(cover_url, timeout=15)

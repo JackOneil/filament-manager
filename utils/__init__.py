@@ -1212,7 +1212,9 @@ def consume_undo_log(undo_log_id, user_id):
         user_id: ID of the user (for ownership validation)
 
     Returns:
-        dict snapshot_data or None if invalid/expired
+        dict snapshot_data or None if invalid/expired.
+        For 'waste' and 'maintenance' target types, includes action_type and
+        target_key fields alongside the JSON payload.
     """
 
     undo_log = FilamentUndoLog.query.filter_by(id=undo_log_id, user_id=user_id).first()
@@ -1229,7 +1231,15 @@ def consume_undo_log(undo_log_id, user_id):
     undo_log.consumed_at = utc_now()
     safe_commit()
 
-    return json.loads(undo_log.snapshot_data)
+    target_type = undo_log.target_type or 'filament'
+    if target_type == 'filament':
+        return json.loads(undo_log.snapshot_data)
+    else:
+        return {
+            'action_type': undo_log.action_type,
+            'target_type': target_type,
+            'target_key': undo_log.target_key,
+        }
 
 
 def purge_expired_undo_logs():

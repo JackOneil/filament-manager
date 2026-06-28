@@ -8,7 +8,7 @@
             <p class="text-gray-500 mt-1">{{ t('maintenance_desc') }}</p>
         </div>
         <div class="flex gap-3">
-            <button onclick="document.getElementById('addMaintenanceModal').classList.remove('hidden')"
+            <button onclick="maintenanceModal().openAdd()"
                     class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl shadow transition flex items-center gap-2">
                 <i class="fa-solid fa-plus"></i> {{ t('maintenance_add') }}
             </button>
@@ -146,7 +146,7 @@
                 </form>
                 {% endif %}
                 <button type="button"
-                        onclick="openEditModal({{ rec.id }})"
+                        onclick="maintenanceModal().openEdit({{ rec.id }})"
                         class="text-gray-300 hover:text-blue-500 transition" title="{{ t('maintenance_edit') }}">
                     <i class="fa-solid fa-pen-to-square"></i>
                 </button>
@@ -180,21 +180,22 @@
     {% endif %}
 </div>
 
-<!-- Add Maintenance Modal -->
-<div id="addMaintenanceModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 space-y-5">
+<!-- Unified Maintenance Modal (Add / Edit) -->
+<div id="maintModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+     x-data="window.__maintModalState">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 space-y-5 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between">
-            <h2 class="text-xl font-bold text-gray-800">{{ t('maintenance_add') }}</h2>
-            <button onclick="document.getElementById('addMaintenanceModal').classList.add('hidden')"
+            <h2 class="text-xl font-bold text-gray-800" x-text="mode === 'edit' ? editTitle : addTitle"></h2>
+            <button @click="close()"
                     class="text-gray-400 hover:text-gray-700 transition text-xl">
                 <i class="fa-solid fa-times"></i>
             </button>
         </div>
-        <form method="POST" action="{{ url_for('maintenance_add') }}" class="space-y-4">
+        <form :action="formAction" method="POST" @submit.prevent="submit" class="space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="ui-label">{{ t('maintenance_printer_type') }}</label>
-                    <select name="printer_type" id="mPrinterType" onchange="updatePrinterNames()"
+                    <select name="printer_type" x-model="form.printer_type" @change="filterPrinters()"
                             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                         <option value="bambu">{{ t('maintenance_printer_bambu') }}</option>
                         <option value="prusa">{{ t('maintenance_printer_prusa') }}</option>
@@ -202,21 +203,18 @@
                 </div>
                 <div>
                     <label class="ui-label">{{ t('maintenance_printer_name') }}</label>
-                    <select name="printer_id" id="mPrinterId" onchange="setMPrinterName()"
+                    <select name="printer_id" x-model="form.printer_id" @change="syncPrinterName()"
                             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                        {% for p in bambu_printers %}
-                        <option value="{{ p.id }}" data-type="bambu" data-name="{{ p.name }}">{{ p.name }}</option>
-                        {% endfor %}
-                        {% for p in prusa_printers %}
-                        <option value="{{ p.id }}" data-type="prusa" data-name="{{ p.name }}">{{ p.name }}</option>
-                        {% endfor %}
+                        <template x-for="p in visiblePrinters" :key="p.id">
+                            <option :value="p.id" x-text="p.name" :data-name="p.name"></option>
+                        </template>
                     </select>
-                    <input type="hidden" name="printer_name" id="mPrinterNameHidden" value="">
+                    <input type="hidden" name="printer_name" x-model="form.printer_name">
                 </div>
             </div>
             <div>
                 <label class="ui-label">{{ t('maintenance_type_label') }}</label>
-                <select name="maintenance_type" id="mMaintenanceType"
+                <select name="maintenance_type" x-model="form.maintenance_type"
                         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                     {% for mt in maintenance_types %}
                     <option value="{{ mt }}">{{ t('maintenance_type_' ~ mt) }}</option>
@@ -226,13 +224,13 @@
             <div>
                 <label class="ui-label">{{ t('maintenance_sop_template') }}</label>
                 <div class="flex gap-2">
-                    <select id="mSopTemplate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    <select x-model="sopTemplateId" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                         <option value="">{{ t('maintenance_sop_select') }}</option>
                         {% for sop in sop_templates %}
                         <option value="{{ sop.id }}">{{ sop.label }}</option>
                         {% endfor %}
                     </select>
-                    <button type="button" onclick="applySopTemplate('m')"
+                    <button type="button" @click="applySop()"
                             class="px-3 py-2 rounded-lg text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 transition">
                         {{ t('maintenance_sop_apply') }}
                     </button>
@@ -240,36 +238,36 @@
             </div>
             <div>
                 <label class="ui-label">{{ t('maintenance_notes') }}</label>
-                <textarea name="notes" id="mNotes" rows="2"
+                <textarea name="notes" x-model="form.notes" rows="2"
                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                           placeholder="{{ t('maintenance_notes_placeholder') }}"></textarea>
                 <label class="mt-2 inline-flex items-center gap-2 text-xs text-gray-600">
-                    <input type="checkbox" name="notes_is_markdown" id="mNotesMarkdown" value="1" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                    <input type="checkbox" name="notes_is_markdown" x-model="form.notes_is_markdown" value="1" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
                     <span>{{ t('maintenance_notes_markdown') }}</span>
                 </label>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label class="ui-label">{{ t('maintenance_performed_at') }}</label>
-                    <input type="datetime-local" name="performed_at" id="mPerformedAt"
+                    <input type="datetime-local" name="performed_at" x-model="form.performed_at"
                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                 </div>
                 <div>
                     <label class="ui-label">{{ t('maintenance_next_service_at') }}</label>
-                    <input type="date" name="next_service_at"
+                    <input type="date" name="next_service_at" x-model="form.next_service_at"
                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                 </div>
             </div>
             <!-- Recurrence -->
             <div class="bg-gray-50 rounded-xl p-4 space-y-3">
                 <div class="flex items-center gap-2">
-                    <input type="checkbox" name="recurrence_enabled" id="mRecurrenceEnabled" value="1"
+                    <input type="checkbox" name="recurrence_enabled" x-model="form.recurrence_enabled" value="1"
                            class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                    <label for="mRecurrenceEnabled" class="ui-label mb-0">{{ t('maintenance_recurrence_enable') }}</label>
+                    <label class="ui-label mb-0">{{ t('maintenance_recurrence_enable') }}</label>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <select name="recurrence_type" id="mRecurrenceType"
+                        <select name="recurrence_type" x-model="form.recurrence_type"
                                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                             {% for rt_val, rt_label in recurrence_types %}
                             <option value="{{ rt_val }}">{{ rt_label }}</option>
@@ -277,195 +275,48 @@
                         </select>
                     </div>
                     <div>
-                        <input type="number" name="recurrence_value" id="mRecurrenceValue" min="1" value="1"
+                        <input type="number" name="recurrence_value" x-model="form.recurrence_value" min="1"
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                     </div>
                 </div>
             </div>
             <div class="bg-sky-50 rounded-xl p-4 space-y-3">
                 <div class="flex items-center gap-2">
-                    <input type="checkbox" name="predictive_enabled" id="mPredictiveEnabled" value="1"
+                    <input type="checkbox" name="predictive_enabled" x-model="form.predictive_enabled" value="1"
                            class="w-4 h-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500">
-                    <label for="mPredictiveEnabled" class="ui-label mb-0">{{ t('maintenance_predictive_enable') }}</label>
+                    <label class="ui-label mb-0">{{ t('maintenance_predictive_enable') }}</label>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                         <label class="ui-label text-xs">{{ t('maintenance_predictive_runtime_hours') }}</label>
-                        <input type="number" step="0.1" min="0" name="predictive_runtime_hours" id="mPredictiveRuntime"
+                        <input type="number" step="0.1" min="0" name="predictive_runtime_hours" x-model="form.predictive_runtime_hours"
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
                     </div>
                     <div>
                         <label class="ui-label text-xs">{{ t('maintenance_predictive_jobs_count') }}</label>
-                        <input type="number" min="0" name="predictive_jobs_count" id="mPredictiveJobs"
+                        <input type="number" min="0" name="predictive_jobs_count" x-model="form.predictive_jobs_count"
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
                     </div>
                     <div>
                         <label class="ui-label text-xs">{{ t('maintenance_predictive_filament_grams') }}</label>
-                        <input type="number" step="1" min="0" name="predictive_filament_grams" id="mPredictiveGrams"
+                        <input type="number" step="1" min="0" name="predictive_filament_grams" x-model="form.predictive_filament_grams"
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
                     </div>
                     <div>
                         <label class="ui-label text-xs">{{ t('maintenance_predictive_window_days') }}</label>
-                        <input type="number" min="1" max="365" name="predictive_window_days" id="mPredictiveWindow" value="30"
+                        <input type="number" min="1" max="365" name="predictive_window_days" x-model="form.predictive_window_days"
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
                     </div>
                 </div>
             </div>
             <div class="flex justify-end gap-3 pt-2">
-                <button type="button"
-                        onclick="document.getElementById('addMaintenanceModal').classList.add('hidden')"
+                <button type="button" @click="close()"
                         class="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
                     {{ t('cancel') }}
                 </button>
                 <button type="submit"
                         class="px-5 py-2 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow transition">
-                    <i class="fa-solid fa-save mr-1"></i>{{ t('save') }}
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Edit Maintenance Modal -->
-<div id="editMaintenanceModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 space-y-5">
-        <div class="flex items-center justify-between">
-            <h2 class="text-xl font-bold text-gray-800">{{ t('maintenance_edit_title') }}</h2>
-            <button onclick="document.getElementById('editMaintenanceModal').classList.add('hidden')"
-                    class="text-gray-400 hover:text-gray-700 transition text-xl">
-                <i class="fa-solid fa-times"></i>
-            </button>
-        </div>
-        <form method="POST" id="editMaintenanceForm" class="space-y-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="ui-label">{{ t('maintenance_printer_type') }}</label>
-                    <select name="printer_type" id="ePrinterType" onchange="eUpdatePrinterNames()"
-                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                        <option value="bambu">{{ t('maintenance_printer_bambu') }}</option>
-                        <option value="prusa">{{ t('maintenance_printer_prusa') }}</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="ui-label">{{ t('maintenance_printer_name') }}</label>
-                    <select name="printer_id" id="ePrinterId" onchange="eSetPrinterName()"
-                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                        {% for p in bambu_printers %}
-                        <option value="{{ p.id }}" data-type="bambu" data-name="{{ p.name }}">{{ p.name }}</option>
-                        {% endfor %}
-                        {% for p in prusa_printers %}
-                        <option value="{{ p.id }}" data-type="prusa" data-name="{{ p.name }}">{{ p.name }}</option>
-                        {% endfor %}
-                    </select>
-                    <input type="hidden" name="printer_name" id="ePrinterNameHidden" value="">
-                </div>
-            </div>
-            <div>
-                <label class="ui-label">{{ t('maintenance_type_label') }}</label>
-                <select name="maintenance_type" id="eMaintenanceType"
-                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                    {% for mt in maintenance_types %}
-                    <option value="{{ mt }}">{{ t('maintenance_type_' ~ mt) }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label class="ui-label">{{ t('maintenance_sop_template') }}</label>
-                <div class="flex gap-2">
-                    <select id="eSopTemplate" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                        <option value="">{{ t('maintenance_sop_select') }}</option>
-                        {% for sop in sop_templates %}
-                        <option value="{{ sop.id }}">{{ sop.label }}</option>
-                        {% endfor %}
-                    </select>
-                    <button type="button" onclick="applySopTemplate('e')"
-                            class="px-3 py-2 rounded-lg text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 transition">
-                        {{ t('maintenance_sop_apply') }}
-                    </button>
-                </div>
-            </div>
-            <div>
-                <label class="ui-label">{{ t('maintenance_notes') }}</label>
-                <textarea name="notes" id="eNotes" rows="2"
-                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                          placeholder="{{ t('maintenance_notes_placeholder') }}"></textarea>
-                <label class="mt-2 inline-flex items-center gap-2 text-xs text-gray-600">
-                    <input type="checkbox" name="notes_is_markdown" id="eNotesMarkdown" value="1" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                    <span>{{ t('maintenance_notes_markdown') }}</span>
-                </label>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="ui-label">{{ t('maintenance_performed_at') }}</label>
-                    <input type="datetime-local" name="performed_at" id="ePerformedAt"
-                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                </div>
-                <div>
-                    <label class="ui-label">{{ t('maintenance_next_service_at') }}</label>
-                    <input type="date" name="next_service_at" id="eNextServiceAt"
-                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                </div>
-            </div>
-            <!-- Recurrence -->
-            <div class="bg-gray-50 rounded-xl p-4 space-y-3">
-                <div class="flex items-center gap-2">
-                    <input type="checkbox" name="recurrence_enabled" id="eRecurrenceEnabled" value="1"
-                           class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                    <label for="eRecurrenceEnabled" class="ui-label mb-0">{{ t('maintenance_recurrence_enable') }}</label>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <select name="recurrence_type" id="eRecurrenceType"
-                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                            {% for rt_val, rt_label in recurrence_types %}
-                            <option value="{{ rt_val }}">{{ rt_label }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div>
-                        <input type="number" name="recurrence_value" id="eRecurrenceValue" min="1" value="1"
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                    </div>
-                </div>
-            </div>
-            <div class="bg-sky-50 rounded-xl p-4 space-y-3">
-                <div class="flex items-center gap-2">
-                    <input type="checkbox" name="predictive_enabled" id="ePredictiveEnabled" value="1"
-                           class="w-4 h-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500">
-                    <label for="ePredictiveEnabled" class="ui-label mb-0">{{ t('maintenance_predictive_enable') }}</label>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                        <label class="ui-label text-xs">{{ t('maintenance_predictive_runtime_hours') }}</label>
-                        <input type="number" step="0.1" min="0" name="predictive_runtime_hours" id="ePredictiveRuntime"
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
-                    </div>
-                    <div>
-                        <label class="ui-label text-xs">{{ t('maintenance_predictive_jobs_count') }}</label>
-                        <input type="number" min="0" name="predictive_jobs_count" id="ePredictiveJobs"
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
-                    </div>
-                    <div>
-                        <label class="ui-label text-xs">{{ t('maintenance_predictive_filament_grams') }}</label>
-                        <input type="number" step="1" min="0" name="predictive_filament_grams" id="ePredictiveGrams"
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
-                    </div>
-                    <div>
-                        <label class="ui-label text-xs">{{ t('maintenance_predictive_window_days') }}</label>
-                        <input type="number" min="1" max="365" name="predictive_window_days" id="ePredictiveWindow"
-                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
-                    </div>
-                </div>
-            </div>
-            <div class="flex justify-end gap-3 pt-2">
-                <button type="button"
-                        onclick="document.getElementById('editMaintenanceModal').classList.add('hidden')"
-                        class="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition">
-                    {{ t('cancel') }}
-                </button>
-                <button type="submit"
-                        class="px-5 py-2 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow transition">
-                    <i class="fa-solid fa-save mr-1"></i>{{ t('maintenance_edit_save') }}
+                    <i class="fa-solid fa-save mr-1"></i><span x-text="mode === 'edit' ? editSaveLabel : saveLabel"></span>
                 </button>
             </div>
         </form>
@@ -473,149 +324,186 @@
 </div>
 
 <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
-const bambuPrinters = {{ bambu_printers | map(attribute='name') | list | tojson }};
-const prusaPrinters = {{ prusa_printers | map(attribute='name') | list | tojson }};
-const maintenanceSopTemplates = {{ sop_templates | tojson }};
+window._maintBambuPrinters = [{% for p in bambu_printers %}{id: {{ p.id }}, name: {{ p.name | tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];
+window._maintPrusaPrinters = [{% for p in prusa_printers %}{id: {{ p.id }}, name: {{ p.name | tojson }}}{% if not loop.last %},{% endif %}{% endfor %}];
+window._maintSopTemplates = {{ sop_templates | tojson }};
+window._maintAddUrl = {{ url_for('maintenance_add')|tojson }};
+window._maintEditUrlPrefix = {{ url_for('maintenance_edit', rec_id=0)|tojson }};
+window._maintDataUrlPrefix = {{ url_for('maintenance_data', rec_id=0)|tojson }};
 
-const maintenanceRecords = {
-{% for item in records %}{% set rec = item.rec %}
-    {{ rec.id }}: {
-        printer_type: {{ rec.printer_type | tojson }},
-        printer_id: {{ rec.printer_id | tojson }},
-        printer_name: {{ rec.printer_name | tojson }},
-        maintenance_type: {{ rec.maintenance_type | tojson }},
-        notes: {{ rec.notes | tojson }},
-        notes_is_markdown: {{ rec.notes_is_markdown | tojson }},
-        performed_at: {{ (rec.performed_at.strftime('%Y-%m-%dT%H:%M') if rec.performed_at else '') | tojson }},
-        next_service_at: {{ (rec.next_service_at.strftime('%Y-%m-%d') if rec.next_service_at else '') | tojson }},
-        recurrence_type: {{ rec.recurrence_type | tojson }},
-        recurrence_value: {{ rec.recurrence_value | tojson }},
-        recurrence_enabled: {{ rec.recurrence_enabled | tojson }},
-        predictive_enabled: {{ rec.predictive_enabled | tojson }},
-        predictive_runtime_hours: {{ rec.predictive_runtime_hours | tojson }},
-        predictive_jobs_count: {{ rec.predictive_jobs_count | tojson }},
-        predictive_filament_grams: {{ rec.predictive_filament_grams | tojson }},
-        predictive_window_days: {{ rec.predictive_window_days | tojson }}
-    }{% if not loop.last %},{% endif %}
-{% endfor %}
+// Inert default state so Alpine directives on the modal don't crash before
+// the user opens it for the first time.
+window.__maintModalState = {
+    mode: 'add',
+    recId: null,
+    editTitle: {{ t('maintenance_edit_title')|tojson }},
+    addTitle: {{ t('maintenance_add')|tojson }},
+    editSaveLabel: {{ t('maintenance_edit_save')|tojson }},
+    saveLabel: {{ t('save')|tojson }},
+    formAction: window._maintAddUrl,
+    form: {
+        printer_type: 'bambu',
+        printer_id: null,
+        printer_name: '',
+        maintenance_type: 'other',
+        notes: '',
+        notes_is_markdown: false,
+        performed_at: '',
+        next_service_at: '',
+        recurrence_enabled: false,
+        recurrence_type: 'none',
+        recurrence_value: 1,
+        predictive_enabled: false,
+        predictive_runtime_hours: 0,
+        predictive_jobs_count: 0,
+        predictive_filament_grams: 0,
+        predictive_window_days: 30,
+    },
+    sopTemplateId: '',
+    loading: false,
+    get visiblePrinters() {
+        var type = this.form.printer_type;
+        var all = [];
+        window._maintBambuPrinters.forEach(function(p) { all.push({ id: p.id, name: p.name, type: 'bambu' }); });
+        window._maintPrusaPrinters.forEach(function(p) { all.push({ id: p.id, name: p.name, type: 'prusa' }); });
+        return all.filter(function(p) { return p.type === type; });
+    },
+    filterPrinters: function() { /* replaced when opened */ },
+    syncPrinterName: function() { /* replaced when opened */ },
+    applySop: function() { /* replaced when opened */ },
+    openAdd: function() { window.maintenanceModal().openAdd(); },
+    openEdit: function(id) { window.maintenanceModal().openEdit(id); },
+    close: function() { document.getElementById('maintModal').classList.add('hidden'); },
+    submit: function() { /* replaced when opened */ },
 };
 
-function renderMaintenanceMarkdown() {
-    if (typeof markdownEditor !== 'function') return;
-    const parser = markdownEditor({ defaultMode: 'markdown' });
-    document.querySelectorAll('.js-maint-note[data-is-markdown="1"]').forEach((el) => {
-        const raw = el.getAttribute('data-note') || '';
-        try {
-            const markdown = JSON.parse(raw);
-            el.innerHTML = parser.markdownToHtml(markdown || '');
-        } catch (e) {
-            el.textContent = raw;
+window.maintenanceModal = function() {
+    if (window.__maintModalInstance) return window.__maintModalInstance;
+    var st = window.__maintModalState;
+    var modal = document.getElementById('maintModal');
+
+    var printers = [];
+    window._maintBambuPrinters.forEach(function(p) { printers.push({ id: p.id, name: p.name, type: 'bambu' }); });
+    window._maintPrusaPrinters.forEach(function(p) { printers.push({ id: p.id, name: p.name, type: 'prusa' }); });
+
+    function blankForm() {
+        var now = new Date();
+        var local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        return {
+            printer_type: 'bambu',
+            printer_id: printers.length > 0 ? printers[0].id : null,
+            printer_name: printers.length > 0 ? printers[0].name : '',
+            maintenance_type: 'other',
+            notes: '',
+            notes_is_markdown: false,
+            performed_at: local,
+            next_service_at: '',
+            recurrence_enabled: false,
+            recurrence_type: 'none',
+            recurrence_value: 1,
+            predictive_enabled: false,
+            predictive_runtime_hours: 0,
+            predictive_jobs_count: 0,
+            predictive_filament_grams: 0,
+            predictive_window_days: 30
+        };
+    }
+
+    // Override the inert methods with real implementations
+    st.filterPrinters = function() {
+        var visible = st.visiblePrinters;
+        if (visible.length > 0) {
+            st.form.printer_id = visible[0].id;
+            st.form.printer_name = visible[0].name;
         }
-    });
-}
+    };
 
-function applySopTemplate(prefix) {
-    const select = document.getElementById(prefix + 'SopTemplate');
-    if (!select || !select.value) return;
-    const template = maintenanceSopTemplates.find((item) => item.id === select.value);
-    if (!template) return;
+    st.syncPrinterName = function() {
+        var sel = modal.querySelector('select[name="printer_id"]');
+        if (!sel) return;
+        var opt = sel.options[sel.selectedIndex];
+        if (opt) st.form.printer_name = opt.getAttribute('data-name') || opt.textContent;
+    };
 
-    const notesEl = document.getElementById(prefix + 'Notes');
-    if (notesEl && !notesEl.value.trim()) {
-        notesEl.value = template.notes || '';
-    }
-    const notesMarkdownEl = document.getElementById(prefix + 'NotesMarkdown');
-    if (notesMarkdownEl) {
-        notesMarkdownEl.checked = true;
-    }
-    const typeEl = document.getElementById(prefix + 'MaintenanceType');
-    if (typeEl && template.maintenance_type) {
-        typeEl.value = template.maintenance_type;
-    }
-}
+    st.applySop = function() {
+        if (!st.sopTemplateId) return;
+        var tpl = window._maintSopTemplates.find(function(item) { return item.id === st.sopTemplateId; });
+        if (!tpl) return;
+        if (!st.form.notes.trim()) st.form.notes = tpl.notes || '';
+        st.form.notes_is_markdown = true;
+        if (tpl.maintenance_type) st.form.maintenance_type = tpl.maintenance_type;
+    };
 
-function updatePrinterNames() {
-    const type = document.getElementById('mPrinterType').value;
-    const sel = document.getElementById('mPrinterId');
-    const options = sel.querySelectorAll('option');
-    options.forEach(opt => {
-        opt.style.display = opt.dataset.type === type ? '' : 'none';
-    });
-    // Select first visible
-    const visible = [...options].filter(o => o.dataset.type === type);
-    if (visible.length) visible[0].selected = true;
-    setMPrinterName();
-}
+    st.openAdd = function() {
+        st.mode = 'add';
+        st.recId = null;
+        st.formAction = window._maintAddUrl;
+        Object.assign(st.form, blankForm());
+        st.sopTemplateId = '';
+        modal.classList.remove('hidden');
+    };
 
-function setMPrinterName() {
-    const sel = document.getElementById('mPrinterId');
-    const selected = sel.options[sel.selectedIndex];
-    document.getElementById('mPrinterNameHidden').value = selected ? (selected.dataset.name || '') : '';
-}
+    st.openEdit = function(id) {
+        st.mode = 'edit';
+        st.recId = id;
+        st.loading = true;
+        modal.classList.remove('hidden');
+        fetch(window._maintDataUrlPrefix.replace('/0/','/' + id + '/'))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                st.form.printer_type = data.printer_type || 'bambu';
+                st.form.printer_id = data.printer_id;
+                st.form.printer_name = data.printer_name || '';
+                st.form.maintenance_type = data.maintenance_type || 'other';
+                st.form.notes = data.notes || '';
+                st.form.notes_is_markdown = data.notes_is_markdown || false;
+                st.form.performed_at = data.performed_at || '';
+                st.form.next_service_at = data.next_service_at || '';
+                st.form.recurrence_type = data.recurrence_type || 'none';
+                st.form.recurrence_value = data.recurrence_value || 1;
+                st.form.recurrence_enabled = data.recurrence_enabled || false;
+                st.form.predictive_enabled = data.predictive_enabled || false;
+                st.form.predictive_runtime_hours = data.predictive_runtime_hours || 0;
+                st.form.predictive_jobs_count = data.predictive_jobs_count || 0;
+                st.form.predictive_filament_grams = data.predictive_filament_grams || 0;
+                st.form.predictive_window_days = data.predictive_window_days || 30;
+                st.formAction = window._maintEditUrlPrefix.replace('/0/','/' + id + '/');
+                st.sopTemplateId = '';
+                st.loading = false;
+            })
+            .catch(function() {
+                st.loading = false;
+                modal.classList.add('hidden');
+                if (window.showToast) window.showToast('maintenance_load_error', 'error');
+            });
+    };
 
-// ── Edit modal helpers ──
-function openEditModal(id) {
-    const rec = maintenanceRecords[id];
-    if (!rec) return;
+    st.close = function() {
+        modal.classList.add('hidden');
+    };
 
-    const form = document.getElementById('editMaintenanceForm');
-    form.action = '{{ url_for("maintenance_edit", rec_id=99999) }}'.replace('99999', id);
+    st.submit = function(e) {
+        var fd = new FormData();
+        for (var k in st.form) fd.append(k, st.form[k]);
+        if (st.form.notes_is_markdown) fd.set('notes_is_markdown', '1');
+        st.loading = true;
+        fetch(st.formAction, { method: 'POST', body: fd })
+            .then(function(r) {
+                if (r.redirected) { window.location.href = r.url; }
+                else { window.location.reload(); }
+            })
+            .catch(function() {
+                st.loading = false;
+                if (window.showToast) window.showToast('maintenance_save_error', 'error');
+            });
+    };
 
-    document.getElementById('ePrinterType').value = rec.printer_type;
-    document.getElementById('eMaintenanceType').value = rec.maintenance_type;
-    document.getElementById('eNotes').value = rec.notes || '';
-    document.getElementById('eNotesMarkdown').checked = rec.notes_is_markdown || false;
-    document.getElementById('ePerformedAt').value = rec.performed_at || '';
-    document.getElementById('eNextServiceAt').value = rec.next_service_at || '';
-    document.getElementById('eRecurrenceType').value = rec.recurrence_type || 'none';
-    document.getElementById('eRecurrenceValue').value = rec.recurrence_value || 1;
-    document.getElementById('eRecurrenceEnabled').checked = rec.recurrence_enabled || false;
-    document.getElementById('ePredictiveEnabled').checked = rec.predictive_enabled || false;
-    document.getElementById('ePredictiveRuntime').value = rec.predictive_runtime_hours || '';
-    document.getElementById('ePredictiveJobs').value = rec.predictive_jobs_count || '';
-    document.getElementById('ePredictiveGrams').value = rec.predictive_filament_grams || '';
-    document.getElementById('ePredictiveWindow').value = rec.predictive_window_days || 30;
+    window.__maintModalInstance = st;
+    return st;
+};
 
-    eUpdatePrinterNames();
-    if (rec.printer_id) {
-        const sel = document.getElementById('ePrinterId');
-        for (let i = 0; i < sel.options.length; i++) {
-            if (sel.options[i].value === String(rec.printer_id) && sel.options[i].dataset.type === rec.printer_type) {
-                sel.selectedIndex = i;
-                break;
-            }
-        }
-    }
-    document.getElementById('ePrinterNameHidden').value = rec.printer_name;
-    document.getElementById('editMaintenanceModal').classList.remove('hidden');
-}
-
-function eUpdatePrinterNames() {
-    const type = document.getElementById('ePrinterType').value;
-    const sel = document.getElementById('ePrinterId');
-    const options = sel.querySelectorAll('option');
-    options.forEach(opt => {
-        opt.style.display = opt.dataset.type === type ? '' : 'none';
-    });
-    const visible = [...options].filter(o => o.dataset.type === type);
-    if (visible.length) visible[0].selected = true;
-    eSetPrinterName();
-}
-
-function eSetPrinterName() {
-    const sel = document.getElementById('ePrinterId');
-    const selected = sel.options[sel.selectedIndex];
-    document.getElementById('ePrinterNameHidden').value = selected ? (selected.dataset.name || '') : '';
-}
-
-// Set default datetime to now
 document.addEventListener('DOMContentLoaded', function() {
-    const now = new Date();
-    const local = now.toISOString().slice(0, 16);
-    document.getElementById('mPerformedAt').value = local;
-    updatePrinterNames();
-    setMPrinterName();
-    renderMaintenanceMarkdown();
+    // Markdown notes rendered server-side, no extra client init needed
 });
 </script>
 {% endblock %}

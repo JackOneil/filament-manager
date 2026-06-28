@@ -303,7 +303,7 @@ class Project(db.Model):
     client_name = db.Column(db.String(100), nullable=True)
     client_email = db.Column(db.String(255), nullable=True)
     client_phone = db.Column(db.String(50), nullable=True)
-    estimated_print_time = db.Column(db.Integer, default=0) # in minutes
+    estimated_print_time = db.Column(db.Integer, nullable=False, default=0) # in minutes
     status = db.Column(db.String(20), default='NEW', index=True) # PENDING_APPROVAL, APPROVED, REJECTED, PRINTING, DONE
     priority = db.Column(db.String(10), nullable=False, default='medium')  # low, medium, high, urgent
     tag_text = db.Column(db.Text, nullable=True)
@@ -518,7 +518,7 @@ class BambuPrinter(db.Model):
     name = db.Column(db.String(200), nullable=False)
     printer_model = db.Column(db.String(50), nullable=True)
     notes = db.Column(db.Text, nullable=True)
-    pre_job_time_minutes = db.Column(db.Integer, default=0)  # calibration/warmup time before print
+    pre_job_time_minutes = db.Column(db.Integer, nullable=False, default=0)  # calibration/warmup time before print
     power_draw_watts = db.Column(db.Integer, nullable=True)
     created_at = db.Column(UtcDateTime, default=_utc_now)
 
@@ -670,17 +670,24 @@ class WasteFile(db.Model):
 
 
 class FilamentUndoLog(db.Model):
-    """Database-backed undo log for filament operations.
+    """Database-backed undo log for filament, waste, and maintenance operations.
 
     Persists undo snapshots in the database instead of in-memory cache,
     providing durability across restarts and better audit trail.
+
+    Supports multiple target types via target_type + target_key columns:
+    - 'filament': uses filament_id FK (existing behavior)
+    - 'waste': uses target_key (JSON serialized waste record data)
+    - 'maintenance': uses target_key (JSON serialized maintenance record data)
     """
     id = db.Column(db.Integer, primary_key=True)
     created_at = db.Column(UtcDateTime, default=_utc_now, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False, index=True)
-    action_type = db.Column(db.String(50), nullable=False)  # delete_filament, bulk_delete, remove_spool
+    action_type = db.Column(db.String(50), nullable=False)  # delete_filament, bulk_delete, remove_spool, delete_waste, delete_maintenance
     filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='CASCADE'), nullable=True, index=True)
-    snapshot_data = db.Column(db.Text, nullable=False)  # JSON of filament state and relations
+    snapshot_data = db.Column(db.Text, nullable=True)  # JSON of filament state and relations (for filament targets)
+    target_type = db.Column(db.String(20), nullable=True, default='filament', index=True)  # 'filament', 'waste', 'maintenance'
+    target_key = db.Column(db.Text, nullable=True)  # JSON payload for non-filament targets (waste/maintenance restore data)
     expires_at = db.Column(UtcDateTime, nullable=False, index=True)
     is_consumed = db.Column(db.Boolean, nullable=False, default=False)
     consumed_at = db.Column(UtcDateTime, nullable=True)
@@ -689,4 +696,4 @@ class FilamentUndoLog(db.Model):
     filament = db.relationship('Filament', backref=db.backref('undo_logs', lazy=True))
 
     def __repr__(self):
-        return f'<FilamentUndoLog {self.id} action={self.action_type!r} user={self.user_id} consumed={self.is_consumed}>'
+        return f'<FilamentUndoLog {self.id} action={self.action_type!r} target={self.target_type} user={self.user_id} consumed={self.is_consumed}>'

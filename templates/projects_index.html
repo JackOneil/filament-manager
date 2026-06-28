@@ -53,10 +53,9 @@
 
     <!-- Widget visibility / colour panel (shown in edit mode) -->
     <style>
-    /* On screens narrower than xl (1280px), force every widget to span the full
-       grid width regardless of any col-span-* classes applied by the layout editor
-       or saved in localStorage. */
-    @media (max-width: 1279px) {
+    /* On mobile (< 768px), force every widget to span the full grid width.
+       Tablet (768-1279px) uses the 2-column md: grid layout defined on the container. */
+    @media (max-width: 767px) {
         #projects-layout > .dashboard-widget {
             grid-column: 1 / -1 !important;
         }
@@ -83,9 +82,9 @@
         </style>
         <div id="projects-loading-overlay" class="hidden absolute inset-0 z-20 pointer-events-none">
             <div class="absolute inset-0 rounded-2xl bg-white/65 dark:bg-slate-900/55 backdrop-blur-[1px]"></div>
-            <div class="relative p-4 md:p-5 grid grid-cols-1 xl:grid-cols-4 gap-4 md:gap-6">
-                <div class="xl:col-span-4 h-12 rounded-xl bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
-                <div class="xl:col-span-4 h-11 rounded-xl bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+            <div class="relative p-4 md:p-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6">
+                <div class="md:col-span-2 xl:col-span-4 h-12 rounded-xl bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
+                <div class="md:col-span-2 xl:col-span-4 h-11 rounded-xl bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
                 <div class="h-44 rounded-2xl bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
                 <div class="h-44 rounded-2xl bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
                 <div class="h-44 rounded-2xl bg-gray-200/70 dark:bg-slate-700/60 ui-skeleton"></div>
@@ -118,6 +117,7 @@ window.initProjectsLayout = function() {
         showBtnTitle: {{ t('dashboard_show_widget')|tojson }},
         limitAllText: {{ t('stats_limit_all')|tojson }},
         limitSelectTitle: {{ t('dashboard_rows')|tojson }},
+        mdGridCols: 2,
         defaultOrder: ['due_calendar', 'status_new', 'status_printing', 'status_done', 'project_table'],
     });
 };

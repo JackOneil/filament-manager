@@ -174,7 +174,7 @@
             id: 'projects',
             icon: 'fa-folder-open',
             hasTour: true,
-            endpoints: ['projects_index', 'project_create', 'project_detail', 'project_edit', 'project_delete', 'project_upload_file', 'project_download_file', 'project_view_file', 'project_image_file', 'project_delete_file', 'project_add_link', 'project_delete_link', 'project_refresh_link', 'project_add_comment', 'project_update_comment', 'project_delete_comment', 'project_toggle_comment_checkbox', 'project_toggle_description_checkbox', 'project_add_filament', 'project_remove_filament', 'project_update_filament', 'project_consume_filament', 'project_status', 'project_advance_status', 'project_clone', 'project_generate_share_token', 'project_revoke_share_token', 'project_share', 'project_templates_index', 'project_template_save', 'project_template_delete', 'project_create_from_template', 'project_comment_react', 'project_add_todo', 'project_toggle_todo', 'project_delete_todo', 'project_edit_todo', 'project_add_print_item', 'project_edit_print_item', 'project_delete_print_item', 'project_increment_print_item', 'project_decrement_print_item', 'project_share_download_file', 'project_share_view_file', 'project_share_image_file', 'project_undo'],
+            endpoints: ['projects_index', 'project_create', 'project_detail', 'project_edit', 'project_delete', 'project_upload_file', 'project_download_file', 'project_view_file', 'project_image_file', 'project_delete_file', 'project_add_link', 'project_delete_link', 'project_refresh_link', 'project_add_comment', 'project_update_comment', 'project_delete_comment', 'project_toggle_comment_checkbox', 'project_toggle_description_checkbox', 'project_add_filament', 'project_remove_filament', 'project_update_filament', 'project_consume_filament', 'project_status', 'project_advance_status', 'project_clone', 'project_generate_share_token', 'project_revoke_share_token', 'project_share', 'project_templates_index', 'project_template_save', 'project_template_delete', 'project_create_from_template', 'project_template_data', 'project_comment_react', 'project_add_todo', 'project_toggle_todo', 'project_delete_todo', 'project_edit_todo', 'project_add_print_item', 'project_edit_print_item', 'project_delete_print_item', 'project_increment_print_item', 'project_decrement_print_item', 'project_share_download_file', 'project_share_view_file', 'project_share_image_file', 'project_undo'],
             title: { cs: 'Projekty', en: 'Projects' },
             tips: [
                 {
@@ -596,7 +596,7 @@
             id: 'maintenance',
             icon: 'fa-wrench',
             hasTour: true,
-            endpoints: ['maintenance_index', 'maintenance_add', 'maintenance_edit', 'maintenance_delete', 'maintenance_ics', 'maintenance_duplicate', 'maintenance_schedule_30', 'maintenance_resolve_fault'],
+            endpoints: ['maintenance_index', 'maintenance_add', 'maintenance_edit', 'maintenance_delete', 'maintenance_ics', 'maintenance_duplicate', 'maintenance_schedule_30', 'maintenance_resolve_fault', 'maintenance_data'],
             title: { cs: 'Údržba', en: 'Maintenance' },
             tips: [
                 {
@@ -626,7 +626,7 @@
             id: 'waste',
             icon: 'fa-triangle-exclamation',
             hasTour: true,
-            endpoints: ['waste_index', 'waste_add', 'waste_edit', 'waste_delete', 'waste_upload_file', 'waste_serve_file', 'waste_download_file', 'waste_delete_file'],
+            endpoints: ['waste_index', 'waste_add', 'waste_edit', 'waste_delete', 'waste_upload_file', 'waste_serve_file', 'waste_download_file', 'waste_delete_file', 'waste_records_partial', 'waste_add_ajax', 'waste_edit_ajax', 'waste_delete_ajax', 'waste_data_ajax', 'waste_upload_ajax', 'waste_delete_file_ajax'],
             title: { cs: 'Zmetky a odpady', en: 'Waste & Scrap' },
             tips: [
                 {

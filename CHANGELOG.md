@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.119.3] - 2026-06-28
+### Fixed
+- **PostgreSQL `DATETIME` → `TIMESTAMP` compatibility (BUG-596)**: 11 `_safe_alter()` migration calls used `DATETIME` type which PostgreSQL rejects (requires `TIMESTAMP`). All changed to `TIMESTAMP` for cross-engine compatibility. (migrations.py)
+- **SSRF guard for Bambu cover image fetch (BUG-597)**: `_cache_cover_image()` in `bambu_helpers.py` fetched external URLs from Bambu API responses without `is_safe_external_url()` validation. Added SSRF check with warning logging. (routes/bambu_helpers.py)
+- **IDOR bypass for project-less files (BUG-598)**: `_check_file_access()` in `routes/models.py` skipped all authorization for files with `project_id IS NULL`. Now requires admin access for orphaned files. (routes/models.py)
+- **N+1 backup export (BUG-599)**: Project export in `backup_helpers.py` triggered 7 lazy-load queries per project (files, links, filaments, quotes, comments, todos, print_items). Added `joinedload()` eager loading. (routes/backup_helpers.py)
+- **Notification polling `setInterval` leak**: `notificationBell()` component in `app-shell.js` never cleared its polling interval on component destruction. Added `destroy()` lifecycle method with `clearInterval()`. (static/js/app-shell.js)
+- **Silent invalid date filter errors in Bambu page**: 4 `except (ValueError, OverflowError): pass` blocks swallowed invalid date inputs with zero user feedback. Added `flash()` warnings via new `bambu_invalid_date_filter` i18n key. (routes/bambu.py, messages.py)
+- **Unused imports removed**: `secrets`, `threading` (routes/inventory.py), `mimetypes` (routes/bambu.py), `threading` (routes/projects.py). (routes/inventory.py, routes/bambu.py, routes/projects.py)
+- **CSP nonce missing on `inventory.js` script tag** in `index.html`. Added nonce injection. (templates/index.html)
+- **Hardcoded/missing `aria-label` attributes**: Replaced hardcoded `aria-label="Close"` with `{{ t("close") }}` in `bambu.html`, added missing `aria-label` to `&times;` close buttons in `bambu.html` and `prusa.html`. (templates/bambu.html, templates/prusa.html)
+- **`nullable=False` added to nullable default=0 columns**: `Project.estimated_print_time` and `BambuPrinter.pre_job_time_minutes` now have `nullable=False`. (models.py)
+- **Heatmap labels HTML-escaped** in `enhancements.js` to prevent potential XSS via label data. (static/js/enhancements.js)
+- **Model edit clears `project_id` on empty form**: `model_edit` was setting `root_file.project_id = None` when the form field was omitted, disassociating the file from its project. Now only updates when explicitly provided. (routes/models.py)
+- **`.env` added to `.dockerignore`** along with `node_modules/` and `*.log`. (BUG-560, .dockerignore)
+
+## [1.119.2] - 2026-06-28
+### Fixed
+- **Backup export/import missing critical fields (BUG-594)**: Comprehensive audit revealed 7 fields missing from the backup/restore cycle:
+  - `FilamentUndoLog.target_type` and `target_key` (🔴 critical) — undo metadata for waste/maintenance operations was lost, breaking undo after restore. (routes/backup_helpers.py, routes/backup.py)
+  - `Project.share_token` (🔴 critical) — share links were lost on restore, requiring manual re-generation. (routes/backup_helpers.py, routes/backup.py)
+  - `User.last_login_at` (🟠 medium) — last login timestamps lost after restore. (routes/backup_helpers.py, routes/backup.py)
+  - `AppSetting.link_preview_reader_enabled` (🟠 medium) — Jina AI reader opt-in lost after restore. (routes/backup_helpers.py, routes/backup.py)
+  - `BambuPrintJob.raw_payload` and `PrusaPrintJob.raw_payload` (🟠 medium) — raw API payload data lost after restore. (routes/backup_helpers.py, routes/backup.py)
+- **Heatmap legend showing unresolved placeholders (BUG-595)**: The `{{T:less}}` and `{{T:more}}` placeholders in the consumption heatmap legend were never resolved to translated text (`méně`/`více` or `less`/`more`) because the translation replacement ran before `initHeatmaps()` created the legend DOM elements. Fixed by using the i18n helper directly in `initHeatmaps()`. (static/js/enhancements.js)
+- **Duplicate `material` key in translations**: The `material` i18n key was defined twice in both `cs` and `en` dictionaries. Removed the duplicate from the "Generic single-word labels" section. (messages.py)
+
+## [1.119.1] - 2026-06-28
+### Fixed
+- **403 Forbidden on waste page AJAX endpoints (BUG-593)**: The waste page filters, modal add/edit/delete, data fetch, and photo upload AJAX endpoints (`waste_records_partial`, `waste_add_ajax`, `waste_edit_ajax`, `waste_delete_ajax`, `waste_data_ajax`, `waste_upload_ajax`, `waste_delete_file_ajax`) were not registered in `SECTION_BY_ENDPOINT` in `auth.py`, causing the default-deny security policy to reject all AJAX requests with HTTP 403. This broke the waste page filter pills, the "Zapsat zmetek" button modal submission, and inline edit/delete actions. (auth.py, routes/waste.py)
+- **Unmapped AJAX endpoints for maintenance and project templates**: `maintenance_data` and `project_template_data` AJAX endpoints were also missing from `SECTION_BY_ENDPOINT`, causing 403 errors when accessing maintenance record data or project template data via JavaScript. Added to `SECTION_PRINTERS` and `SECTION_PROJECTS` respectively. (auth.py)
+
 ## [1.119.0] - 2026-06-27
 ### Added
 - **Dark-mode Chart.js theming**: New `window.enh` API in `static/js/enhancements.js` registers every Chart.js instance and re-themes it automatically when the user toggles dark mode. Chart axes, grid, legend and tooltip colours now adapt to the theme without a page reload. (static/js/enhancements.js, templates/stats.html, static/css/enhancements.css)

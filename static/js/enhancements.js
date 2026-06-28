@@ -226,7 +226,7 @@
             }
             // body rows
             for (let d = 0; d < matrix.length; d++) {
-                html += '<div class="enh-heatmap-label">' + (labels[d] || '') + '</div>';
+                html += '<div class="enh-heatmap-label">' + (labels[d] ? labels[d].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : '') + '</div>';
                 for (let h = 0; h < 24; h++) {
                     const v = matrix[d][h] || 0;
                     const pct = v / flatMax;
@@ -239,7 +239,8 @@
                 }
             }
             html += '</div>';
-            html += '<div class="enh-heatmap-legend"><span>{{T:less}}</span><div class="enh-heatmap-legend-bar"></div><span>{{T:more}}</span></div>';
+            var _ll = _resolveLocalLabels();
+            html += '<div class="enh-heatmap-legend"><span>' + _ll.less + '</span><div class="enh-heatmap-legend-bar"></div><span>' + _ll.more + '</span></div>';
             el.innerHTML = html;
         });
     }
@@ -255,13 +256,6 @@
     }
 
     function init() {
-        // Replace heatmap legend placeholders with real translations
-        document.querySelectorAll('.enh-heatmap-legend').forEach(function (el) {
-            const labels = _resolveLocalLabels();
-            const spans = el.querySelectorAll('span');
-            if (spans[0]) spans[0].textContent = labels.less;
-            if (spans[1]) spans[1].textContent = labels.more;
-        });
         initKpiCounters();
         initRipple();
         initMobileRowActions();

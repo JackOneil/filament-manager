@@ -10,7 +10,6 @@ import math
 import re
 import logging
 import os
-import mimetypes
 from datetime import datetime
 
 import requests
@@ -83,7 +82,7 @@ def register(app):
                 df = datetime.strptime(date_from, '%Y-%m-%d')
                 base_q = base_q.filter(BambuPrintJob.started_at >= df)
             except (ValueError, OverflowError):
-                pass
+                flash(translate('bambu_invalid_date_filter'), 'warning')
         if date_to:
             try:
                 dt = datetime.strptime(date_to, '%Y-%m-%d')
@@ -91,7 +90,7 @@ def register(app):
                 dt_end = dt.replace(hour=23, minute=59, second=59)
                 base_q = base_q.filter(BambuPrintJob.started_at <= dt_end)
             except (ValueError, OverflowError):
-                pass
+                flash(translate('bambu_invalid_date_filter'), 'warning')
         if hide_failed:
             base_q = base_q.filter(BambuPrintJob.status.notin_(('FAILED', 'CANCELLED')))
         if job_filter == 'unassigned':
@@ -120,14 +119,14 @@ def register(app):
                 df = datetime.strptime(date_from, '%Y-%m-%d')
                 count_base = count_base.filter(BambuPrintJob.started_at >= df)
             except (ValueError, OverflowError):
-                pass
+                flash(translate('bambu_invalid_date_filter'), 'warning')
         if date_to:
             try:
                 dt = datetime.strptime(date_to, '%Y-%m-%d')
                 dt_end = dt.replace(hour=23, minute=59, second=59)
                 count_base = count_base.filter(BambuPrintJob.started_at <= dt_end)
             except (ValueError, OverflowError):
-                pass
+                flash(translate('bambu_invalid_date_filter'), 'warning')
         if hide_failed:
             count_base = count_base.filter(BambuPrintJob.status.notin_(('FAILED', 'CANCELLED')))
         count_all = count_base.count()
@@ -219,14 +218,14 @@ def register(app):
                 df = datetime.strptime(date_from, '%Y-%m-%d')
                 base_q = base_q.filter(BambuPrintJob.started_at >= df)
             except (ValueError, OverflowError):
-                pass
+                flash(translate('bambu_invalid_date_filter'), 'warning')
         if date_to:
             try:
                 dt = datetime.strptime(date_to, '%Y-%m-%d')
                 dt_end = dt.replace(hour=23, minute=59, second=59)
                 base_q = base_q.filter(BambuPrintJob.started_at <= dt_end)
             except (ValueError, OverflowError):
-                pass
+                flash(translate('bambu_invalid_date_filter'), 'warning')
         if hide_failed:
             base_q = base_q.filter(BambuPrintJob.status.notin_(('FAILED', 'CANCELLED')))
         if job_filter == 'unassigned':

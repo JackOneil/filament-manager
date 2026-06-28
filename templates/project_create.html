@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto">
+<div class="max-w-2xl mx-auto" x-data="projectWizard()">
     <div class="mb-6 flex items-center gap-3">
         <a href="{{ url_for('projects_index') }}" class="text-gray-500 hover:text-blue-600 transition">
             <i class="fa-solid fa-arrow-left text-xl"></i>
@@ -9,135 +9,252 @@
         <h1 class="text-3xl font-bold text-gray-800">{{ t('project_create') }}</h1>
     </div>
 
-    <form method="POST" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
-        {% if project_templates %}
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project_template_select') }}</label>
-            <select onchange="if(this.value) window.location=this.value" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
-                <option value="">—</option>
-                {% for tpl in project_templates %}
-                <option value="{{ url_for('project_create_from_template', tid=tpl.id) }}"{% if prefill_template and prefill_template.id == tpl.id %} selected{% endif %}>{{ tpl.name }}</option>
-                {% endfor %}
-            </select>
+    <!-- Step indicator -->
+    <nav class="flex items-center justify-between mb-8" aria-label="Progress">
+        {% for i in range(1, 5) %}
+        <div class="flex items-center" :class="{ 'flex-1': {{ i }} < 4 }">
+            <button type="button" @click="goToStep({{ i }})" :disabled="step < {{ i }}"
+                :class="step === {{ i }} ? 'bg-blue-600 text-white shadow-md' : (step > {{ i }} ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-400')"
+                class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition disabled:opacity-40">
+                <span x-show="step <= {{ i }}">{{ i }}</span>
+                <i x-show="step > {{ i }}" class="fa-solid fa-check"></i>
+            </button>
+            <span class="ml-2 text-sm font-medium hidden sm:inline"
+                :class="step >= {{ i }} ? 'text-gray-800' : 'text-gray-400'">
+                {% if i == 1 %}{{ t('project_wizard_step_basics') }}{% elif i == 2 %}{{ t('project_wizard_step_classify') }}{% elif i == 3 %}{{ t('project_wizard_step_details') }}{% else %}{{ t('project_wizard_step_review') }}{% endif %}
+            </span>
         </div>
+        {% if i < 4 %}
+        <div class="flex-1 mx-3 h-1 rounded-full" :class="step > {{ i }} ? 'bg-emerald-500' : 'bg-gray-200'"></div>
         {% endif %}
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project_name') }} *</label>
-            <input type="text" name="name" required value="{{ prefill_template.name if prefill_template else '' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
-            {% if suggestions %}
-            <div class="mt-2.5">
-                <span class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{{ t('project_suggested_names') }}</span>
-                <div class="flex flex-wrap gap-2">
-                    {% for name in suggestions %}
-                    <button type="button" 
-                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200 hover:border-slate-300 transition-colors"
-                            onclick="document.getElementsByName('name')[0].value = {{ name | tojson }}">
-                        <i class="fa-solid fa-magic text-blue-500"></i> {{ name }}
-                    </button>
+        {% endfor %}
+    </nav>
+
+    <form method="POST" @submit.prevent="submit" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
+        <!-- Step 1: Basics -->
+        <div x-show="step === 1" x-cloak class="space-y-6">
+            {% if project_templates %}
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project_template_select') }}</label>
+                <select x-model="templateId" @change="applyTemplate()"
+                        class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition">
+                    <option value="">—</option>
+                    {% for tpl in project_templates %}
+                    <option value="{{ tpl.id }}">{{ tpl.name }}</option>
                     {% endfor %}
-                </div>
+                </select>
             </div>
             {% endif %}
-        </div>
-        
-        {% if is_admin_user %}
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project_client') }}</label>
-            <input type="text" name="client_name" value="{{ prefill_template.name if prefill_template else '' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
-        </div>
-        {% else %}
-        <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark-surface-muted">
-            <div class="text-sm font-semibold text-slate-900 dark-text-primary">{{ t('project_client') }}</div>
-            <div class="text-sm text-slate-700 mt-1 dark-text-primary">{{ default_client_name }}</div>
-            <p class="text-xs text-slate-600 mt-2 dark-text-secondary">{{ t('project_create_user_hint') }}</p>
-        </div>
-        {% endif %}
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project_client_email') }}</label>
-                <input type="email" name="client_email" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition" placeholder="{{ t('auth_email_placeholder') }}">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project_client_phone') }}</label>
-                <input type="tel" name="client_phone" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
-            </div>
-        </div>
-
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project_priority') }}</label>
-            <select name="priority" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
-                <option value="low">{{ t('priority_low') }}</option>
-                <option value="medium" selected>{{ t('priority_medium') }}</option>
-                <option value="high">{{ t('priority_high') }}</option>
-                <option value="urgent">{{ t('priority_urgent') }}</option>
-            </select>
-        </div>
-
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('tag_list') }}</label>
-            <input type="text" name="tag_text" value="{{ prefill_template.tag_text if prefill_template else '' }}" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project_due_date') }}</label>
-                <input type="date" name="due_date" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project_time') }}</label>
-                <div class="flex gap-2" x-data="{}"> 
-                    <div class="relative flex-1">
-                        <input type="number" name="print_hours" value="{{ (prefill_template.estimated_print_time // 60) if prefill_template else 0 }}" min="0"
-                               class="w-full border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
-                        <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400 text-xs font-bold">h</div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project_name') }} *</label>
+                <input type="text" name="name" x-model="form.name" required
+                       class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition">
+                {% if suggestions %}
+                <div class="mt-2.5">
+                    <span class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{{ t('project_suggested_names') }}</span>
+                    <div class="flex flex-wrap gap-2">
+                        {% for name in suggestions %}
+                        <button type="button"
+                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200 transition-colors"
+                                @click="form.name = {{ name|tojson }}">
+                            <i class="fa-solid fa-magic text-blue-500"></i> {{ name }}
+                        </button>
+                        {% endfor %}
                     </div>
-                    <div class="relative flex-1">
-                        <input type="number" name="print_minutes" value="{{ (prefill_template.estimated_print_time % 60) if prefill_template else 0 }}" min="0" max="59"
-                               class="w-full border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
-                        <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400 text-xs font-bold">min</div>
+                </div>
+                {% endif %}
+            </div>
+            {% if is_admin_user %}
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project_client') }}</label>
+                <input type="text" name="client_name" x-model="form.client_name"
+                       class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition">
+            </div>
+            {% else %}
+            <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark-surface-muted">
+                <div class="text-sm font-semibold text-slate-900 dark-text-primary">{{ t('project_client') }}</div>
+                <div class="text-sm text-slate-700 mt-1 dark-text-primary">{{ default_client_name }}</div>
+                <p class="text-xs text-slate-600 mt-2 dark-text-secondary">{{ t('project_create_user_hint') }}</p>
+            </div>
+            {% endif %}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project_client_email') }}</label>
+                    <input type="email" name="client_email" x-model="form.client_email"
+                           class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project_client_phone') }}</label>
+                    <input type="tel" name="client_phone" x-model="form.client_phone"
+                           class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition">
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Classification -->
+        <div x-show="step === 2" x-cloak class="space-y-6">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project_priority') }}</label>
+                <select name="priority" x-model="form.priority"
+                        class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition">
+                    <option value="low">{{ t('priority_low') }}</option>
+                    <option value="medium" selected>{{ t('priority_medium') }}</option>
+                    <option value="high">{{ t('priority_high') }}</option>
+                    <option value="urgent">{{ t('priority_urgent') }}</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('tag_list') }}</label>
+                <input type="text" name="tag_text" x-model="form.tag_text"
+                       class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition">
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project_due_date') }}</label>
+                    <input type="date" name="due_date" x-model="form.due_date"
+                           class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project_time') }}</label>
+                    <div class="flex gap-2">
+                        <div class="relative flex-1">
+                            <input type="number" name="print_hours" x-model="form.print_hours" min="0"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-blue-500 outline-none transition">
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400 text-xs font-bold">h</div>
+                        </div>
+                        <div class="relative flex-1">
+                            <input type="number" name="print_minutes" x-model="form.print_minutes" min="0" max="59"
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 pr-10 focus:ring-2 focus:ring-blue-500 outline-none transition">
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400 text-xs font-bold">min</div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project_description') }}</label>
-            <p class="text-xs text-gray-500 mb-2">{{ t('markdown_editor_help') }}</p>
-            <div x-data='markdownEditor({ defaultMode: "visual", placeholder: "{{ t("project_description") }}", initialValue: {{ (prefill_template.description or "") | tojson }} })' class="md-editor-shell">
-                <textarea x-ref="source" x-model="value" name="description" class="hidden"></textarea>
-                <div class="md-editor-toolbar">
-                    <div class="md-editor-toolbar-group">
-                        <button type="button" class="md-editor-btn" @click="apply('bold')" title="{{ t('markdown_editor_bold') }}"><i class="fa-solid fa-bold"></i></button>
-                        <button type="button" class="md-editor-btn" @click="apply('italic')" title="{{ t('markdown_editor_italic') }}"><i class="fa-solid fa-italic"></i></button>
-                        <button type="button" class="md-editor-btn" @click="apply('h2')" title="{{ t('markdown_editor_heading') }}"><i class="fa-solid fa-heading"></i></button>
-                        <button type="button" class="md-editor-btn" @click="apply('ul')" title="{{ t('markdown_editor_bullets') }}"><i class="fa-solid fa-list-ul"></i></button>
-                        <button type="button" class="md-editor-btn" @click="apply('ol')" title="{{ t('markdown_editor_numbers') }}"><i class="fa-solid fa-list-ol"></i></button>
-                        <button type="button" class="md-editor-btn" @click="apply('quote')" title="{{ t('markdown_editor_quote') }}"><i class="fa-solid fa-quote-left"></i></button>
-                        <button type="button" class="md-editor-btn" @click="apply('code')" title="{{ t('markdown_editor_code') }}"><i class="fa-solid fa-code"></i></button>
-                        <button type="button" class="md-editor-btn" @click="apply('link')" title="{{ t('markdown_editor_link') }}"><i class="fa-solid fa-link"></i></button>
-                        <button type="button" class="md-editor-btn" @click="apply('checkbox')" title="{{ t('markdown_editor_checkbox_title') }}"><i class="fa-regular fa-square-check"></i></button>
+        <!-- Step 3: Details -->
+        <div x-show="step === 3" x-cloak class="space-y-6">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project_description') }}</label>
+                <p class="text-xs text-gray-500 mb-2">{{ t('markdown_editor_help') }}</p>
+                <div x-data='markdownEditor({ defaultMode: "visual", placeholder: "{{ t("project_description") }}", initialValue: "" })'
+                     x-init="$watch('$parent.form.description', v => { if(value !== v) value = v })"
+                     class="md-editor-shell">
+                    <textarea x-ref="source" x-model="value" name="description" class="hidden"></textarea>
+                    <div class="md-editor-toolbar">
+                        <div class="md-editor-toolbar-group">
+                            <button type="button" class="md-editor-btn" @click="apply('bold')" title="{{ t('markdown_editor_bold') }}"><i class="fa-solid fa-bold"></i></button>
+                            <button type="button" class="md-editor-btn" @click="apply('italic')" title="{{ t('markdown_editor_italic') }}"><i class="fa-solid fa-italic"></i></button>
+                            <button type="button" class="md-editor-btn" @click="apply('h2')" title="{{ t('markdown_editor_heading') }}"><i class="fa-solid fa-heading"></i></button>
+                            <button type="button" class="md-editor-btn" @click="apply('ul')" title="{{ t('markdown_editor_bullets') }}"><i class="fa-solid fa-list-ul"></i></button>
+                            <button type="button" class="md-editor-btn" @click="apply('ol')" title="{{ t('markdown_editor_numbers') }}"><i class="fa-solid fa-list-ol"></i></button>
+                            <button type="button" class="md-editor-btn" @click="apply('quote')" title="{{ t('markdown_editor_quote') }}"><i class="fa-solid fa-quote-left"></i></button>
+                            <button type="button" class="md-editor-btn" @click="apply('code')" title="{{ t('markdown_editor_code') }}"><i class="fa-solid fa-code"></i></button>
+                            <button type="button" class="md-editor-btn" @click="apply('link')" title="{{ t('markdown_editor_link') }}"><i class="fa-solid fa-link"></i></button>
+                            <button type="button" class="md-editor-btn" @click="apply('checkbox')" title="{{ t('markdown_editor_checkbox_title') }}"><i class="fa-regular fa-square-check"></i></button>
+                        </div>
+                        <div class="md-editor-toolbar-group">
+                            <button type="button" class="md-editor-btn" :class="{ 'is-active': mode === 'visual' }" @click="setMode('visual')">{{ t('markdown_editor_visual') }}</button>
+                            <button type="button" class="md-editor-btn" :class="{ 'is-active': mode === 'markdown' }" @click="setMode('markdown')">{{ t('markdown_editor_markdown') }}</button>
+                            <button type="button" class="md-editor-btn" :class="{ 'is-active': mode === 'preview' }" @click="setMode('preview')">{{ t('markdown_editor_preview') }}</button>
+                        </div>
                     </div>
-                    <div class="md-editor-toolbar-group">
-                        <button type="button" class="md-editor-btn" :class="{ 'is-active': mode === 'visual' }" @click="setMode('visual')">{{ t('markdown_editor_visual') }}</button>
-                        <button type="button" class="md-editor-btn" :class="{ 'is-active': mode === 'markdown' }" @click="setMode('markdown')">{{ t('markdown_editor_markdown') }}</button>
-                        <button type="button" class="md-editor-btn" :class="{ 'is-active': mode === 'preview' }" @click="setMode('preview')">{{ t('markdown_editor_preview') }}</button>
+                    <div class="md-editor-surface">
+                        <div x-show="mode === 'visual'" x-cloak x-ref="visual" contenteditable="true" class="md-editor-visual" :style="{ minHeight: editorHeight + 'px' }" :data-placeholder="placeholder" @input="syncFromVisual()"></div>
+                        <textarea x-show="mode === 'markdown'" x-cloak x-ref="markdown" x-model="value" class="md-editor-input font-mono text-sm" :style="{ minHeight: editorHeight + 'px' }" :placeholder="placeholder"></textarea>
+                        <div x-show="mode === 'preview'" x-cloak class="md-editor-preview" :style="{ minHeight: editorHeight + 'px' }" x-html="markdownToHtml(value)"></div>
                     </div>
+                    <div class="md-editor-resizer" @mousedown.prevent="startResize($event)"><div class="md-editor-resizer-line"></div></div>
                 </div>
-                <div class="md-editor-surface">
-                    <div x-show="mode === 'visual'" x-cloak x-ref="visual" contenteditable="true" class="md-editor-visual" :style="{ minHeight: editorHeight + 'px' }" :data-placeholder="placeholder" @input="syncFromVisual()"></div>
-                    <textarea x-show="mode === 'markdown'" x-cloak x-ref="markdown" x-model="value" class="md-editor-input font-mono text-sm" :style="{ minHeight: editorHeight + 'px' }" :placeholder="placeholder"></textarea>
-                    <div x-show="mode === 'preview'" x-cloak class="md-editor-preview" :style="{ minHeight: editorHeight + 'px' }" x-html="markdownToHtml(value)"></div>
-                </div>
-                <div class="md-editor-resizer" @mousedown.prevent="startResize($event)"><div class="md-editor-resizer-line"></div></div>
             </div>
         </div>
 
-        <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
-            <a href="{{ url_for('projects_index') }}" class="px-5 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition">{{ t('cancel') }}</a>
-            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow transition flex items-center gap-2">
-                <i class="fa-solid fa-save"></i> {{ t('save') }}
-            </button>
+        <!-- Step 4: Review -->
+        <div x-show="step === 4" x-cloak class="space-y-4">
+            <div class="ui-card-soft p-4 space-y-2">
+                <h3 class="text-sm font-semibold text-gray-500 uppercase">{{ t('project_wizard_step_basics') }}</h3>
+                <p class="text-gray-800 font-semibold" x-text="form.name || '—'"></p>
+                <p class="text-sm text-gray-600" x-text="form.client_name || '—'"></p>
+                <p class="text-xs text-gray-400" x-show="form.client_email"><i class="fa-solid fa-envelope mr-1"></i><span x-text="form.client_email"></span></p>
+                <p class="text-xs text-gray-400" x-show="form.client_phone"><i class="fa-solid fa-phone mr-1"></i><span x-text="form.client_phone"></span></p>
+            </div>
+            <div class="ui-card-soft p-4 space-y-2">
+                <h3 class="text-sm font-semibold text-gray-500 uppercase">{{ t('project_wizard_step_classify') }}</h3>
+                <p><span class="text-xs text-gray-500">{{ t('project_priority') }}: </span><span class="text-sm font-semibold" x-text="form.priority"></span></p>
+                <p x-show="form.tag_text"><span class="text-xs text-gray-500">{{ t('tag_list') }}: </span><span class="text-sm" x-text="form.tag_text"></span></p>
+                <p x-show="form.due_date"><span class="text-xs text-gray-500">{{ t('project_due_date') }}: </span><span class="text-sm" x-text="form.due_date"></span></p>
+                <p x-show="form.print_hours || form.print_minutes"><span class="text-xs text-gray-500">{{ t('project_time') }}: </span><span class="text-sm" x-text="(form.print_hours||0)+'h '+(form.print_minutes||0)+'min'"></span></p>
+            </div>
+            <div class="ui-card-soft p-4 space-y-2" x-show="form.description">
+                <h3 class="text-sm font-semibold text-gray-500 uppercase">{{ t('project_description') }}</h3>
+                <div class="text-sm text-gray-700 max-h-32 overflow-y-auto whitespace-pre-wrap" x-text="form.description"></div>
+            </div>
+        </div>
+
+        <div class="flex justify-between gap-3 pt-4 border-t border-gray-100">
+            <div>
+                <button type="button" x-show="step > 1" @click="step--"
+                        class="px-5 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                    <i class="fa-solid fa-arrow-left mr-1"></i>{{ t('project_wizard_previous') }}
+                </button>
+            </div>
+            <div class="flex gap-3">
+                <a href="{{ url_for('projects_index') }}" class="px-5 py-2 text-gray-500 hover:text-gray-700 rounded-lg transition">{{ t('cancel') }}</a>
+                <button type="button" x-show="step < 4" @click="step++"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow transition">
+                    {{ t('project_wizard_next') }}<i class="fa-solid fa-arrow-right ml-1"></i>
+                </button>
+                <button type="submit" x-show="step === 4"
+                        class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg shadow transition flex items-center gap-2">
+                    <i class="fa-solid fa-save"></i> {{ t('save') }}
+                </button>
+            </div>
         </div>
     </form>
 </div>
+
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
+function projectWizard() {
+    return {
+        step: 1,
+        templateId: '',
+        form: {
+            name: {{ (prefill_template.name if prefill_template else '')|tojson }},
+            client_name: {{ is_admin_user and (prefill_template.name if prefill_template else '')|tojson or ''|tojson }},
+            client_email: '',
+            client_phone: '',
+            priority: 'medium',
+            tag_text: {{ (prefill_template.tag_text if prefill_template else '')|tojson }},
+            due_date: '',
+            print_hours: '{{ ((prefill_template.estimated_print_time // 60) if prefill_template else 0) }}',
+            print_minutes: '{{ ((prefill_template.estimated_print_time % 60) if prefill_template else 0) }}',
+            description: {{ (prefill_template.description if prefill_template else '')|tojson }},
+        },
+        goToStep(n) { if (n <= this.step || n === this.step + 1) this.step = n; },
+        applyTemplate() {
+            if (!this.templateId) return;
+            var self = this;
+            var tplId = this.templateId;
+            fetch('/project-templates/' + tplId + '/data')
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (d.name) self.form.name = d.name;
+                    if (d.client_name) self.form.client_name = d.client_name;
+                    if (d.client_email) self.form.client_email = d.client_email;
+                    if (d.client_phone) self.form.client_phone = d.client_phone;
+                    if (d.priority) self.form.priority = d.priority;
+                    if (d.tag_text) self.form.tag_text = d.tag_text;
+                    if (d.description) self.form.description = d.description;
+                    if (d.estimated_print_time) {
+                        self.form.print_hours = String(Math.floor(d.estimated_print_time / 60));
+                        self.form.print_minutes = String(d.estimated_print_time % 60);
+                    }
+                });
+        },
+        submit(e) {
+            if (this.step < 4) { this.step = 4; e.preventDefault(); }
+        }
+    };
+}
+</script>
 {% endblock %}

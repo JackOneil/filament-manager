@@ -225,18 +225,19 @@ function appShell() {
         }
         opts = opts || {};
         var method = (opts.method || 'GET').toUpperCase();
+        var newOpts = Object.assign({}, opts);
         if (method !== 'GET' && method !== 'HEAD') {
             var headers = new Headers(opts.headers || {});
             headers.set('X-CSRFToken', csrfToken);
-            var newOpts = {};
-            for (var k in opts) {
-                if (k === 'headers') continue;
-                newOpts[k] = opts[k];
-            }
             newOpts.headers = headers;
-            return _origFetch.call(this, url, newOpts);
         }
-        return _origFetch.call(this, url, opts);
+        // Ensure credentials are sent so the session cookie is included.
+        // This is the browser default for same-origin but some frameworks
+        // (or manual overrides) may strip it — enforce it here.
+        if (newOpts.credentials === undefined) {
+            newOpts.credentials = 'same-origin';
+        }
+        return _origFetch.call(this, url, newOpts);
     };
 
     // ── Client-side toast helper ─────────────────────────────────────────
@@ -338,6 +339,13 @@ function appShell() {
 
             _startPolling() {
                 this._pollTimer = setInterval(() => this._poll(), this._pollInterval);
+            },
+
+            destroy() {
+                if (this._pollTimer) {
+                    clearInterval(this._pollTimer);
+                    this._pollTimer = null;
+                }
             },
 
             _poll() {

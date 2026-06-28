@@ -1,15 +1,16 @@
 """Waste/scrap tracking — record failed prints with reason, weight, filament and project."""
+import json
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from flask import abort, redirect, render_template, request, send_from_directory, url_for, Blueprint
+from flask import abort, jsonify, redirect, render_template, request, send_from_directory, url_for, Blueprint
 from werkzeug.utils import secure_filename
 
 from auth import require_admin
 from sqlalchemy.orm import joinedload
 from database import db
-from models import Filament, Project, WasteFile, WasteRecord, AppSetting
+from models import Filament, FilamentUndoLog, Project, WasteFile, WasteRecord, AppSetting
 from utils import utc_now, safe_commit
 
 
@@ -69,7 +70,13 @@ def register(app):
         filter_project = request.args.get('project', '')
         page = request.args.get('page', 1, type=int)
 
-        query = WasteRecord.query.order_by(WasteRecord.created_at.desc())
+        query = WasteRecord.query.options(
+            joinedload(WasteRecord.filament).joinedload(Filament.brand),
+            joinedload(WasteRecord.filament).joinedload(Filament.material),
+            joinedload(WasteRecord.filament).joinedload(Filament.color),
+            joinedload(WasteRecord.project),
+            joinedload(WasteRecord.files),
+        ).order_by(WasteRecord.created_at.desc())
         if filter_reason and filter_reason in _get_waste_reasons():
             query = query.filter(WasteRecord.reason == filter_reason)
         if filter_filament:
@@ -193,6 +200,221 @@ def register(app):
         db.session.delete(rec)
         safe_commit()
         return redirect(url_for('waste_index'))
+
+    @bp.route('/waste/_records')
+    def waste_records_partial():
+        """AJAX partial — returns only the records list + pagination."""
+        from auth import get_current_user, is_admin
+        user = get_current_user()
+        if not is_admin(user):
+            abort(403)
+
+        filter_reason = request.args.get('reason', '')
+        filter_filament = request.args.get('filament', '')
+        filter_project = request.args.get('project', '')
+        page = request.args.get('page', 1, type=int)
+
+        query = WasteRecord.query.options(
+            joinedload(WasteRecord.filament).joinedload(Filament.brand),
+            joinedload(WasteRecord.filament).joinedload(Filament.material),
+            joinedload(WasteRecord.filament).joinedload(Filament.color),
+            joinedload(WasteRecord.project),
+            joinedload(WasteRecord.files),
+        ).order_by(WasteRecord.created_at.desc())
+        if filter_reason and filter_reason in _get_waste_reasons():
+            query = query.filter(WasteRecord.reason == filter_reason)
+        if filter_filament:
+            query = query.filter(WasteRecord.filament_id == filter_filament)
+        if filter_project:
+            query = query.filter(WasteRecord.project_id == filter_project)
+
+        paginated = db.paginate(query.statement, page=page, per_page=20, error_out=False)
+        total_waste = db.session.query(db.func.sum(WasteRecord.weight_grams)).scalar() or 0
+
+        return render_template(
+            '_waste_records.html',
+            records=paginated.items,
+            paginated=paginated,
+            filter_reason=filter_reason,
+            filter_filament=filter_filament,
+            filter_project=filter_project,
+            total_waste=total_waste,
+        )
+
+    @bp.route('/waste/_add', methods=['POST'])
+    def waste_add_ajax():
+        from auth import get_current_user, is_admin
+        user = get_current_user()
+        if not is_admin(user):
+            abort(403)
+
+        filament_id = request.form.get('filament_id', type=int)
+        project_id = request.form.get('project_id', type=int) or None
+        reason = request.form.get('reason', 'other')
+        if reason not in _get_waste_reasons():
+            reason = 'other'
+        notes = request.form.get('notes', '').strip() or None
+
+        try:
+            weight_grams = float(request.form.get('weight_grams', 0))
+            if weight_grams <= 0:
+                weight_grams = 0.0
+        except (TypeError, ValueError):
+            weight_grams = 0.0
+
+        if not filament_id:
+            return jsonify(success=False, error='filament_required'), 400
+
+        rec = WasteRecord(
+            filament_id=filament_id,
+            project_id=project_id,
+            reason=reason,
+            weight_grams=weight_grams,
+            notes=notes,
+            recorded_by_user_id=user.id if user else None,
+        )
+        db.session.add(rec)
+        safe_commit()
+        return jsonify(success=True, id=rec.id)
+
+    @bp.route('/waste/<int:rec_id>/_edit', methods=['POST'])
+    def waste_edit_ajax(rec_id):
+        from auth import get_current_user, is_admin
+        user = get_current_user()
+        if not is_admin(user):
+            abort(403)
+        rec = db.get_or_404(WasteRecord, rec_id)
+
+        filament_id = request.form.get('filament_id', type=int)
+        if filament_id:
+            rec.filament_id = filament_id
+
+        project_id = request.form.get('project_id', type=int) or None
+        rec.project_id = project_id
+
+        reason = request.form.get('reason', 'other')
+        if reason not in _get_waste_reasons():
+            reason = 'other'
+        rec.reason = reason
+
+        try:
+            weight_grams = float(request.form.get('weight_grams', 0))
+            if weight_grams < 0:
+                weight_grams = 0.0
+        except (TypeError, ValueError):
+            weight_grams = 0.0
+        rec.weight_grams = weight_grams
+
+        rec.notes = request.form.get('notes', '').strip() or None
+        safe_commit()
+        return jsonify(success=True)
+
+    @bp.route('/waste/<int:rec_id>/_delete', methods=['POST'])
+    def waste_delete_ajax(rec_id):
+        from auth import get_current_user, is_admin
+        user = get_current_user()
+        if not is_admin(user):
+            abort(403)
+        rec = db.get_or_404(WasteRecord, rec_id)
+
+        # Create undo log before deleting
+        undo_data = json.dumps({
+            'filament_id': rec.filament_id,
+            'project_id': rec.project_id,
+            'reason': rec.reason,
+            'weight_grams': rec.weight_grams,
+            'notes': rec.notes,
+            'created_at': rec.created_at.isoformat() if rec.created_at else None,
+            'recorded_by_user_id': rec.recorded_by_user_id,
+        })
+        db.session.add(FilamentUndoLog(
+            user_id=user.id,
+            action_type='delete_waste',
+            target_type='waste',
+            target_key=undo_data,
+            snapshot_data=None,
+            expires_at=utc_now() + timedelta(seconds=14),
+        ))
+        safe_commit()
+
+        for f in list(rec.files):
+            try:
+                os.remove(f.filepath)
+            except OSError:
+                pass
+        db.session.delete(rec)
+        safe_commit()
+        return jsonify(success=True)
+
+    @bp.route('/waste/<int:rec_id>/_data')
+    def waste_data_ajax(rec_id):
+        from auth import get_current_user, is_admin
+        user = get_current_user()
+        if not is_admin(user):
+            abort(403)
+        rec = db.get_or_404(WasteRecord, rec_id)
+        return jsonify(
+            filament_id=rec.filament_id,
+            filament_name=rec.filament.name if rec.filament else '',
+            project_id=rec.project_id,
+            project_name=rec.project.name if rec.project else '',
+            reason=rec.reason,
+            weight=rec.weight_grams,
+            notes=rec.notes or '',
+        )
+
+    @bp.route('/waste/<int:rec_id>/_upload', methods=['POST'])
+    def waste_upload_ajax(rec_id):
+        from auth import get_current_user, is_admin
+        user = get_current_user()
+        if not is_admin(user):
+            abort(403)
+        rec = db.get_or_404(WasteRecord, rec_id)
+        files = request.files.getlist('file')
+        added = []
+        for file in files:
+            if not file or file.filename == '':
+                continue
+            if not _is_allowed_waste_image(file.filename):
+                continue
+            original_filename = secure_filename(file.filename)
+            if not original_filename:
+                continue
+            stored_name = _build_waste_storage_name(rec.id, original_filename)
+            filepath = os.path.join(upload_folder, stored_name)
+            file.save(filepath)
+            wf = WasteFile(
+                waste_record_id=rec.id,
+                filename=original_filename,
+                filepath=filepath,
+            )
+            db.session.add(wf)
+            added.append(wf)
+        safe_commit()
+        from flask import url_for as _url_for
+        thumbnails = []
+        for wf in added:
+            thumbnails.append({
+                'id': wf.id,
+                'url': _url_for('waste_serve_file', file_id=wf.id),
+                'filename': wf.filename,
+            })
+        return jsonify(success=True, thumbnails=thumbnails)
+
+    @bp.route('/waste/file/<int:file_id>/_delete', methods=['POST'])
+    def waste_delete_file_ajax(file_id):
+        from auth import get_current_user, is_admin
+        user = get_current_user()
+        if not is_admin(user):
+            abort(403)
+        wf = db.get_or_404(WasteFile, file_id)
+        try:
+            os.remove(wf.filepath)
+        except OSError:
+            pass
+        db.session.delete(wf)
+        safe_commit()
+        return jsonify(success=True)
 
     @bp.route('/waste/<int:rec_id>/upload', methods=['POST'])
     def waste_upload_file(rec_id):

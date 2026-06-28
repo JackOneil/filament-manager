@@ -8,6 +8,8 @@ import tarfile
 import uuid
 from flask import current_app as app, request, redirect, url_for, Response, Blueprint, flash
 
+from sqlalchemy.orm import joinedload
+
 from database import db
 from models import (
     Brand, Color, Material, AppSetting, Filament, MovementHistory,
@@ -208,6 +210,7 @@ def _build_export_data(app, include_files=True):
                 'backup_auto_keep_count': getattr(setting, 'backup_auto_keep_count', 10) if setting else 10,
                 'backup_auto_keep_days': getattr(setting, 'backup_auto_keep_days', 0) if setting else 0,
                 'waste_reasons_json': getattr(setting, 'waste_reasons_json', '') if setting else '',
+                'link_preview_reader_enabled': getattr(setting, 'link_preview_reader_enabled', False) if setting else False,
                 # bambu_token intentionally excluded for security
             } if setting else {},
 
@@ -267,6 +270,7 @@ def _build_export_data(app, include_files=True):
                 'client_email': proj.client_email,
                 'client_phone': proj.client_phone,
                 'priority': proj.priority,
+                'share_token': proj.share_token,
                 'tag_text': proj.tag_text,
                 'estimated_print_time': proj.estimated_print_time,
                 'due_date': proj.due_date.isoformat() if proj.due_date else None,
@@ -326,7 +330,17 @@ def _build_export_data(app, include_files=True):
                     'sort_order': pi.sort_order,
                     'created_at': pi.created_at.isoformat() if pi.created_at else None,
                 } for pi in proj.print_items],
-            } for proj in Project.query.order_by(Project.created_at).all()],
+            } for proj in Project.query
+                .options(
+                    joinedload(Project.files),
+                    joinedload(Project.links),
+                    joinedload(Project.filaments).joinedload(ProjectFilament.filament),
+                    joinedload(Project.quotes).joinedload(ProjectQuote.filament),
+                    joinedload(Project.comments),
+                    joinedload(Project.todos),
+                    joinedload(Project.print_items),
+                )
+                .order_by(Project.created_at).all()],
 
             'project_templates': [{
                 'name': tpl.name,
@@ -349,6 +363,7 @@ def _build_export_data(app, include_files=True):
                 'notify_project_comment': user.notify_project_comment,
                 'preferred_language': user.preferred_language,
                 'preferred_theme': user.preferred_theme,
+                'last_login_at': user.last_login_at.isoformat() if user.last_login_at else None,
                 'created_at': user.created_at.isoformat() if user.created_at else None,
             } for user in User.query.order_by(User.created_at).all()],
 
@@ -440,6 +455,7 @@ def _build_export_data(app, include_files=True):
                 'status': j.status,
                 'weight_grams': j.weight_grams,
                 'cost_time': j.cost_time,
+                'raw_payload': j.raw_payload,
                 'started_at': j.started_at.isoformat() if j.started_at else None,
                 'finished_at': j.finished_at.isoformat() if j.finished_at else None,
                 'synced_at': j.synced_at.isoformat() if j.synced_at else None,
@@ -497,6 +513,7 @@ def _build_export_data(app, include_files=True):
                 'weight_grams': j.weight_grams,
                 'cost_time': j.cost_time,
                 'progress': j.progress,
+                'raw_payload': j.raw_payload,
                 'started_at': j.started_at.isoformat() if j.started_at else None,
                 'finished_at': j.finished_at.isoformat() if j.finished_at else None,
                 'synced_at': j.synced_at.isoformat() if j.synced_at else None,
@@ -556,6 +573,8 @@ def _build_export_data(app, include_files=True):
                 'filament_name': ul.filament.name if ul.filament else None,
                 'filament_ref': _filament_ref(ul.filament),
                 'snapshot_data': ul.snapshot_data,
+                'target_type': ul.target_type,
+                'target_key': ul.target_key,
                 'expires_at': ul.expires_at.isoformat() if ul.expires_at else None,
                 'is_consumed': ul.is_consumed,
                 'consumed_at': ul.consumed_at.isoformat() if ul.consumed_at else None,

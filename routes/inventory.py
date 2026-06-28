@@ -1,8 +1,7 @@
 """Inventory routes: listing, CRUD, spool management, and filament detail."""
+import json
 import math
 import os
-import secrets
-import threading
 from collections import Counter
 from datetime import datetime, timedelta
 from types import SimpleNamespace
@@ -13,7 +12,7 @@ from sqlalchemy.orm import joinedload
 
 from database import db
 from auth import get_current_user, is_admin
-from models import AppSetting, PrusaPrinter, BambuJobMaterial, BambuPrintJob, BambuPrinter, PrusaPrintJob, Brand, Color, Filament, Material, MovementHistory, Notification, Project, ProjectComment, ProjectFilament, ProjectQuote, FilamentUndoLog
+from models import AppSetting, PrusaPrinter, BambuJobMaterial, BambuPrintJob, BambuPrinter, PrusaPrintJob, Brand, Color, Filament, Material, MovementHistory, Notification, PrinterMaintenance, Project, ProjectComment, ProjectFilament, ProjectQuote, FilamentUndoLog, WasteRecord
 from utils import (
     build_action_center,
     build_filament_history_name as _display_filament_name,
@@ -514,6 +513,59 @@ def register(app):
                         float(filament.weight_remaining or 0.0),
                         note=translate('movement_note_undo_bulk_delete'),
                     )
+            elif action_type in ('delete_waste', 'delete_maintenance'):
+                target_key = snapshot_data.get('target_key')
+                if not target_key:
+                    raise ValueError('missing_target_key')
+                if isinstance(target_key, str):
+                    target_data = json.loads(target_key)
+                else:
+                    target_data = target_key
+
+                if action_type == 'delete_waste':
+                    # Recreate records will have new created_at; preserve original
+                    rec = WasteRecord(
+                        filament_id=target_data.get('filament_id'),
+                        project_id=target_data.get('project_id'),
+                        reason=target_data.get('reason', 'other'),
+                        weight_grams=float(target_data.get('weight_grams', 0)),
+                        notes=target_data.get('notes'),
+                        recorded_by_user_id=target_data.get('recorded_by_user_id'),
+                    )
+                    if target_data.get('created_at'):
+                        try:
+                            rec.created_at = datetime.fromisoformat(target_data['created_at'])
+                        except (ValueError, TypeError):
+                            pass
+                    db.session.add(rec)
+                elif action_type == 'delete_maintenance':
+                    rec = PrinterMaintenance(
+                        printer_type=target_data.get('printer_type', 'bambu'),
+                        printer_id=target_data.get('printer_id'),
+                        printer_name=target_data.get('printer_name', ''),
+                        maintenance_type=target_data.get('maintenance_type', 'other'),
+                        notes=target_data.get('notes'),
+                        notes_is_markdown=target_data.get('notes_is_markdown', False),
+                        recurrence_type=target_data.get('recurrence_type', 'none'),
+                        recurrence_value=int(target_data.get('recurrence_value', 0)),
+                        recurrence_enabled=target_data.get('recurrence_enabled', False),
+                        predictive_enabled=target_data.get('predictive_enabled', False),
+                        predictive_runtime_hours=float(target_data.get('predictive_runtime_hours', 0)),
+                        predictive_jobs_count=int(target_data.get('predictive_jobs_count', 0)),
+                        predictive_filament_grams=float(target_data.get('predictive_filament_grams', 0)),
+                        predictive_window_days=int(target_data.get('predictive_window_days', 30)),
+                    )
+                    if target_data.get('performed_at'):
+                        try:
+                            rec.performed_at = datetime.fromisoformat(target_data['performed_at'])
+                        except (ValueError, TypeError):
+                            pass
+                    if target_data.get('next_service_at'):
+                        try:
+                            rec.next_service_at = datetime.strptime(target_data['next_service_at'], '%Y-%m-%d')
+                        except (ValueError, TypeError):
+                            pass
+                    db.session.add(rec)
             else:
                 raise ValueError('unsupported_undo_type')
 

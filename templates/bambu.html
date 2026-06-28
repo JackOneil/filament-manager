@@ -267,7 +267,7 @@
 <div id="bambu-lightbox" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
     <div class="absolute inset-0 bg-black/80" onclick="closeBambuLightbox()"></div>
     <div class="relative z-10 flex flex-col items-center max-w-3xl w-full">
-        <button onclick="closeBambuLightbox()" class="absolute -top-12 right-0 text-white hover:text-gray-300 text-3xl transition-colors" aria-label="Close">
+        <button onclick="closeBambuLightbox()" class="absolute -top-12 right-0 text-white hover:text-gray-300 text-3xl transition-colors" aria-label="{{ t('close') }}">
             <i class="fa-solid fa-xmark"></i>
         </button>
         <img id="bambu-lightbox-img" src="" alt="" class="max-h-[80vh] max-w-full rounded-xl shadow-2xl object-contain bg-gray-900">
@@ -281,7 +281,7 @@
     <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10">
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-triangle-exclamation text-orange-500 mr-2"></i>{{ t('waste_log_modal_title') }}</h2>
-            <button type="button" onclick="document.getElementById('wasteModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            <button type="button" onclick="document.getElementById('wasteModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="{{ t('close') }}">&times;</button>
         </div>
         <form method="POST" action="{{ url_for('waste_add') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

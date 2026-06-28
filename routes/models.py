@@ -50,9 +50,15 @@ def _check_project_access(project_id):
     abort(404)
 
 def _check_file_access(file_id):
+    user = get_current_user()
+    if not user:
+        abort(401)
     f = ProjectFile.query.get_or_404(file_id)
     if f.project_id is not None:
         _check_project_access(f.project_id)
+    elif user.role != 'admin':
+        # Orphaned file (project_id IS NULL) — require admin access
+        abort(403)
     return f
 
 def _is_allowed_model_file(filename):
@@ -442,7 +448,8 @@ def model_edit(root_id):
 
     root_file.display_name = display_name
     root_file.model_note   = model_note
-    root_file.project_id   = project_id
+    if request.form.get('project_id', '').strip() != '':
+        root_file.project_id = project_id
     root_file.category_id  = category_id
     # Update note specifically on the latest version
     latest.version_note = version_note

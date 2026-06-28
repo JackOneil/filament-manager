@@ -36,11 +36,11 @@ def run_migrations(app: Flask) -> None:
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN items_per_page INTEGER NOT NULL DEFAULT 12")
         _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN bambu_auto_sync_enabled BOOLEAN NOT NULL DEFAULT 0')
         _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN bambu_auto_sync_interval_minutes INTEGER NOT NULL DEFAULT 60')
-        _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN bambu_last_sync_at DATETIME DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN bambu_last_sync_at TIMESTAMP DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN bambu_last_sync_status VARCHAR(255) DEFAULT NULL')
-        _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN bambu_last_test_at DATETIME DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN bambu_last_test_at TIMESTAMP DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN bambu_last_test_status VARCHAR(255) DEFAULT NULL')
-        _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN backup_last_export_at DATETIME DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN backup_last_export_at TIMESTAMP DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE app_setting ADD COLUMN backup_last_export_meta TEXT DEFAULT NULL')
 
         # Billing details
@@ -107,8 +107,8 @@ def run_migrations(app: Flask) -> None:
         # PrusaLink integration
         _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN notes TEXT DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN enabled BOOLEAN NOT NULL DEFAULT 1")
-        _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN last_sync_at DATETIME DEFAULT NULL")
-        _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN last_success_at DATETIME DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN last_sync_at TIMESTAMP DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN last_success_at TIMESTAMP DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN last_sync_status VARCHAR(255) DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE prusa_print_job ADD COLUMN progress FLOAT DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE prusa_print_job ADD COLUMN raw_payload TEXT DEFAULT NULL")
@@ -118,19 +118,19 @@ def run_migrations(app: Flask) -> None:
         _safe_alter(app, 'ALTER TABLE "user" ADD COLUMN notify_project_created BOOLEAN NOT NULL DEFAULT 1')
         _safe_alter(app, 'ALTER TABLE "user" ADD COLUMN notify_project_status_changed BOOLEAN NOT NULL DEFAULT 1')
         _safe_alter(app, 'ALTER TABLE "user" ADD COLUMN notify_project_comment BOOLEAN NOT NULL DEFAULT 1')
-        _safe_alter(app, 'ALTER TABLE "user" ADD COLUMN last_login_at DATETIME DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE "user" ADD COLUMN last_login_at TIMESTAMP DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE "user" ADD COLUMN preferred_language VARCHAR(10) DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE "user" ADD COLUMN preferred_theme VARCHAR(10) DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE user_invite ADD COLUMN email VARCHAR(255) DEFAULT NULL')
         _safe_alter(app, "ALTER TABLE user_invite ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user'")
         _safe_alter(app, 'ALTER TABLE user_invite ADD COLUMN section_permissions TEXT DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE user_invite ADD COLUMN is_used BOOLEAN NOT NULL DEFAULT 0')
-        _safe_alter(app, 'ALTER TABLE user_invite ADD COLUMN expires_at DATETIME DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE user_invite ADD COLUMN expires_at TIMESTAMP DEFAULT NULL')
         _safe_alter(app, "ALTER TABLE notification ADD COLUMN kind VARCHAR(50) NOT NULL DEFAULT 'info'")
         _safe_alter(app, 'ALTER TABLE notification ADD COLUMN body TEXT DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE notification ADD COLUMN link VARCHAR(500) DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE notification ADD COLUMN is_read BOOLEAN NOT NULL DEFAULT 0')
-        _safe_alter(app, 'ALTER TABLE project_comment ADD COLUMN updated_at DATETIME DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE project_comment ADD COLUMN updated_at TIMESTAMP DEFAULT NULL')
 
         # ── Invoice / document numbering ─────────────────────────────────────
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN invoice_prefix VARCHAR(20) NOT NULL DEFAULT 'FV'")
@@ -155,7 +155,7 @@ def run_migrations(app: Flask) -> None:
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN backup_auto_time VARCHAR(5) NOT NULL DEFAULT '03:00'")
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN backup_auto_day INTEGER NOT NULL DEFAULT 1")
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN backup_auto_include_files BOOLEAN NOT NULL DEFAULT 1")
-        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN backup_auto_last_run_at DATETIME DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN backup_auto_last_run_at TIMESTAMP DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN backup_auto_keep_count INTEGER NOT NULL DEFAULT 10")
         _safe_alter(app, "ALTER TABLE app_setting ADD COLUMN backup_auto_keep_days INTEGER NOT NULL DEFAULT 0")
 
@@ -175,13 +175,13 @@ def run_migrations(app: Flask) -> None:
         _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN recurrence_enabled BOOLEAN NOT NULL DEFAULT 0")
         _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN notes_is_markdown BOOLEAN NOT NULL DEFAULT 0")
         _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN fault_resolved BOOLEAN NOT NULL DEFAULT 0")
-        _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN fault_resolved_at DATETIME DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN fault_resolved_at TIMESTAMP DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN predictive_enabled BOOLEAN NOT NULL DEFAULT 0")
         _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN predictive_runtime_hours FLOAT NOT NULL DEFAULT 0")
         _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN predictive_jobs_count INTEGER NOT NULL DEFAULT 0")
         _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN predictive_filament_grams FLOAT NOT NULL DEFAULT 0")
         _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN predictive_window_days INTEGER NOT NULL DEFAULT 30")
-        _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN last_renewed_at DATETIME DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE printer_maintenance ADD COLUMN last_renewed_at TIMESTAMP DEFAULT NULL")
 
         # ── Printer Specific Power Profile ───────────────────────────────────
         _safe_alter(app, "ALTER TABLE bambu_printer ADD COLUMN power_draw_watts INTEGER DEFAULT NULL")
@@ -211,6 +211,16 @@ def run_migrations(app: Flask) -> None:
 
         # ── Model categories (BL-004) ────────────────────────────────────────
         _safe_alter(app, "ALTER TABLE project_file ADD COLUMN category_id INTEGER DEFAULT NULL REFERENCES model_category(id) ON DELETE SET NULL")
+
+        # ── Undo log extension: support waste & maintenance target types ─────
+        _safe_alter(app, "ALTER TABLE filament_undo_log ADD COLUMN target_type VARCHAR(20) DEFAULT 'filament'")
+        _safe_alter(app, "ALTER TABLE filament_undo_log ADD COLUMN target_key TEXT DEFAULT NULL")
+        _safe_alter(app, "ALTER TABLE filament_undo_log ALTER COLUMN snapshot_data DROP NOT NULL")
+        try:
+            db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_filament_undo_log_target_type ON filament_undo_log (target_type)"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
         try:
             db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_project_file_category_id ON project_file (category_id)"))
             db.session.commit()

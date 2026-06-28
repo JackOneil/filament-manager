@@ -320,6 +320,8 @@ def register(app):
                             setting.backup_auto_keep_days = s.get('backup_auto_keep_days', 0)
                         if 'waste_reasons_json' in s:
                             setting.waste_reasons_json = s.get('waste_reasons_json', '')
+                        if 'link_preview_reader_enabled' in s:
+                            setting.link_preview_reader_enabled = s['link_preview_reader_enabled']
 
                 # ── 2b. Users, invites, notifications ────────────────
                 for user_data in data.get('users', []):
@@ -340,6 +342,7 @@ def register(app):
                             notify_project_comment=user_data.get('notify_project_comment', True),
                             preferred_language=user_data.get('preferred_language'),
                             preferred_theme=user_data.get('preferred_theme'),
+                            last_login_at=datetime.fromisoformat(user_data['last_login_at']) if user_data.get('last_login_at') else None,
                             created_at=datetime.fromisoformat(user_data['created_at']) if user_data.get('created_at') else utc_now(),
                         )
                         db.session.add(existing_user)
@@ -438,6 +441,7 @@ def register(app):
                             client_email=proj_data.get('client_email'),
                             client_phone=proj_data.get('client_phone'),
                             priority=proj_data.get('priority', 'medium'),
+                            share_token=proj_data.get('share_token'),
                             tag_text=format_tags(proj_data.get('tag_text', '')),
                             estimated_print_time=proj_data.get('estimated_print_time', 0),
                             due_date=datetime.fromisoformat(proj_data['due_date']) if proj_data.get('due_date') else None,
@@ -683,6 +687,7 @@ def register(app):
                         status=j.get('status'),
                         weight_grams=j.get('weight_grams'),
                         cost_time=j.get('cost_time'),
+                        raw_payload=j.get('raw_payload'),
                         started_at=datetime.fromisoformat(j['started_at']) if j.get('started_at') else None,
                         finished_at=datetime.fromisoformat(j['finished_at']) if j.get('finished_at') else None,
                         synced_at=datetime.fromisoformat(j['synced_at']) if j.get('synced_at') else utc_now(),
@@ -814,6 +819,7 @@ def register(app):
                         weight_grams=j.get('weight_grams'),
                         cost_time=j.get('cost_time'),
                         progress=j.get('progress'),
+                        raw_payload=j.get('raw_payload'),
                         started_at=datetime.fromisoformat(j['started_at']) if j.get('started_at') else None,
                         finished_at=datetime.fromisoformat(j['finished_at']) if j.get('finished_at') else None,
                         synced_at=datetime.fromisoformat(j['synced_at']) if j.get('synced_at') else utc_now(),
@@ -962,8 +968,10 @@ def register(app):
                         action_type=ul_data.get('action_type', ''),
                         filament_id=filament.id if filament else None,
                         snapshot_data=ul_data.get('snapshot_data', ''),
+                        target_type=ul_data.get('target_type', 'filament'),
+                        target_key=ul_data.get('target_key'),
                         expires_at=datetime.fromisoformat(ul_data['expires_at']) if ul_data.get('expires_at') else utc_now(),
-                        is_consumed=ul_data.get('is_consumed', True),
+                        is_consumed=ul_data.get('is_consumed', False),
                         consumed_at=datetime.fromisoformat(ul_data['consumed_at']) if ul_data.get('consumed_at') else None,
                     ))
 

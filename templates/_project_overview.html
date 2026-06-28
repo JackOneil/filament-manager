@@ -108,29 +108,42 @@
                          done: {{ item.quantity_done }},
                          total: {{ item.quantity_total }},
                          editing: false,
+                         loading: false,
                          get pct() { return this.total > 0 ? Math.round(this.done / this.total * 100) : 0; },
                          async increment() {
-                             const r = await fetch('{{ url_for('project_increment_print_item', id=project.id, item_id=item.id) }}', {
-                                 method: 'POST',
-                                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                             });
-                             if (r.ok) {
-                                 const d = await r.json();
-                                 const diff = d.quantity_done - this.done;
-                                 this.done = d.quantity_done;
-                                 this.$el.dispatchEvent(new CustomEvent('print-item-changed', { bubbles: true, detail: { diff } }));
+                             if (this.loading) return;
+                             this.loading = true;
+                             try {
+                                 const r = await fetch('{{ url_for('project_increment_print_item', id=project.id, item_id=item.id) }}', {
+                                     method: 'POST',
+                                     headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                                 });
+                                 if (r.ok) {
+                                     const d = await r.json();
+                                     const diff = d.quantity_done - this.done;
+                                     this.done = d.quantity_done;
+                                     this.$el.dispatchEvent(new CustomEvent('print-item-changed', { bubbles: true, detail: { diff } }));
+                                 }
+                             } finally {
+                                 this.loading = false;
                              }
                          },
                          async decrement() {
-                             const r = await fetch('{{ url_for('project_decrement_print_item', id=project.id, item_id=item.id) }}', {
-                                 method: 'POST',
-                                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                             });
-                             if (r.ok) {
-                                 const d = await r.json();
-                                 const diff = d.quantity_done - this.done;
-                                 this.done = d.quantity_done;
-                                 this.$el.dispatchEvent(new CustomEvent('print-item-changed', { bubbles: true, detail: { diff } }));
+                             if (this.loading) return;
+                             this.loading = true;
+                             try {
+                                 const r = await fetch('{{ url_for('project_decrement_print_item', id=project.id, item_id=item.id) }}', {
+                                     method: 'POST',
+                                     headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                                 });
+                                 if (r.ok) {
+                                     const d = await r.json();
+                                     const diff = d.quantity_done - this.done;
+                                     this.done = d.quantity_done;
+                                     this.$el.dispatchEvent(new CustomEvent('print-item-changed', { bubbles: true, detail: { diff } }));
+                                 }
+                             } finally {
+                                 this.loading = false;
                              }
                          }
                      }">
@@ -155,17 +168,19 @@
                         {% if can_edit_project %}
                         <div class="flex flex-wrap items-center gap-2 shrink-0">
                             <button type="button" @click="decrement()"
-                                    class="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-100 transition"
-                                    :class="done <= 0 ? 'opacity-40 cursor-not-allowed' : ''"
-                                    :disabled="done <= 0" title="-1">
-                                <i class="fa-solid fa-minus text-xs"></i>
+                                    :disabled="done <= 0 || loading"
+                                    :class="{ 'opacity-40': done <= 0, 'cursor-not-allowed': done <= 0 || loading }"
+                                    class="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-100 transition" title="-1">
+                                <i class="fa-solid fa-minus text-xs" x-show="!loading"></i>
+                                <i class="fa-solid fa-spinner fa-spin text-xs" x-show="loading" x-cloak></i>
                             </button>
                             <span class="text-sm font-bold w-8 text-center" x-text="done"></span>
                             <button type="button" @click="increment()"
-                                    class="w-8 h-8 flex items-center justify-center rounded-xl border border-transparent transition"
-                                    :class="done >= total ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'"
-                                    :disabled="done >= total" title="+1">
-                                <i class="fa-solid fa-plus text-xs"></i>
+                                    :disabled="done >= total || loading"
+                                    :class="{ 'bg-gray-100 text-gray-400 cursor-not-allowed': done >= total || loading, 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200': !(done >= total || loading) }"
+                                    class="w-8 h-8 flex items-center justify-center rounded-xl border border-transparent transition" title="+1">
+                                <i class="fa-solid fa-plus text-xs" x-show="!loading"></i>
+                                <i class="fa-solid fa-spinner fa-spin text-xs" x-show="loading" x-cloak></i>
                             </button>
                             <button type="button" @click="editing = !editing" class="ui-badge">
                                 <i class="fa-solid fa-pen"></i>
@@ -307,11 +322,13 @@
                             <i class="fa-regular fa-face-smile"></i>
                         </button>
                         <div x-show="open" x-cloak @click.outside="open = false"
-                            class="absolute bottom-full left-0 mb-1 bg-white border border-gray-200 rounded-xl shadow-lg p-2 flex gap-2 z-20 whitespace-nowrap">
-                            {% for emoji_opt in ['👍', '✅', '🔄', '🎉', '❤️'] %}
-                            <button type="button" @click="toggle('{{ emoji_opt }}'); open = false"
-                                class="text-lg hover:scale-125 transition-transform cursor-pointer">{{ emoji_opt }}</button>
-                            {% endfor %}
+                            class="absolute bottom-full left-0 mb-1 bg-white border border-gray-200 rounded-xl shadow-lg p-2 z-20 whitespace-nowrap">
+                            <div class="flex gap-1.5 flex-wrap max-w-[220px]">
+                                {% for emoji_opt in ['👍', '✅', '🔄', '🎉', '❤️', '😮', '😂', '🚀', '👀', '💯', '🔥', '🙏'] %}
+                                <button type="button" @click="toggle('{{ emoji_opt }}'); open = false"
+                                    class="text-lg hover:scale-125 transition-transform cursor-pointer p-0.5">{{ emoji_opt }}</button>
+                                {% endfor %}
+                            </div>
                         </div>
                     </div>
                 </div>

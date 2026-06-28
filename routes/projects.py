@@ -1,6 +1,5 @@
 import math
 import os
-import threading
 import uuid
 from datetime import date, datetime
 from types import SimpleNamespace
@@ -973,6 +972,20 @@ def register(app):
         flash(translate('project_template_deleted'), 'success')
         return redirect(url_for('project_templates_index'))
 
+    @bp.route('/project-templates/<int:tid>/data')
+    def project_template_data(tid):
+        tpl = ProjectTemplate.query.get_or_404(tid)
+        return jsonify(
+            name=tpl.name,
+            client_name='',
+            client_email='',
+            client_phone='',
+            priority='medium',
+            tag_text=tpl.tag_text or '',
+            description=tpl.description or '',
+            estimated_print_time=tpl.estimated_print_time or 0,
+        )
+
     @bp.route('/projects/create/from_template/<int:tid>')
     def project_create_from_template(tid):
         tpl = ProjectTemplate.query.get_or_404(tid)
@@ -993,7 +1006,7 @@ def register(app):
             return jsonify({'error': translate('error_unauthorized')}), 401
         comment = ProjectComment.query.filter_by(id=cid, project_id=id).first_or_404()
         emoji = request.form.get('emoji', '').strip()
-        ALLOWED_EMOJIS = {'👍', '✅', '🔄', '🎉', '❤️'}
+        ALLOWED_EMOJIS = {'👍', '✅', '🔄', '🎉', '❤️', '😮', '😂', '🚀', '👀', '💯', '🔥', '🙏'}
         if emoji not in ALLOWED_EMOJIS:
             return jsonify({'error': translate('error_invalid_emoji')}), 400
         existing = ProjectCommentReaction.query.filter_by(comment_id=cid, user_id=user.id, emoji=emoji).first()
