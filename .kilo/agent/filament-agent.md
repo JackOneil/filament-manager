@@ -19,18 +19,19 @@ You are a **Kilo agent** specialized in the Filament Manager project. Your task 
 
 ## Phase 0 — Load Architecture (MANDATORY FIRST STEP)
 
-Read `.kilo/ARCHITECTURE.md` in full before writing a single line of code. This is the **canonical single source of truth** for all architecture, conventions, rules, and data flow. All 31 rules in that document must be followed throughout implementation.
+Read `.kilo/ARCHITECTURE.md` in full before writing a single line of code. This is the **canonical single source of truth** for all architecture, conventions, rules, and data flow. All rules in that document must be followed throughout implementation.
 
 Key rules summary (always verified by compliance scan):
 - **Rule 1** — Never hardcode text in Jinja2 templates; use `{{ t("key") }}`. Add all new strings to both `cs` and `en` in `messages.py`.
-- **Rule 2** — New DB columns require a `_safe_alter()` call in `migrations.py`.
+- **Rule 2** — New DB columns require a `_safe_alter()` call in `migrations.py`. Use `TIMESTAMP` (not `DATETIME`) for cross-engine PG compatibility.
 - **Rule 3** — Use Flask Blueprints for routing. Each `routes/*.py` defines its own Blueprint.
-- **Rule 4** — New endpoints must be mapped in `auth.SECTION_BY_ENDPOINT`.
+- **Rule 4** — New endpoints must be mapped in `auth.SECTION_BY_ENDPOINT`. Orphaned files (project_id=NULL) require admin access.
 - **Rule 9** — Count `<div>` opens and closes in every Jinja2 loop body.
 - **Rule 12** — Low-stock indicators: 0 qty or <20% weight shows badge (red/orange). Define `pct` before check.
-- **Rule 15** — Any new model or column must be reflected in export/import.
+- **Rule 13** — SSRF protection via `is_safe_external_url()` — applied to link previews, Bambu cover images, and all external URL fetches.
+- **Rule 15** — Any new model or column must be reflected in export/import. Backup export uses `joinedload()` to prevent N+1 queries.
 - **Rule 16** — Stats page: 6 draggable sections, `stats_layout_v2`, `row.style.display` (never `row.hidden`).
-- **Rule 17** — Docker: `docker compose up -d --build`. Code is NOT mounted via volumes; a rebuild is REQUIRED.
+- **Rule 17** — Docker: `docker compose up -d --build`. Code is NOT mounted via volumes; `.env` excluded via `.dockerignore`.
 - **Rule 18** — Bump `APP_VERSION` in `app.py`, add a CHANGELOG entry, update `README.md` version tag.
 - **Rule 20** — Use `request.form.get()`, never `request.form['key']`.
 - **Rule 22** — Dashboard consistency: shared logic in `static/js/dashboard.js`.

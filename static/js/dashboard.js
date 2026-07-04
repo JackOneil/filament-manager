@@ -206,10 +206,11 @@ function createWidgetLayoutManager(config) {
 
     // Prevent duplicate manager instances on the same container (e.g. after AJAX reload)
     if (container.__dashLayoutManager) {
-        container.__dashLayoutManager.destroy();
+        if (typeof container.__dashLayoutManager.destroy === 'function') {
+            container.__dashLayoutManager.destroy();
+        }
+        container.__dashLayoutManager = null;
     }
-    var self = {};
-    container.__dashLayoutManager = self;
 
     var itemSelector = config.itemSelector || '[data-widget-id]';
     var defaultOrder = config.defaultOrder || [];
@@ -959,7 +960,9 @@ function createWidgetLayoutManager(config) {
         container.__dashLayoutManager = null;
     }
 
-    return { toggleEditMode: toggleEditMode, moveUp: moveUp, moveDown: moveDown, reset: reset, destroy: destroy };
+    var manager = { toggleEditMode: toggleEditMode, moveUp: moveUp, moveDown: moveDown, reset: reset, destroy: destroy };
+    container.__dashLayoutManager = manager;
+    return manager;
 }
 
 

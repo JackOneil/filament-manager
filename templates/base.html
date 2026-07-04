@@ -438,7 +438,7 @@
                 {% endif %}
             </div>
         </header>
-    <script src="{{ url_for('static', filename='js/dashboard.js') }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}?v={{ app_version }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
     <script src="{{ url_for('static', filename='js/tour.js') }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
     <script src="{{ url_for('static', filename='js/help.js') }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
     <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>

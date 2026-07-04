@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.119.4] - 2026-07-02
+### Fixed
+- **Markdown code block unreadable in light theme**: `<code>` inside `<pre>` blocks in project descriptions/comments inherited `bg-gray-100` from the generic `[&_code]:bg-gray-100` Tailwind rule, rendering light text on a light background. Added `[&_pre_code]:bg-transparent` to override the background for code inside pre blocks. Affected: project description, project comments, and share page. (templates/_project_overview.html, templates/project_share.html)
+
 ## [1.119.3] - 2026-06-28
 ### Fixed
 - **PostgreSQL `DATETIME` → `TIMESTAMP` compatibility (BUG-596)**: 11 `_safe_alter()` migration calls used `DATETIME` type which PostgreSQL rejects (requires `TIMESTAMP`). All changed to `TIMESTAMP` for cross-engine compatibility. (migrations.py)

@@ -3,7 +3,7 @@
         <div>
                 <div class="ui-label">{{ t('project_description') }}</div>
                 {% if project.description %}
-                <div class="mt-3 text-base text-gray-700 dark:text-slate-300 space-y-3 break-words [&_a]:text-blue-600 [&_a:hover]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-gray-200 [&_blockquote]:pl-4 [&_blockquote]:italic [&_code]:bg-gray-100 dark:[&_code]:bg-slate-700 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-4 [&_pre]:rounded-2xl [&_pre]:overflow-x-auto [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:leading-7"{% if can_edit_project %} data-checkbox-url="{{ url_for('project_toggle_description_checkbox', id=project.id) }}"{% endif %}>{{ project_description_html }}</div>
+                <div class="mt-3 text-base text-gray-700 dark:text-slate-300 space-y-3 break-words [&_a]:text-blue-600 [&_a:hover]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-gray-200 [&_blockquote]:pl-4 [&_blockquote]:italic [&_code]:bg-gray-100 dark:[&_code]:bg-slate-700 [&_pre_code]:bg-transparent [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-4 [&_pre]:rounded-2xl [&_pre]:overflow-x-auto [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:leading-7"{% if can_edit_project %} data-checkbox-url="{{ url_for('project_toggle_description_checkbox', id=project.id) }}"{% endif %}>{{ project_description_html }}</div>
                 {% else %}
                 <div class="text-base text-gray-700 mt-3">-</div>
                 {% endif %}
@@ -304,7 +304,7 @@
                         {% endif %}
                     </div>
                 </div>
-                <div x-show="!editing" class="mt-3 text-sm text-gray-700 dark:text-slate-300 space-y-3 break-words [&_a]:text-blue-600 [&_a:hover]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-gray-200 [&_blockquote]:pl-4 [&_blockquote]:italic [&_code]:bg-gray-100 dark:[&_code]:bg-slate-700 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-4 [&_pre]:rounded-2xl [&_pre]:overflow-x-auto [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:leading-6"{% if can_edit_project %} data-checkbox-url="{{ url_for('project_toggle_comment_checkbox', id=project.id, comment_id=comment.id) }}"{% endif %}>{{ comment.body_html|safe }}</div>
+                <div x-show="!editing" class="mt-3 text-sm text-gray-700 dark:text-slate-300 space-y-3 break-words [&_a]:text-blue-600 [&_a:hover]:underline [&_blockquote]:border-l-4 [&_blockquote]:border-gray-200 [&_blockquote]:pl-4 [&_blockquote]:italic [&_code]:bg-gray-100 dark:[&_code]:bg-slate-700 [&_pre_code]:bg-transparent [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-4 [&_pre]:rounded-2xl [&_pre]:overflow-x-auto [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:leading-6"{% if can_edit_project %} data-checkbox-url="{{ url_for('project_toggle_comment_checkbox', id=project.id, comment_id=comment.id) }}"{% endif %}>{{ comment.body_html|safe }}</div>
                 {# Emoji reactions #}
                 {# Use single-quoted attribute so JSON's double quotes (from tojson) don't terminate x-data early. #}
                 <div class="flex flex-wrap items-center gap-1.5 mt-2" x-data='commentReactions({{ comment.id }}, {{ comment.reactions | tojson }})'>

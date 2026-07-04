@@ -463,11 +463,14 @@ def collect_sparkline_data(filaments, now=None):
     for fid, date_str, weight in results_id:
         if fid in by_id and date_str:
             try:
-                dt = datetime.strptime(date_str, '%Y-%m-%d').date()
+                if isinstance(date_str, datetime.date):
+                    dt = date_str
+                else:
+                    dt = datetime.strptime(date_str, '%Y-%m-%d').date()
                 day_index = (dt - since_date).days
                 if 0 <= day_index <= 6:
                     by_id[fid][day_index] += weight or 0.0
-            except ValueError:
+            except (ValueError, TypeError):
                 pass
 
     # Aggregate by Name and Date
@@ -488,11 +491,14 @@ def collect_sparkline_data(filaments, now=None):
         fid = by_name.get(name)
         if fid in by_id and date_str:
             try:
-                dt = datetime.strptime(date_str, '%Y-%m-%d').date()
+                if isinstance(date_str, datetime.date):
+                    dt = date_str
+                else:
+                    dt = datetime.strptime(date_str, '%Y-%m-%d').date()
                 day_index = (dt - since_date).days
                 if 0 <= day_index <= 6:
                     by_id[fid][day_index] += weight or 0.0
-            except ValueError:
+            except (ValueError, TypeError):
                 pass
 
     return by_id
@@ -1667,11 +1673,54 @@ def _is_weak_preview_value(value, kind):
 
     lowered = value.lower()
     if kind == 'title':
-        return lowered in {'just a moment...', 'makerworld'}
+        return (lowered in {'just a moment...', 'makerworld'}
+                or 'performing security verification' in lowered
+                or 'checking your browser' in lowered
+                or 'attention required' in lowered)
     if kind == 'description':
-        return lowered in {'explore', 'home', 'community'} or len(value.strip()) < 12
+        return (lowered in {'explore', 'home', 'community'}
+                or 'captcha' in lowered
+                or 'please make sure you are authorized' in lowered
+                or len(value.strip()) < 12)
     if kind == 'image':
         return any(marker in lowered for marker in ('avatar/', 'favicon', '/user/'))
+    return False
+
+
+def _is_cloudflare_challenge(soup):
+    """Detect Cloudflare challenge / Turnstile / CAPTCHA interstitial pages.
+
+    When Cloudflare blocks a direct fetch with a browser challenge, the
+    returned HTML contains title text like ``Just a moment...`` and may
+    also include logo images.  Without this check the garbage metadata
+    (title + favicon) looks "good enough" and the Jina reader fallback
+    is never triggered, so the link preview stays broken.
+    """
+    if not soup:
+        return False
+    title_tag = soup.find('title')
+    if title_tag:
+        title_text = (title_tag.get_text(strip=True) or '').lower()
+        if 'just a moment' in title_text:
+            return True
+        if 'attention required' in title_text:
+            return True
+    # Cloudflare Turnstile / challenge scripts
+    for script in soup.find_all('script'):
+        src = script.get('src', '')
+        if 'challenges.cloudflare.com' in src or '/cdn-cgi/challenge-platform/' in src:
+            return True
+    # Turnstile widget
+    if soup.find('div', id='challenge-body-text'):
+        return True
+    if soup.find('div', class_=lambda c: c and 'cf-turnstile' in c):
+        return True
+    # Generic CAPTCHA page markers
+    body_text = (soup.body.get_text().lower() if soup.body else '')
+    if 'checking if the site connection is secure' in body_text:
+        return True
+    if 'please turn javascript on and reload the page' in body_text:
+        return True
     return False
 
 
@@ -1708,6 +1757,7 @@ def fetch_link_metadata(url):
             'Upgrade-Insecure-Requests': '1',
         }
         response, final_url = _follow_safe_redirects(clean_url, headers=headers, timeout=5)
+        soup = None
         if response.status_code == 200 and 'text/html' in response.headers.get('Content-Type', ''):
             soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -1736,15 +1786,31 @@ def fetch_link_metadata(url):
                 meta['og_description'] = meta['og_description'] or json_preview['description']
                 meta['og_image'] = meta['og_image'] or json_preview['image']
 
-        if not (meta['og_title'] and meta['og_image']):
+        cloudflare_challenge = _is_cloudflare_challenge(soup)
+        if cloudflare_challenge:
+            meta['og_title'] = None
+            meta['og_description'] = None
+            meta['og_image'] = None
+        if not (meta['og_title'] and meta['og_image']) or cloudflare_challenge:
             markdown_preview = _fetch_reader_fallback(clean_url, headers=headers, timeout=10)
             if markdown_preview:
-                if markdown_preview['title'] and _is_weak_preview_value(meta['og_title'], 'title'):
+                # Only accept reader results that are NOT challenge/captcha garbage
+                if (markdown_preview['title']
+                        and not _is_weak_preview_value(markdown_preview['title'], 'title')
+                        and _is_weak_preview_value(meta['og_title'], 'title')):
                     meta['og_title'] = markdown_preview['title']
                 if markdown_preview['description'] and _is_weak_preview_value(meta['og_description'], 'description'):
                     meta['og_description'] = markdown_preview['description']
                 if markdown_preview['image'] and _is_weak_preview_value(meta['og_image'], 'image'):
                     meta['og_image'] = markdown_preview['image']
+
+            # If after all attempts the title is still a challenge page, discard it
+            if meta['og_title'] and _is_weak_preview_value(meta['og_title'], 'title'):
+                meta['og_title'] = None
+            if meta['og_description'] and _is_weak_preview_value(meta['og_description'], 'description'):
+                meta['og_description'] = None
+            if meta['og_image'] and _is_weak_preview_value(meta['og_image'], 'image'):
+                meta['og_image'] = None
 
     except Exception:
         return meta
