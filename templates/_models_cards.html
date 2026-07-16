@@ -84,6 +84,15 @@
                         <span class="italic">—</span>
                         {% endif %}
                     </div>
+                    {% if item.project_tags %}
+                    <div class="flex flex-wrap gap-1 mt-1.5">
+                        {% for tag in item.project_tags[:3] %}
+                        <button type="button" @click.prevent="window.__models && window.__models.selectTag('{{ tag }}')"
+                            class="ui-badge text-[10px] hover:bg-blue-100 hover:text-blue-700 cursor-pointer transition"
+                            title="{{ t('filter_by_tag') }}: {{ tag }}">{{ tag }}</button>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
 
                     <!-- Category Badge -->
                     {% if item.category_name %}

@@ -16,7 +16,7 @@ from werkzeug.utils import secure_filename
 from database import db
 from auth import get_current_user, is_admin
 from models import Project, ProjectFile, AppSetting, User, ModelComment, ModelCategory
-from utils import escape_like, utc_now, translate, safe_commit
+from utils import escape_like, parse_tags, utc_now, translate, safe_commit
 
 logger = logging.getLogger(__name__)
 
@@ -190,6 +190,16 @@ def models_index():
         'no_thumb': no_thumb,
     }
 
+    # Collect unique project tags for filter dropdown
+    tag_rows = (
+        db.session.query(Project.tag_text)
+        .filter(Project.tag_text.isnot(None), Project.tag_text != '')
+    )
+    if not is_admin(user):
+        tag_rows = tag_rows.filter(Project.owner_user_id == (user.id if user else -1))
+    all_tag_texts = [r[0] for r in tag_rows.all()]
+    unique_tags = sorted(set(tag for raw in all_tag_texts for tag in parse_tags(raw)), key=str.lower)
+
     return render_template(
         'models_index.html',
         projects=projects,
@@ -197,6 +207,7 @@ def models_index():
         model_extensions=sorted(list(MODEL_EXTENSIONS)),
         models_stats=models_stats,
         categories=categories,
+        tag_options=unique_tags,
     )
 
 @bp.route('/models/upload', methods=['POST'])
@@ -302,6 +313,10 @@ def api_models_list():
     elif category_id:
         query = query.filter(ProjectFile.category_id == category_id)
 
+    tag_filter = request.args.get('tag', '').strip()
+    if tag_filter:
+        query = query.filter(Project.tag_text.ilike(f'%{escape_like(tag_filter)}%'))
+
     # Pagination params (parse early for DB-level limit)
     page = request.args.get('page', 1, type=int)
     setting = AppSetting.query.first()
@@ -364,6 +379,7 @@ def api_models_list():
             'latest': latest,
             'display_name': root.display_name or root.filename.rsplit('.', 1)[0],
             'project_name': root.project.name if root.project else '',
+            'project_tags': parse_tags(root.project.tag_text) if root.project and root.project.tag_text else [],
             'size': latest.file_size_bytes or 0,
             'uploaded_at': latest.uploaded_at or datetime.min,
             'version_count': len([root] + root.versions),
@@ -417,6 +433,8 @@ def model_detail(root_id):
     comments = ModelComment.query.filter_by(root_file_id=root_id)\
                                  .order_by(ModelComment.created_at.asc()).all()
 
+    project_tags = parse_tags(root_file.project.tag_text) if root_file.project and root_file.project.tag_text else []
+
     return render_template(
         'models_detail.html',
         root=root_file,
@@ -426,6 +444,7 @@ def model_detail(root_id):
         projects=_get_projects(),
         comments=comments,
         categories=ModelCategory.query.order_by(ModelCategory.name).all(),
+        project_tags=project_tags,
     )
 
 @bp.route('/models/<int:root_id>/edit', methods=['POST'])

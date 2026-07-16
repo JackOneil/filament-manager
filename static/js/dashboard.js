@@ -56,12 +56,15 @@ function _dashEnsurePickerClose() {
     if (_dashPickerCloseReg) return;
     _dashPickerCloseReg = true;
     document.addEventListener('mousedown', function(e) {
-        if (!e.target.closest || !e.target.closest('.widget-color-wrap')) {
+        if (!e.target.closest || (!e.target.closest('.widget-color-wrap') && !e.target.closest('.widget-color-picker'))) {
             document.querySelectorAll('.widget-color-picker').forEach(function(p) {
                 p.classList.add('hidden');
             });
         }
     });
+    // Reposition open pickers on scroll/resize
+    window.addEventListener('scroll', _dashRepositionPickers, { passive: true, capture: true });
+    window.addEventListener('resize', _dashRepositionPickers, { passive: true });
 }
 
 // Returns the inner visual card element to which background colour should be applied.
@@ -87,6 +90,39 @@ function _dashUpdateColorBtnUI(btn, colorId) {
     }
 }
 
+// ── Picker portal helpers ──────────────────────────────────────────────────────
+// Shows the color picker dropdown positioned below-right of the trigger button.
+// Uses position:fixed + getBoundingClientRect to escape all stacking contexts.
+function _dashShowPicker(pickerOuter, btn) {
+    var rect = btn.getBoundingClientRect();
+    pickerOuter.style.top  = (rect.bottom + 6) + 'px';
+    pickerOuter.style.left = (rect.right - 156) + 'px';  // right-aligned, min-width 156px
+    // Ensure it stays within the viewport
+    if (pickerOuter.style.left && parseInt(pickerOuter.style.left) < 8) {
+        pickerOuter.style.left = '8px';
+    }
+    pickerOuter.classList.remove('hidden');
+}
+
+function _dashHidePicker(pickerOuter) {
+    pickerOuter.classList.add('hidden');
+}
+
+// Scroll/resize — reposition or hide open pickers
+var _dashPickerScrollTicking = false;
+function _dashRepositionPickers() {
+    document.querySelectorAll('.widget-color-picker:not(.hidden)').forEach(function(p) {
+        // Find the associated button by traversing back from a data reference
+        var btn = p._dashTriggerBtn;
+        if (btn) {
+            var rect = btn.getBoundingClientRect();
+            p.style.top  = (rect.bottom + 6) + 'px';
+            p.style.left = (rect.right - 156) + 'px';
+            if (parseInt(p.style.left) < 8) p.style.left = '8px';
+        }
+    });
+}
+
 // Build a colour-picker button with dropdown. Returns a wrapper <div>.
 // onSelect(colorId) is called when the user picks a colour.
 function _dashMakeColorPickerBtn(currentColorId, onSelect) {
@@ -99,12 +135,14 @@ function _dashMakeColorPickerBtn(currentColorId, onSelect) {
     btn.className = 'widget-color-btn w-7 h-7 flex items-center justify-center rounded transition hover:bg-blue-50';
     _dashUpdateColorBtnUI(btn, currentColorId || '');
 
-    // Picker dropdown shell
+    // Picker dropdown shell — rendered as a portal (appended to body)
+    // to escape all widget stacking contexts (position:relative, will-change,
+    // opacity) that trap z-index in edit mode.
     var pickerOuter = document.createElement('div');
-    pickerOuter.className = 'widget-color-picker hidden absolute z-[999] right-0 top-full mt-1.5';
+    pickerOuter.className = 'widget-color-picker hidden';
+    pickerOuter.style.cssText = 'position:fixed;z-index:9999;min-width:156px';
 
     var pickerInner = document.createElement('div');
-    pickerInner.style.cssText = 'min-width:156px';
     pickerInner.className = 'bg-white border border-gray-200 rounded-xl shadow-xl p-2.5';
 
     var grid = document.createElement('div');
@@ -128,7 +166,7 @@ function _dashMakeColorPickerBtn(currentColorId, onSelect) {
 
         swatch.addEventListener('click', function(e) {
             e.stopPropagation();
-            pickerOuter.classList.add('hidden');
+            _dashHidePicker(pickerOuter);
             _dashUpdateColorBtnUI(btn, color.id);
             // Refresh active ring on sibling swatches
             grid.querySelectorAll('button').forEach(function(s, si) {
@@ -150,8 +188,10 @@ function _dashMakeColorPickerBtn(currentColorId, onSelect) {
 
     pickerInner.appendChild(grid);
     pickerOuter.appendChild(pickerInner);
+    // Append picker to body (portal) — not to the widget subtree —
+    // so it escapes all stacking contexts.
+    document.body.appendChild(pickerOuter);
     wrap.appendChild(btn);
-    wrap.appendChild(pickerOuter);
 
     btn.addEventListener('click', function(e) {
         e.preventDefault();
@@ -161,7 +201,11 @@ function _dashMakeColorPickerBtn(currentColorId, onSelect) {
         document.querySelectorAll('.widget-color-picker').forEach(function(p) {
             p.classList.add('hidden');
         });
-        if (isHidden) pickerOuter.classList.remove('hidden');
+        if (isHidden) {
+            // Store reference for repositioning
+            pickerOuter._dashTriggerBtn = btn;
+            _dashShowPicker(pickerOuter, btn);
+        }
     });
 
     return wrap;

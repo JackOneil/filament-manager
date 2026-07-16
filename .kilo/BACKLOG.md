@@ -238,6 +238,9 @@
 | BL-001 | OctoPrint Integration | Add OctoPrint printer integration alongside Bambu/Prusa | 🟡 Medium | L (Large) | Backlog |
 | BL-002 | REST API | Public REST API for third-party integrations | 🟡 Medium | XL (Extra Large) | Backlog |
 | BL-003 | RFID/NFC Spool Pairing | Tag filament spools with RFID/NFC for automatic identification | 🟡 Medium | L (Large) | Backlog |
+| BL-012 | Bambu: Manual Print Duplicate | Ruční duplikace tisku z Bambu tiskárny. **Fix:** Implementována POST route `/bambu/job/<id>/duplicate` pro ruční duplikování tisku. Nová kopie má `external_id` s prefixem `manual-dup-` a `deducted=False` pro nezávislé přiřazení filamentu. | 🟡 Medium | S (Small) | Fixed in v1.119.6 |
+| BL-013 | Project tags on model views | Modely nahrané přes projekty nyní přejímají a zobrazují štítky svého projektu. Projektové štítky se zobrazují na kartách modelů, v řádcích tabulky i na stránce detailu modelu. | 🟢 Low | XS (X-Small) | Fixed in v1.119.7 |
+| BL-015 | Bambu waste modal: interactive filament search + AMS auto-suggest | Interaktivní filamentový vyhledávač v modálním okně zmetku na stránce Bambu. Automatické předvyplnění filamentu dle barvy a materiálu z AMS. | 🟢 Low | S (Small) | Fixed in v1.119.10 |
 | BL-006 | PostgreSQL Support (4.2) | **PostgreSQL podpora jako alternativa k SQLite.** Dialektová abstrakce v `database.py` (`detect_dialect()`, `engine_options_for()`), `DATABASE_URL` env var pro výběr databáze, automatické nastavení connection poolu pro PostgreSQL (`pool_size=10`, `max_overflow=20`, `pool_pre_ping=True`), `psycopg2-binary` driver. Docker Compose rozšířen o `postgres:16-alpine` service s healthcheckem a persistentním volume. Migrační script `migrate_to_pg.py` pro přechod z SQLite na PostgreSQL. Migrační guide v README. `_safe_alter()` a migrace ošetřeny pro PostgreSQL rezervovaná slova (`"user"`). SQLite-only operace (`PRAGMA`, table recreation) hlídané dialect checkem. | 🟡 Medium | L (Large) | Fixed in v1.118.0 |
 
 | BL-005 | Interactive Notification Bell with Live Counter | **Notifikační zvonek s live counterem v topbaru.** Interaktivní dropdown s Alpine.js zobrazující poslední notifikace s ikonami podle typu, relativním časem, pulzující animací nových notifikací. AJAX polling každých 30s aktualizuje počet nepřečtených. Nové API endpointy: `/api/notifications/unread-count`, `/api/notifications/recent`, `/api/notifications/<id>/mark-read`, `/api/notifications/mark-all-read`. **Obsahuje:** 4 nové endpointy v `routes/auth.py`, Alpine.js komponenta v `base.html`, `notificationBell()` funkce v `app-shell.js`, CSS animace v `app.css`, i18n klíč `notifications_see_all` (cs+en), `SECTION_BY_ENDPOINT` a `help.js` aktualizace. | 🟡 Medium | M (Medium) | Fixed in v1.117.0 |
@@ -407,21 +410,28 @@
 | BUG-600 | Markdown code block unreadable in light theme — `[&_code]:bg-gray-100` overrides dark `<pre>` background | v1.119.4 | 2026-07-02 |
 | BUG-601 | Alpine.js JS error on project create — `|tojson` quote nesting + `$parent` undefined in `$watch` | v1.119.5 | 2026-07-04 |
 | BUG-602 | `/filaments` returns 500 — `strptime()` type mismatch (PG `datetime.date` vs SQLite `str`) | v1.119.5 | 2026-07-04 |
+| BL-012 | Bambu: Manual Print Duplicate | v1.119.6 | 2026-07-04 |
+| BL-013 | Project tags on model views | v1.119.7 | 2026-07-13 |
+| BL-014 | Tag filter on models page | v1.119.8 | 2026-07-13 |
+| BUG-603 | Color picker dropdown hidden behind widgets (portal pattern + mousedown fix) | v1.119.12 | 2026-07-13 |
+| BL-015 | Bambu waste modal: interactive filament search + AMS auto-suggest | v1.119.10 | 2026-07-13 |
+| BL-016 | Bambu waste modal: interactive Project + AJAX submit + job mapping | v1.119.12 | 2026-07-13 |
+| BUG-603 | Color picker z-index (portal + mousedown fix) | v1.119.12 | 2026-07-13 |
 
 ---
 
 ## Summary Statistics
 
-### Current State (post v1.119.5 — 2026-07-04)
+### Current State (post v1.119.12 — 2026-07-13)
 
 | Category | Fixed | Remaining |
 |----------|-------|-----------|
 | 🔴 Critical | 10 (BUG-500, BUG-501, BUG-502, BUG-590, BUG-592, BUG-594, BUG-560, BUG-596, BUG-601, BUG-602) | 0 |
 | 🟠 High | 12 (BUG-503–510, BUG-591, BUG-593, BUG-597, BUG-598) | 5 remaining (BUG-561–565) |
-| 🟡 Medium | 9 (BUG-517, BUG-519, BUG-520, BUG-521, BUG-522, BUG-523, BUG-595, BUG-599, BUG-600) | 5 remaining |
+| 🟡 Medium | 9 (BUG-517, BUG-519, BUG-520, BUG-521, BUG-522, BUG-523, BUG-595, BUG-599, BUG-600) | 5 remaining — **BUG-603 fixed in v1.119.11** |
 | 🟢 Low | 7 (BUG-524, BUG-528, BUG-529, BUG-532, BUG-533, BUG-534, BUG-536) | 8 remaining |
-| 🆕 Features | BL-004, BL-005, BL-006, **BL-007** | — |
-| **Total** | **40 fixed** | **18 remaining** |
+| 🆕 Features | BL-004–BL-007, BL-012–BL-016 | — |
+| **Total** | **46 fixed** | **16 remaining** |
 
 ### v1.119.0 — UI Enhancement Sprint
 - **BL-007** (Implement dark mode / mobile / viz / micro-interaction batch): Closed in v1.119.0. Added 15 new test cases (`tests/test_ui_v119.py`), 4 new assets (`static/css/enhancements.css`, `static/js/enhancements.js`), heatmap data in `routes/stats.py`, animated counters, sparklines, responsive table-to-card transformation, and theme-reactive Chart.js.
@@ -475,5 +485,5 @@
 
 ---
 
-*Last updated: 2026-07-04 (v1.119.5 — Alpine.js project creation JS syntax error fix)*
+*Last updated: 2026-07-13 (v1.119.12 — Waste modal AJAX + portal fix)*
 *Canonical architecture: `.kilo/ARCHITECTURE.md`*

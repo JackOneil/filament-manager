@@ -605,6 +605,60 @@ def register(app):
             return jsonify({'ok': True, 'filament_id': filament_id, 'filament_name': filament_name})
         return redirect(url_for('bambu_jobs'))
 
+    @bp.route('/bambu/job/<int:job_id>/duplicate', methods=['POST'])
+    def bambu_job_duplicate(job_id):
+        """Create a manual duplicate of an existing Bambu print job.
+
+        Used when a print was repeated directly on the printer (not via the
+        cloud queue) and therefore never appeared in the sync feed.  The new
+        record is marked as not-deducted so the user can assign filament and
+        deduct stock independently.
+        """
+        job = db.session.get(BambuPrintJob, job_id)
+        if not job:
+            return jsonify({'ok': False, 'error': translate('error_job_not_found')}), 404
+
+        now = utc_now()
+        import uuid
+        new_external_id = f"manual-dup-{job.external_id}-{uuid.uuid4().hex[:8]}"
+
+        new_job = BambuPrintJob(
+            external_id=new_external_id,
+            printer_name=job.printer_name,
+            printer_model=job.printer_model,
+            device_id=job.device_id,
+            model_name=job.model_name,
+            status='FINISH',
+            started_at=now,
+            finished_at=now,
+            weight_grams=job.weight_grams,
+            cost_time=job.cost_time,
+            raw_payload=job.raw_payload,
+            project_id=job.project_id,
+            filament_id=job.filament_id,
+            deducted=False,
+            synced_at=now,
+        )
+        db.session.add(new_job)
+        db.session.flush()
+
+        # Copy material slots — reset deducted flag so user can deduct again
+        for mat in job.materials:
+            new_mat = BambuJobMaterial(
+                job_id=new_job.id,
+                ams_id=mat.ams_id,
+                tray_id=mat.tray_id,
+                color_hex=mat.color_hex,
+                material_name=mat.material_name,
+                weight_grams=mat.weight_grams,
+                filament_id=mat.filament_id,
+                deducted=False,
+            )
+            db.session.add(new_mat)
+
+        safe_commit()
+        return jsonify({'ok': True, 'new_job_id': new_job.id, 'message': translate('bambu_duplicate_success')})
+
     @bp.route('/bambu/job/<int:job_id>/delete', methods=['POST'])
     def bambu_job_delete(job_id):
         job = db.session.get(BambuPrintJob, job_id)

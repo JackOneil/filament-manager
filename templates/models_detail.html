@@ -18,6 +18,11 @@
                     <a href="{{ url_for('project_detail', id=root.project.id) }}" class="hover:underline font-semibold text-blue-600 dark:text-blue-400 truncate">
                         {{ root.project.name }}
                     </a>
+                    {% if project_tags %}
+                        {% for tag in project_tags %}
+                        <a href="{{ url_for('models.models_index') }}?tag={{ tag | urlencode }}" class="ui-badge text-[10px] hover:bg-blue-100 hover:text-blue-700 cursor-pointer transition" title="{{ t('filter_by_tag') }}: {{ tag }}">{{ tag }}</a>
+                        {% endfor %}
+                    {% endif %}
                     {% else %}
                     <span class="italic">—</span>
                     {% endif %}

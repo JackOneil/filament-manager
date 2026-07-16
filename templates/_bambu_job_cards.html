@@ -162,6 +162,12 @@
                 class="text-xs bg-gray-100 hover:bg-gray-200 transition-colors text-gray-700 font-semibold px-3 py-1.5 rounded-lg">
                 <i class="fa-solid fa-link"></i> {{ t('bambu_map_filament') }}
             </button>
+            <button type="button"
+                onclick="bambuDuplicateJob({{ job.id }}, '{{ t('bambu_duplicate_confirm')|e }}')"
+                class="text-xs text-blue-500 hover:text-blue-700 transition-colors px-3 py-1.5 rounded-lg flex items-center gap-1"
+                title="{{ t('bambu_duplicate') }}">
+                <i class="fa-solid fa-copy"></i> {{ t('bambu_duplicate') }}
+            </button>
             <form method="POST" action="{{ url_for('bambu_job_delete', job_id=job.id) }}"
                 data-confirm="{{ t('bambu_delete_confirm') }}">
                 <button type="submit"
@@ -173,6 +179,7 @@
             <button type="button"
                 class="text-xs text-orange-500 hover:text-orange-700 transition-colors px-3 py-1.5 rounded-lg flex items-center gap-1"
                 data-waste-btn
+                data-job-id="{{ job.id }}"
                 data-filament-id="{{ display_filament.id if display_filament else '' }}"
                 data-project-id="{{ job.project.id if job.project else '' }}"
                 data-weight="{{ '%.1f'|format(job.weight_grams) if job.weight_grams else '' }}"

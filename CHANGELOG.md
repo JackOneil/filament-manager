@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.119.12] — 2026-07-13
+
+### Added
+- **Bambu waste modal: interactive Project search**: Pole "Projekt" nyní interaktivní fulltext vyhledávač (stejný pattern jako filament).
+- **Waste recording stays on Bambu page**: Po zaznamenání zmetku se již nepřesměrovává na stránku zmetků — formulář odeslán AJAXem, tisk je automaticky namapován na vybraný filament a projekt s odečtením zásob. Job se okamžitě zobrazí jako přiřazený.
+- **Waste propagates filament to print job**: Vybraný filament a projekt se při záznamu zmetku propíše i do Bambu tisku — včetně odečtu (`deduct=1`) a aktualizace UI.
+
+### Fixed
+- **BUG-603 (2nd re-fix): Color picker portal regression** — přechod na portal pattern (`position: fixed` v `document.body`) způsobil, že kliknutí na barevné políčko bylo přerušeno `mousedown` handlerem, který picker schoval dřív, než se stihl zpracovat `click`. Oprava: `_dashEnsurePickerClose` nyní kontroluje i `.widget-color-picker` jako bezpečnou zónu. (static/js/dashboard.js)
+
+## [1.119.11] — 2026-07-13
+
+### Fixed
+- **BUG-603 (re-fix): Color picker dropdown hidden behind adjacent widgets**: Původní fix pomocí `z-index: 50` na widgetu nefungoval — `will-change: transform` a `opacity < 1` v editačním režimu vytvářejí nezávislé stacking kontexty, které `z-index` ignorují. **Oprava:** Color picker dropdown nyní používa portal pattern — renderuje se přímo do `document.body` s `position: fixed` a pozicí vypočítanou z `getBoundingClientRect()`. Tím zcela uniká všem stacking kontextům. Přidán `scroll`/`resize` listener pro přepočítání pozice. (static/js/dashboard.js)
+
+## [1.119.10] — 2026-07-13
+
+### Added
+- **Bambu waste modal: interactive filament search + AMS auto-suggestion**: V modálním okně "Zaznamenat zmetek" na stránce Bambu tisků je nyní interaktivní filamentový vyhledávač (plnotextové vyhledávání s barevnými indikátory) namísto nativního `<select>`. Filament je automaticky předvybrán dle barvy a materiálu z AMS dat — stejná logika `_rankFilaments`/`_suggestedFilaments` jako u přiřazování filamentů k tiskům. (templates/bambu.html, templates/_bambu_job_cards.html)
+
+## [1.119.9] — 2026-07-13
+
+### Fixed
+- **Color picker dropdown hidden behind widgets on Projects/Overview pages**: `.dashboard-widget { position: relative }` creates a CSS stacking context trapping the colour picker (`z-[999]`) inside its parent widget. Adjacent widgets later in the DOM rendered above the picker dropdown, making it invisible and unselectable. **Fix:** When the colour picker opens, the parent widget's `z-index` is elevated to `50`. Reset on close (swatch click, click-away, and edit-mode toggle). (static/js/dashboard.js)
+
+## [1.119.8] — 2026-07-13
+
+### Added
+- **Tag filter on models page**: Nový sloupec "Štítky" s interaktivním dropdown filtrem na stránce modelů — automaticky obsahuje všechny dostupné štítky z projektů. Kliknutím na štítek u modelu se filtrují modely podle daného štítku. Tag badges are now clickable and filter the models list. Added `tag` query parameter to API and Alpine.js component with fulltext search dropdown. (routes/models.py, templates/models_index.html, templates/_models_cards.html, templates/_models_rows.html, templates/models_detail.html, messages.py)
+
+## [1.119.7] — 2026-07-13
+
+### Added
+- **Project tags displayed on models**: Modely nahrané přes projekty nyní přejímají a zobrazují štítky svého projektu. Project tags shown on model cards, list rows, and detail page when the model belongs to a project. Uses `ui-badge` style consistent with project detail page. (routes/models.py, templates/_models_cards.html, templates/_models_rows.html, templates/models_detail.html)
+
+## [1.119.6] — 2026-07-04
+
+### Added
+- Bambu: Ruční duplikování tisku — nová funkce `/bambu/job/<id>/duplicate` (POST) umožňuje vytvořit manuální kopii tisku, který nebyl synchronizován (edge case opakovaného tisku přímo na tiskárně). Nová kopie má `deducted=False` pro nezávislé přiřazení filamentu.
+
+### Fixed
+- N/A
+
 ## [1.119.4] - 2026-07-02
 ### Fixed
 - **Markdown code block unreadable in light theme**: `<code>` inside `<pre>` blocks in project descriptions/comments inherited `bg-gray-100` from the generic `[&_code]:bg-gray-100` Tailwind rule, rendering light text on a light background. Added `[&_pre_code]:bg-transparent` to override the background for code inside pre blocks. Affected: project description, project comments, and share page. (templates/_project_overview.html, templates/project_share.html)

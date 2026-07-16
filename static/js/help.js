@@ -413,6 +413,13 @@
                         cs: 'Klikněte na „Přiřadit projekt" u libovolné tiskové úlohy. Systém nabídne existující projekty na základě shody s názvem úlohy (fuzzy matching). Pokud žádný nevyhovuje, zobrazí se tlačítko „Vytvořit nový projekt" s předvyplněným názvem — jedním kliknutím projekt okamžitě vznikne a přiřadí se k úloze.',
                         en: 'Click "Assign project" on any print job. The system suggests existing projects based on fuzzy-matching the job title. If none match, a "Create new project" button appears with a pre-filled name — one click creates and assigns the project immediately.'
                     }
+                },
+                {
+                    title: { cs: 'Duplikovat tisk', en: 'Duplicate Print' },
+                    text: {
+                        cs: 'Ručně zduplikujte tisk, který nebyl synchronizován (např. opakovaný tisk přímo na tiskárně). Nová kopie má výchozí odpočet vypnutý (deducted=False), abyste mohli filament přiřadit a odečíst ručně.',
+                        en: 'Manually duplicate a print that was not synced (e.g. a reprint triggered directly on the printer). The new copy has deduction disabled (deducted=False) so you can assign and deduct filament manually.'
+                    }
                 }
             ]
         },

@@ -283,22 +283,40 @@
             <h2 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-triangle-exclamation text-orange-500 mr-2"></i>{{ t('waste_log_modal_title') }}</h2>
             <button type="button" onclick="document.getElementById('wasteModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="{{ t('close') }}">&times;</button>
         </div>
-        <form method="POST" action="{{ url_for('waste_add') }}">
+        <form id="wasteForm" @submit.prevent="submitWaste($el)" x-data="wasteForm()">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="job_id" :value="jobId">
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('filament') }}</label>
-                    <select id="wasteFilamentSelect" name="filament_id" required
-                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none">
-                        <option value="">{{ t('waste_select_filament') }}</option>
-                        {% for f in waste_filaments %}
-                        <option value="{{ f.id }}">{{ f.name }}</option>
-                        {% endfor %}
-                    </select>
+                    <div class="relative" @click.outside="filOpen = false">
+                        <input type="text" x-model="filQ" @focus="filOpen = true" @input="filOpen = true"
+                            placeholder="{{ t('waste_select_filament') }}" autocomplete="off"
+                            :class="filId ? 'border-blue-400 bg-blue-50' : 'border-gray-300'"
+                            class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none">
+                        <div x-show="filOpen" x-cloak class="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                            <div @click="selectFil('', ''); filOpen = false"
+                                class="px-3 py-2 cursor-pointer text-sm border-b border-gray-100 hover:bg-gray-50"
+                                :class="!filId ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-500'">
+                                — {{ t('waste_select_filament') }} —
+                            </div>
+                            <template x-for="opt in filteredFils" :key="opt.id">
+                                <div @click="selectFil(opt.id, opt.label); filOpen = false"
+                                    class="px-3 py-2 cursor-pointer text-sm border-b border-gray-50 last:border-b-0 flex items-center justify-between"
+                                    :class="filId == opt.id ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-blue-50'">
+                                    <span class="flex items-center gap-2">
+                                        <span class="w-3 h-3 rounded-full border border-gray-300" :style="'background-color:' + (opt.color_hex || '#ccc')"></span>
+                                        <span x-text="opt.label"></span>
+                                    </span>
+                                    <i x-show="filId == opt.id" class="fa-solid fa-check text-blue-500 text-xs"></i>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('waste_reason_label') }}</label>
-                    <select id="wasteReasonSelect" name="reason" required
+                    <select id="wasteReasonSelect" x-model="reason" required
                         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none">
                         <option value="stringing">{{ t('waste_reason_stringing') }}</option>
                         <option value="warping">{{ t('waste_reason_warping') }}</option>
@@ -312,35 +330,50 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('waste_weight') }} (g)</label>
-                    <input type="number" id="wasteWeightInput" name="weight_grams" step="0.1" min="0"
+                    <input type="number" x-model="weight" step="0.1" min="0"
                         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
                         placeholder="0.0">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project') }}</label>
-                    <select id="wasteProjectSelect" name="project_id"
-                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none">
-                        <option value="">{{ t('waste_select_project') }}</option>
-                        {% for p in waste_projects %}
-                        <option value="{{ p.id }}">{{ p.name }}</option>
-                        {% endfor %}
-                    </select>
+                    <div class="relative" @click.outside="projOpen = false">
+                        <input type="text" x-model="projQ" @focus="projOpen = true" @input="projOpen = true"
+                            placeholder="{{ t('waste_select_project') }}" autocomplete="off"
+                            :class="projId ? 'border-blue-400 bg-blue-50' : 'border-gray-300'"
+                            class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none">
+                        <div x-show="projOpen" x-cloak class="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                            <div @click="selectProj('', ''); projOpen = false"
+                                class="px-3 py-2 cursor-pointer text-sm border-b border-gray-100 hover:bg-gray-50"
+                                :class="!projId ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-500'">
+                                — {{ t('waste_select_project') }} —
+                            </div>
+                            <template x-for="opt in filteredProjs" :key="opt.id">
+                                <div @click="selectProj(opt.id, opt.name); projOpen = false"
+                                    class="px-3 py-2 cursor-pointer text-sm border-b border-gray-50 last:border-b-0 flex items-center justify-between"
+                                    :class="projId == opt.id ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-blue-50'">
+                                    <span x-text="opt.name"></span>
+                                    <i x-show="projId == opt.id" class="fa-solid fa-check text-blue-500 text-xs"></i>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('waste_notes') }}</label>
-                    <textarea id="wasteNotesInput" name="notes" rows="2"
+                    <textarea x-model="notes" rows="2"
                         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
                         placeholder="{{ t('waste_notes_placeholder') }}"></textarea>
                 </div>
             </div>
             <div class="flex justify-end gap-3 mt-6">
-                <button type="button" onclick="document.getElementById('wasteModal').classList.add('hidden')"
+                <button type="button" @click="closeModal()"
                     class="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
                     {{ t('cancel') }}
                 </button>
-                <button type="submit"
-                    class="px-4 py-2 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition">
-                    {{ t('waste_add') }}
+                <button type="submit" :disabled="saving"
+                    class="px-4 py-2 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition" :class="saving ? 'opacity-60' : ''">
+                    <span x-show="!saving">{{ t('waste_add') }}</span>
+                    <span x-show="saving"><i class="fa-solid fa-spinner fa-spin mr-1"></i>{{ t('saving') }}...</span>
                 </button>
             </div>
         </form>
@@ -348,17 +381,6 @@
 </div>
 
 <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
-// ── Waste from failed print: modal open handler ───────────────────────────────────────────
-document.addEventListener('click', function(e) {
-    var btn = e.target.closest('[data-waste-btn]');
-    if (!btn) return;
-    document.getElementById('wasteFilamentSelect').value = btn.dataset.filamentId || '';
-    document.getElementById('wasteReasonSelect').value = 'spaghetti';
-    document.getElementById('wasteWeightInput').value = btn.dataset.weight || '';
-    document.getElementById('wasteProjectSelect').value = btn.dataset.projectId || '';
-    document.getElementById('wasteNotesInput').value = btn.dataset.notes || '';
-    document.getElementById('wasteModal').classList.remove('hidden');
-});
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         var m = document.getElementById('wasteModal');
@@ -430,8 +452,12 @@ function _materialFamilyMatch(preferred, candidate) {
     return _materialFamilyToken(a) === _materialFamilyToken(b);
 }
 
+// ── Rank filaments by material/colour match to AMS slot (for dropdown suggestions)
+// Limits input to 80 filaments before scoring to keep per-slot init cheap.
 function _rankFilaments(base, preferredMaterial, preferredColorHex) {
-    return base.slice().sort((a, b) => {
+    // Take first 80 — sufficient for colour/material sorting, fast per-component
+    var limited = base.slice(0, 80);
+    return limited.slice().sort((a, b) => {
         const aMat = (a.material_name || '').toLowerCase();
         const bMat = (b.material_name || '').toLowerCase();
         const da = _hexDistance(a.color_hex, preferredColorHex);
@@ -479,6 +505,123 @@ const _BI = {
   },
 {% endfor %}{% endif %}
 };
+// ── Waste form: interactive filament + project search with AJAX submit ──────────
+function wasteForm() {
+    return {
+        jobId: 0,
+        filId: '', filQ: '', filOpen: false,
+        projId: '', projQ: '', projOpen: false,
+        reason: 'spaghetti',
+        weight: '',
+        notes: '',
+        saving: false,
+        get filteredFils() {
+            var q = _normSearchText(this.filQ);
+            if (!q) return _BF.slice(0, 30);
+            return _BF.filter(function(f) {
+                return _normSearchText(f.label).includes(q)
+                    || _normSearchText(f.mat).includes(q)
+                    || _normSearchText(f.material_name || '').includes(q)
+                    || _normSearchText(f.color_hex || '').includes(q);
+            }).slice(0, 30);
+        },
+        get filteredProjs() {
+            var q = _normSearchText(this.projQ);
+            if (!q) return _BP.slice(0, 30);
+            return _BP.filter(function(p) {
+                return _normSearchText(p.name).includes(q);
+            }).slice(0, 30);
+        },
+        selectFil(id, label) { this.filId = id; this.filQ = label; this.filOpen = false; },
+        selectProj(id, name) { this.projId = id; this.projQ = name; this.projOpen = false; },
+        setFilament(id, label) { this.filId = id; this.filQ = label; },
+        setProject(id, name) { this.projId = id; this.projQ = name; },
+        closeModal() { document.getElementById('wasteModal').classList.add('hidden'); },
+        async submitWaste(formEl) {
+            if (!this.filId || this.saving) return;
+            this.saving = true;
+            var csrf = formEl.querySelector('[name="csrf_token"]').value;
+            try {
+                // 1. Create waste record via AJAX
+                var fd1 = new FormData();
+                fd1.append('csrf_token', csrf);
+                fd1.append('filament_id', this.filId);
+                fd1.append('project_id', this.projId || '');
+                fd1.append('reason', this.reason);
+                fd1.append('weight_grams', this.weight || '0');
+                fd1.append('notes', this.notes || '');
+                var r1 = await fetch('/waste/_add', { method: 'POST', body: fd1 });
+                var d1 = await r1.json();
+                if (!d1.success) { alert(d1.error || 'Waste creation failed'); this.saving = false; return; }
+
+                // 2. Map Bambu job to the selected filament + project + deduct stock
+                if (this.jobId > 0) {
+                    var fd2 = new FormData();
+                    fd2.append('csrf_token', csrf);
+                    fd2.append('filament_id', this.filId);
+                    if (this.projId) fd2.append('project_id', this.projId);
+                    fd2.append('deduct', '1');
+                    var r2 = await fetch('/bambu/job/' + this.jobId + '/map?ajax=1', { method: 'POST', body: fd2 });
+                    var d2 = await r2.json();
+                    if (d2.ok) {
+                        // Reload the page so the job card updates with new filament assignment
+                        window.location.reload();
+                        return;
+                    }
+                }
+                this.closeModal();
+            } catch (err) {
+                console.error('Waste submit failed:', err);
+            } finally {
+                this.saving = false;
+            }
+        },
+    };
+}
+// ── Waste from failed print: modal open handler ───────────────────────────────────────
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-waste-btn]');
+    if (!btn) return;
+
+    var jobId = parseInt(btn.dataset.jobId) || 0;
+    var bi = jobId ? (_BI[jobId] || {}) : {};
+    var prefMat = bi.prefMaterial || '';
+    var prefCol = bi.prefColor || '';
+
+    // Auto-suggest filament based on AMS data (same logic as per-slot assignment)
+    var ranked = _rankFilaments(_BF, prefMat, prefCol);
+    var suggested = _suggestedFilaments(ranked, prefMat, prefCol);
+    var best = suggested[0] || null;
+
+    // Find the waste form Alpine component
+    var wasteFormEl = document.querySelector('[x-data="wasteForm()"]');
+    if (wasteFormEl && wasteFormEl.__x) {
+        var comp = wasteFormEl.__x.$data;
+        comp.jobId = jobId;
+        if (best) {
+            comp.setFilament(best.id, best.label);
+        } else if (btn.dataset.filamentId) {
+            var existing = _BF.find(function(f) { return f.id == parseInt(btn.dataset.filamentId); });
+            if (existing) comp.setFilament(existing.id, existing.label);
+            else comp.setFilament('', '');
+        } else {
+            comp.setFilament('', '');
+        }
+        // Pre-fill project from button data
+        if (btn.dataset.projectId) {
+            var proj = _BP.find(function(p) { return p.id == btn.dataset.projectId; });
+            if (proj) comp.setProject(proj.id, proj.name);
+            else comp.setProject('', '');
+        } else {
+            comp.setProject('', '');
+        }
+        comp.reason = 'spaghetti';
+        comp.weight = btn.dataset.weight || '';
+        comp.notes = btn.dataset.notes || '';
+    }
+
+    document.getElementById('wasteModal').classList.remove('hidden');
+});
 
 // ── Project suggestions: match cleaned job title against project names ────────
 function _suggestedProjects(cleanedTitle) {
@@ -1069,5 +1212,31 @@ function _lbEsc(e) { if (e.key === 'Escape') closeBambuLightbox(); }
         _observer.observe(sentinel);
     }
 })();
+
+async function bambuDuplicateJob(jobId, confirmMsg) {
+    if (!confirm(confirmMsg)) return;
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    try {
+        const resp = await fetch(`/bambu/job/${jobId}/duplicate`, {
+            method: 'POST',
+            headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/json'}
+        });
+        const data = await resp.json();
+        if (data.ok) {
+            const el = document.getElementById('sync-result');
+            if (el) {
+                el.textContent = data.message || '{{ t("bambu_duplicate_success") }}';
+                el.className = 'rounded-lg px-4 py-3 text-sm font-medium bg-green-100 text-green-700';
+                el.classList.remove('hidden');
+                setTimeout(() => el.classList.add('hidden'), 4000);
+            }
+            window.location.reload();
+        } else {
+            alert(data.error || '{{ t("bambu_duplicate_error") }}');
+        }
+    } catch (e) {
+        alert('{{ t("bambu_duplicate_error") }}');
+    }
+}
 </script>
 {% endblock %}

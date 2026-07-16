@@ -68,7 +68,7 @@
 
     <!-- Filters & Sorting Panel -->
     <div class="ui-panel relative z-20">
-        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 items-end">
+        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
             <!-- Fulltext search -->
             <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">{{ t('search_filament') }}</label>
@@ -137,6 +137,36 @@
                         </div>
                     </template>
                     <div x-show="filteredFileTypes.length === 0" class="px-3 py-2 text-gray-400 dark:text-slate-500 italic text-xs text-center">–</div>
+                </div>
+            </div>
+
+            <!-- Tag interactive dropdown -->
+            <div class="relative" @click.outside="tagOpen = false">
+                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500 mb-2">{{ t('tag_list') }}</label>
+                <div class="relative">
+                    <input type="text" x-model="tagQ" @focus="tagOpen = true" @input="tagOpen = true"
+                        placeholder="{{ t('filter_tags_placeholder') }}" autocomplete="off"
+                        :class="tag ? 'border-blue-400 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-600' : ''"
+                        class="ui-input pr-8">
+                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400">
+                        <i class="fa-solid fa-chevron-down text-xs transition-transform duration-150" :class="tagOpen ? 'rotate-180' : ''"></i>
+                    </div>
+                </div>
+                <div x-show="tagOpen" x-cloak class="absolute z-30 w-full mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                    <div @click="selectTag(''); tagOpen = false"
+                        class="px-3 py-2 cursor-pointer text-sm italic border-b border-gray-100 dark:border-slate-700"
+                        :class="tag === '' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-400 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-700/50'">
+                        — {{ t('filter_all') }} —
+                    </div>
+                    <template x-for="opt in filteredTagOptions" :key="opt">
+                        <div @click="selectTag(opt); tagOpen = false"
+                            class="px-3 py-2 cursor-pointer text-sm border-b border-gray-50 dark:border-slate-700/50 last:border-b-0 flex items-center justify-between"
+                            :class="tag === opt ? 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-800 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-slate-700/50'">
+                            <span x-text="opt"></span>
+                            <i x-show="tag === opt" class="fa-solid fa-check text-blue-500 text-xs"></i>
+                        </div>
+                    </template>
+                    <div x-show="filteredTagOptions.length === 0" class="px-3 py-2 text-gray-400 dark:text-slate-500 italic text-xs text-center">–</div>
                 </div>
             </div>
 
@@ -453,6 +483,12 @@ function modelsApp() {
         fileTypeOpen: false,
         fileTypeOptions: {{ model_extensions|tojson }},
 
+        // Tag filter
+        tag: '',
+        tagQ: '',
+        tagOpen: false,
+        tagOptions: {{ tag_options|tojson }},
+
         // Category filter
         categoryId: '',
         categoryQ: '',
@@ -476,6 +512,10 @@ function modelsApp() {
             const q = (this.fileTypeQ || '').toLowerCase();
             return q ? this.fileTypeOptions.filter(e => e.toLowerCase().includes(q)) : this.fileTypeOptions;
         },
+        get filteredTagOptions() {
+            const q = (this.tagQ || '').toLowerCase();
+            return q ? this.tagOptions.filter(t => t.toLowerCase().includes(q)) : this.tagOptions;
+        },
         get filteredCategories() {
             const q = ((this.categoryQ || '').toLowerCase()).normalize('NFD').replace(/[\u0300-\u036f]/g, '');
             if (!q) return this.categoryOptions;
@@ -495,6 +535,11 @@ function modelsApp() {
             this.fileTypeQ = val ? val.toUpperCase() : '';
             this.page = 1;
         },
+        selectTag(val) {
+            this.tag = val;
+            this.tagQ = val || '';
+            this.page = 1;
+        },
         selectCategory(id, name) {
             this.categoryId = id;
             this.categoryQ = name;
@@ -511,6 +556,14 @@ function modelsApp() {
             const defaultSort = this.sortOptions.find(o => o.value === this.sortBy);
             if (defaultSort) this.sortQ = defaultSort.label;
 
+            // Read URL query parameters for initial filter state
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlTag = urlParams.get('tag');
+            if (urlTag) {
+                this.tag = urlTag;
+                this.tagQ = urlTag;
+            }
+
             this.$watch('viewMode', val => {
                 localStorage.setItem('models_view_mode', val);
                 this.fetchContent();
@@ -518,6 +571,7 @@ function modelsApp() {
             this.$watch('sortBy', () => { this.fetchContent(); });
             this.$watch('projectId', () => { this.fetchContent(); });
             this.$watch('fileType', () => { this.fetchContent(); });
+            this.$watch('tag', () => { this.page = 1; this.fetchContent(); });
             this.$watch('categoryId', () => { this.fetchContent(); });
             this.$watch('fulltext', () => { this.page = 1; this.fetchContent(); });
             this.$watch('noProject', () => { this.page = 1; this.fetchContent(); });
@@ -546,6 +600,7 @@ function modelsApp() {
                 });
                 if (this.noProject) params.append('no_project', '1');
                 if (this.noCategory) params.append('no_category', '1');
+                if (this.tag) params.append('tag', this.tag);
 
                 const res = await fetch(`/api/models-list?${params.toString()}`, {
                     signal: this._abortController.signal
@@ -594,6 +649,8 @@ function modelsApp() {
             this.projectQ = '';
             this.fileType = '';
             this.fileTypeQ = '';
+            this.tag = '';
+            this.tagQ = '';
             this.categoryId = '';
             this.categoryQ = '';
             this.fulltext = '';
