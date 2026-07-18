@@ -477,7 +477,7 @@
                     <div x-data="uploadStepper({
                         url: '{{ url_for('project_upload_file', id=project.id) }}',
                         accept: '.3mf,.stl,.obj,.amf,.step,.stp,.gcode,.gc,.bgcode,.jpg,.jpeg,.png,.gif,.webp',
-                        maxSizeMB: 64,
+                        maxSizeMB: 256,
                         isModel: (name) => /\.(3mf|stl|obj|amf|step|stp|gcode|gc|bgcode)$/i.test(name)
                     })" class="mb-5">
                         <div x-show="phase === 'idle' || phase === 'error'"
@@ -958,7 +958,7 @@ function uploadStepper(config) {
     return {
         url: config.url,
         accept: config.accept,
-        maxSizeMB: config.maxSizeMB || 64,
+        maxSizeMB: config.maxSizeMB || 256,
         isModel: config.isModel || (() => false),
         phase: 'idle',         // idle | validating | uploading | preview | done | error
         progress: 0,

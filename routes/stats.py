@@ -207,7 +207,7 @@ def register(app):
         usage_daily = {key: 0.0 for key in label_keys}
         purchase_daily = {key: 0.0 for key in label_keys}
         _label_keys_snapshot = list(label_keys)
-        material_daily = defaultdict(lambda: {key: 0.0 for key in _label_keys_snapshot})
+        material_daily = defaultdict(lambda keys=list(label_keys): {key: 0.0 for key in keys})
         purchase_filament_rows = []
         # Heatmap: 7 rows (Mon..Sun) × 24 columns (hours) of total usage in grams.
         # Uses the last 90 days of movement history (extended window) for richer

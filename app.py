@@ -51,7 +51,7 @@ from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
 
-APP_VERSION = '1.119.14'
+APP_VERSION = '1.120.1'
 
 csrf = CSRFProtect()
 
@@ -81,7 +81,7 @@ def create_app(test_config=None) -> Flask:
         app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(db_dir, "filament.db")}'
 
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['MAX_CONTENT_LENGTH'] = 64 * 1024 * 1024
+    app.config['MAX_CONTENT_LENGTH'] = 256 * 1024 * 1024
     app.config['PROJECT_UPLOAD_FOLDER'] = os.path.join(db_dir, 'uploads')
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'

@@ -572,7 +572,10 @@ def register(app):
             safe_commit()
             flash('undo_toast_applied', 'success')
         except Exception:
-            db.session.rollback()
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
             app.logger.exception("Undo action failed")
             flash('undo_toast_failed', 'error')
 
@@ -934,7 +937,10 @@ def register(app):
         try:
             safe_commit()
         except Exception:
-            db.session.rollback()
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
             app.logger.exception("Community DB import commit failed")
             imported = 0
             flash(translate('community_db_import_failed'), 'error')

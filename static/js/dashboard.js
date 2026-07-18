@@ -471,7 +471,7 @@ function createWidgetLayoutManager(config) {
                             return function(colorId) {
                                 if (!layout.colors) layout.colors = {};
                                 layout.colors[wid] = colorId;
-                                var el = document.querySelector('[data-widget-id="' + wid + '"]');
+                                 var el = document.querySelector('[data-widget-id="' + CSS.escape(wid) + '"]');
                                 if (el) _dashInnerCard(el).style.backgroundColor = _dashGetBg(colorId);
                                 syncVisibility();  // refresh dot in overview panel
                                 saveLayout();
@@ -1061,7 +1061,7 @@ function createCardResizeManager(config) {
 
     // ── Size ──────────────────────────────────────────────────────────────────
     function applySize(cardId, size) {
-        var card = document.querySelector('[data-card-id="' + cardId + '"]');
+        var card = document.querySelector('[data-card-id="' + CSS.escape(cardId) + '"]');
         if (!card) return;
         clearXlSpan(card);
         var nextSize = parseInt(size || getDefaultSize(card), 10) || getDefaultSize(card);
@@ -1070,7 +1070,7 @@ function createCardResizeManager(config) {
 
     function setSize(cardId, size) {
         var layout      = config.getLayout();
-        var card        = document.querySelector('[data-card-id="' + cardId + '"]');
+        var card        = document.querySelector('[data-card-id="' + CSS.escape(cardId) + '"]');
         if (!card) return;
         var defaultSize = getDefaultSize(card);
         if (parseInt(size, 10) === defaultSize) {
@@ -1084,7 +1084,7 @@ function createCardResizeManager(config) {
 
     // ── Row limits ────────────────────────────────────────────────────────────
     function applyLimit(cardId, limit) {
-        var card = document.querySelector('[data-card-id="' + cardId + '"]');
+        var card = document.querySelector('[data-card-id="' + CSS.escape(cardId) + '"]');
         if (!card) return;
         var lim = (limit === 'all') ? Infinity : parseInt(limit, 10);
         card.querySelectorAll('[data-row-index]').forEach(function(row) {
@@ -1156,7 +1156,7 @@ function createCardResizeManager(config) {
                             var layout = config.getLayout();
                             if (!layout.colors) layout.colors = {};
                             layout.colors[cid] = colorId;
-                            var el = document.querySelector('[data-card-id="' + cid + '"]');
+                             var el = document.querySelector('[data-card-id="' + CSS.escape(cid) + '"]');
                             if (el) el.style.backgroundColor = _dashGetBg(colorId);
                             config.saveLayout();
                             if (typeof updateRestorePanel === 'function') updateRestorePanel();
@@ -1189,7 +1189,7 @@ function createCardResizeManager(config) {
             var layout = config.getLayout();
             if (!layout.heights) layout.heights = {};
             layout.heights[resizeState.id] = resizeState.currentHeight;
-            var card = document.querySelector('[data-card-id="' + resizeState.id + '"]');
+            var card = document.querySelector('[data-card-id="' + CSS.escape(resizeState.id) + '"]');
             if (card) card.style.minHeight = resizeState.currentHeight + 'px';
             config.saveLayout();
         }
@@ -1213,7 +1213,7 @@ function createCardResizeManager(config) {
         var layout = config.getLayout();
         if (!layout.heights) return;
         Object.entries(layout.heights).forEach(function(entry) {
-            var el = document.querySelector('[data-card-id="' + entry[0] + '"]');
+            var el = document.querySelector('[data-card-id="' + CSS.escape(entry[0]) + '"]');
             if (el) el.style.minHeight = entry[1] + 'px';
         });
     }

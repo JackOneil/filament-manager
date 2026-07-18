@@ -304,7 +304,7 @@ class Project(db.Model):
     client_email = db.Column(db.String(255), nullable=True)
     client_phone = db.Column(db.String(50), nullable=True)
     estimated_print_time = db.Column(db.Integer, nullable=False, default=0) # in minutes
-    status = db.Column(db.String(20), default='NEW', index=True) # PENDING_APPROVAL, APPROVED, REJECTED, PRINTING, DONE
+    status = db.Column(db.String(20), nullable=False, default='NEW', index=True) # PENDING_APPROVAL, APPROVED, REJECTED, PRINTING, DONE
     priority = db.Column(db.String(10), nullable=False, default='medium')  # low, medium, high, urgent
     tag_text = db.Column(db.Text, nullable=True)
     share_token = db.Column(db.String(64), unique=True, nullable=True, index=True)
@@ -457,7 +457,7 @@ class ProjectTemplate(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    estimated_print_time = db.Column(db.Integer, default=0)
+    estimated_print_time = db.Column(db.Integer, nullable=False, default=0)
     tag_text = db.Column(db.Text, nullable=True)
     created_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     created_at = db.Column(UtcDateTime, default=_utc_now)

@@ -242,7 +242,7 @@
         <h2 class="text-2xl font-bold mt-1 mb-4">{{ t('project_comments_heading') }}</h2>
         {% if can_edit_project %}
         <form method="POST" action="{{ url_for('project_add_comment', id=project.id) }}" class="ui-card-soft p-4 mb-4 space-y-3">
-            <div x-data='markdownEditor({ defaultMode: "visual", placeholder: "{{ t("project_comment_placeholder") }}" })' class="md-editor-shell">
+            <div x-data='markdownEditor({ defaultMode: "visual", placeholder: {{ t("project_comment_placeholder")|tojson }} })' class="md-editor-shell">
                 <textarea x-ref="source" x-model="value" name="body" class="hidden"></textarea>
                 <div class="md-editor-toolbar">
                     <div class="md-editor-toolbar-group">
@@ -334,7 +334,7 @@
                 </div>
                 {% if comment.can_edit %}
                 <form x-show="editing" x-cloak method="POST" action="{{ url_for('project_update_comment', id=project.id, comment_id=comment.id) }}" class="space-y-3 mt-3">
-                    <div x-data='markdownEditor({ defaultMode: "visual", placeholder: "{{ t("project_comment_placeholder") }}" })' class="md-editor-shell">
+                    <div x-data='markdownEditor({ defaultMode: "visual", placeholder: {{ t("project_comment_placeholder")|tojson }} })' class="md-editor-shell">
                         <textarea x-ref="source" x-model="value" name="body" class="hidden">{{ comment.body }}</textarea>
                         <div class="md-editor-toolbar">
                             <div class="md-editor-toolbar-group">

@@ -172,7 +172,7 @@ def models_index():
     user = get_current_user()
     base_q = ProjectFile.query.filter(ProjectFile.parent_file_id.is_(None))
     if not is_admin(user):
-        base_q = base_q.outerjoin(Project).filter(Project.owner_user_id == user.id if user else False)
+        base_q = base_q.outerjoin(Project).filter(Project.owner_user_id == (user.id if user else None))
     ext_conditions = [ProjectFile.filename.like(f'%.{ext}') for ext in MODEL_EXTENSIONS]
     base_q = base_q.filter(db.or_(*ext_conditions))
 

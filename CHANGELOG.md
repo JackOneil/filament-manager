@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.120.1] — 2026-07-18
+
+### Added
+- **Tag suggestions v editaci projektu**: Do formuláře pro editaci projektu přidán dynamický seznam existujících štítků (`tag_existing`). Kliknutím na štítek se přidá do vstupního pole. Alpine.js komponenta `tagEditor` zobrazuje pouze štítky, které ještě nejsou v projektu použity. Backend v `routes/projects.py:465` sbírá unikátní existující tagy ze všech projektů a filtruje již použité. (templates/project_edit.html, routes/projects.py, messages.py)
+
+## [1.120.0] — 2026-07-18
+
+### Changed
+- **Upload limit zvýšen z 64 MB na 256 MB**: `MAX_CONTENT_LENGTH` v `app.py` změněno na 256 MiB. Client-side validace v `uploadStepper` (`project_detail.html`) synchronizována na 256 MB. Týká se nahrávání 3D modelů (STL, 3MF, STEP) i obrázků do projektů.
+
+## [1.119.15] — 2026-07-18
+
+### Fixed
+- **BUG-554/576**: Oprava SQLAlchemy filtru `user.id if user else False` → `user.id if user else None` v `routes/models.py`.
+- **BUG-555**: Oprava lambda capture-by-reference v `routes/stats.py:210` — použít default argument binding.
+- **BUG-557**: Oprava maskování výjimek v `routes/inventory.py` — `db.session.rollback()` nyní obalen do vnitřního `try/except`.
+- **BUG-570**: Odstraněn neexistující `LegacyAPIWarning` filter z `pytest.ini`; přidány `pytest` a `pytest-xdist` do `requirements.txt`.
+- **BUG-573**: Přidáno `nullable=False` ke sloupcům `Project.status` a `ProjectTemplate.estimated_print_time` v `models.py`.
+- **BUG-574**: CSS selector injection fix v `static/js/dashboard.js` — 7 `querySelector` volání nyní používá `CSS.escape()`.
+- **BUG-711**: Opraven N+1 dotaz na `ProjectComment.reactions` v `routes/projects.py:336` — přidán `joinedload(ProjectComment.reactions)`.
+- **BUG-567 (částečně)**: Opraven XSS v `x-data` Pattern A (4 instance) — `placeholder: "{{ t(...) }}"` → `placeholder: {{ t(...)|tojson }}`.
+
+### Verified
+- **BUG-556**: False positive — `imported_files_map` v `routes/backup.py` je aktivně používán na řádcích 524 a 531.
+- **BUG-563**: Již opraveno dříve — obě lokace v `routes/stats.py` obsahují všechny 4 action types.
+- **BUG-571**: `.dockerignore` již obsahuje `node_modules/`, `*.log`, `.env`.
+
 ## [1.119.14] — 2026-07-18
 
 ### Fixed

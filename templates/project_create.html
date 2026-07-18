@@ -137,7 +137,7 @@
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">{{ t('project_description') }}</label>
                 <p class="text-xs text-gray-500 mb-2">{{ t('markdown_editor_help') }}</p>
-                <div x-data='markdownEditor({ defaultMode: "visual", placeholder: "{{ t("project_description") }}", initialValue: "" })'
+                <div x-data='markdownEditor({ defaultMode: "visual", placeholder: {{ t("project_description")|tojson }}, initialValue: "" })'
                      class="md-editor-shell">
                     <textarea x-ref="source" x-model="value" name="description" class="hidden"></textarea>
                     <div class="md-editor-toolbar">

@@ -334,6 +334,7 @@ def register(app):
                 joinedload(Project.links),
                 joinedload(Project.quotes),
                 joinedload(Project.comments).joinedload(ProjectComment.user),
+                joinedload(Project.comments).joinedload(ProjectComment.reactions),
                 joinedload(Project.todos).joinedload(ProjectTodo.user),
                 joinedload(Project.filaments).joinedload(ProjectFilament.filament).joinedload(Filament.color),
                 joinedload(Project.filaments).joinedload(ProjectFilament.filament).joinedload(Filament.brand),
@@ -460,7 +461,19 @@ def register(app):
                 project.owner_name = owner_name
             safe_commit()
             return redirect(url_for('project_detail', id=project.id))
-        return render_template('project_edit.html', project=project, project_tags=format_tags(project.tag_text), can_manage_project=is_admin())
+        # Collect existing unique project tags for suggestions (exclude tags already on this project)
+        current_tags_lower = {t.lower() for t in parse_tags(project.tag_text or '')}
+        all_rows = db.session.query(Project.tag_text).filter(Project.tag_text.isnot(None), Project.tag_text != '').all()
+        seen = set()
+        existing_tags = []
+        for row in all_rows:
+            for tag in parse_tags(row[0]):
+                low = tag.lower()
+                if low not in seen and low not in current_tags_lower:
+                    seen.add(low)
+                    existing_tags.append(tag)
+        existing_tags.sort(key=str.lower)
+        return render_template('project_edit.html', project=project, project_tags=format_tags(project.tag_text), existing_tags=existing_tags, can_manage_project=is_admin())
 
     @bp.route('/projects/<int:id>/delete', methods=['POST'])
     def project_delete(id):
