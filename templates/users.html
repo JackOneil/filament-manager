@@ -17,7 +17,7 @@
                 <div class="font-semibold">{{ t('users_invite_generated') }}</div>
                 {% set invite_url = request.url_root.rstrip('/') + url_for('activate_invite') + '?code=' + generated_invite %}
                 <div class="mt-2 break-all text-xs bg-gray-50 rounded-lg p-2 font-mono">{{ invite_url }}</div>
-                <button onclick="navigator.clipboard.writeText('{{ invite_url|e }}').then(() => { this.textContent = '{{ t('copied') }}'; setTimeout(() => { this.textContent = '{{ t('users_copy_link') }}'; }, 2000); })"
+                <button onclick='navigator.clipboard.writeText({{ invite_url|tojson }}).then(() => { this.textContent = '{{ t('copied') }}'; setTimeout(() => { this.textContent = '{{ t('users_copy_link') }}'; }, 2000); })'
                         class="mt-2 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition font-semibold">
                     <i class="fa-regular fa-copy mr-1"></i>{{ t('users_copy_link') }}
                 </button>

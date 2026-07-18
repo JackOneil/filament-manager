@@ -795,11 +795,11 @@
                                 <i class="fa-solid fa-cart-shopping text-xs"></i>
                             </a>
                             {% elif item.filament.brand.shop_url %}
-                            <button type="button" onclick="openReorderShop('{{ item.filament.name|e }}', '{{ item.filament.brand.shop_url|e }}')" class="w-8 h-8 rounded-full flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-800/40 transition flex-shrink-0" title="{{ t('stats_search_shop') }}">
+                            <button type="button" onclick='openReorderShop({{ item.filament.name|tojson }}, {{ item.filament.brand.shop_url|tojson }})' class="w-8 h-8 rounded-full flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-800/40 transition flex-shrink-0" title="{{ t('stats_search_shop') }}">
                                 <i class="fa-solid fa-cart-shopping text-xs"></i>
                             </button>
                             {% elif app_settings and app_settings.reorder_shop_url %}
-                            <button type="button" onclick="openReorderShop('{{ item.filament.name|e }}', '{{ app_settings.reorder_shop_url|e }}')" class="w-8 h-8 rounded-full flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-800/40 transition flex-shrink-0" title="{{ t('stats_search_shop') }}">
+                            <button type="button" onclick='openReorderShop({{ item.filament.name|tojson }}, {{ app_settings.reorder_shop_url|tojson }})' class="w-8 h-8 rounded-full flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-800/40 transition flex-shrink-0" title="{{ t('stats_search_shop') }}">
                                 <i class="fa-solid fa-cart-shopping text-xs"></i>
                             </button>
                             {% endif %}

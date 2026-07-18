@@ -80,9 +80,9 @@
             {% if fil.shop_url %}
             <a href="{{ fil.shop_url }}" target="_blank" rel="noopener noreferrer" title="{{ t('stats_open_shop') }}" class="text-green-500 hover:text-green-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-cart-shopping"></i></a>
             {% elif fil.brand.shop_url %}
-            <button type="button" onclick="openReorderShop('{{ fil.name|e }}', '{{ fil.brand.shop_url|e }}')" title="{{ t('stats_search_shop') }}" aria-label="{{ t('stats_search_shop') }}" class="text-green-500 hover:text-green-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-cart-shopping"></i></button>
+            <button type="button" onclick='openReorderShop({{ fil.name|tojson }}, {{ fil.brand.shop_url|tojson }})' title="{{ t('stats_search_shop') }}" aria-label="{{ t('stats_search_shop') }}" class="text-green-500 hover:text-green-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-cart-shopping"></i></button>
             {% elif app_settings and app_settings.reorder_shop_url %}
-            <button type="button" onclick="openReorderShop('{{ fil.name|e }}', '{{ app_settings.reorder_shop_url|e }}')" title="{{ t('stats_search_shop') }}" aria-label="{{ t('stats_search_shop') }}" class="text-green-500 hover:text-green-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-cart-shopping"></i></button>
+            <button type="button" onclick='openReorderShop({{ fil.name|tojson }}, {{ app_settings.reorder_shop_url|tojson }})' title="{{ t('stats_search_shop') }}" aria-label="{{ t('stats_search_shop') }}" class="text-green-500 hover:text-green-700 transition-colors text-sm sm:text-base"><i class="fa-solid fa-cart-shopping"></i></button>
             {% endif %}
         </div>
     </div>

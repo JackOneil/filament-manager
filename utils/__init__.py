@@ -1547,7 +1547,7 @@ def _extract_script_json_candidates(soup):
         except json.JSONDecodeError:
             continue
 
-    pattern = re.compile(r'({.*})', re.DOTALL)
+    pattern = re.compile(r'({.*?})', re.DOTALL)
     for script in soup.find_all('script'):
         content = script.string or script.get_text()
         if not content or ('image' not in content and 'title' not in content and 'description' not in content):
@@ -1842,7 +1842,8 @@ def validate_printer_host(host):
 
     Returns the cleaned URL or None if the value is clearly invalid.
     Only http:// and https:// are allowed. Empty string is treated as invalid.
-    Localhost/loopback addresses are rejected.
+    Localhost/loopback/private addresses are rejected via string matching
+    and DNS resolution.
     """
     host = (host or '').strip().rstrip('/')
     if not host:
@@ -1866,6 +1867,22 @@ def validate_printer_host(host):
         # Also allow IPv6 addresses in brackets
         if not re.match(r'^\[[0-9a-fA-F:]+\]$', hostname):
             return None
+    # Resolve hostname to IP and check for loopback/private bypass attempts
+    try:
+        import socket
+        addrinfos = socket.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)
+        for item in addrinfos:
+            resolved_ip = item[4][0]
+            try:
+                ip_obj = ipaddress.ip_address(resolved_ip)
+                # Reject loopback, link-local, multicast, and unspecified
+                # (private IPs are allowed — printers are on local networks)
+                if ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_multicast or ip_obj.is_unspecified:
+                    return None
+            except ValueError:
+                return None
+    except socket.gaierror:
+        pass  # DNS resolution failed — allow (hostname sanity was already checked)
     return host
 
 

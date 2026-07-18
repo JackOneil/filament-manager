@@ -163,7 +163,7 @@
                 <i class="fa-solid fa-link"></i> {{ t('bambu_map_filament') }}
             </button>
             <button type="button"
-                onclick="bambuDuplicateJob({{ job.id }}, '{{ t('bambu_duplicate_confirm')|e }}')"
+                onclick='bambuDuplicateJob({{ job.id }}, {{ t('bambu_duplicate_confirm')|tojson }})'
                 class="text-xs text-blue-500 hover:text-blue-700 transition-colors px-3 py-1.5 rounded-lg flex items-center gap-1"
                 title="{{ t('bambu_duplicate') }}">
                 <i class="fa-solid fa-copy"></i> {{ t('bambu_duplicate') }}

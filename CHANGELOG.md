@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.119.14] — 2026-07-18
+
+### Fixed
+- **BUG-562**: Přidáno `ports: 5050:5000` do `docker-compose.yml` — aplikace nyní dostupná na localhost:5050.
+- **BUG-563**: `prusa_print` a `bulk_delete` action types již byly v `routes/stats.py` (opraveno dříve).
+- **BUG-564**: Opraven XSS v `markdown-editor.js:306` — `innerHTML` z `cloneContents()` nyní stripuje HTML tagy před vložením do task item.
+- **BUG-565**: Přidáno `db.session.commit()` do `auth.py:invalidate_all_user_sessions()` — session invalidation již není ztracena.
+- **BUG-706**: XSS oprava — nahrazeno `'{{ var|e }}'` za `{{ var|tojson }}` v 21 onclick kontextech napříč 8 šablonami. HTML atributy přepnuty na single-quotes pro kompatibilitu s `|tojson`.
+- **BUG-707**: SSRF ochrana v `utils/__init__.py:validate_printer_host()` — přidána DNS resoluce s kontrolou loopback/link-local/multicast IP adres.
+- **BUG-708**: Admin self-logout oprava — `routes/auth.py:344` nyní detekuje editaci vlastního profilu a použije `invalidate_all_other_sessions()`.
+- **BUG-709**: Detached ORM object oprava — `routes/prusa.py:174` nyní re-fetchuje `PrusaPrinter` po rollbacku před mutací.
+
+### Known Issue
+- **BUG-561**: `AUTH_REQUIRED_IN_TESTS` nelze jednoduše přidat — 20 testovacích tříd vyžaduje refaktor auth setupu (přihlášení). Označeno jako "needs investigation".
+
+## [1.119.13] — 2026-07-18
+
+### Fixed
+- **BUG-700**: Přidán chybějící `flash` import v `routes/bambu.py` — `NameError` při neplatném datovém filtru na stránce Bambu (line 16).
+- **BUG-701**: Přidán chybějící `translate` import v `routes/auth.py` — `NameError` při mazání uživatele (sebe sama/posledního admina) (line 2).
+- **BUG-702**: Opravena greedy regex `({.*})` na non-greedy `({.*?})` v `utils/__init__.py:1550` — JSON-LD extrakce nyní správně parsuje stránky s více JSON objekty.
+- **BUG-703**: Opraveno ICS escapování čárek z `\:` na `\,` v `routes/maintenance.py:452` — vygenerované iCalendar soubory nyní odpovídají RFC 5545.
+- **BUG-704**: Opravena logika `0 or 10` v `app.py:694` a `routes/backup.py:129` — nastavení `backup_auto_keep_count = 0` (neomezená retence) již není přepsáno na 10. Použit explicitní `None` check.
+- **BUG-705**: Opravena SQLite-nekompatibilní `ALTER COLUMN` syntaxe v `migrations.py:218` — migrace nyní skipne `DROP NOT NULL` na SQLite (nepodporováno). PostgreSQL migrace probíhá normálně.
+
 ## [1.119.12] — 2026-07-13
 
 ### Added

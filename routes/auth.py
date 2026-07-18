@@ -1,5 +1,5 @@
 from datetime import datetime
-from utils import utc_now, safe_commit
+from utils import translate, utc_now, safe_commit
 import time
 
 from flask import abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for, Blueprint
@@ -341,8 +341,15 @@ def register(app):
             user.notify_project_status_changed = _bool_field('notify_project_status_changed')
             user.notify_project_comment = _bool_field('notify_project_comment')
             safe_commit()
-            # Invalidate all sessions for this user to enforce new permissions immediately
-            invalidate_all_user_sessions(user)
+            # Invalidate all sessions for this user to enforce new permissions immediately.
+            # If admin edits themselves, preserve their current session.
+            current = get_current_user()
+            if current and user.id == current.id:
+                session_key = session.get('_session_key', '')
+                if session_key:
+                    invalidate_all_other_sessions(user, session_key)
+            else:
+                invalidate_all_user_sessions(user)
             safe_commit()
             flash('users_user_updated', 'success')
             return redirect(url_for('user_detail', user_id=user.id))

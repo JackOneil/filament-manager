@@ -173,9 +173,12 @@ def do_poll(printer: PrusaPrinter) -> dict:
     except Exception as exc:
         db.session.rollback()
         try:
-            printer.last_sync_at = now
-            printer.last_sync_status = f'error: {str(exc)[:220]}'
-            safe_commit()
+            # Re-fetch the printer to avoid operating on a detached ORM object
+            printer = db.session.query(PrusaPrinter).filter(PrusaPrinter.id == printer.id).first()
+            if printer:
+                printer.last_sync_at = now
+                printer.last_sync_status = f'error: {str(exc)[:220]}'
+                safe_commit()
         except Exception:
             db.session.rollback()
             _LOG.exception('PrusaLink nested error-status commit failed for printer %s', printer.name)

@@ -13,7 +13,7 @@ import os
 from datetime import datetime
 
 import requests
-from flask import current_app, render_template, request, redirect, url_for, jsonify, Blueprint, send_file, abort
+from flask import current_app, flash, render_template, request, redirect, url_for, jsonify, Blueprint, send_file, abort
 
 from database import db
 from models import (

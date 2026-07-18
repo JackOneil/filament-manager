@@ -126,8 +126,10 @@ def register(app):
             safe_commit()
 
             # Clean up old backups according to retention settings
-            keep_count = getattr(setting, 'backup_auto_keep_count', 10) or 10
-            keep_days = getattr(setting, 'backup_auto_keep_days', 0) or 0
+            keep_count = getattr(setting, 'backup_auto_keep_count', None)
+            keep_count = 10 if keep_count is None else keep_count
+            keep_days = getattr(setting, 'backup_auto_keep_days', None)
+            keep_days = 0 if keep_days is None else keep_days
             removed = _cleanup_old_backups(backup_dir, keep_count=keep_count, keep_days=keep_days)
             if removed:
                 app.logger.info(f"Cleaned up {removed} old backup(s) (keep_count={keep_count}, keep_days={keep_days})")

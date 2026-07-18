@@ -449,7 +449,7 @@ def register(app):
             # Strip all newline variants to prevent CRLF injection
             text = text.replace('\r\n', ' ').replace('\r', ' ').replace('\n', ' ')
             # Escape iCalendar special characters (backslash first to avoid double-escaping)
-            text = text.replace('\\', '\\\\').replace(';', '\\;').replace(',', '\\:')
+            text = text.replace('\\', '\\\\').replace(';', '\\;').replace(',', '\\,')
             return text
 
         lines = [

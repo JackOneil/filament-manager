@@ -51,13 +51,13 @@
                 <i class="fa-solid fa-cart-shopping"></i> {{ t('detail_order_btn') }}
             </a>
             {% elif filament.brand.shop_url %}
-            <button type="button" onclick="openReorderShop('{{ filament.name|e }}', '{{ filament.brand.shop_url|e }}')"
+            <button type="button" onclick='openReorderShop({{ filament.name|tojson }}, {{ filament.brand.shop_url|tojson }})'
                class="inline-flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition
                {% if is_critical %}bg-red-600 hover:bg-red-700 text-white{% else %}bg-amber-500 hover:bg-amber-600 text-white{% endif %}">
                 <i class="fa-solid fa-magnifying-glass"></i> {{ t('detail_search_btn') }}
             </button>
             {% elif app_settings and app_settings.reorder_shop_url %}
-            <button type="button" onclick="openReorderShop('{{ filament.name|e }}', '{{ app_settings.reorder_shop_url|e }}')"
+            <button type="button" onclick='openReorderShop({{ filament.name|tojson }}, {{ app_settings.reorder_shop_url|tojson }})'
                class="inline-flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition
                {% if is_critical %}bg-red-600 hover:bg-red-700 text-white{% else %}bg-amber-500 hover:bg-amber-600 text-white{% endif %}">
                 <i class="fa-solid fa-magnifying-glass"></i> {{ t('detail_search_btn') }}
@@ -118,12 +118,12 @@
                     <i class="fa-solid fa-cart-shopping"></i> {{ t('detail_order_btn') }}
                 </a>
                 {% elif filament.brand.shop_url %}
-                <button type="button" onclick="openReorderShop('{{ filament.name|e }}', '{{ filament.brand.shop_url|e }}')"
+                <button type="button" onclick='openReorderShop({{ filament.name|tojson }}, {{ filament.brand.shop_url|tojson }})'
                    class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 text-sm font-semibold transition">
                     <i class="fa-solid fa-magnifying-glass"></i> {{ t('detail_search_btn') }}
                 </button>
                 {% elif app_settings and app_settings.reorder_shop_url %}
-                <button type="button" onclick="openReorderShop('{{ filament.name|e }}', '{{ app_settings.reorder_shop_url|e }}')"
+                <button type="button" onclick='openReorderShop({{ filament.name|tojson }}, {{ app_settings.reorder_shop_url|tojson }})'
                    class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 text-sm font-semibold transition">
                     <i class="fa-solid fa-magnifying-glass"></i> {{ t('detail_search_btn') }}
                 </button>

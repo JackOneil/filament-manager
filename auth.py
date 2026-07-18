@@ -731,6 +731,10 @@ def invalidate_all_user_sessions(user):
         .filter(UserSession.user_id == user.id)
         .delete(synchronize_session='fetch')
     )
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
     return deleted
 
 

@@ -215,7 +215,9 @@ def run_migrations(app: Flask) -> None:
         # ── Undo log extension: support waste & maintenance target types ─────
         _safe_alter(app, "ALTER TABLE filament_undo_log ADD COLUMN target_type VARCHAR(20) DEFAULT 'filament'")
         _safe_alter(app, "ALTER TABLE filament_undo_log ADD COLUMN target_key TEXT DEFAULT NULL")
-        _safe_alter(app, "ALTER TABLE filament_undo_log ALTER COLUMN snapshot_data DROP NOT NULL")
+        # ALTER COLUMN is not supported by SQLite — only run on PostgreSQL
+        if _dialect != 'sqlite':
+            _safe_alter(app, "ALTER TABLE filament_undo_log ALTER COLUMN snapshot_data DROP NOT NULL")
         try:
             db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_filament_undo_log_target_type ON filament_undo_log (target_type)"))
             db.session.commit()

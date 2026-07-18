@@ -303,7 +303,10 @@
 
                     var text = document.createElement('span');
                     text.className = 'task-text';
-                    text.innerHTML = innerHtml || '';
+                    // Sanitize: strip HTML tags to prevent XSS via cloneContents()
+                    var tmp = document.createElement('div');
+                    tmp.innerHTML = innerHtml || '';
+                    text.textContent = tmp.textContent;
 
                     li.appendChild(checkbox);
                     li.appendChild(document.createTextNode(' '));

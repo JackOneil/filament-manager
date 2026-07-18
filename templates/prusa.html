@@ -13,7 +13,7 @@
                 {% if printers %}
                 <div class="flex items-center gap-2 flex-wrap">
                     {% for printer in printers %}
-                    <button id="sync-btn-{{ printer.id }}" onclick="doSync({{ printer.id }}, '{{ printer.name|e }}')"
+                    <button id="sync-btn-{{ printer.id }}" onclick='doSync({{ printer.id }}, {{ printer.name|tojson }})'
                         class="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 transition-colors text-white font-semibold px-4 py-2 rounded-lg shadow text-sm">
                         <i class="fa-solid fa-rotate" id="sync-icon-{{ printer.id }}"></i>
                         <span id="sync-label-{{ printer.id }}">{{ printer.name }}</span>
