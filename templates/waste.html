@@ -444,6 +444,13 @@ const _WASTE_ADD_URL = {{ url_for('waste_add')|tojson }};
         for (var i = 0; i < input.files.length; i++) fd.append('file', input.files[i]);
         var xhr = new XMLHttpRequest();
         xhr.open('POST', '/waste/' + recId + '/_upload');
+        // Global CSRF auto-injection covers window.fetch and forms, but NOT
+        // XMLHttpRequest — send the token explicitly (project_detail.html
+        // uses the same pattern).
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        if (csrfMeta) {
+            xhr.setRequestHeader('X-CSRFToken', csrfMeta.getAttribute('content'));
+        }
         xhr.upload.onprogress = function(ev) {
             if (ev.lengthComputable && progress) {
                 progress.classList.remove('hidden');

@@ -148,8 +148,9 @@ class ProjectSortingTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         html = response.data.decode('utf-8')
         self.assertIn('>ACME Studio</a>', html)
-        # Client filter now uses Alpine.js selectClient() rather than a URL link
-        self.assertIn("selectClient('ACME Studio')", html)
+        # Client filter now uses Alpine.js selectClient() rather than a URL link.
+        # The value is injected via |tojson (double-quoted, XSS-safe).
+        self.assertIn('selectClient("ACME Studio")', html)
 
         filtered_response = self.client.get('/projects?sort_by=name&client=ACME+Studio')
         self.assertEqual(filtered_response.status_code, 200)

@@ -43,7 +43,7 @@ models.py               # All ORM models (~35 tables): Brand, Color, Material, F
                         #   Notification, AuditLog, PrinterMaintenance, WasteRecord, WasteFile,
                         #   FilamentUndoLog
 auth.py                 # Multi-user auth, RBAC, session management, invite system
-messages.py             # i18n translations (cs + en), ~1745 keys per language
+messages.py             # i18n translations (cs + en), 1765 keys per language
 utils/                   # Shared helpers package (was utils.py in 1.105.x and earlier)
   __init__.py            # re-exports: utc_now(), translate(), get_settings(), log_movement(),
                         #   render_markdown(), escape_like(), encrypt/decrypt_token(),
@@ -215,13 +215,14 @@ Widget shells and search inputs remain stable — no flicker
 
 ### 3.4 Background Workers
 
-Three daemon threads start in `create_app()`:
+Four daemon threads start in `create_app()`:
 
 | Worker               | Interval                  | Function                                      |
 | -------------------- | ------------------------- | --------------------------------------------- |
 | `bambu-sync-worker`  | 60s (backoff → max 3600s) | `routes.bambu.do_sync()` — Bambu Cloud API    |
 | `prusa-sync-worker`  | 60s (backoff → max 900s)  | `routes.prusa.do_poll()` — PrusaLink local API|
 | `auto-backup-worker` | 60s (check only)           | Scheduled backup to `data/backup/` directory  |
+| `model-thumbnail-worker` | 60s (check only) | Background regeneration of missing model thumbnails |
 
 ### 3.5 DB Schema Migration Strategy
 
@@ -498,7 +499,7 @@ The `/export` and `/import` functions in `routes/backup.py` must cover the **ent
 
 ## 7. Constants / Hard Rules
 
-- App URL: `http://192.168.32.17:5000`
+- App URL: `http://localhost:5050` (container port 5000)
 - Test command: `cd /opt/git/filament && source .venv/bin/activate && python -m pytest tests/ -v --tb=short -n auto 2>&1` (parallel execution via pytest-xdist)
 - Build command: `cd /opt/git/filament && docker compose up -d --build 2>&1`
 - Version file: `app.py` (variable `APP_VERSION`)

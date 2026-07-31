@@ -71,7 +71,7 @@
                             {% if item.project_tags %}
                             <div class="flex flex-wrap gap-1 mt-1">
                                 {% for tag in item.project_tags[:2] %}
-                                <button type="button" @click.prevent="window.__models && window.__models.selectTag('{{ tag }}')"
+                                <button type="button" @click.prevent='window.__models && window.__models.selectTag({{ tag|tojson }})'
                                     class="ui-badge text-[10px] hover:bg-blue-100 hover:text-blue-700 cursor-pointer transition"
                                     title="{{ t('filter_by_tag') }}: {{ tag }}">{{ tag }}</button>
                                 {% endfor %}

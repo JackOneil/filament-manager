@@ -193,9 +193,9 @@ class GetPendingUndoTests(_BaseUndoTests):
 
 
 class ConsumeUndoTests(_BaseUndoTests):
-    def test_consume_marks_as_consumed(self):
+    def test_consume_returns_data_without_marking_consumed(self):
         with self.app.app_context():
-            from utils import create_undo_snapshot, consume_undo_log
+            from utils import create_undo_snapshot, consume_undo_log, mark_undo_consumed
             undo_log = create_undo_snapshot(
                 user_id=self.admin_id,
                 action_type='delete_filament',
@@ -205,20 +205,34 @@ class ConsumeUndoTests(_BaseUndoTests):
             self.assertIsNotNone(data)
             self.assertEqual(data['filament']['name'], 'Undo PLA')
 
-            # Verify consumed
+            # consume_undo_log is a read-only peek: the row must NOT be marked
+            # consumed yet, so a failed restore can be retried (review fix H13).
+            log = db.session.get(FilamentUndoLog, undo_log.id)
+            self.assertFalse(log.is_consumed)
+            self.assertIsNone(log.consumed_at)
+
+            # The caller marks the log consumed only after a successful restore.
+            self.assertTrue(mark_undo_consumed(undo_log.id, self.admin_id))
             log = db.session.get(FilamentUndoLog, undo_log.id)
             self.assertTrue(log.is_consumed)
             self.assertIsNotNone(log.consumed_at)
 
-    def test_consume_twice_returns_none(self):
+    def test_consume_twice_returns_data_until_marked_consumed(self):
         with self.app.app_context():
-            from utils import create_undo_snapshot, consume_undo_log
+            from utils import create_undo_snapshot, consume_undo_log, mark_undo_consumed
             undo_log = create_undo_snapshot(
                 user_id=self.admin_id,
                 action_type='delete_filament',
                 filament=self.filament,
             )
-            consume_undo_log(undo_log.id, self.admin_id)
+            # Peeking twice is allowed — nothing is consumed by reading.
+            data = consume_undo_log(undo_log.id, self.admin_id)
+            self.assertIsNotNone(data)
+            data = consume_undo_log(undo_log.id, self.admin_id)
+            self.assertIsNotNone(data)
+
+            # After the caller marks it consumed, further peeks return None.
+            mark_undo_consumed(undo_log.id, self.admin_id)
             data = consume_undo_log(undo_log.id, self.admin_id)
             self.assertIsNone(data)
 
@@ -232,6 +246,16 @@ class ConsumeUndoTests(_BaseUndoTests):
             )
             data = consume_undo_log(undo_log.id, 99999)
             self.assertIsNone(data)
+
+    def test_mark_consumed_wrong_user_returns_false(self):
+        with self.app.app_context():
+            from utils import create_undo_snapshot, mark_undo_consumed
+            undo_log = create_undo_snapshot(
+                user_id=self.admin_id,
+                action_type='delete_filament',
+                filament=self.filament,
+            )
+            self.assertFalse(mark_undo_consumed(undo_log.id, 99999))
 
     def test_consume_nonexistent_returns_none(self):
         with self.app.app_context():

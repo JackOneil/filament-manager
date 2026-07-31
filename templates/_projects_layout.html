@@ -253,7 +253,7 @@
                                     <div class="flex flex-nowrap items-center gap-1 mt-2 overflow-hidden h-6">
                                         {% for tag in tags[:2] %}
                                         {% if tag.strip() %}
-                                        <button type="button" @click.prevent="if (window.__proj) window.__proj.selectTag('{{ tag.strip() }}')" class="ui-badge max-w-28 truncate hover:bg-blue-100 hover:text-blue-700 cursor-pointer transition">{{ tag.strip() }}</button>
+                                        <button type="button" @click.prevent='if (window.__proj) window.__proj.selectTag({{ tag.strip()|tojson }})' class="ui-badge max-w-28 truncate hover:bg-blue-100 hover:text-blue-700 cursor-pointer transition">{{ tag.strip() }}</button>
                                         {% endif %}
                                         {% endfor %}
                                         {% if ns.total > 2 %}
@@ -264,7 +264,7 @@
                                 </td>
                                 <td>
                                     {% if p.client_name %}
-                                    <a href="#" @click.prevent="if (window.__proj) window.__proj.selectClient('{{ p.client_name }}')" class="text-blue-600 hover:underline">{{ p.client_name }}</a>
+                                    <a href="#" @click.prevent='if (window.__proj) window.__proj.selectClient({{ p.client_name|tojson }})' class="text-blue-600 hover:underline">{{ p.client_name }}</a>
                                     {% else %}
                                     -
                                     {% endif %}

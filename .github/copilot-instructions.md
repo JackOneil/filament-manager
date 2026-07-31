@@ -36,7 +36,7 @@ The project uses a **modular Flask app factory pattern with Flask Blueprints**. 
 app.py                  # Entry point: create_app(), background workers (bambu-sync, prusa-sync, auto-backup)
 database.py             # Shared db = SQLAlchemy() instance
 migrations.py           # Database migrations: run_migrations(), _safe_alter() schema updates and seeds
-models.py               # All ORM models (~25 tables): Brand, Color, Material, Filament,
+models.py               # All ORM models (~35 tables): Brand, Color, Material, Filament,
                         #   MovementHistory, AppSetting, PrintHistory, Project, ProjectFile,
                         #   ProjectLink, ProjectFilament, ProjectQuote, ProjectComment, ProjectTodo,
                         #   StorageShelf, StoragePlacement, BambuPrinter, BambuPrintJob,
@@ -45,7 +45,7 @@ models.py               # All ORM models (~25 tables): Brand, Color, Material, F
                         #   FilamentUndoLog, PrinterMaintenance, WasteRecord, WasteFile,
                         #   FilamentUndoLog
 auth.py                 # Multi-user auth, RBAC, session management, invite system
-messages.py             # i18n translations (cs + en), ~700 keys per language
+messages.py             # i18n translations (cs + en), 1765 keys per language
 utils/                   # Shared helpers package (was utils.py in 1.105.x and earlier)
   __init__.py            # re-exports the most-used helpers for backward compat:
                         #   utc_now(), translate(), get_settings(), log_movement(),
@@ -196,13 +196,14 @@ Widget shells and search inputs remain stable — no flicker
 
 ### 3.4 Background Workers
 
-Three daemon threads start in `create_app()`:
+Four daemon threads start in `create_app()`:
 
 | Worker               | Interval                  | Function                                      |
 | -------------------- | ------------------------- | --------------------------------------------- |
 | `bambu-sync-worker`  | 60s (backoff → max 3600s) | `routes.bambu.do_sync()` — Bambu Cloud API    |
 | `prusa-sync-worker`  | 60s (backoff → max 900s)  | `routes.prusa.do_poll()` — PrusaLink local API|
 | `auto-backup-worker` | 60s (check only)           | Scheduled backup to `data/backup/` directory  |
+| `model-thumbnail-worker` | 60s (check only) | Background regeneration of missing model thumbnails |
 
 ### 3.5 DB Schema Migration Strategy
 
@@ -363,8 +364,8 @@ The `/export` and `/import` functions in `routes/backup.py` must cover the **ent
 - **Import safety controls**: `/import` supports dry-run compatibility checks and conflict mode selection (`skip`, `merge`, `overwrite`).
 
 ### Rule 16 — Stats Page Draggable Layout
-- The Statistics page has **6 named sections**, each a `<div class="stats-section" data-section-id="...">`:
-  `section_overview`, `section_charts_primary`, `section_charts_secondary`, `section_tables`, `section_detail`, `section_colors`.
+- The Statistics page has **7 named sections**, each a `<div class="stats-section" data-section-id="...">`:
+  `section_overview`, `section_charts_primary`, `section_charts_secondary`, `section_tables`, `section_detail`, `section_colors`, `section_heatmap`.
 - Layout is persisted in `localStorage` key `stats_layout_v2` as `{order:[...], hidden:[...], limits:{cardId: number|'all'}}`.
 - **Edit mode**: toggled by `toggleEditMode()`, adds `edit-mode` class to `#stats-page`.
 - **Row limit display**: use `row.style.display = 'none'` / `''` — **never `row.hidden`** — because Tailwind's `display:flex` overrides the `[hidden]` attribute.
@@ -424,7 +425,7 @@ The `/export` and `/import` functions in `routes/backup.py` must cover the **ent
 | Page | Grid container class | `mdGridCols` |
 |---|---|---|
 | Overview (`overview.html`) | `grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4` | `2` |
-| Projects (`projects_index.html` / `_projects_layout.html`) | `grid grid-cols-1 xl:grid-cols-4` | `1` (default) |
+| Projects (`projects_index.html` / `_projects_layout.html`) | `grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4` | `2` |
 
 **CSS override as safety net:** For grids that must be single-column on mobile regardless of JS/localStorage, add a scoped `!important` rule in the page template:
 ```html
@@ -500,6 +501,13 @@ This is already applied to `projects_index.html` and overrides any stale localSt
 - Update the **Summary Statistics** section at the bottom to reflect the current state
 - Add completed items to the **📋 Completed** table with version and date
 - This rule applies to ALL implementations — no exceptions. Even small fixes must update the backlog.
+
+### Rule 33 — UI Enhancements Module (`window.enh` + `static/css/enhancements.css`)
+- All non-essential visual polish lives in `static/css/enhancements.css` + `static/js/enhancements.js`. Never pollute `app.css` with new utility classes.
+- Charts MUST register via `window.enh.registerChart(instance)` after creation so theme switching re-themes them automatically. The `window.enh.palette()` helper returns the current light/dark colour tokens.
+- Page-transition / stagger animations use the `[data-animate]` + `[data-stagger="N"]` attribute pattern — pure CSS, no JS animation loops.
+- Buttons opt into ripple effect via `data-enh-ripple`. Sparklines via `data-enh-sparkline="1,2,3,..."`. Heatmaps via `data-enh-heatmap='{...JSON...}'`.
+- Theme reactivity is driven by a `MutationObserver` on `<html>` class — never set theme colours directly from JS, always read from CSS custom properties.
 
 ### Rule 29 — Architecture Documentation Updates
 - **After implementing new features, refactoring, or structural changes, always update architecture documentation:**

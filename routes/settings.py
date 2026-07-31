@@ -6,7 +6,7 @@ from datetime import timedelta
 import requests
 from flask import render_template, request, redirect, url_for, Blueprint, flash, jsonify
 from database import db
-from auth import get_current_user
+from auth import get_current_user, safe_redirect_target
 from models import (
     Brand, Color, Material, AppSetting, Filament, Project,
     BambuPrinter, PrusaPrinter, User, ModelCategory,
@@ -17,6 +17,8 @@ from utils import (
     decrypt_token,
     encrypt_token,
     format_tags,
+    normalize_hex,
+    normalize_shop_url,
     parse_sync_status,
     prusa_test_connection,
     remove_tag,
@@ -107,7 +109,11 @@ def register(app):
                         raise ValueError('settings_color_required')
                     if Color.query.filter_by(name=color_name).first():
                         raise ValueError('settings_color_exists')
-                    db.session.add(Color(name=color_name, hex_value=color_hex))
+                    # Validate the hex value — it is injected into inline CSS
+                    # style attributes (CSS injection / UI corruption guard).
+                    if color_hex and not normalize_hex(color_hex):
+                        raise ValueError('settings_color_hex_invalid')
+                    db.session.add(Color(name=color_name, hex_value=normalize_hex(color_hex)))
                     app.logger.debug(f"Added color: {color_name}")
 
                 elif action == 'material':
@@ -161,7 +167,7 @@ def register(app):
                     if brand:
                         old = brand.name
                         brand.name = request.form.get('name', brand.name).strip() or brand.name
-                        brand.shop_url = request.form.get('shop_url', '').strip() or None
+                        brand.shop_url = normalize_shop_url(request.form.get('shop_url'))
                         app.logger.debug(f"Brand edited: {old} -> {brand.name}")
 
                 elif action == 'edit_material':
@@ -175,7 +181,11 @@ def register(app):
                     col = db.session.get(Color, request.form.get('id', 0, type=int))
                     if col:
                         col.name = request.form.get('name', col.name).strip() or col.name
-                        col.hex_value = request.form.get('hex_value', col.hex_value).strip()
+                        raw_hex = request.form.get('hex_value', '').strip()
+                        if raw_hex:
+                            if not normalize_hex(raw_hex):
+                                raise ValueError('settings_color_hex_invalid')
+                            col.hex_value = normalize_hex(raw_hex)
                         app.logger.debug(f"Color edited: {col.name}")
 
                 elif action == 'delete_brand':
@@ -579,7 +589,7 @@ def register(app):
                 setting.theme = new_theme
                 safe_commit()
                 app.logger.debug(f"Global theme changed to: {new_theme}")
-        return redirect(request.referrer or url_for('index'))
+        return redirect(safe_redirect_target(request.referrer, 'index'))
 
     @bp.route('/onboarding/dismiss', methods=['POST'])
     def onboarding_dismiss():
@@ -587,5 +597,5 @@ def register(app):
         if setting:
             setting.onboarding_dismissed = True
             safe_commit()
-        return redirect(request.referrer or url_for('index'))
+        return redirect(safe_redirect_target(request.referrer, 'index'))
     app.register_blueprint(bp)

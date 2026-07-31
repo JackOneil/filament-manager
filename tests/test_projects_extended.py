@@ -8,6 +8,7 @@ import secrets
 import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from app import create_app
 from auth import hash_password
@@ -386,7 +387,8 @@ class ProjectLinkTests(_BaseProjectTests):
         with self.app.app_context():
             self.assertIsNone(db.session.get(ProjectLink, link_id))
 
-    def test_add_link_with_external_refresh(self):
+    @patch('routes.projects._schedule_link_preview_refresh')
+    def test_add_link_with_external_refresh(self, mock_schedule):
         """Setting ?refresh=1 triggers link preview fetch."""
         self.login_admin()
         response = self.client.post(
@@ -395,6 +397,9 @@ class ProjectLinkTests(_BaseProjectTests):
             follow_redirects=False,
         )
         self.assertEqual(response.status_code, 302)
+        # The background preview refresh must be scheduled, but never perform
+        # real network fetches inside the test suite.
+        mock_schedule.assert_called_once()
 
         with self.app.app_context():
             link = ProjectLink.query.filter_by(project_id=self.project_id).first()

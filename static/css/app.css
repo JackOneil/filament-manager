@@ -1182,3 +1182,13 @@
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
+
+/* Mobile collapsing topbar (mobile-ux.js adds .collapsed on scroll down).
+   The header is a flex item above the scrolling <main> — a negative
+   margin collapses it without breaking the layout. */
+header {
+    transition: margin-top 0.2s ease;
+}
+header.collapsed {
+    margin-top: -3.5rem; /* h-14 = 3.5rem */
+}

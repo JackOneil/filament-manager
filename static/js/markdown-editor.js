@@ -13,6 +13,7 @@
                     if (this.$refs.visual) {
                         this.$refs.visual.addEventListener('keydown', this.handleVisualKeydown.bind(this));
                         this.$refs.visual.addEventListener('mousedown', this.handleVisualMouseDown.bind(this));
+                        this.$refs.visual.addEventListener('click', this.handleVisualCheckboxClick.bind(this));
                         this.$refs.visual.addEventListener('keyup', this.saveVisualSelection.bind(this));
                         this.$refs.visual.addEventListener('mouseup', this.saveVisualSelection.bind(this));
                         this.$refs.visual.addEventListener('focus', this.saveVisualSelection.bind(this));
@@ -462,6 +463,20 @@
                     event.preventDefault();
                     var li = target.closest('li.task-list-item');
                     this.placeCaretInTaskItem(li, false);
+                },
+                handleVisualCheckboxClick(event) {
+                    // Toggle the task checkbox in visual mode: preventDefault()
+                    // in handleVisualMouseDown suppresses the native toggle, so
+                    // we flip the checked state and update the source value here.
+                    var target = event && event.target;
+                    if (!target || !target.matches || !target.matches('input.task-checkbox')) return;
+                    var checkbox = target;
+                    var li = checkbox.closest('li.task-list-item');
+                    checkbox.checked = !checkbox.checked;
+                    if (li) {
+                        li.classList.toggle('checked', checkbox.checked);
+                    }
+                    this.syncFromVisual();
                 },
                 escapeHtml(value) {
                     return String(value || '')

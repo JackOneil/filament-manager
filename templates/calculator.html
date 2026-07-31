@@ -126,14 +126,14 @@
                         {% for f in filaments %}
                             <div class="filament-option px-4 py-3 hover:bg-green-55 cursor-pointer border-b border-gray-55 last:border-b-0" 
                                  data-value="{{ f.id }}"
-                                 x-show="!filamentSearch || '{{ (f.name ~ ' ' ~ f.brand.name ~ ' ' ~ f.material.name)|lower }}'.includes(filamentSearch.toLowerCase())"
+                                 x-show='!filamentSearch || {{ (f.name ~ ' ' ~ f.brand.name ~ ' ' ~ f.material.name)|lower|tojson }}.includes(filamentSearch.toLowerCase())'
                                  :class="filamentId == '{{ f.id }}' ? 'bg-green-100 border-l-4 border-green-500' : ''"
-                                 @click="
-                                     filamentId = '{{ f.id }}';
-                                     filamentSelectedLabel = '{{ f.name }} | {{ f.brand.name }} {{ f.material.name }}';
+                                 @click='
+                                     filamentId = "{{ f.id }}";
+                                     filamentSelectedLabel = {{ (f.name ~ ' | ' ~ f.brand.name ~ ' ' ~ f.material.name)|tojson }};
                                      filamentSearch = filamentSelectedLabel;
                                      dropdownOpen = false;
-                                 ">
+                                 '>
                                 <div class="font-bold text-gray-800">{{ f.name }}</div>
                                 <div class="text-sm text-gray-500">{{ f.brand.name }} {{ f.material.name }}</div>
                             </div>

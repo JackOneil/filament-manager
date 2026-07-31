@@ -7,11 +7,11 @@ from datetime import datetime, timedelta
 from types import SimpleNamespace
 
 from flask import abort, flash, jsonify, render_template, request, redirect, session, url_for, Blueprint
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import joinedload
 
 from database import db
-from auth import get_current_user, is_admin
+from auth import get_current_user, is_admin, safe_redirect_target
 from models import AppSetting, PrusaPrinter, BambuJobMaterial, BambuPrintJob, BambuPrinter, PrusaPrintJob, Brand, Color, Filament, Material, MovementHistory, Notification, PrinterMaintenance, Project, ProjectComment, ProjectFilament, ProjectQuote, FilamentUndoLog, WasteRecord
 from utils import (
     build_action_center,
@@ -29,7 +29,9 @@ from utils import (
     get_filament_tags,
     get_live_printers,
     log_movement,
+    mark_undo_consumed,
     movement_action_label,
+    normalize_shop_url,
     parse_tags,
     restore_filament_from_snapshot,
     restore_bulk_from_snapshot,
@@ -222,7 +224,7 @@ def register(app):
         filament = db.get_or_404(Filament, id)
         filament.reorder_alert_snoozed = not bool(filament.reorder_alert_snoozed)
         safe_commit()
-        return redirect(request.referrer or url_for('filament_detail', id=filament.id))
+        return redirect(safe_redirect_target(request.referrer, 'filament_detail', id=filament.id))
 
     @bp.route('/inventory/bulk', methods=['POST'])
     def inventory_bulk():
@@ -288,6 +290,9 @@ def register(app):
                 brand = db.session.get(Brand, brand_id)
                 material = db.session.get(Material, material_id)
                 color = db.session.get(Color, color_id)
+                if not (brand and material and color):
+                    flash('inventory_invalid_reference', 'error')
+                    return redirect(url_for('add'))
                 name = f"{brand.name} {material.name} {color.name}"
 
             new_fil = Filament(
@@ -340,7 +345,7 @@ def register(app):
             filament.tag_text = format_tags(request.form.get('tag_text', filament.tag_text or ''))
             filament.min_stock_grams = max(request.form.get('min_stock_grams', filament.min_stock_grams, type=float) or 0.0, 0.0)
             filament.max_stock_grams = max(request.form.get('max_stock_grams', filament.max_stock_grams, type=float) or 0.0, 0.0)
-            filament.shop_url = request.form.get('shop_url', '').strip() or None
+            filament.shop_url = normalize_shop_url(request.form.get('shop_url'))
 
             weight_diff = filament.weight_remaining - old_weight
             if weight_diff > 0:
@@ -404,11 +409,39 @@ def register(app):
         _require_inventory_admin()
         filament = db.get_or_404(Filament, id)
         removed_weight = 0.0
-        if filament.quantity > 0:
-            filament.quantity -= 1
-            actual_amount = deduct_filament_stock(filament, filament.weight_total)
-            log_movement(filament, 'remove', actual_amount, note=translate('movement_note_removed_spool'))
-            removed_weight = float(actual_amount or 0.0)
+        if filament.quantity > 0 and filament.weight_total > 0:
+            # Atomically decrement quantity AND weight (compare-and-swap) so
+            # concurrent requests cannot double-decrement or lose an update.
+            for _attempt in range(5):
+                old_qty = int(filament.quantity or 0)
+                old_weight = float(filament.weight_remaining or 0.0)
+                if old_qty <= 0:
+                    break
+                new_weight = max(0.0, old_weight - float(filament.weight_total))
+                result = db.session.execute(
+                    text(
+                        "UPDATE filament SET quantity = quantity - 1, "
+                        "weight_remaining = :new "
+                        "WHERE id = :fid AND quantity > 0 AND weight_remaining = :old"
+                    ),
+                    {'new': new_weight, 'fid': filament.id, 'old': old_weight},
+                )
+                if result.rowcount == 1:
+                    actual_amount = old_weight - new_weight
+                    filament.quantity = old_qty - 1
+                    filament.weight_remaining = new_weight
+                    log_movement(filament, 'remove', actual_amount, note=translate('movement_note_removed_spool'))
+                    removed_weight = actual_amount
+                    break
+                # Contention — re-read the committed row and retry.
+                row = db.session.execute(
+                    text("SELECT quantity, weight_remaining FROM filament WHERE id = :fid"),
+                    {'fid': filament.id},
+                ).fetchone()
+                if row is None:
+                    break
+                filament.quantity = int(row[0])
+                filament.weight_remaining = float(row[1])
         safe_commit()
         if removed_weight > 0:
             # Create DB-backed undo snapshot
@@ -473,15 +506,16 @@ def register(app):
         if not undo_log_id or undo_log_id != pending.get('undo_log_id'):
             flash('undo_toast_not_available', 'error')
             session.pop(_UNDO_SESSION_KEY, None)
-            return redirect(request.referrer or url_for('filaments_index'))
+            return redirect(safe_redirect_target(request.referrer, 'filaments_index'))
 
-        # Consume the undo log and get snapshot data
+        # Fetch snapshot data (the log row is only marked consumed AFTER the
+        # restore succeeds, so a failed undo can be retried).
         snapshot_data = consume_undo_log(undo_log_id, user_id)
         session.pop(_UNDO_SESSION_KEY, None)
         
         if not snapshot_data:
             flash('undo_toast_not_available', 'error')
-            return redirect(request.referrer or url_for('filaments_index'))
+            return redirect(safe_redirect_target(request.referrer, 'filaments_index'))
 
         try:
             action_type = snapshot_data.get('action_type') or snapshot_data.get('type')
@@ -553,6 +587,13 @@ def register(app):
                         except (ValueError, TypeError):
                             pass
                     db.session.add(rec)
+                    # Re-deduct the wasted grams that waste_delete returned.
+                    from routes.waste import _deduct_waste_stock
+                    _deduct_waste_stock(
+                        target_data.get('filament_id'),
+                        float(target_data.get('weight_grams', 0)),
+                        target_data.get('project_id'),
+                    )
                 elif action_type == 'delete_maintenance':
                     rec = PrinterMaintenance(
                         printer_type=target_data.get('printer_type', 'bambu'),
@@ -585,6 +626,7 @@ def register(app):
                 raise ValueError('unsupported_undo_type')
 
             safe_commit()
+            mark_undo_consumed(undo_log_id, user_id)
             flash('undo_toast_applied', 'success')
         except Exception:
             try:
@@ -594,7 +636,7 @@ def register(app):
             app.logger.exception("Undo action failed")
             flash('undo_toast_failed', 'error')
 
-        return redirect(request.referrer or url_for('filaments_index'))
+        return redirect(safe_redirect_target(request.referrer, 'filaments_index'))
 
     # ── Operator / Admin mode toggle ──────────────────────────────────────────
 
@@ -604,10 +646,10 @@ def register(app):
         from auth import get_current_user, is_admin
         user = get_current_user()
         if not is_admin(user):
-            return redirect(request.referrer or url_for('index'))
+            return redirect(safe_redirect_target(request.referrer, 'index'))
         current = session.get('ui_mode', 'admin')
         session['ui_mode'] = 'operator' if current == 'admin' else 'admin'
-        return redirect(request.referrer or url_for('index'))
+        return redirect(safe_redirect_target(request.referrer, 'index'))
 
     # ── CSV filament import ───────────────────────────────────────────────────
 
@@ -794,7 +836,7 @@ def register(app):
                     min_stock_grams=min_stock,
                     max_stock_grams=max_stock,
                     tag_text=format_tags(row.get('tags', '')) or None,
-                    shop_url=row.get('shop_url', '').strip() or None,
+                    shop_url=normalize_shop_url(row.get('shop_url')),
                     quality_drying=row.get('quality_drying', '').strip() or None,
                     quality_stringing=row.get('quality_stringing', '').strip() or None,
                     quality_adhesion=row.get('quality_adhesion', '').strip() or None,

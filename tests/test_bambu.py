@@ -852,13 +852,14 @@ class CacheCoverImageTests(unittest.TestCase):
 
     def _make_response(self, content_type, body=b'\x89PNG' + b'\x00' * 100):
         mock_resp = MagicMock()
+        mock_resp.status_code = 200
         mock_resp.headers = {'Content-Type': content_type}
         mock_resp.content = body
         mock_resp.raise_for_status = MagicMock()
         return mock_resp
 
-    @patch('routes.bambu._thumb_dir')
-    @patch('routes.bambu.requests.get')
+    @patch('routes.bambu_helpers._thumb_dir')
+    @patch('routes.bambu_helpers.requests.get')
     def test_standard_image_png_mime_type(self, mock_get, mock_thumb_dir):
         mock_thumb_dir.return_value = self.temp_dir
         mock_get.return_value = self._make_response('image/png')
@@ -867,8 +868,8 @@ class CacheCoverImageTests(unittest.TestCase):
         self.assertTrue(result.endswith('.png'))
         self.assertTrue(os.path.isfile(result))
 
-    @patch('routes.bambu._thumb_dir')
-    @patch('routes.bambu.requests.get')
+    @patch('routes.bambu_helpers._thumb_dir')
+    @patch('routes.bambu_helpers.requests.get')
     def test_binary_octet_stream_falls_back_to_png_url_extension(self, mock_get, mock_thumb_dir):
         """S3 serves images as binary/octet-stream — extension must come from URL."""
         mock_thumb_dir.return_value = self.temp_dir
@@ -882,32 +883,32 @@ class CacheCoverImageTests(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertTrue(result.endswith('.png'))
 
-    @patch('routes.bambu._thumb_dir')
-    @patch('routes.bambu.requests.get')
+    @patch('routes.bambu_helpers._thumb_dir')
+    @patch('routes.bambu_helpers.requests.get')
     def test_binary_octet_stream_falls_back_to_jpg_url_extension(self, mock_get, mock_thumb_dir):
         mock_thumb_dir.return_value = self.temp_dir
         mock_get.return_value = self._make_response('binary/octet-stream', b'\xff\xd8' + b'\x00' * 100)
-        url = 'https://cdn.example.com/jobs/job_s3_002/cover.jpg'
+        url = 'https://example.com/jobs/job_s3_002/cover.jpg'
         result = _cache_cover_image('job_s3_002', url)
         self.assertIsNotNone(result)
         self.assertTrue(result.endswith('.jpg'))
 
-    @patch('routes.bambu._thumb_dir')
-    @patch('routes.bambu.requests.get')
+    @patch('routes.bambu_helpers._thumb_dir')
+    @patch('routes.bambu_helpers.requests.get')
     def test_unknown_mime_and_no_url_extension_returns_none(self, mock_get, mock_thumb_dir):
         mock_thumb_dir.return_value = self.temp_dir
         mock_get.return_value = self._make_response('application/octet-stream')
         result = _cache_cover_image('job_no_ext', 'https://example.com/thumb_no_ext')
         self.assertIsNone(result)
 
-    @patch('routes.bambu.requests.get')
+    @patch('routes.bambu_helpers.requests.get')
     def test_http_error_returns_none(self, mock_get):
         mock_get.side_effect = Exception('connection refused')
         result = _cache_cover_image('job_err', 'https://example.com/thumb.png')
         self.assertIsNone(result)
 
-    @patch('routes.bambu._thumb_dir')
-    @patch('routes.bambu.requests.get')
+    @patch('routes.bambu_helpers._thumb_dir')
+    @patch('routes.bambu_helpers.requests.get')
     def test_empty_content_returns_none(self, mock_get, mock_thumb_dir):
         mock_thumb_dir.return_value = self.temp_dir
         mock_get.return_value = self._make_response('image/png', b'')

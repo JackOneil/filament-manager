@@ -11,7 +11,7 @@ _VALID_PER_PAGE = [10, 20, 50, 100]
 _COOKIE_KEY = 'history_per_page'
 
 _ALL_ACTION_TYPES = [
-    'add', 'remove', 'bambu_print',
+    'add', 'remove', 'bambu_print', 'prusa_print', 'waste',
     'bulk_add_weight', 'bulk_delete',
     'bulk_add_spool', 'bulk_remove_spool',
 ]

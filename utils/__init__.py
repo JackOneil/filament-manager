@@ -10,10 +10,11 @@ from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
-from urllib.parse import urljoin, urlparse, urlunparse
+from urllib.parse import urljoin, urlparse, urlsplit, urlunparse
 
 import requests
 from bs4 import BeautifulSoup
+from sqlalchemy import text
 from sqlalchemy.orm import joinedload
 
 from database import db
@@ -863,6 +864,22 @@ def build_action_center(now=None):
     return result
 
 
+def normalize_shop_url(value: str | None) -> str | None:
+    """Validate a shop URL for use in ``href`` attributes.
+
+    Returns the trimmed URL or None when the scheme is not http/https or
+    the host is missing — ``javascript:``, ``data:`` and relative URLs
+    are rejected so stored values can never become executable links.
+    """
+    value = (value or '').strip()
+    if not value:
+        return None
+    parsed = urlsplit(value)
+    if parsed.scheme not in ('http', 'https') or not parsed.netloc:
+        return None
+    return value
+
+
 def normalize_hex(value: str | None) -> str | None:
     """Normalize a color hex value to uppercase #RRGGBB, or None if invalid."""
     if not value:
@@ -1036,20 +1053,70 @@ def log_movement(filament, action_type, weight, project_id=None, bambu_job_id=No
 def deduct_filament_stock(filament, requested_weight):
     """Deduct stock safely and keep weight/quantity consistent.
 
+    The weight decrement runs as an atomic compare-and-swap UPDATE so
+    concurrent requests (gunicorn threads share one process) cannot lose
+    updates by reading a stale ``weight_remaining``.  On contention the
+    committed value is re-read and the CAS is retried (bounded).
+
+    Non-persisted objects (no ``id`` — used by unit tests and in-memory
+    callers) fall back to a plain in-memory deduction.
+
     Returns the actually deducted weight after clamping to zero.
     """
     if not filament or requested_weight <= 0:
         return 0.0
 
-    old_weight = filament.weight_remaining
-    filament.weight_remaining = max(0.0, filament.weight_remaining - requested_weight)
-    actual_amount = old_weight - filament.weight_remaining
+    filament_id = getattr(filament, 'id', None)
+    if not filament_id:
+        # Non-persisted object — plain in-memory deduction.
+        old_weight = float(filament.weight_remaining or 0.0)
+        actual_amount = min(old_weight, requested_weight)
+        filament.weight_remaining = old_weight - actual_amount
+        if filament.weight_total > 0:
+            expected_quantity = math.ceil(filament.weight_remaining / filament.weight_total)
+            if expected_quantity < filament.quantity:
+                filament.quantity = expected_quantity
+        return actual_amount
 
+    for _attempt in range(5):
+        old_weight = float(filament.weight_remaining or 0.0)
+        if old_weight <= 0:
+            filament.weight_remaining = 0.0
+            return 0.0
+        new_weight = max(0.0, old_weight - requested_weight)
+        result = db.session.execute(
+            text(
+                "UPDATE filament SET weight_remaining = :new "
+                "WHERE id = :fid AND weight_remaining = :old"
+            ),
+            {'new': new_weight, 'fid': filament_id, 'old': old_weight},
+        )
+        if result.rowcount == 1:
+            filament.weight_remaining = new_weight
+            actual_amount = old_weight - new_weight
+            if filament.weight_total > 0:
+                expected_quantity = math.ceil(new_weight / filament.weight_total)
+                if expected_quantity < filament.quantity:
+                    filament.quantity = expected_quantity
+            return actual_amount
+        # Another thread modified the row between our read and the UPDATE —
+        # re-read the committed value and retry.
+        row = db.session.execute(
+            text("SELECT weight_remaining FROM filament WHERE id = :fid"),
+            {'fid': filament_id},
+        ).fetchone()
+        if row is None:
+            return 0.0
+        filament.weight_remaining = float(row[0])
+
+    # Give up after repeated contention: deduct from the freshest known value.
+    old_weight = float(filament.weight_remaining or 0.0)
+    actual_amount = min(old_weight, requested_weight)
+    filament.weight_remaining = old_weight - actual_amount
     if filament.weight_total > 0:
         expected_quantity = math.ceil(filament.weight_remaining / filament.weight_total)
         if expected_quantity < filament.quantity:
             filament.quantity = expected_quantity
-
     return actual_amount
 
 
@@ -1125,6 +1192,13 @@ def create_undo_snapshot(user_id, action_type, filament, project_filaments=None,
     return undo_log
 
 
+def _snapshot_attr(obj, key):
+    """Read a field from either a plain dict or an ORM object."""
+    if isinstance(obj, dict):
+        return obj.get(key)
+    return getattr(obj, key, None)
+
+
 def create_bulk_undo_snapshot(user_id, entries):
     """Create a database-backed undo snapshot for bulk delete operation.
 
@@ -1145,33 +1219,33 @@ def create_bulk_undo_snapshot(user_id, entries):
         filament = entry['filament']
         snapshot_data['entries'].append({
             'filament': {
-                'id': filament.id,
-                'name': filament.name,
-                'brand_id': filament.brand_id,
-                'color_id': filament.color_id,
-                'material_id': filament.material_id,
-                'weight_total': filament.weight_total,
-                'weight_remaining': filament.weight_remaining,
-                'price': filament.price,
-                'quantity': filament.quantity,
-                'min_stock_grams': filament.min_stock_grams,
-                'max_stock_grams': filament.max_stock_grams,
-                'tag_text': filament.tag_text,
-                'quality_stringing': filament.quality_stringing,
-                'quality_adhesion': filament.quality_adhesion,
-                'quality_drying': filament.quality_drying,
-                'quality_profile': filament.quality_profile,
-                'quality_notes': filament.quality_notes,
-                'recommended_nozzle_temp': filament.recommended_nozzle_temp,
-                'recommended_bed_temp': filament.recommended_bed_temp,
-                'reorder_alert_snoozed': filament.reorder_alert_snoozed,
-                'shop_url': filament.shop_url,
+                'id': _snapshot_attr(filament, 'id'),
+                'name': _snapshot_attr(filament, 'name'),
+                'brand_id': _snapshot_attr(filament, 'brand_id'),
+                'color_id': _snapshot_attr(filament, 'color_id'),
+                'material_id': _snapshot_attr(filament, 'material_id'),
+                'weight_total': _snapshot_attr(filament, 'weight_total'),
+                'weight_remaining': _snapshot_attr(filament, 'weight_remaining'),
+                'price': _snapshot_attr(filament, 'price'),
+                'quantity': _snapshot_attr(filament, 'quantity'),
+                'min_stock_grams': _snapshot_attr(filament, 'min_stock_grams'),
+                'max_stock_grams': _snapshot_attr(filament, 'max_stock_grams'),
+                'tag_text': _snapshot_attr(filament, 'tag_text'),
+                'quality_stringing': _snapshot_attr(filament, 'quality_stringing'),
+                'quality_adhesion': _snapshot_attr(filament, 'quality_adhesion'),
+                'quality_drying': _snapshot_attr(filament, 'quality_drying'),
+                'quality_profile': _snapshot_attr(filament, 'quality_profile'),
+                'quality_notes': _snapshot_attr(filament, 'quality_notes'),
+                'recommended_nozzle_temp': _snapshot_attr(filament, 'recommended_nozzle_temp'),
+                'recommended_bed_temp': _snapshot_attr(filament, 'recommended_bed_temp'),
+                'reorder_alert_snoozed': _snapshot_attr(filament, 'reorder_alert_snoozed'),
+                'shop_url': _snapshot_attr(filament, 'shop_url'),
             },
             'project_filaments': [
                 {
-                    'project_id': pf.project_id,
-                    'estimated_weight': pf.estimated_weight,
-                    'is_used': pf.is_used,
+                    'project_id': _snapshot_attr(pf, 'project_id'),
+                    'estimated_weight': _snapshot_attr(pf, 'estimated_weight'),
+                    'is_used': _snapshot_attr(pf, 'is_used'),
                 }
                 for pf in entry.get('project_filaments', [])
             ],
@@ -1211,7 +1285,7 @@ def get_pending_undo(user_id):
 
 
 def consume_undo_log(undo_log_id, user_id):
-    """Consume an undo log entry (mark as consumed and return snapshot data).
+    """Return snapshot data for an undo log entry without consuming it.
 
     Args:
         undo_log_id: ID of the undo log entry
@@ -1221,6 +1295,10 @@ def consume_undo_log(undo_log_id, user_id):
         dict snapshot_data or None if invalid/expired.
         For 'waste' and 'maintenance' target types, includes action_type and
         target_key fields alongside the JSON payload.
+
+    The log row is NOT marked as consumed here — the caller must invoke
+    :func:`mark_undo_consumed` only after the restore succeeded, so a
+    failed restore can be retried instead of burning the snapshot.
     """
 
     undo_log = FilamentUndoLog.query.filter_by(id=undo_log_id, user_id=user_id).first()
@@ -1232,10 +1310,6 @@ def consume_undo_log(undo_log_id, user_id):
 
     if undo_log.expires_at < utc_now():
         return None
-
-    undo_log.is_consumed = True
-    undo_log.consumed_at = utc_now()
-    safe_commit()
 
     target_type = undo_log.target_type or 'filament'
     if target_type == 'filament':
@@ -1254,6 +1328,22 @@ def consume_undo_log(undo_log_id, user_id):
             'target_type': target_type,
             'target_key': undo_log.target_key,
         }
+
+
+def mark_undo_consumed(undo_log_id, user_id):
+    """Mark an undo log entry as consumed after a successful restore.
+
+    Idempotent: returns True when the row was (or already is) consumed,
+    False when the row does not exist or belongs to another user.
+    """
+    undo_log = FilamentUndoLog.query.filter_by(id=undo_log_id, user_id=user_id).first()
+    if not undo_log:
+        return False
+    if not undo_log.is_consumed:
+        undo_log.is_consumed = True
+        undo_log.consumed_at = utc_now()
+        safe_commit()
+    return True
 
 
 def purge_expired_undo_logs():
@@ -1895,15 +1985,41 @@ def validate_printer_host(host):
 
 
 def prusa_request(printer, path):
-    """GET request to a PrusaLink endpoint.  Returns parsed JSON or None on error."""
+    """GET request to a PrusaLink endpoint.  Returns parsed JSON or None on error.
+
+    The stored host is re-validated on every call (SSRF hardening) and
+    redirects are followed only after re-validating each target.
+    """
+    host = validate_printer_host(printer.host) if printer.host else None
+    if not host:
+        return None
     api_key = decrypt_token(printer.api_key)
-    url = f'{printer.host.rstrip("/")}/{path.lstrip("/")}'
+    url = f'{host.rstrip("/")}/{path.lstrip("/")}'
     try:
         resp = requests.get(
             url,
             headers=prusa_request_headers(api_key),
             timeout=_PRUSA_TIMEOUT,
+            allow_redirects=False,
         )
+        # Follow redirects manually, re-validating every target against the
+        # SSRF blocklist (a redirect to 127.0.0.1/169.254.x.x is rejected).
+        for _ in range(3):
+            if resp.status_code not in (301, 302, 303, 307, 308):
+                break
+            target = resp.headers.get('Location')
+            if not target:
+                return None
+            if target.startswith('/'):
+                target = host.rstrip('/') + target
+            if not validate_printer_host(target):
+                return None
+            resp = requests.get(
+                target,
+                headers=prusa_request_headers(api_key),
+                timeout=_PRUSA_TIMEOUT,
+                allow_redirects=False,
+            )
         if resp.status_code == 204:
             return {}  # No content — no current job
         resp.raise_for_status()

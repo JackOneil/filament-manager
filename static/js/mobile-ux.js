@@ -36,16 +36,32 @@
                 try { swipeRoutes = JSON.parse(swipeRoutesEl.textContent); } catch (e) { /* ignore */ }
             }
 
+            function isHorizontallyScrollable(el) {
+                // Skip the swipe gesture when the touch started inside a
+                // horizontally scrollable container (Kanban board, wide
+                // tables) — panning it would otherwise navigate away.
+                let node = el;
+                while (node && node !== document.body) {
+                    if (node.scrollWidth > node.clientWidth + 8) {
+                        return true;
+                    }
+                    node = node.parentElement;
+                }
+                return false;
+            }
+
             if (currentEndpoint && swipeRoutes[currentEndpoint]) {
                 document.addEventListener('touchstart', e => {
                     // Do not trigger swipe on interactive elements, maps, or drag-and-drop handles
                     if (e.target.closest('input, textarea, select, button, a, [role="button"], #map, [draggable="true"], .no-swipe')) return;
+                    if (isHorizontallyScrollable(e.target)) return;
                     touchstartX = e.changedTouches[0].screenX;
                     touchstartY = e.changedTouches[0].screenY;
                 }, { passive: true });
 
                 document.addEventListener('touchend', e => {
                     if (e.target.closest('input, textarea, select, button, a, [role="button"], #map, [draggable="true"], .no-swipe')) return;
+                    if (isHorizontallyScrollable(e.target)) return;
                     touchendX = e.changedTouches[0].screenX;
                     touchendY = e.changedTouches[0].screenY;
                     handleSwipe();

@@ -95,7 +95,7 @@
                 <div class="mt-1" x-data="{ open: false }">
                     <div class="text-sm text-gray-600" :class="open ? '' : 'max-h-10 overflow-hidden'">
                         {% if rec.notes_is_markdown %}
-                        <div class="js-maint-note prose prose-sm max-w-none" data-note='{{ rec.notes | tojson }}' data-is-markdown="1"></div>
+                        <div class="js-maint-note prose prose-sm max-w-none">{{ render_markdown(rec.notes) | safe }}</div>
                         {% else %}
                         <p class="whitespace-pre-wrap">{{ rec.notes }}</p>
                         {% endif %}

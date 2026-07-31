@@ -169,7 +169,7 @@
                             {% set file_ext = ver.filename.rsplit('.', 1)[-1].lower() if '.' in ver.filename else '' %}
                             {% if file_ext in ['3mf', 'stl', 'obj', 'amf', 'step', 'stp', 'gcode', 'gc', 'bgcode'] %}
                             {% set preview_url = url_for('models.model_public_share_file', token=root.share_token, file_id=ver.id, filename=ver.filename) %}
-                            <button type="button" @click="loadModelVersion({{ ver.id }}, '{{ ver.filename }}', '{{ preview_url }}', {{ ver.version }}, '{{ ver.file_size_bytes or 0 }}', '{{ ver.checksum_sha256 or '' }}', '{{ ver.mime_type or '' }}', '{{ ver.uploaded_by.name or ver.uploaded_by.email if ver.uploaded_by else 'System' }}', '{{ ver.uploaded_at | fmt_dt('%d.%m.%Y %H:%M') }}', '{{ (ver.version_note or '') | replace("'", "\\'") | replace('"', '\\"') }}')"
+                            <button type="button" @click='loadModelVersion({{ ver.id }}, {{ ver.filename|tojson }}, {{ preview_url|tojson }}, {{ ver.version }}, {{ (ver.file_size_bytes or 0)|tojson }}, {{ (ver.checksum_sha256 or '')|tojson }}, {{ (ver.mime_type or '')|tojson }}, {{ (ver.uploaded_by.name if ver.uploaded_by else 'System')|tojson }}, {{ (ver.uploaded_at | fmt_dt('%d.%m.%Y %H:%M'))|tojson }}, {{ (ver.version_note or '')|tojson }})'
                                 :class="activeFileId === {{ ver.id }} ? 'ui-badge-brand' : ''" class="ui-badge h-8 px-3 gap-1">
                                 <i class="fa-solid fa-eye text-[10px]"></i> {{ t('preview') }}
                             </button>

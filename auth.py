@@ -329,10 +329,10 @@ def is_safe_redirect_target(target):
     )
 
 
-def safe_redirect_target(target, fallback_endpoint='index'):
+def safe_redirect_target(target, fallback_endpoint='index', **kwargs):
     if is_safe_redirect_target(target):
         return target
-    return url_for(fallback_endpoint)
+    return url_for(fallback_endpoint, **kwargs)
 
 
 def login_user(user, plain_password=None):

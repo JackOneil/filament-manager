@@ -1,5 +1,6 @@
 """Waste/scrap tracking — record failed prints with reason, weight, filament and project."""
 import json
+import math
 import os
 import uuid
 from datetime import datetime, timedelta
@@ -12,7 +13,7 @@ from sqlalchemy.orm import joinedload
 from database import db
 from models import Filament, FilamentUndoLog, Project, WasteFile, WasteRecord, AppSetting
 from routes.inventory_helpers import _UNDO_SESSION_KEY
-from utils import utc_now, safe_commit
+from utils import deduct_filament_stock, log_movement, translate, utc_now, safe_commit
 
 
 _DEFAULT_WASTE_REASONS = ['stringing', 'warping', 'bed_adhesion', 'clogging', 'layer_shift', 'spaghetti', 'broken_support', 'other']
@@ -21,6 +22,39 @@ WASTE_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
 # Undo TTL for waste-record deletion — matches the filament undo window so
 # the user has a realistic chance to click "Vrátit" before it expires.
 _WASTE_UNDO_TTL_MINUTES = 15
+
+
+def _restore_waste_stock(rec):
+    """Return wasted grams back to the filament stock (delete path)."""
+    if not rec or not rec.filament_id or not rec.weight_grams or rec.weight_grams <= 0:
+        return
+    filament = db.session.get(Filament, rec.filament_id)
+    if not filament:
+        return
+    filament.weight_remaining = float(filament.weight_remaining or 0.0) + float(rec.weight_grams)
+    if filament.weight_total > 0:
+        expected_qty = math.ceil(filament.weight_remaining / filament.weight_total)
+        if expected_qty > filament.quantity:
+            filament.quantity = expected_qty
+    log_movement(filament, 'add', float(rec.weight_grams), note=translate('movement_note_waste_restore'))
+
+
+def _deduct_waste_stock(filament_id, weight_grams, project_id=None):
+    """Deduct wasted grams from the filament stock (create/undo path)."""
+    if not filament_id or not weight_grams or weight_grams <= 0:
+        return
+    filament = db.session.get(Filament, filament_id)
+    if not filament:
+        return
+    actual = deduct_filament_stock(filament, weight_grams)
+    if actual > 0:
+        log_movement(
+            filament,
+            'waste',
+            actual,
+            project_id=project_id,
+            note=translate('movement_note_waste'),
+        )
 
 
 def _get_waste_reasons():
@@ -153,6 +187,8 @@ def register(app):
             notes=notes,
             recorded_by_user_id=user.id if user else None,
         ))
+        # Wasted grams leave the inventory: deduct stock and log the movement.
+        _deduct_waste_stock(filament_id, weight_grams, project_id)
         safe_commit()
         return redirect(url_for('waste_index'))
 
@@ -163,6 +199,9 @@ def register(app):
         if not is_admin(user):
             abort(403)
         rec = db.get_or_404(WasteRecord, rec_id)
+
+        old_filament_id = rec.filament_id
+        old_weight = float(rec.weight_grams or 0.0)
 
         filament_id = request.form.get('filament_id', type=int)
         if filament_id:
@@ -186,6 +225,35 @@ def register(app):
 
         rec.notes = request.form.get('notes', '').strip() or None
 
+        # Keep inventory consistent with the edit: restore the old amount to
+        # the old filament, deduct the new amount from the new filament.
+        if rec.filament_id == old_filament_id:
+            delta = weight_grams - old_weight
+            if delta > 0:
+                _deduct_waste_stock(rec.filament_id, delta, rec.project_id)
+            elif delta < 0:
+                filament = db.session.get(Filament, rec.filament_id)
+                if filament:
+                    filament.weight_remaining = float(filament.weight_remaining or 0.0) + abs(delta)
+                    log_movement(
+                        filament,
+                        'add',
+                        abs(delta),
+                        note=translate('movement_note_waste_restore'),
+                    )
+        else:
+            if old_filament_id and old_weight > 0:
+                old_fil = db.session.get(Filament, old_filament_id)
+                if old_fil:
+                    old_fil.weight_remaining = float(old_fil.weight_remaining or 0.0) + old_weight
+                    log_movement(
+                        old_fil,
+                        'add',
+                        old_weight,
+                        note=translate('movement_note_waste_restore'),
+                    )
+            _deduct_waste_stock(rec.filament_id, weight_grams, rec.project_id)
+
         safe_commit()
         return redirect(url_for('waste_index'))
 
@@ -196,6 +264,8 @@ def register(app):
         if not is_admin(user):
             abort(403)
         rec = db.get_or_404(WasteRecord, rec_id)
+        # Return the wasted grams back to the filament stock.
+        _restore_waste_stock(rec)
         # Delete associated files from disk
         for f in list(rec.files):
             try:
@@ -279,6 +349,8 @@ def register(app):
             recorded_by_user_id=user.id if user else None,
         )
         db.session.add(rec)
+        # Wasted grams leave the inventory: deduct stock and log the movement.
+        _deduct_waste_stock(filament_id, weight_grams, project_id)
         safe_commit()
         return jsonify(success=True, id=rec.id)
 
@@ -321,6 +393,9 @@ def register(app):
         if not is_admin(user):
             abort(403)
         rec = db.get_or_404(WasteRecord, rec_id)
+
+        # Return the wasted grams back to the filament stock.
+        _restore_waste_stock(rec)
 
         # Create undo log before deleting
         undo_data = json.dumps({

@@ -59,16 +59,21 @@ class TestBackupPathSafety:
         # Textual path is inside tmp_path, but realpath is not.
         assert _is_path_inside(str(link_file), str(tmp_path)) is False
 
-    def test_backup_storage_dir_is_realpath(self, tmp_path, monkeypatch):
+    def test_backup_storage_dir_is_realpath(self, tmp_path):
         # The data dir is created on demand and returned as realpath.
+        # Redirect the storage dir into the test sandbox so the test never
+        # touches the production data/backup directory.
         from routes import backup as backup_mod
-        # Re-point __file__ resolution by monkey-patching the module's
-        # _BACKUP_STORAGE_DIRNAME constant and calling with our tmp dir
-        # would require lots of plumbing.  Simpler: just call the helper
-        # and assert it returns a realpath that exists.
-        d = backup_mod._backup_storage_dir()
-        assert os.path.isdir(d)
-        assert os.path.realpath(d) == d
+        from app import create_app
+        app = create_app({
+            'TESTING': True,
+            'BACKUP_DIR': str(tmp_path / 'backup'),
+            'SQLALCHEMY_DATABASE_URI': f'sqlite:///{tmp_path / "t.db"}',
+        })
+        with app.app_context():
+            d = backup_mod._backup_storage_dir()
+            assert os.path.isdir(d)
+            assert os.path.realpath(d) == d
 
 
 # ── 5.11 — movement_action_label i18n ────────────────────────────────

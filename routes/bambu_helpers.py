@@ -14,6 +14,7 @@ import mimetypes
 from datetime import datetime, timedelta, timezone
 
 import requests
+from urllib.parse import urljoin
 from flask import current_app, render_template, request, redirect, url_for, jsonify, Blueprint, send_file, abort
 
 from database import db
@@ -130,11 +131,27 @@ def _cache_cover_image(external_id: str, cover_url: str | None) -> str | None:
         return None
 
     if not is_safe_external_url(cover_url):
-        _LOG.warning('Bambu cover image URL may be unsafe: %s', cover_url)
-        # Continue anyway — Bambu API responses are trusted sources
+        _LOG.warning('Bambu cover image URL rejected (SSRF guard): %s', cover_url)
+        # Do NOT fetch — cover URLs can be attacker-influenced via crafted
+        # backup imports (raw_payload) and could point at internal services.
+        return None
 
     try:
-        resp = requests.get(cover_url, timeout=15)
+        resp = requests.get(cover_url, timeout=15, allow_redirects=False)
+        # Follow redirects manually, re-validating every hop (S3 signed URLs
+        # redirect to the bucket — the target must pass the same SSRF checks).
+        for _ in range(3):
+            if resp.status_code not in (301, 302, 303, 307, 308):
+                break
+            location = resp.headers.get('Location')
+            if not location:
+                return None
+            if location.startswith('/'):
+                location = urljoin(cover_url, location)
+            if not is_safe_external_url(location):
+                _LOG.warning('Bambu cover redirect rejected (SSRF guard): %s', location)
+                return None
+            resp = requests.get(location, timeout=15, allow_redirects=False)
         resp.raise_for_status()
     except Exception:
         _LOG.warning('Bambu cover image download failed: %s', cover_url)
@@ -610,25 +627,26 @@ def do_sync(token: str, region: str) -> dict:
 
     # ── Orphan reconciliation ──────────────────────────────────────────────
     # Any job still marked RUNNING whose external_id was NOT seen in the API
-    # response is reconciled to FINISH.  When the API returns zero tasks
-    # (e.g. temporary outage), ALL RUNNING jobs are treated as orphans rather
-    # than leaving them stuck forever.
-    try:
-        orphans_query = BambuPrintJob.query.filter(BambuPrintJob.status == 'RUNNING')
-        if all_ext_ids:
-            orphans_query = orphans_query.filter(~BambuPrintJob.external_id.in_(all_ext_ids))
-        orphans = orphans_query.all()
-        for orphan in orphans:
-            orphan.status = 'FINISH'
-            if not orphan.finished_at:
-                orphan.finished_at = utc_now()
-        if orphans:
-            safe_commit()
-            orphans_reconciled = len(orphans)
-            _LOG.info('Bambu sync: auto-reconciled %d orphan RUNNING job(s) to FINISH', orphans_reconciled)
-    except Exception as exc:
-        db.session.rollback()
-        _LOG.warning('Bambu sync orphan reconciliation failed: %s', exc)
+    # response is reconciled to FINISH.  This only runs when the API actually
+    # returned tasks — an empty response usually means a transient outage,
+    # and treating it as authoritative would force-finish every RUNNING job.
+    if all_ext_ids:
+        try:
+            orphans = BambuPrintJob.query.filter(
+                BambuPrintJob.status == 'RUNNING',
+                ~BambuPrintJob.external_id.in_(all_ext_ids),
+            ).all()
+            for orphan in orphans:
+                orphan.status = 'FINISH'
+                if not orphan.finished_at:
+                    orphan.finished_at = utc_now()
+            if orphans:
+                safe_commit()
+                orphans_reconciled = len(orphans)
+                _LOG.info('Bambu sync: auto-reconciled %d orphan RUNNING job(s) to FINISH', orphans_reconciled)
+        except Exception as exc:
+            db.session.rollback()
+            _LOG.warning('Bambu sync orphan reconciliation failed: %s', exc)
 
     # ── Auto-mapping (runs after commit so job IDs are stable) ───────────────
     setting = get_settings()

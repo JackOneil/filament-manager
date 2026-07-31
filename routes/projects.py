@@ -9,7 +9,7 @@ from markupsafe import Markup
 from sqlalchemy.orm import joinedload, selectinload
 from werkzeug.utils import secure_filename
 
-from auth import create_notification, get_current_user, is_admin
+from auth import create_notification, get_current_user, is_admin, safe_redirect_target
 from database import db
 from models import (
     AppSetting,
@@ -189,6 +189,7 @@ def register(app):
                 .options(
                     selectinload(Project.filaments).joinedload(ProjectFilament.filament),
                     selectinload(Project.quotes),
+                    selectinload(Project.print_items),
                     selectinload(Project.bambu_jobs).selectinload(BambuPrintJob.materials),
                     selectinload(Project.bambu_jobs).joinedload(BambuPrintJob.filament),
                     selectinload(Project.prusa_jobs).joinedload(PrusaPrintJob.filament),
@@ -736,7 +737,7 @@ def register(app):
         slot = _consume_pending_undo(session)
         if not slot:
             flash('undo_toast_not_available', 'error')
-            return redirect(request.referrer or url_for('projects_index'))
+            return redirect(safe_redirect_target(request.referrer, 'projects_index'))
         kind = slot.get('kind')
         undo_id = slot.get('undo_log_id')
         project_id = slot.get('project_id')
@@ -755,13 +756,13 @@ def register(app):
                 return _project_detail_redirect(project_id, 'files') if project_id else redirect(url_for('projects_index'))
             else:
                 flash('undo_toast_not_available', 'error')
-                return redirect(request.referrer or url_for('projects_index'))
+                return redirect(safe_redirect_target(request.referrer, 'projects_index'))
         except Exception:
             db.session.rollback()
             current_app.logger.exception("Project undo failed for slot=%s", slot)
             flash('undo_toast_failed', 'error')
             _cleanup_undo_artifacts(slot)
-            return redirect(request.referrer or url_for('projects_index'))
+            return redirect(safe_redirect_target(request.referrer, 'projects_index'))
 
     @bp.route('/projects/<int:id>/add_link', methods=['POST'])
     def project_add_link(id):

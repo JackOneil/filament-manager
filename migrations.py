@@ -388,17 +388,36 @@ def _migrate_nullable_project_id(app: Flask, dialect: str = 'sqlite') -> None:
                 model_note TEXT,
                 uploaded_by_user_id INTEGER,
                 share_token VARCHAR(64),
+                category_id INTEGER,
                 PRIMARY KEY (id),
                 FOREIGN KEY (project_id) REFERENCES project (id) ON DELETE CASCADE,
                 FOREIGN KEY (parent_file_id) REFERENCES project_file (id) ON DELETE CASCADE,
-                FOREIGN KEY (uploaded_by_user_id) REFERENCES user (id) ON DELETE SET NULL
+                FOREIGN KEY (uploaded_by_user_id) REFERENCES user (id) ON DELETE SET NULL,
+                FOREIGN KEY (category_id) REFERENCES model_category (id) ON DELETE SET NULL
             )
         """))
+        # Explicit column list: SELECT * would break on databases that already
+        # gained category_id from a later migration (17 vs 16 columns).
         db.session.execute(text("""
-            INSERT INTO project_file_new SELECT * FROM project_file
+            INSERT INTO project_file_new (
+                id, project_id, filename, filepath, uploaded_at, version,
+                parent_file_id, display_name, file_size_bytes, mime_type,
+                checksum_sha256, thumbnail_path, version_note, model_note,
+                uploaded_by_user_id, share_token, category_id
+            )
+            SELECT
+                id, project_id, filename, filepath, uploaded_at, version,
+                parent_file_id, display_name, file_size_bytes, mime_type,
+                checksum_sha256, thumbnail_path, version_note, model_note,
+                uploaded_by_user_id, share_token, category_id
+            FROM project_file
         """))
         db.session.execute(text("DROP TABLE project_file"))
         db.session.execute(text("ALTER TABLE project_file_new RENAME TO project_file"))
+        # The rebuild drops every index on the old table — recreate them so
+        # project-file queries do not degrade to full table scans.
+        db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_project_file_project_parent ON project_file (project_id, parent_file_id)"))
+        db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_project_file_category_id ON project_file (category_id)"))
         db.session.commit()
         app.logger.info("Successfully migrated project_file.project_id to nullable.")
     except Exception as e:

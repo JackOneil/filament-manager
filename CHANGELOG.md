@@ -22,6 +22,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Backup import: oprava transakce a limity dekomprese** — `db.session.begin()` v `/import` selhával na otevřené read-only transakci z předchozího requestu („A transaction is already begun“) — před blokem se transakce korektně ukončí; `_load_backup_package` má nyní limity velikosti členů archivu (256 MB/člen, 512 MB celkem) proti tar-bomb DoS. (routes/backup.py, routes/backup_helpers.py)
 - **Regresní testy** — nový soubor `tests/test_review_fixes.py` (23 testů) pokrývá všechny výše uvedené opravy včetně migrace legacy schémat.
 
+### Security
+
+- **Bulk delete filamentů přestal padat s HTTP 500** — `create_bulk_undo_snapshot()` přistupoval k dictům z `_build_filament_restore_bundle()` jako k ORM objektům (`AttributeError: 'dict' object has no attribute 'id'`); snapshot nyní čte pole z dictů i ORM objektů. (utils/__init__.py, routes/inventory.py)
+- **Stored XSS v kalkulačce a přehledech projektů/modelů opraven** — názvy filamentů, tagy, `client_name` a jména uploaderů byly interpolovány do jednořádkových JS stringů v Alpine atributech (HTML entity se dekódují před vyhodnocením výrazu → spustitelný kód). Vše převedeno na `|tojson`; na veřejné share stránce modelů se navíc již nezobrazuje e-mail uploadera. (templates/calculator.html, _projects_layout.html, _models_cards.html, _models_rows.html, models_detail.html, models_share.html)
+- **Hromadné akce uživatelů opraveny** — `@submit.prevent` na formuláři bulk akcí vždy volal `preventDefault()`, takže aktivace/deaktivace/smazání uživatelů přes UI nikdy neproběhla. (templates/users.html)
+- **Upload fotek zmetků selhával na CSRF 400** — `XMLHttpRequest` neprocházel globálním CSRF auto-injection patchem (pokrývá jen `fetch` a formuláře); hlavička `X-CSRFToken` se nyní posílá explicitně. (templates/waste.html)
+- **SSRF: Bambu cover obrázky se stahují jen z bezpečných URL** — `is_safe_external_url()` se dříve pouze zalogovala a fetch proběhl vždy; nyní se neschválená URL zahodí a redirecty se re-validují na každém hopu (URL je ovlivnitelná craftnutým backup importem). (routes/bambu_helpers.py)
+- **SSRF: PrusaLink host se re-validuje při každém requestu** — `prusa_request()` validuje uložený host před každým voláním a redirecty sleduje jen po re-validaci cíle; import backupu navíc prochází `validate_printer_host()` (craftnutý backup nemůže nasměrovat 60s poller na vnitřní adresy). (utils/__init__.py, routes/backup.py)
+- **Open redirect přes `Referer` uzavřen** — `redirect(request.referrer or ...)` na 10 místech (inventory, projects, settings) nyní prochází `safe_redirect_target()` (povolen jen same-host cíl). (routes/inventory.py, routes/projects.py, routes/settings.py)
+- **`shop_url` a barvy validovány** — `javascript:`/`data:` URL v `shop_url` (filament, brand, CSV import) se odmítají (`normalize_shop_url`); `hex_value` barev prochází `normalize_hex()` (CSS injection přes style atributy). (utils/__init__.py, routes/inventory.py, routes/settings.py)
+- **Bootstrap admin race uzavřen** — dvě souběžné registrace na prázdné DB se serializují zámkem a role admina se přiděluje až po re-checku počtu uživatelů. (routes/auth.py)
+- **Ochrana posledního admina** — demotace/deaktivace posledního aktivního administrátora je odmítnuta (dosud chráněno jen mazání). (routes/auth.py)
+- **Path traversal v importu backupu uzavřen** — `original_name` souborů zmetků prochází `secure_filename()` (craftnutý backup mohl zapsat soubor mimo upload adresář). (routes/backup.py)
+- **Alpine `SyntaxError` na kalkulačce/projektech/modely opraven** — `|tojson` vrací Markup, takže v dvojitě-uvozovkovaných HTML atributech holá `"` z dat (např. název filamentu `PETG 50% "heavy"`) atribut předčasně ukončila a Alpine vyhodnotil oříznutý výraz (`Unexpected token '}'`). Atributy interpolující `|tojson` přepnuty na single-quoted delimitery (konvence z BUG-706) — `calculator.html`, `_projects_layout.html`, `_models_cards.html`, `_models_rows.html`, `models_detail.html`, `models_share.html`, `_filament_context_menu.html`, `quote_export.html`, `filament_db.html`; přidán regresní test `tests/test_alpine_expressions.py` (6 testů), který renderuje stránky s hostilními daty a validuje úplnost Alpine výrazů. (9 šablon, tests/)
+- **`SECRET_KEY` persistován** — bez env var se klíč ukládá do `data/secret_key` (0600), takže session/CSRF tokeny přežijí restart i `docker compose up -d --build`. (app.py)
+- **Undo snapshot se konzumuje až po úspěšném restoru** — `consume_undo_log()` je read-only peek; nové `mark_undo_consumed()` se volá až po úspěšném obnovení, takže selhaný undo lze zopakovat. (utils/__init__.py, routes/inventory.py)
+
+### Fixed
+
+- **Remove spool odečítal dvakrát** — ruční `quantity -= 1` i `deduct_filament_stock(weight_total)` přepočítávaly quantity; odečet je nyní jediný atomický compare-and-swap UPDATE (quantity i váha). (routes/inventory.py)
+- **Odpad nyní skutečně snižuje zásoby** — vytvoření záznamu odpadu odečte váhu ze zásob s `log_movement('waste')`, smazání/undo váhu vrací, editace řeší deltu i změnu filamentu; action type `waste` a `prusa_print` přidány do filtru historie a překladů. (routes/waste.py, routes/inventory.py, routes/history.py, messages.py)
+- **Bambu: dvojitý odečet u slot dedukce uzavřen** — slot-level dedukce propaguje `job.deducted` po odečtení všech slotů; job-level „map + deduct“ je blokován u multi-material jobů a u jobů s částečně deduktovanými sloty. (routes/bambu.py)
+- **Bambu remap vrací skutečně odečtenou váhu** — restore používá sumu z `MovementHistory` (po clampu) místo nominální váhy jobu; `deducted` se nastavuje jen když dedukce proběhla. (routes/bambu.py)
+- **Odečet zásob je atomický** — `deduct_filament_stock()` používá compare-and-swap UPDATE s bounded retry (žádné ztracené updaty při souběhu 4 gunicorn threadů). (utils/__init__.py)
+- **Backoff workerů reaguje na API chyby** — 401/429/5xx z Bambu/Prusa syncu nyní spouští exponenciální backoff (reset jen při úspěchu), cap 3600 s. (app.py)
+- **Bambu orphan reconcilace nekorumpuje RUNNING joby při výpadku API** — prázdná odpověď se nepovažuje za autoritativní; reconcilace běží jen když API vrátilo tasky. (routes/bambu_helpers.py)
+- **Migrace `project_file` rebuild opravena** — rekreace tabulky obsahuje `category_id` (17 sloupců) s explicitním sloupcovým INSERT a po rebuildu se obnovují indexy (dosud `INSERT SELECT *` selhával na DB s `category_id` a ztrácely se indexy). (migrations.py)
+- **`migrate_to_pg.py` nepřichází o data** — do seznamu migrovaných tabulek doplněny `model_category`, `model_comment`, `project_print_item` (byly tiše vynechány). (migrate_to_pg.py)
+- **Import backupu: AppSetting se vytváří, nejen upravuje** — na čerstvé DB restore nezpůsobí ztrátu konfigurace; `PrinterMaintenance.printer_id` se resolve podle (typ, jméno) místo raw ID. (routes/backup.py)
+- **Export běží jedním průchodem** — `/export` už nevolá `_build_export_data()` dvakrát (poloviční počet DB dotazů). (routes/backup.py)
+- **Poznámky údržby s Markdown se zobrazují** — prázdný `js-maint-note` div (bez konzumenta) nahrazen server-side renderem přes `render_markdown()` (nově dostupný v šablonách). (templates/maintenance.html, app.py)
+- **Task checkboxy v Markdown editoru jdou přepínat** — `preventDefault()` ve vizuálním módu potlačoval nativní toggle; přidán `click` handler s propagací do zdrojové hodnoty. (static/js/markdown-editor.js)
+- **Mobile swipe neunáší horizontální scroll** — gesto se ignoruje, když dotyk začal ve horizontálně scrollovatelném kontejneru (Kanban, široké tabulky). (static/js/mobile-ux.js)
+- **Collapsing topbar oživen** — chybějící CSS pravidlo pro `header.collapsed` (handler existoval, ale nic se nedělo). (static/css/app.css)
+- **Legacy session undo sloty nezpůsobují 500** — porovnání naivního `expires_at` s aware `utc_now()` normalizuje časové pásmo. (app.py)
+- **N+1 na indexu projektů odstraněn** — `selectinload(Project.print_items)` (kanban karty/table dělaly ~116 lazy dotazů na stránku). (routes/projects.py)
+- **`add()` filamentu nepadá s 500 na neexistující značku/materiál/barvu** — chybná reference se ohlásí a vrátí na formulář. (routes/inventory.py)
+- **Testy izolovány od produkčních adresářů** — opraveny patch targety v `test_bambu.py` (thumbnaily se ukládaly do `data/bambu_thumbs/`), `_backup_storage_dir()` respektuje `BACKUP_DIR` config, síťové fetche link preview jsou mockované. (tests/test_bambu.py, tests/test_refactors.py, tests/test_backup_extended.py, tests/test_projects_extended.py)
+- **`pytest.ini` nevyžaduje povinně xdist** — `-n auto` přesunuto z addopts na explicitní volání (suite běží i bez pytest-xdist). (pytest.ini)
+
 ## [1.120.1] — 2026-07-18
 
 ### Added

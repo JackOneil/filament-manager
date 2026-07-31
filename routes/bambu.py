@@ -18,7 +18,7 @@ from flask import current_app, flash, render_template, request, redirect, url_fo
 from database import db
 from models import (
     BambuPrinter, BambuPrintJob, BambuJobMaterial,
-    Filament, PrintHistory, Project, ProjectFilament,
+    Filament, MovementHistory, PrintHistory, Project, ProjectFilament,
 )
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import joinedload
@@ -49,6 +49,26 @@ from routes.bambu_helpers import (
 
 def register(app):
     bp = Blueprint('bambu', __name__)
+
+    def _job_deducted_total(job_ref, filament_name):
+        """Sum of grams actually deducted (post-clamp) for a job/filament.
+
+        Movement rows record the real deducted amount — restoring this exact
+        sum (instead of the nominal job weight) keeps stock math consistent
+        when a deduction was clamped by low stock.
+        """
+        total = (
+            db.session.query(
+                db.func.coalesce(db.func.sum(MovementHistory.amount), 0.0)
+            )
+            .filter(
+                MovementHistory.bambu_job_id == job_ref.id,
+                MovementHistory.action_type == 'bambu_print',
+                MovementHistory.filament_name == filament_name,
+            )
+            .scalar()
+        )
+        return float(total or 0.0)
 
     # Make format_duration available in all templates from this route module
     app.jinja_env.globals['format_duration'] = format_duration
@@ -387,6 +407,8 @@ def register(app):
             deduct_now
             and filament_id
             and not job.deducted
+            and not any(m.deducted for m in job.materials)
+            and len(job.materials) <= 1
             and job.weight_grams
             and job.weight_grams > 0
         ):
@@ -432,10 +454,16 @@ def register(app):
         ):
             # Job was already deducted but a different filament is being assigned
             # → restore stock to the old filament and deduct from the new one.
+            # Restore the amount that was ACTUALLY deducted (recorded in the
+            # movement history) rather than the nominal job weight — a clamped
+            # deduction (low stock) must not inflate the old filament.
             old_filament = db.session.get(Filament, old_filament_id)
             new_filament = db.session.get(Filament, filament_id)
             if old_filament:
-                old_filament.weight_remaining = old_filament.weight_remaining + job.weight_grams
+                restore_amount = _job_deducted_total(job, old_filament.name)
+                if restore_amount <= 0:
+                    restore_amount = job.weight_grams
+                old_filament.weight_remaining = old_filament.weight_remaining + restore_amount
                 if old_filament.weight_total > 0:
                     expected_qty = math.ceil(old_filament.weight_remaining / old_filament.weight_total)
                     if expected_qty > old_filament.quantity:
@@ -443,7 +471,7 @@ def register(app):
                 log_movement(
                     old_filament,
                     'add',
-                    job.weight_grams,
+                    restore_amount,
                     project_id=project_id or job.project_id,
                     bambu_job_id=job.id,
                     note=translate('movement_note_bambu_remap_return').format(label=job_label),
@@ -459,8 +487,10 @@ def register(app):
                         bambu_job_id=job.id,
                         note=translate('movement_note_bambu_remap').format(label=job_label),
                     )
-            if single_slot:
-                single_slot.deducted = True
+                    # Only flag the slot as deducted when a deduction actually
+                    # happened (new filament may have zero stock).
+                    if single_slot:
+                        single_slot.deducted = True
 
         safe_commit()
         if is_ajax:
@@ -520,6 +550,11 @@ def register(app):
                     # Propagate to the linked project if any
                     if job.project:
                         job.project.mark_planned_filament_used(filament_id)
+                    # When every slot of the job is now deducted, flag the job
+                    # itself as deducted so a later job-level "map + deduct"
+                    # cannot double-deduct the full job weight.
+                    if all(m.deducted for m in job.materials):
+                        job.deducted = True
 
         safe_commit()
 
@@ -563,8 +598,15 @@ def register(app):
                 old_filament = db.session.get(Filament, old_filament_id)
                 new_filament = db.session.get(Filament, filament_id)
                 if old_filament:
-                    # Restore stock to old filament
-                    old_filament.weight_remaining = old_filament.weight_remaining + weight
+                    # Restore the amount that was actually deducted (recorded
+                    # in movements) — a clamped deduction must not inflate
+                    # the old filament back to the full nominal slot weight.
+                    restore_amount = _job_deducted_total(job, old_filament.name)
+                    if restore_amount <= 0:
+                        restore_amount = weight
+                    else:
+                        restore_amount = min(restore_amount, weight)
+                    old_filament.weight_remaining = old_filament.weight_remaining + restore_amount
                     if old_filament.weight_total > 0:
                         expected_qty = math.ceil(old_filament.weight_remaining / old_filament.weight_total)
                         if expected_qty > old_filament.quantity:
@@ -572,7 +614,7 @@ def register(app):
                     log_movement(
                         old_filament,
                         'add',
-                        weight,
+                        restore_amount,
                         project_id=job.project_id,
                         bambu_job_id=job.id,
                         note=translate('movement_note_bambu_remap_return').format(label=job_label),

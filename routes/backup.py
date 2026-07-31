@@ -8,6 +8,7 @@ import tarfile
 import uuid
 from datetime import datetime, date
 from flask import abort, current_app as app, request, redirect, url_for, Response, Blueprint, flash
+from werkzeug.utils import secure_filename
 
 from database import db
 from models import (
@@ -19,7 +20,7 @@ from models import (
     Notification, AuditLog, ModelComment, ModelCategory,
     PrinterMaintenance, WasteRecord, WasteFile, FilamentUndoLog, ProjectTemplate,
 )
-from utils import encrypt_token, format_tags, safe_commit, utc_now, translate
+from utils import encrypt_token, format_tags, safe_commit, utc_now, translate, validate_printer_host
 
 
 from routes.backup_helpers import (
@@ -52,12 +53,22 @@ def _backup_storage_dir() -> str:
 
     The directory is created on demand so the very first backup works
     without manual ``mkdir``.  The returned path contains no symlinks.
+    Tests can redirect the location via ``app.config['BACKUP_DIR']`` so
+    the suite never touches the production ``data/backup`` directory.
     """
-    base = os.path.abspath(os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        'data',
-        _BACKUP_STORAGE_DIRNAME,
-    ))
+    try:
+        from flask import current_app
+        configured = current_app.config.get('BACKUP_DIR')
+    except Exception:
+        configured = None
+    if configured:
+        base = str(configured)
+    else:
+        base = os.path.abspath(os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'data',
+            _BACKUP_STORAGE_DIRNAME,
+        ))
     os.makedirs(base, exist_ok=True)
     return os.path.realpath(base)
 
@@ -85,7 +96,9 @@ def register(app):
             setting.backup_last_export_meta = json.dumps(data['backup_meta'], ensure_ascii=False)
             safe_commit()
 
-        archive_bytes = _build_backup_archive_bytes(app, include_files=include_files)
+        # Build the archive from the data we already walked — a second
+        # _build_export_data() pass would double every DB query on export.
+        archive_bytes = _build_backup_archive_from_data(data, include_files=include_files)
         response = Response(archive_bytes, mimetype='application/gzip')
         suffix = 'filament_backup.tar.gz' if include_files else 'filament_backup_db_only.tar.gz'
         response.headers['Content-Disposition'] = f'attachment; filename={suffix}'
@@ -276,6 +289,12 @@ def register(app):
                 s = data.get('app_settings', {})
                 if s and not skip_mode:
                     setting = AppSetting.query.first()
+                    if not setting:
+                        # A fresh database has no settings row — create one so
+                        # a restore actually restores the configuration instead
+                        # of silently dropping it.
+                        setting = AppSetting()
+                        db.session.add(setting)
                     if setting:
                         setting.lang = s.get('lang', setting.lang)
                         setting.currency = s.get('currency', setting.currency)
@@ -789,9 +808,19 @@ def register(app):
                         continue
                     # Only restore if host present; api_key is not exported so skip
                     if pp.get('host'):
+                        # Re-validate the host (SSRF hardening): a crafted
+                        # backup must not be able to point the 60s poller at
+                        # internal addresses.
+                        valid_host = validate_printer_host(pp.get('host', ''))
+                        if not valid_host:
+                            app.logger.warning(
+                                "Skipping Prusa printer import: host failed SSRF validation (%s)",
+                                pp.get('host'),
+                            )
+                            continue
                         restored_printer = PrusaPrinter(
                             name=pp.get('name', ''),
-                            host=pp.get('host', ''),
+                            host=valid_host,
                             api_key=encrypt_token('NEEDS_CONFIGURATION'),
                             printer_model=pp.get('printer_model'),
                             notes=pp.get('notes'),
@@ -898,10 +927,22 @@ def register(app):
                     ).first()
                     if exists_m:
                         continue
+                    # Resolve printer_id by (type, name) — printer IDs are
+                    # re-assigned on restore, so the raw ID would silently
+                    # point at an unrelated printer.
+                    printer_id = m_data.get('printer_id')
+                    printer_type = m_data.get('printer_type', 'bambu')
+                    printer_name = m_data.get('printer_name', '')
+                    if printer_id:
+                        if printer_type == 'bambu':
+                            resolved = BambuPrinter.query.filter_by(name=printer_name).first()
+                        else:
+                            resolved = PrusaPrinter.query.filter_by(name=printer_name).first()
+                        printer_id = resolved.id if resolved else None
                     db.session.add(PrinterMaintenance(
-                        printer_type=m_data.get('printer_type', 'bambu'),
-                        printer_id=m_data.get('printer_id'),
-                        printer_name=m_data.get('printer_name', ''),
+                        printer_type=printer_type,
+                        printer_id=printer_id,
+                        printer_name=printer_name,
                         maintenance_type=m_data.get('maintenance_type', 'other'),
                         notes=m_data.get('notes'),
                         notes_is_markdown=bool(m_data.get('notes_is_markdown', False)),
@@ -953,7 +994,7 @@ def register(app):
                         wf_content = backup_files.get(archive_path)
                         if wf_content is None:
                             continue
-                        original_name = wf_data.get('filename', 'attachment.jpg')
+                        original_name = secure_filename(wf_data.get('filename', 'attachment.jpg')) or 'attachment.jpg'
                         stored_name = f'w{waste_record.id}_{uuid.uuid4().hex[:12]}_{original_name}'
                         dest_path = os.path.join(upload_folder, stored_name)
                         with open(dest_path, 'wb') as fh:

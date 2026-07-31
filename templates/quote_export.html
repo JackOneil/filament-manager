@@ -159,7 +159,7 @@
                 <div class="flex justify-between items-start mb-12">
                     <div>
                         <h1 class="text-3xl font-black text-gray-900 tracking-tight"
-                            x-text="invoice.type === 'proforma' ? {{ t('quote_export_proforma_title')|tojson }} : {{ t('quote_export_invoice_title')|tojson }}"></h1>
+                            x-text='invoice.type === "proforma" ? {{ t('quote_export_proforma_title')|tojson }} : {{ t('quote_export_invoice_title')|tojson }}'></h1>
                         <p class="text-gray-500 mt-1">{{ t('quote_export_doc_number_label') }}: <strong class="text-gray-800" x-text="invoice.number"></strong></p>
                     </div>
                 </div>
@@ -202,7 +202,7 @@
                     </div>
                     <div>
                         <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">{{ t('quote_export_bank') }}</p>
-                        <p class="font-bold text-gray-800" x-text="supplier.bank || {{ t('quote_export_bank_placeholder')|tojson }}"></p>
+                        <p class="font-bold text-gray-800" x-text='supplier.bank || {{ t('quote_export_bank_placeholder')|tojson }}'></p>
                     </div>
                 </div>
 
@@ -265,7 +265,7 @@
                     <h1 class="text-4xl font-black tracking-tight mb-4">{{ quote.project.name }}</h1>
                     <div class="flex items-center gap-2 text-indigo-100">
                         <i class="fa-solid fa-user text-sm"></i>
-                        <span class="text-lg font-medium" x-text="customer.name || {{ t('quote_export_for_client')|tojson }}"></span>
+                        <span class="text-lg font-medium" x-text='customer.name || {{ t('quote_export_for_client')|tojson }}'></span>
                     </div>
                 </div>
 
@@ -277,7 +277,7 @@
                         </div>
                         <div class="text-right">
                             <p class="text-xs text-gray-500 uppercase font-bold tracking-widest">{{ t('quote_export_supplier') }}</p>
-                            <p class="font-medium text-gray-800" x-text="supplier.name || {{ (quote.project.owner_display_name or '')|tojson }}"></p>
+                            <p class="font-medium text-gray-800" x-text='supplier.name || {{ (quote.project.owner_display_name or "")|tojson }}'></p>
                         </div>
                     </div>
 

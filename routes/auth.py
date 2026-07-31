@@ -178,6 +178,10 @@ def register(app):
         current = get_current_user()
         if current:
             return redirect(url_for('index'))
+        # The user count is re-checked inside the lock on POST so two
+        # concurrent first registrations cannot both claim the admin role
+        # (bootstrap race). The lock is process-local — gunicorn runs a
+        # single worker with 4 threads, so it serializes all registrations.
         existing_users = User.query.count()
         if request.method == 'POST':
             # Rate limit registration attempts
@@ -195,17 +199,23 @@ def register(app):
             if User.query.filter_by(email=email).first():
                 flash('auth_email_exists', 'error')
                 return render_template('auth_register.html', bootstrap_admin=(existing_users == 0))
-            role = 'admin' if existing_users == 0 else 'user'
-            permissions = default_section_permissions() if role == 'user' else None
-            user = User(
-                email=email,
-                name=name,
-                password_hash=hash_password(password),
-                role=role,
-                section_permissions=serialize_permissions(permissions, role=role),
-            )
-            db.session.add(user)
-            safe_commit()
+
+            with _login_lock:
+                # Re-check inside the lock: the first account ever created is
+                # the bootstrap admin. Without this, two simultaneous POSTs on
+                # an empty DB would both read count == 0 and both become admins.
+                is_bootstrap = (User.query.count() == 0)
+                role = 'admin' if is_bootstrap else 'user'
+                permissions = default_section_permissions() if role == 'user' else None
+                user = User(
+                    email=email,
+                    name=name,
+                    password_hash=hash_password(password),
+                    role=role,
+                    section_permissions=serialize_permissions(permissions, role=role),
+                )
+                db.session.add(user)
+                safe_commit()
             login_user(user, plain_password=password)
             flash('auth_register_success', 'success')
             return redirect(url_for('index'))
@@ -332,10 +342,22 @@ def register(app):
 
             # Regular update
             role = 'admin' if request.form.get('role') == 'admin' else 'user'
-            user.name = request.form.get('name', '').strip() or user.name
-            user.email = request.form.get('email', '').strip().lower() or user.email
+            name = request.form.get('name', '').strip() or user.name
+            email = request.form.get('email', '').strip().lower() or user.email
+            is_active = _bool_field('is_active')
+
+            # Never allow the last active admin to be demoted or deactivated —
+            # otherwise the instance becomes permanently locked out.
+            admin_count = User.query.filter_by(role='admin', is_active=True).count()
+            is_last_admin = (user.role == 'admin' and user.is_active and admin_count <= 1)
+            if is_last_admin and (role != 'admin' or not is_active):
+                flash('users_last_admin_protected', 'error')
+                return redirect(url_for('user_detail', user_id=user.id))
+
+            user.name = name
+            user.email = email
             user.role = role
-            user.is_active = _bool_field('is_active')
+            user.is_active = is_active
             user.section_permissions = serialize_permissions(_permissions_from_form(), role=role)
             user.notify_project_created = _bool_field('notify_project_created')
             user.notify_project_status_changed = _bool_field('notify_project_status_changed')

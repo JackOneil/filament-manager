@@ -28,7 +28,7 @@ import json
 import logging
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from flask import Flask, render_template
 from flask_wtf.csrf import CSRFProtect
 from flask_compress import Compress
@@ -46,7 +46,21 @@ from models import (
     User, UserInvite, Notification, AuditLog, ProjectComment,
     PrinterMaintenance, FilamentUndoLog, ProjectTemplate, ProjectCommentReaction,
 )  # noqa: F401
-from utils import get_settings, utc_now
+from utils import get_settings, render_markdown, utc_now
+
+
+def _is_pending_undo_valid(expires_at):
+    """True when an undo session slot has not expired yet.
+
+    Handles legacy naive datetimes (stored before the app switched to
+    timezone-aware UTC) — comparing a naive datetime against the aware
+    utc_now() would otherwise raise TypeError on every request.
+    """
+    if not expires_at:
+        return False
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    return expires_at > utc_now()
 from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
@@ -59,17 +73,34 @@ csrf = CSRFProtect()
 def create_app(test_config=None) -> Flask:
     app = Flask(__name__)
     app.config['APP_VERSION'] = APP_VERSION
-    # Secret key: must be set via SECRET_KEY env var in production.
-    # Defaults to a random value (sessions lost on restart) if not configured.
-    app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24).hex())
-    if not os.environ.get('SECRET_KEY'):
-        app.logger.warning('SECRET_KEY env var not set — sessions will not persist across restarts.')
-    # Only trust X-Forwarded-* headers when explicitly running behind a reverse proxy.
-    if os.environ.get('BEHIND_PROXY'):
-        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
     db_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'data')
     os.makedirs(db_dir, exist_ok=True)
+
+    # Secret key: must be set via SECRET_KEY env var in production.
+    # When unset, we persist a generated key under data/secret_key so
+    # sessions and CSRF tokens survive restarts and rebuilds. A plain
+    # os.urandom() fallback would log every user out after each deploy.
+    secret_key = os.environ.get('SECRET_KEY')
+    if not secret_key:
+        secret_key_path = os.path.join(db_dir, 'secret_key')
+        try:
+            if os.path.exists(secret_key_path):
+                with open(secret_key_path, 'r', encoding='utf-8') as fh:
+                    secret_key = fh.read().strip()
+            if not secret_key:
+                secret_key = os.urandom(24).hex()
+                with open(secret_key_path, 'w', encoding='utf-8') as fh:
+                    fh.write(secret_key)
+                os.chmod(secret_key_path, 0o600)
+            app.logger.warning('SECRET_KEY env var not set — using persisted key in %s.', secret_key_path)
+        except OSError:
+            secret_key = os.urandom(24).hex()
+            app.logger.warning('SECRET_KEY env var not set and key file unwritable — sessions will not persist across restarts.')
+    app.secret_key = secret_key
+    # Only trust X-Forwarded-* headers when explicitly running behind a reverse proxy.
+    if os.environ.get('BEHIND_PROXY'):
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
     # Database URI: honour DATABASE_URL env var (PostgreSQL / external SQLite).
     # When unset, default to local SQLite (backward-compatible).
@@ -247,7 +278,7 @@ def create_app(test_config=None) -> Flask:
             except (TypeError, ValueError):
                 expires_at = None
 
-            if expires_at and expires_at > utc_now():
+            if _is_pending_undo_valid(expires_at):
                 pending_inventory_undo = raw_undo
             else:
                 _session.pop('inventory_pending_undo', None)
@@ -262,13 +293,14 @@ def create_app(test_config=None) -> Flask:
             except (TypeError, ValueError):
                 expires_at = None
 
-            if expires_at and expires_at > utc_now():
+            if _is_pending_undo_valid(expires_at):
                 pending_project_undo = raw_proj_undo
             else:
                 _session.pop('project_pending_undo', None)
 
         return dict(
             t=t,
+            render_markdown=render_markdown,
             current_lang=lang,
             current_currency=currency,
             theme=theme,
@@ -455,19 +487,23 @@ def _start_bambu_sync_worker(app: Flask) -> None:
                             setting.bambu_last_sync_at = utc_now()
                             if result.get('error'):
                                 setting.bambu_last_sync_status = f"error: {result['error'][:220]}"
+                                # API-level errors (401/429/5xx) must also
+                                # trigger backoff — otherwise a rate limit
+                                # causes a retry every 60 s forever.
+                                _consecutive_errors += 1
                             else:
                                 setting.bambu_last_sync_status = json.dumps({
                                     'added': result.get('added', 0),
                                     'updated': result.get('updated', 0),
                                     'skipped': result.get('skipped', 0),
                                 })
+                                _consecutive_errors = 0
                             db.session.commit()
-                _consecutive_errors = 0
             except Exception as exc:
                 app.logger.error("Background Bambu sync failed: %s", exc)
                 _consecutive_errors += 1
             # Exponential backoff: 60s → 120s → 240s → … → 3600s max
-            time.sleep(min(60 * (2 ** min(_consecutive_errors, 5)), 3600))
+            time.sleep(min(60 * (2 ** min(_consecutive_errors, 6)), 3600))
 
     thread = threading.Thread(target=worker, name='bambu-sync-worker', daemon=True)
     thread.start()
@@ -494,17 +530,26 @@ def _start_prusa_sync_worker(app: Flask) -> None:
             try:
                 with app.app_context():
                     printers = PrusaPrinter.query.filter_by(enabled=True).all()
+                    poll_failed = False
                     for printer in printers:
                         try:
-                            do_poll(printer)
+                            result = do_poll(printer)
+                            if result and result.get('error'):
+                                # API-level errors (unreachable host, bad key,
+                                # rate limit) must trigger the backoff too.
+                                poll_failed = True
                         except Exception as exc:
                             app.logger.warning('Prusa poll error for %s: %s', printer.name, exc)
-                _consecutive_errors = 0
+                            poll_failed = True
+                    if poll_failed:
+                        _consecutive_errors += 1
+                    else:
+                        _consecutive_errors = 0
             except Exception as exc:
                 app.logger.error('Background Prusa sync failed: %s', exc)
                 _consecutive_errors += 1
             # Poll interval: 60 s under normal conditions, exponential backoff on errors
-            time.sleep(min(60 * (2 ** min(_consecutive_errors, 4)), 900))
+            time.sleep(min(60 * (2 ** min(_consecutive_errors, 5)), 900))
 
     thread = threading.Thread(target=worker, name='prusa-sync-worker', daemon=True)
     thread.start()

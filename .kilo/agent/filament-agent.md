@@ -2,7 +2,7 @@
 description: "Full-cycle Filament Manager agent. Use for any feature, bugfix, refactor, or optimization. Reads ARCHITECTURE.md as canonical rules source, implements changes, runs tests, bumps version, updates changelog/readme, builds Docker, smoke-tests. NEVER skips build."
 mode: primary
 model: opencode-go/deepseek-v4-pro
-steps: 200
+steps: 1000
 color: "#0ea5e9"
 permission:
   bash: allow

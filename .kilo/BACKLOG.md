@@ -59,6 +59,37 @@
 | BUG-737 | Storage routes: HTTP 500 on non-numeric input; shelf shrink silently deletes placements | `routes/storage.py`: `max(request.form.get('columns', type=int), 1)` → `max(None, 1)` TypeError on bad input; `storage_reorder_shelves` `int(shelf_id)` ValueError; `_repack_shelf_slots` deleted overflow placements (data loss). **Fix:** `_coerce_int()` helper; reorder skips non-numeric IDs; repack never deletes — the shelf auto-expands to fit all placements. | 🟠 High | S (Small) | Fixed in v1.120.2 |
 | BUG-738 | Backup import has no decompression size limits (tar-bomb DoS) | `routes/backup_helpers.py:_load_backup_package` read every tar member fully into memory without limits. **Fix:** 256 MB per-member / 512 MB total caps → graceful import failure. | 🟠 High | S (Small) | Fixed in v1.120.2 |
 | BUG-739 | Backup import transaction bug — "A transaction is already begun on this Session" | `routes/backup.py import_data`: `with db.session.begin()` failed whenever the thread had previously served a read-only request (open transaction). **Fix:** `db.session.rollback()` before the `begin()` block. | 🟠 High | XS (Trivial) | Fixed in v1.120.2 |
+| BUG-745 | Bulk delete filamentů vždy končí HTTP 500 | `routes/inventory.py` bulk delete volá `create_bulk_undo_snapshot()` s dicts z `_build_filament_restore_bundle()`, ale snapshot čte atributy (`filament.id`) jako z ORM objektu → `AttributeError` → 500, filamenty se nesmažou. **Fix:** `_snapshot_attr()` čte z dictů i ORM objektů (filament i project_filaments). | 🔴 Critical | S (Small) | Fixed in v1.120.2 |
+| BUG-746 | Stored XSS — raw interpolace do Alpine JS stringů | `templates/calculator.html:129,133`, `_projects_layout.html:256,267`, `_models_cards.html:90`, `_models_rows.html:74`, `models_detail.html:303`, `models_share.html:172`: názvy filamentů/tagů/`client_name`/uploaderů v jednořádkových JS literálech — entity se dekódují před vyhodnocením výrazu → spustitelný kód (data z CSV/backup importu). **Fix:** vše převedeno na `|tojson`; veřejná share stránka navíc nezobrazuje e-mail uploadera. | 🔴 Critical | S (Small) | Fixed in v1.120.2 |
+| BUG-747 | Hromadné akce uživatelů (bulk) nikdy neproběhnou | `templates/users.html:147`: `@submit.prevent` vždy volá `preventDefault()` — aktivace/deaktivace/smazání přes UI je mrtvé. **Fix:** `@submit` + `$event.preventDefault()` jen při nezamítnutém confirmu. | 🟠 High | XS (Trivial) | Fixed in v1.120.2 |
+| BUG-748 | Upload fotek zmetků selhává na CSRF 400 | `templates/waste.html:445-457`: `XMLHttpRequest` neprochází globálním CSRF patchem (pokrývá jen `fetch` + formuláře) → každý upload 400. **Fix:** explicitní `X-CSRFToken` hlavička z meta tagu. | 🟠 High | XS (Trivial) | Fixed in v1.120.2 |
+| BUG-749 | remove_spool odečítá dvakrát | `routes/inventory.py`: ruční `quantity -= 1` + `deduct_filament_stock(weight_total)` (přepočet quantity) → jedna akce zničí bookkeeping dvou cívek; undo obnoví špatný stav. **Fix:** jediný atomický CAS UPDATE (quantity i váha). | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-750 | Odpad nesnižuje zásoby a nepíše movementy | `routes/waste.py`: `waste_add`/`waste_add_ajax` jen vloží záznam — váha chybí v `weight_remaining`, ve statistikách i v historii. **Fix:** add odečte stock s `log_movement('waste')`, delete/undo vrací, edit řeší deltu/změnu filamentu. | 🟠 High | M (Medium) | Fixed in v1.120.2 |
+| BUG-751 | Bambu: dvojitý odečet a ztrátový remap | `routes/bambu.py`: slot dedukce nenastaví `job.deducted` (následný job-level deduct odečte znovu celou váhu); multi-material job se odečte z jedné cívky; remap vrací nominální váhu i po clampu a značí `deducted` bez odečtu. **Fix:** propagace `job.deducted`, guardy na multi-material/částečné dedukce, restore podle skutečných movementů. | 🟠 High | M (Medium) | Fixed in v1.120.2 |
+| BUG-752 | `deduct_filament_stock` non-atomic — ztracené updaty | `utils/__init__.py`: read-modify-write; 4 gunicorn thready → souběžné odečty se ztrácejí. **Fix:** compare-and-swap UPDATE s bounded retry (SQLite i PG); nepersisted objekty fallback na in-memory odečet. | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-753 | PrusaLink SSRF — host se neověřuje při běhu ani při importu | `utils/__init__.py prusa_request` volá uložený host bez re-validace (redirecty, DNS rebinding); `/import` obnovuje `PrusaPrinter.host` bez `validate_printer_host`. **Fix:** validace před každým requestem + re-validace redirect hopů (limit 3); import host validuje a jinak skipne se warningem. | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-754 | Open redirect přes `Referer` | `redirect(request.referrer or ...)` na 10 místech (`routes/inventory.py`, `routes/projects.py`, `routes/settings.py`) — Referer je útočníkem ovlivnitelný. **Fix:** `safe_redirect_target()` (same-host kontrola; fallback endpoint s kwargs). | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-755 | `shop_url` a `hex_value` bez validace | `routes/settings.py`, `routes/inventory.py`: `shop_url` renderovaný do `href` bez kontroly schématu (`javascript:` klikací), `hex_value` do CSS `style` atributů (CSS injection). **Fix:** `normalize_shop_url()` (jen http/https + netloc) a `normalize_hex()` (#RRGGBB) na všech vstupech včetně CSV importu. | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-756 | Bootstrap admin race | `routes/auth.py register_account`: `role = 'admin' if existing_users == 0` — dvě souběžné registrace na prázdné DB → oba admini (takeover okno na čerstvém deployi). **Fix:** procesní zámek + re-check počtu uvnitř zámku. | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-757 | Poslední admin lockout | `routes/auth.py user_detail update`: demotace/deaktivace posledního aktivního admina nebyla chráněna (jen mazání). **Fix:** guard `is_last_admin` → flash `users_last_admin_protected`. | 🟠 High | XS (Trivial) | Fixed in v1.120.2 |
+| BUG-758 | SECRET_KEY náhodný per process — session ztráta po každém buildu | `app.py`: default `os.urandom(24).hex()` bez perzistence; compose předává prázdný `${SECRET_KEY}` → po `docker compose up -d --build` všechny session i CSRF tokeny neplatné. **Fix:** persistovaný klíč v `data/secret_key` (0600) při chybějící env var. | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-759 | Migrace `project_file` rebuild rozbitá + ztráta indexů | `migrations.py _migrate_nullable_project_id`: CREATE s 16 sloupci + `INSERT SELECT *` z tabulky se 17 sloupci (`category_id`) → trvalé selhání na legacy DB; rebuild tiché zahazuje indexy. **Fix:** 17 sloupců + explicitní sloupcový INSERT + rekreace indexů po RENAME. | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-760 | `migrate_to_pg.py` tiše zahazuje 3 tabulky | `TABLES` chybí `model_category`, `model_comment`, `project_print_item` → skript hlásí úspěch a data jsou pryč. **Fix:** doplněny do seznamu (migrace i čistění). | 🟠 High | XS (Trivial) | Fixed in v1.120.2 |
+| BUG-761 | Import backupu: AppSetting se nevytváří; `printer_id` údržby raw | `routes/backup.py`: na čerstvé DB restore tiše zahodí celou konfiguraci (jen update existujícího řádku); `PrinterMaintenance.printer_id` ukazuje po restore na cizí tiskárny. **Fix:** vytvoření AppSetting; resolve podle (typ, jméno). | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-762 | Path traversal v importu WasteFile | `routes/backup.py`: `original_name` z backupu bez `secure_filename()` → craftnutý backup zapíše soubor mimo upload adresář. **Fix:** `secure_filename()` před sestavením cesty. | 🟠 High | XS (Trivial) | Fixed in v1.120.2 |
+| BUG-763 | Worker backoff nespouští API chyby | `app.py`: `_consecutive_errors` resetován i při `result['error']` (401/429/5xx) → rate-limit retry každých 60 s navždy; komentář „3600s max“ neodpovídal vzorci (1920 s). **Fix:** increment při chybě/reset jen při úspěchu; vzorec capuje na 3600 s; Prusa poller počítá `result['error']` per printer. | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-764 | Bambu orphan reconcilace korumpuje RUNNING joby | `routes/bambu_helpers.py`: prázdná odpověď API (výpadek) = ALL RUNNING joby force-FINISH. **Fix:** reconcilace jen když API vrátilo tasky (`all_ext_ids` guard). | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-765 | Maintenance poznámky (Markdown) se nikdy nezobrazí | `templates/maintenance.html:98`: prázdný `js-maint-note` div bez konzumenta v JS — text s Markdown checkboxem je neviditelný. **Fix:** server-side render `render_markdown()` (nově v context processoru). | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-766 | Task checkboxy v Markdown editoru nelze přepnout | `static/js/markdown-editor.js:459-465`: `preventDefault()` na `input.task-checkbox` bez náhradního handleru → vizuální mód neumí odškrtnout TODO. **Fix:** `click` handler přepíná stav a propaguje do zdrojové hodnoty. | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-767 | Mobile swipe unáší horizontální scroll | `static/js/mobile-ux.js`: horizontální drag >100 px na Kanbanu/širokých tabulkách naviguje na jinou záložku. **Fix:** gesto ignorováno uvnitř horizontálně scrollovatelných kontejnerů. | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-768 | Collapsing topbar je mrtvý kód | `static/js/mobile-ux.js` přidává třídu `.collapsed`, ale žádné CSS pravidlo neexistuje. **Fix:** `header.collapsed { margin-top: -3.5rem }` s transition v `static/css/app.css`. | 🟠 High | XS (Trivial) | Fixed in v1.120.2 |
+| BUG-769 | Legacy session undo sloty → trvalý HTTP 500 | `app.py`: `expires_at` z `fromisoformat` (naivní) porovnáván s aware `utc_now()` mimo try/except → TypeError na každém requestu do vypršení cookie. **Fix:** `_is_pending_undo_valid()` normalizuje tzinfo. | 🟠 High | XS (Trivial) | Fixed in v1.120.2 |
+| BUG-770 | N+1 `Project.print_items` na indexu projektů | `routes/projects.py`: kanban karty/table volají `project.print_items | sum(...)` per projekt (~116 lazy dotazů). **Fix:** `selectinload(Project.print_items)`. | 🟠 High | XS (Trivial) | Fixed in v1.120.2 |
+| BUG-771 | Testy píší do produkčních adresářů + reálné síťové fetche | `test_bambu.py` patchoval špatný modul (thumbnaily do `data/bambu_thumbs/`); `_backup_storage_dir()` mířil do produkčního `data/backup`; `test_projects_extended` spouštěl reálné HTTP fetche (example.com) z daemon threadů. **Fix:** správné patch targety + `status_code=200` v mocku, `BACKUP_DIR` config, mock `_schedule_link_preview_refresh`. | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-772 | `add()` filamentu — HTTP 500 na neexistující značku/materiál/barvu | `routes/inventory.py:291`: `brand.name` na `None` → AttributeError 500 při prázdném jménu + neplatném ID. **Fix:** guard + flash `inventory_invalid_reference`. | 🟠 High | XS (Trivial) | Fixed in v1.120.2 |
+| BUG-773 | Undo: snapshot konzumován před restorem | `utils/__init__.py`: `consume_undo_log` značil `is_consumed=True` před provedením restoru — selhání restoru = nenávratná ztráta unda. **Fix:** `consume_undo_log` je read-only; nové `mark_undo_consumed()` až po úspěchu (všechny větve `inventory_undo`). | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-774 | `pytest.ini` — `-n auto` v addopts bez xdist neprojde | Test suite selhává na kolekci, když chybí pytest-xdist. **Fix:** `-n auto` přesunuto na explicitní volání; addopts jen `-v --tb=short`. | 🟡 Medium | XS (Trivial) | Fixed in v1.120.2 |
+| BUG-782 | Alpine `SyntaxError: Unexpected token '}'` na kalkulačce/projektech/modely | `|tojson` vrací Markup — Jinja ho neescapuje, takže v HTML atributu s dvojitými uvozovkami holá `"` z uživatelských dat atribut předčasně ukončí a Alpine kompiluje oříznutý výraz (`!filamentSearch || ` + uniklý `}`). Způsobeno fixem BUG-746 (atributy s `|tojson` musí mít single-quote delimitery — konvence z BUG-706). **Fix:** `calculator.html`, `_projects_layout.html`, `_models_cards.html`, `_models_rows.html`, `models_detail.html`, `models_share.html` přepnuty na single-quoted atributy; regresní test `tests/test_alpine_expressions.py` (6 testů) renderuje stránky s hostilními daty a validuje úplnost výrazů. | 🔴 Critical | S (Small) | Fixed in v1.120.2 |
 
 
 
@@ -115,10 +146,17 @@
 | ID | Title | Description | Criticality | Effort | Status |
 |----|-------|-------------|-------------|--------|--------|
 | BUG-740 | Auto-backup: Monday (day 0) silently becomes Tuesday | `app.py:627`: `day_val = getattr(setting, 'backup_auto_day', 1) or 1` — `0 or 1` → 1, but settings store weekly day 0=Monday. A user selecting Monday gets Tuesday backups. **Fix:** explicit `is None` check. | 🟡 Medium | XS (Trivial) | **Open** |
-| BUG-741 | Bambu cover-image SSRF check is bypassed (contradicts docs) | `routes/bambu_helpers.py:132-135`: `is_safe_external_url()` logs a warning but continues fetching; `requests.get` follows redirects without re-validation. A crafted backup import could supply a cover URL pointing at internal services. | 🟠 High | S (Small) | **Open** |
+| BUG-741 | Bambu cover-image SSRF check is bypassed (contradicts docs) | `routes/bambu_helpers.py:132-135`: `is_safe_external_url()` logs a warning but continues fetching; `requests.get` follows redirects without re-validation. A crafted backup import could supply a cover URL pointing at internal services. **Fix:** The SSRF verdict is now honored — unsafe cover URLs are rejected, and redirects are followed only after re-validating every hop (3-hop limit). | 🟠 High | S (Small) | Fixed in v1.120.2 |
 | BUG-742 | 5 translation keys used in templates but missing from `messages.py` | `automap_confirmed` (overview.html), `selected_filaments_count_prefix` (index.html), `stats_project_dataset`/`stats_usage_dataset`/`stats_purchase_dataset` (stats.html) render as raw keys. | 🟡 Medium | XS (Trivial) | **Open** |
 | BUG-743 | Project undo restores only partially (no comments/quotes/print items/files) | `routes/projects_helpers.py` `snapshot_project_for_undo`/`restore_project_from_undo` — documented limitation; undo of a deleted project silently drops comments, quotes, print items and files. | 🟡 Medium | M (Medium) | **Open** |
-| BUG-744 | Backup export runs the export pass twice + N+1 queries | `routes/backup.py export_data` calls `_build_export_data()` then `_build_backup_archive_bytes()` (which re-runs it); `movement_history`/`bambu_jobs.materials`/`prusa_jobs`/`undo_logs` exports lack `joinedload`. | 🟡 Medium | S (Small) | **Open** |
+| BUG-744 | Backup export runs the export pass twice | `routes/backup.py export_data` calls `_build_export_data()` then `_build_backup_archive_bytes()` (which re-runs it) — every DB query executed twice per export. **Fix:** Archive is now built from the already-walked data dict via `_build_backup_archive_from_data()`. (The N+1 `joinedload` part is tracked as BUG-775.) | 🟡 Medium | S (Small) | Fixed in v1.120.2 |
+| BUG-775 | Backup export N+1 — chybějící `joinedload` | `routes/backup_helpers.py`: `movement_history` (per-row filament/project/job), `bambu_jobs.materials`, `prusa_jobs`, `undo_logs`, `waste_record.files` atd. se načítají lazy → tisíce dotazů při velké DB (export trvá minuty). **Fix:** `joinedload`/`selectinload` pro všechny collection/relationship loady v exportu. | 🟡 Medium | M (Medium) | **Open** |
+| BUG-776 | `escape_like()` nefunguje — chybí `escape='\\'` u `.ilike()` | `utils/__init__.py` + `routes/api.py:43`, `inventory_helpers.py:67`, `history.py:53-60`: escape se provede, ale SQLAlchemy nevysílá ESCAPE klauzuli → hledání názvu s `%`/`_` (např. „PETG 50%“) vrací prázdno. **Fix:** `ilike(..., escape='\\')` na všech voláních. | 🟡 Medium | S (Small) | **Open** |
+| BUG-777 | Sparkline data vždy prázdná — `isinstance(date_str, datetime.date)` TypeError | `utils/__init__.py:466,494`: `datetime` je importovaná třída, `datetime.date` je bound method → TypeError vždy, except ho spolkne → 7denní sparkliney tiše prázdné. **Fix:** `isinstance(date_str, date)` (modulový import). | 🟡 Medium | XS (Trivial) | **Open** |
+| BUG-778 | `export_quote` = mutující GET + race na `invoice_counter` | `routes/calculator.py:384-410`: GET přiděluje číslo faktury a inkrementuje sdílený counter (duplicitní čísla při souběhu; CSRF nechrání GET — `<img>` může pálit čísla). **Fix:** přidělení až při explicitním POST „vystavit fakturu“ nebo atomický `UPDATE ... RETURNING`. | 🟡 Medium | S (Small) | **Open** |
+| BUG-779 | IDOR: reakce na komentáře a šablony projektů | `routes/projects.py:1015-1034` (`project_comment_react` bez `_project_or_404`) a `:988-1013` (`project_template_data`/`create_from_template` bez ownership checku) — ne-admin může číst/měnit cizí data. **Fix:** project check + owner filter u šablon. | 🟠 High | S (Small) | **Open** |
+| BUG-780 | Status state machine projektů — libovolné přechody | `routes/projects.py:853-879`: `project_status` přijme jakýkoli přechod; `project_advance_status` má off-by-one — REJECTED „postoupí“ na NEW. **Fix:** transition table + guard `current_idx == -1`. | 🟡 Medium | S (Small) | **Open** |
+| BUG-781 | Naive/aware datetime 500 v sortech projektů | `routes/projects.py:388-391`, `projects_helpers.py:71,228`: `datetime.max`/`datetime.min` (naivní) vs aware `UtcDateTime` → TypeError při NULL `completed_at` u hotových TODO. **Fix:** aware sentinely (`datetime.max.replace(tzinfo=timezone.utc)`). | 🟠 High | XS (Trivial) | **Open** |
 
 | ID | Title | Description | Criticality | Effort | Status |
 |----|-------|-------------|-------------|--------|--------|
@@ -488,6 +526,39 @@
 | BUG-707 | SSRF bypass via DNS resolution in validate_printer_host | v1.119.14 | 2026-07-18 |
 | BUG-708 | Admin self-logout on profile save | v1.119.14 | 2026-07-18 |
 | BUG-709 | ORM mutation after rollback in prusa.py | v1.119.14 | 2026-07-18 |
+| BUG-741 | Bambu cover-image SSRF check bypassed | v1.120.2 | 2026-07-31 |
+| BUG-744 | Backup export double pass | v1.120.2 | 2026-07-31 |
+| BUG-745 | Bulk delete filamentů HTTP 500 (dict vs ORM snapshot) | v1.120.2 | 2026-07-31 |
+| BUG-746 | Stored XSS v Alpine JS stringech (7 šablon) | v1.120.2 | 2026-07-31 |
+| BUG-747 | Hromadné akce uživatelů neproběhnou (@submit.prevent) | v1.120.2 | 2026-07-31 |
+| BUG-748 | Waste photo upload CSRF 400 (XHR bez tokenu) | v1.120.2 | 2026-07-31 |
+| BUG-749 | remove_spool dvojitý odečet | v1.120.2 | 2026-07-31 |
+| BUG-750 | Odpad nesnižuje zásoby | v1.120.2 | 2026-07-31 |
+| BUG-751 | Bambu dvojitý odečet + ztrátový remap | v1.120.2 | 2026-07-31 |
+| BUG-752 | deduct_filament_stock race (CAS fix) | v1.120.2 | 2026-07-31 |
+| BUG-753 | PrusaLink SSRF (request i import) | v1.120.2 | 2026-07-31 |
+| BUG-754 | Open redirect přes Referer (10 míst) | v1.120.2 | 2026-07-31 |
+| BUG-755 | shop_url/hex_value bez validace | v1.120.2 | 2026-07-31 |
+| BUG-756 | Bootstrap admin race | v1.120.2 | 2026-07-31 |
+| BUG-757 | Poslední admin lockout | v1.120.2 | 2026-07-31 |
+| BUG-758 | SECRET_KEY per-process random | v1.120.2 | 2026-07-31 |
+| BUG-759 | Migrace project_file rebuild (17 sloupců + indexy) | v1.120.2 | 2026-07-31 |
+| BUG-760 | migrate_to_pg chybí 3 tabulky | v1.120.2 | 2026-07-31 |
+| BUG-761 | Import backupu: AppSetting/printer_id | v1.120.2 | 2026-07-31 |
+| BUG-762 | WasteFile import path traversal | v1.120.2 | 2026-07-31 |
+| BUG-763 | Worker backoff při API chybách | v1.120.2 | 2026-07-31 |
+| BUG-764 | Bambu orphan reconcilace při prázdné odpovědi | v1.120.2 | 2026-07-31 |
+| BUG-765 | Maintenance Markdown poznámky nezobrazené | v1.120.2 | 2026-07-31 |
+| BUG-766 | Markdown editor task checkboxy | v1.120.2 | 2026-07-31 |
+| BUG-767 | Mobile swipe hijack horizontální scroll | v1.120.2 | 2026-07-31 |
+| BUG-768 | Collapsing topbar bez CSS | v1.120.2 | 2026-07-31 |
+| BUG-769 | Legacy naive expires_at 500 | v1.120.2 | 2026-07-31 |
+| BUG-770 | N+1 Project.print_items | v1.120.2 | 2026-07-31 |
+| BUG-771 | Testy do produkčních adresářů + reálné fetche | v1.120.2 | 2026-07-31 |
+| BUG-772 | add() 500 na neexistující referenci | v1.120.2 | 2026-07-31 |
+| BUG-773 | Undo consume-before-restore | v1.120.2 | 2026-07-31 |
+| BUG-774 | pytest.ini -n auto bez xdist | v1.120.2 | 2026-07-31 |
+| BUG-782 | Alpine tojson quote delimiters (SyntaxError na 3 stránkách) | v1.120.2 | 2026-07-31 |
 
 ---
 
@@ -497,12 +568,19 @@
 
 | Category | Fixed | Remaining |
 |----------|-------|-----------|
-| 🔴 Critical | 20 | 0 |
-| 🟠 High | 28 | 2 (BUG-561, BUG-741) |
-| 🟡 Medium | 17 | 15 (incl. BUG-740, BUG-742, BUG-743, BUG-744) |
-| 🟢 Low | 7 | 8 |
+| 🔴 Critical | 28 | 0 |
+| 🟠 High | 73 | 3 (BUG-561, BUG-779, BUG-781) |
+| 🟡 Medium | 61 | 18 (incl. BUG-740, BUG-742, BUG-743, BUG-775—BUG-778, BUG-780) |
+| 🟢 Low | 50 | 13 |
 | 🆕 Features | BL-004-007, BL-012-016 | — |
-| **Total** | **80 fixed** | **25 remaining** |
+| **Total** | **212 fixed** | **34 remaining** |
+
+> **Bug audit #8 update (v1.120.2):** 31 findings from the eighth deep audit
+> fixed in this release (BUG-741, BUG-744, BUG-745—BUG-774, BUG-782) — stored XSS in
+> Alpine JS strings, Alpine expression breakage from |tojson quote delimiters,
+> bulk-delete 500, CSRF/SSRF gaps, double stock deductions, backup import
+> integrity, migration/pg-migration data loss, worker backoff and test
+> isolation. 7 new findings recorded as open (BUG-775—BUG-781).
 
 ### v1.119.0 — UI Enhancement Sprint
 - **BL-007** (Implement dark mode / mobile / viz / micro-interaction batch): Closed in v1.119.0. Added 15 new test cases (`tests/test_ui_v119.py`), 4 new assets (`static/css/enhancements.css`, `static/js/enhancements.js`), heatmap data in `routes/stats.py`, animated counters, sparklines, responsive table-to-card transformation, and theme-reactive Chart.js.
