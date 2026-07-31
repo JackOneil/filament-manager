@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.120.1***
+*Current version: **v1.120.2***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 

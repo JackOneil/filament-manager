@@ -650,9 +650,8 @@ def snapshot_project_for_undo(project):
             {
                 'body': t.body,
                 'is_done': t.is_done,
-                'position': t.position,
             }
-            for t in sorted(project.todos, key=lambda x: (x.position or 0, x.id or 0))
+            for t in sorted(project.todos, key=lambda x: (x.id or 0))
         ],
         'links': [
             {
@@ -701,10 +700,17 @@ def restore_project_from_undo(snapshot_id):
         created_by_user_id=proj_data.get('created_by_user_id'),
     )
     if proj_data.get('due_date'):
+        # Snapshots store datetime.isoformat() strings; legacy snapshots may
+        # contain a plain date. Accept both.
         try:
-            new_project.due_date = date.fromisoformat(proj_data['due_date'])
+            parsed_due = datetime.fromisoformat(proj_data['due_date'])
         except (TypeError, ValueError):
-            pass
+            try:
+                parsed_due = datetime.combine(date.fromisoformat(proj_data['due_date']), datetime.min.time())
+            except (TypeError, ValueError):
+                parsed_due = None
+        if parsed_due is not None:
+            new_project.due_date = parsed_due
     if proj_data.get('share_token'):
         new_project.share_token = proj_data['share_token']
 
@@ -726,7 +732,6 @@ def restore_project_from_undo(snapshot_id):
             project_id=new_project.id,
             body=t.get('body', ''),
             is_done=bool(t.get('is_done')),
-            position=t.get('position', 0),
         ))
 
     for l in payload.get('links', []):

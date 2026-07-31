@@ -9,10 +9,20 @@
 > **Bug audit #5:** 2026-06-09 — complete full-codebase audit: all Python, routes, templates, JS, tests, config/Docker. 30 new findings recorded below (BUG-560 through BUG-589).
 > **Bug audit #6:** 2026-07-18 — sixth deep audit: all routes, models, migrations, utils, templates, JS, auth, backup, security. 28 new findings recorded below (BUG-700 through BUG-727).
 > **Bug audit #7:** 2026-07-18 — seventh audit (external agent): cross-verified findings against current codebase, added verified missing findings (BUG-704 through BUG-711).
+> **Bug audit #8:** 2026-07-31 — eighth deep audit (full repository review: models, migrations, routes, templates, JS, backup, auth, storage). 12 findings fixed in v1.120.2 (BUG-728 through BUG-739), 5 new findings remain open (BUG-740 through BUG-744).
 
 ---
 
 ## 🔴 Critical (Immediate)
+
+| ID | Title | Description | Criticality | Effort | Status |
+|----|-------|-------------|-------------|--------|--------|
+| BUG-728 | Project delete with TODOs crashes with HTTP 500 (`ProjectTodo.position` does not exist) | `routes/projects_helpers.py:653`: `snapshot_project_for_undo()` read `t.position` — the `ProjectTodo` model has no `position` column → `AttributeError` → `project_delete` 500s whenever the project has any todo. `restore_project_from_undo()` also passed `position=` to the constructor and dropped `due_date` (parsed `datetime` ISO string with `date.fromisoformat`). **Fix:** Removed the phantom column from snapshot/restore; `due_date` restored via `datetime.fromisoformat` with `date` fallback. (projects_helpers.py) | 🔴 Critical | S (Small) | Fixed in v1.120.2 |
+| BUG-729 | Inventory undo route broken for ALL action types — `action_type` missing from consumed snapshot | `utils/__init__.py:1213`: `consume_undo_log()` returned the raw `snapshot_data` JSON for filament targets — it never contained `action_type`, so `inventory_undo` (`routes/inventory.py:479`) raised `unsupported_undo_type` and undo of delete/remove-spool always failed. **Fix:** `consume_undo_log()` now injects `action_type`/`target_type`/`target_key` from the DB row into the returned dict. | 🔴 Critical | S (Small) | Fixed in v1.120.2 |
+| BUG-730 | Waste/maintenance undo is dead code (3 independent causes) | (1) `snapshot_data=None` violates legacy SQLite `NOT NULL` — the `DROP NOT NULL` migration only ran on PostgreSQL (BUG-705 claimed fixed, wasn't); (2) no `inventory_pending_undo` session slot was set, so the undo toast never rendered; (3) undo TTL was 14 seconds instead of 15 minutes. **Fix:** SQLite table-recreation migration `_migrate_undo_log_nullable_snapshot()`, session slot + title keys in `waste_delete_ajax`/`maintenance_delete`, TTL raised to 15 min, waste page reloads after AJAX delete so the toast renders, new translation keys added. (migrations.py, routes/waste.py, routes/maintenance.py, templates/waste.html, messages.py) | 🔴 Critical | M (Medium) | Fixed in v1.120.2 |
+| BUG-731 | `_migrate_waste_record_fk()` checked the wrong PRAGMA column — migration never ran | `migrations.py`: `PRAGMA foreign_key_list` rows are `(id, seq, table, from, to, on_update, on_delete, match)`; the code tested `row[5]` (on_update, always `'NO ACTION'`) instead of `row[6]` (on_delete) → always early-returned. Additionally `PRAGMA foreign_keys=OFF` is a no-op inside a transaction, so the rebuild would have failed even with the fix. **Fix:** Check `row[6] == 'CASCADE'`; whole rebuild moved to a dedicated AUTOCOMMIT connection with `PRAGMA foreign_keys=OFF`. (migrations.py) | 🔴 Critical | S (Small) | Fixed in v1.120.2 |
+
+
 
 | ID | Title | Description | Criticality | Effort | Status |
 |----|-------|-------------|-------------|--------|--------|
@@ -38,6 +48,19 @@
 ---
 
 ## 🟠 High Priority (Next Sprint)
+
+| ID | Title | Description | Criticality | Effort | Status |
+|----|-------|-------------|-------------|--------|--------|
+| BUG-732 | Quote delete/export and project calculator lack project-ownership checks | `routes/calculator.py`: `delete_quote`/`export_quote`/`calculator_project` had no access control — any non-admin with default project-read permission could delete/export quotes of ANY project (export also claimed an invoice number on GET). **Fix:** Admin-or-project-owner gate (with TESTING bypass consistent with the rest of the codebase). | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-733 | Non-admins can upload orphaned model files (project_id=NULL) | `routes/models.py:213` `model_upload`: with an empty `project_id`, any logged-in user could create a `ProjectFile` with `project_id=None`, which they then cannot even view (`_check_file_access` denies orphans to non-admins). **Fix:** Orphan uploads require admin; regular users must attach the model to one of their own projects (new i18n key `models_error_orphan_denied`). | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-734 | Calculator routes raise HTTP 500 on non-numeric form input | `routes/calculator.py`: unguarded `float(request.form.get('weight'/'print_time'/'margin_percent'))` → ValueError → 500. **Fix:** `_coerce_float()` helper with defaults. | 🟠 High | XS (Trivial) | Fixed in v1.120.2 |
+| BUG-735 | `project_create`/`project_edit` raise HTTP 500 on malformed `due_date` | `routes/projects.py:273,455`: unguarded `datetime.strptime(due_date_str, '%Y-%m-%d')` (todo forms already had the guard). **Fix:** try/except → `None`. | 🟠 High | XS (Trivial) | Fixed in v1.120.2 |
+| BUG-736 | Dirty-session leakage: partial ORM mutation survives failed POSTs; open read transactions break `db.session.begin()` | (1) `routes/inventory.py edit()` mutated `filament.name` before validating numeric fields — a failed parse left the session dirty and the next request committed the partial change; (2) `teardown_db_session` only rolled back on exceptions, so clean-but-open read transactions persisted per thread and `/import` (`with db.session.begin()`) failed with "A transaction is already begun" after any GET. **Fix:** parse-then-assign in `edit()`; teardown now rolls back dirty sessions; `/import` ends the lingering transaction before `begin()`. (routes/inventory.py, app.py, routes/backup.py) | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-737 | Storage routes: HTTP 500 on non-numeric input; shelf shrink silently deletes placements | `routes/storage.py`: `max(request.form.get('columns', type=int), 1)` → `max(None, 1)` TypeError on bad input; `storage_reorder_shelves` `int(shelf_id)` ValueError; `_repack_shelf_slots` deleted overflow placements (data loss). **Fix:** `_coerce_int()` helper; reorder skips non-numeric IDs; repack never deletes — the shelf auto-expands to fit all placements. | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-738 | Backup import has no decompression size limits (tar-bomb DoS) | `routes/backup_helpers.py:_load_backup_package` read every tar member fully into memory without limits. **Fix:** 256 MB per-member / 512 MB total caps → graceful import failure. | 🟠 High | S (Small) | Fixed in v1.120.2 |
+| BUG-739 | Backup import transaction bug — "A transaction is already begun on this Session" | `routes/backup.py import_data`: `with db.session.begin()` failed whenever the thread had previously served a read-only request (open transaction). **Fix:** `db.session.rollback()` before the `begin()` block. | 🟠 High | XS (Trivial) | Fixed in v1.120.2 |
+
+
 
 | ID | Title | Description | Criticality | Effort | Status |
 |----|-------|-------------|-------------|--------|--------|
@@ -88,6 +111,14 @@
 ---
 
 ## 🟡 Medium Priority (Upcoming)
+
+| ID | Title | Description | Criticality | Effort | Status |
+|----|-------|-------------|-------------|--------|--------|
+| BUG-740 | Auto-backup: Monday (day 0) silently becomes Tuesday | `app.py:627`: `day_val = getattr(setting, 'backup_auto_day', 1) or 1` — `0 or 1` → 1, but settings store weekly day 0=Monday. A user selecting Monday gets Tuesday backups. **Fix:** explicit `is None` check. | 🟡 Medium | XS (Trivial) | **Open** |
+| BUG-741 | Bambu cover-image SSRF check is bypassed (contradicts docs) | `routes/bambu_helpers.py:132-135`: `is_safe_external_url()` logs a warning but continues fetching; `requests.get` follows redirects without re-validation. A crafted backup import could supply a cover URL pointing at internal services. | 🟠 High | S (Small) | **Open** |
+| BUG-742 | 5 translation keys used in templates but missing from `messages.py` | `automap_confirmed` (overview.html), `selected_filaments_count_prefix` (index.html), `stats_project_dataset`/`stats_usage_dataset`/`stats_purchase_dataset` (stats.html) render as raw keys. | 🟡 Medium | XS (Trivial) | **Open** |
+| BUG-743 | Project undo restores only partially (no comments/quotes/print items/files) | `routes/projects_helpers.py` `snapshot_project_for_undo`/`restore_project_from_undo` — documented limitation; undo of a deleted project silently drops comments, quotes, print items and files. | 🟡 Medium | M (Medium) | **Open** |
+| BUG-744 | Backup export runs the export pass twice + N+1 queries | `routes/backup.py export_data` calls `_build_export_data()` then `_build_backup_archive_bytes()` (which re-runs it); `movement_history`/`bambu_jobs.materials`/`prusa_jobs`/`undo_logs` exports lack `joinedload`. | 🟡 Medium | S (Small) | **Open** |
 
 | ID | Title | Description | Criticality | Effort | Status |
 |----|-------|-------------|-------------|--------|--------|
@@ -265,6 +296,18 @@
 ## 📊 Completed (moved from backlog)
 
 | ID | Title | Completed In | Date |
+| BUG-728 | Project delete with todos crashes (phantom `ProjectTodo.position`) | v1.120.2 | 2026-07-31 |
+| BUG-729 | Inventory undo broken for all action types (`action_type` missing from snapshot) | v1.120.2 | 2026-07-31 |
+| BUG-730 | Waste/maintenance undo dead (NOT NULL, no session slot, 14s TTL) | v1.120.2 | 2026-07-31 |
+| BUG-731 | `_migrate_waste_record_fk` checked wrong PRAGMA column + PRAGMA-in-transaction no-op | v1.120.2 | 2026-07-31 |
+| BUG-732 | Quote delete/export + project calculator missing ownership checks | v1.120.2 | 2026-07-31 |
+| BUG-733 | Non-admin orphan model upload | v1.120.2 | 2026-07-31 |
+| BUG-734 | Calculator float() inputs → HTTP 500 | v1.120.2 | 2026-07-31 |
+| BUG-735 | project create/edit `strptime` → HTTP 500 | v1.120.2 | 2026-07-31 |
+| BUG-736 | Dirty-session partial save + open-transaction /import failure | v1.120.2 | 2026-07-31 |
+| BUG-737 | Storage 500 on bad input + silent placement deletion on shelf shrink | v1.120.2 | 2026-07-31 |
+| BUG-738 | Backup tar-bomb decompression limits | v1.120.2 | 2026-07-31 |
+| BUG-739 | `db.session.begin()` "already begun" in /import | v1.120.2 | 2026-07-31 |
 |----|-------|-------------|------|
 | BUG-001 | `_migrate_nullable_project_id` CREATE TABLE missing columns | v1.108.2 | 2026-06-07 |
 | BUG-002 | Help panel `currentSection` detection broken (blueprint prefix) | v1.108.2 | 2026-06-07 |
@@ -450,16 +493,16 @@
 
 ## Summary Statistics
 
-### Current State (post v1.119.15 — 2026-07-18)
+### Current State (post v1.120.2 — 2026-07-31)
 
 | Category | Fixed | Remaining |
 |----------|-------|-----------|
-| 🔴 Critical | 16 | 0 |
-| 🟠 High | 20 | 1 (BUG-561) |
-| 🟡 Medium | 17 | 11 remaining |
-| 🟢 Low | 7 | 8 remaining |
+| 🔴 Critical | 20 | 0 |
+| 🟠 High | 28 | 2 (BUG-561, BUG-741) |
+| 🟡 Medium | 17 | 15 (incl. BUG-740, BUG-742, BUG-743, BUG-744) |
+| 🟢 Low | 7 | 8 |
 | 🆕 Features | BL-004-007, BL-012-016 | — |
-| **Total** | **68 fixed** | **14 remaining** |
+| **Total** | **80 fixed** | **25 remaining** |
 
 ### v1.119.0 — UI Enhancement Sprint
 - **BL-007** (Implement dark mode / mobile / viz / micro-interaction batch): Closed in v1.119.0. Added 15 new test cases (`tests/test_ui_v119.py`), 4 new assets (`static/css/enhancements.css`, `static/js/enhancements.js`), heatmap data in `routes/stats.py`, animated counters, sparklines, responsive table-to-card transformation, and theme-reactive Chart.js.
@@ -513,5 +556,5 @@
 
 ---
 
-*Last updated: 2026-07-18 (v1.119.15 — 8 medium bugs fixed, 68 total fixed)*
+*Last updated: 2026-07-31 (v1.120.2 — 12 review-fix bugs fixed, 80 total fixed, 23 new regression tests)*
 *Canonical architecture: `.kilo/ARCHITECTURE.md`*

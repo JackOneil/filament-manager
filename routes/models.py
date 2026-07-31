@@ -212,11 +212,17 @@ def models_index():
 
 @bp.route('/models/upload', methods=['POST'])
 def model_upload():
+    user = get_current_user()
     project_id = request.form.get('project_id', type=int) or None
     if project_id:
         project = _check_project_access(project_id)
-    else:
+    elif is_admin(user):
+        # Admins may upload orphaned models (project_id=NULL); regular users
+        # must always attach the model to one of their own projects.
         project = None
+    else:
+        flash(translate('models_error_orphan_denied'), 'error')
+        return redirect(url_for('models.models_index'))
     if 'file' not in request.files:
         flash(translate('models_error_upload'), 'error')
         return redirect(url_for('models.models_index'))

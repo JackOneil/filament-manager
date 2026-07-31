@@ -2,15 +2,19 @@
 import json
 from datetime import datetime, timedelta
 
-from flask import abort, redirect, render_template, request, url_for, Response, Blueprint
+from flask import abort, redirect, render_template, request, session, url_for, Response, Blueprint
 
 from database import db
 from models import BambuPrinter, BambuPrintJob, FilamentUndoLog, PrinterMaintenance, PrusaPrinter, PrusaPrintJob
+from routes.inventory_helpers import _UNDO_SESSION_KEY
 from utils import translate, utc_now, safe_commit
 
 
 MAINTENANCE_TYPES = ('nozzle_change', 'calibration', 'service', 'fault', 'other')
 RECURRENCE_TYPES = ('none', 'hours', 'days', 'months')
+
+# Undo TTL for maintenance-record deletion — matches the filament undo window.
+_MAINTENANCE_UNDO_TTL_MINUTES = 15
 
 
 def _parse_dt_local(value):
@@ -509,15 +513,23 @@ def register(app):
             'predictive_filament_grams': rec.predictive_filament_grams,
             'predictive_window_days': rec.predictive_window_days,
         })
-        db.session.add(FilamentUndoLog(
+        undo_log = FilamentUndoLog(
             user_id=user.id,
             action_type='delete_maintenance',
             target_type='maintenance',
             target_key=undo_data,
             snapshot_data=None,
-            expires_at=utc_now() + timedelta(seconds=14),
-        ))
+            expires_at=utc_now() + timedelta(minutes=_MAINTENANCE_UNDO_TTL_MINUTES),
+        )
+        db.session.add(undo_log)
         safe_commit()
+        # Populate the undo toast slot so the toast renders on the redirect
+        # and the /inventory/undo endpoint can consume the snapshot.
+        session[_UNDO_SESSION_KEY] = {
+            'undo_log_id': undo_log.id,
+            'title_key': 'undo_toast_maintenance_delete_title',
+            'detail': rec.printer_name or '',
+        }
 
         db.session.delete(rec)
         safe_commit()

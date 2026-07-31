@@ -1239,7 +1239,15 @@ def consume_undo_log(undo_log_id, user_id):
 
     target_type = undo_log.target_type or 'filament'
     if target_type == 'filament':
-        return json.loads(undo_log.snapshot_data)
+        data = json.loads(undo_log.snapshot_data)
+        if isinstance(data, dict):
+            # The stored snapshot does not contain the action type — inject it
+            # from the DB row so route-level consumers (e.g. inventory_undo)
+            # can dispatch without guessing.
+            data.setdefault('action_type', undo_log.action_type)
+            data.setdefault('target_type', target_type)
+            data.setdefault('target_key', undo_log.target_key)
+        return data
     else:
         return {
             'action_type': undo_log.action_type,

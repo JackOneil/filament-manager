@@ -51,7 +51,7 @@ from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
 
-APP_VERSION = '1.120.1'
+APP_VERSION = '1.120.2'
 
 csrf = CSRFProtect()
 
@@ -292,9 +292,17 @@ def create_app(test_config=None) -> Flask:
         This is a safety net for ~30 POST handlers that commit but lack
         try/except blocks — if a constraint violation or other DB error
         occurs, the session is cleaned up to prevent cascading failures
-        on subsequent requests."""
+        on subsequent requests. A session left dirty *without* an exception
+        (e.g. a handler that mutated the ORM and then aborted early) is
+        rolled back too, so partial changes can never leak into the next
+        request's commit."""
         try:
-            if _exception is not None:
+            if (
+                _exception is not None
+                or db.session.dirty
+                or db.session.new
+                or db.session.deleted
+            ):
                 db.session.rollback()
         except Exception:
             pass

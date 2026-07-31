@@ -1,8 +1,31 @@
 """Calculator routes: print cost estimation and history."""
-from flask import render_template, request, redirect, url_for, abort, Blueprint
+from flask import abort, render_template, request, redirect, url_for, Blueprint
 from database import db
 from models import Filament, AppSetting, PrintHistory, Project, ProjectQuote
 from utils import get_current_currency, translate, utc_now, safe_commit
+
+
+def _quote_access_allowed(quote):
+    """Admins and the project owner may manage a quote; everyone else is denied."""
+    from flask import current_app
+    if current_app.config.get('TESTING') and not current_app.config.get('AUTH_REQUIRED_IN_TESTS'):
+        return True
+    from auth import get_current_user, is_admin
+    user = get_current_user()
+    if not user:
+        return False
+    if is_admin(user):
+        return True
+    if quote.project_id and quote.project:
+        return quote.project.owner_user_id == user.id
+    return False
+
+
+def _coerce_float(raw, default=0.0):
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return default
 
 
 def _build_filament_label(filament):
@@ -205,9 +228,9 @@ def register(app):
         if request.method == 'POST':
             filament_id = request.form.get('filament_id', type=int)
             project_id = request.form.get('project_id', type=int)
-            weight = float(request.form.get('weight', 0) or 0)
-            print_time = float(request.form.get('print_time', 0) or 0)
-            margin_percent = float(request.form.get('margin_percent', 0) or 0)
+            weight = _coerce_float(request.form.get('weight', 0) or 0)
+            print_time = _coerce_float(request.form.get('print_time', 0) or 0)
+            margin_percent = _coerce_float(request.form.get('margin_percent', 0) or 0)
             action = request.form.get('action', 'calculate')
 
             if filament_id and weight > 0:
@@ -277,9 +300,19 @@ def register(app):
         project = db.get_or_404(Project, project_id)
         setting = AppSetting.query.first()
 
-        margin_percent = float(request.form.get('margin_percent', 20) or 20)
+        margin_percent = _coerce_float(request.form.get('margin_percent', 20) or 20, 20.0)
         if request.method == 'GET':
-            margin_percent = float(request.args.get('margin', 20) or 20)
+            margin_percent = _coerce_float(request.args.get('margin', 20) or 20, 20.0)
+
+        # Only admins and the project owner may save quotes against a project.
+        from flask import current_app
+        if not (current_app.config.get('TESTING') and not current_app.config.get('AUTH_REQUIRED_IN_TESTS')):
+            from auth import get_current_user, is_admin
+            user = get_current_user()
+            if not user:
+                abort(403)
+            if not (is_admin(user) or (project.owner_user_id and project.owner_user_id == user.id)):
+                abort(403)
 
         project_result = _calculate_project_quote(project, margin_percent, setting)
         saved_quotes = []
@@ -341,6 +374,8 @@ def register(app):
     @bp.route('/calculator/quote/<int:id>/delete', methods=['POST'])
     def delete_quote(id):
         quote = db.get_or_404(ProjectQuote, id)
+        if not _quote_access_allowed(quote):
+            abort(403)
         project_id = quote.project_id
         db.session.delete(quote)
         safe_commit()
@@ -349,6 +384,8 @@ def register(app):
     @bp.route('/calculator/quote/<int:id>/export')
     def export_quote(id):
         quote = db.get_or_404(ProjectQuote, id)
+        if not _quote_access_allowed(quote):
+            abort(403)
         settings = AppSetting.query.first()
 
         # Auto-assign a sequential invoice number on first view

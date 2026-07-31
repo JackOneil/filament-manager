@@ -30,7 +30,21 @@ def _resolve_named_entity(raw_value, model):
     return None
 
 
+def _coerce_int(raw, default):
+    try:
+        parsed = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return parsed
+
+
 def _repack_shelf_slots(shelf, new_slots_count):
+    """Repack placements when a shelf is resized.
+
+    Placements beyond ``new_slots_count`` are moved into free slots first;
+    any remaining overflow is kept — the shelf is expanded to fit so no
+    placement is ever silently deleted.
+    """
     kept_slots = set()
     overflow = []
 
@@ -45,8 +59,12 @@ def _repack_shelf_slots(shelf, new_slots_count):
         placement.slot_index = target_slot
         kept_slots.add(target_slot)
 
-    for placement in overflow[len(free_slots):]:
-        db.session.delete(placement)
+    remaining_overflow = overflow[len(free_slots):]
+    if remaining_overflow:
+        max_used = max(kept_slots) if kept_slots else 0
+        for idx, placement in enumerate(remaining_overflow, start=1):
+            placement.slot_index = max_used + idx
+        shelf.slots_count = max_used + len(remaining_overflow)
 
 
 def _storage_redirect_for_shelf(shelf):
@@ -167,8 +185,8 @@ def register(app):
     @bp.route('/storage/shelf', methods=['POST'])
     def storage_add_shelf():
         name = request.form.get('name', '').strip()
-        columns = max(request.form.get('columns', 4, type=int), 1)
-        slots_count = max(request.form.get('slots_count', 12, type=int), columns)
+        columns = max(_coerce_int(request.form.get('columns'), 4), 1)
+        slots_count = max(_coerce_int(request.form.get('slots_count'), 12), columns)
         if name and not StorageShelf.query.filter_by(name=name).first():
             sort_order = (db.session.query(db.func.max(StorageShelf.sort_order)).scalar() or 0) + 1
             db.session.add(StorageShelf(name=name, columns=columns, slots_count=slots_count, sort_order=sort_order))
@@ -180,8 +198,8 @@ def register(app):
         shelf = db.session.get(StorageShelf, shelf_id)
         if shelf:
             new_name = request.form.get('name', '').strip()
-            columns = max(request.form.get('columns', shelf.columns, type=int), 1)
-            slots_count = max(request.form.get('slots_count', shelf.slots_count, type=int), columns)
+            columns = max(_coerce_int(request.form.get('columns'), shelf.columns or 4), 1)
+            slots_count = max(_coerce_int(request.form.get('slots_count'), shelf.slots_count or 12), columns)
             if new_name and (new_name == shelf.name or not StorageShelf.query.filter_by(name=new_name).first()):
                 shelf.name = new_name
             shelf.columns = columns
@@ -203,7 +221,11 @@ def register(app):
         data = request.get_json(silent=True) or {}
         ids = data.get('order', [])
         for i, shelf_id in enumerate(ids):
-            shelf = db.session.get(StorageShelf, int(shelf_id))
+            try:
+                parsed_id = int(shelf_id)
+            except (TypeError, ValueError):
+                continue
+            shelf = db.session.get(StorageShelf, parsed_id)
             if shelf:
                 shelf.sort_order = i
         safe_commit()

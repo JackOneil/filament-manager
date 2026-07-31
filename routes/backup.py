@@ -6,6 +6,7 @@ import json
 import os
 import tarfile
 import uuid
+from datetime import datetime, date
 from flask import abort, current_app as app, request, redirect, url_for, Response, Blueprint, flash
 
 from database import db
@@ -235,6 +236,12 @@ def register(app):
                 total = len(data.get('filaments', [])) + len(data.get('projects', [])) + len(data.get('users', []))
                 flash(translate('backup_dry_run_ok').format(total=total), 'success')
                 return redirect(url_for('settings') + '?tab=data')
+
+            # `db.session.begin()` requires a fresh transaction. Requests that
+            # only read (typical GETs) leave an open read transaction on the
+            # thread's session — end it first so the import never fails with
+            # "A transaction is already begun on this Session".
+            db.session.rollback()
 
             with db.session.begin():
                 # ── 1. Enumerations ────────────────────────────────────

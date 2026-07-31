@@ -4,18 +4,23 @@ import os
 import uuid
 from datetime import datetime, timedelta
 
-from flask import abort, jsonify, redirect, render_template, request, send_from_directory, url_for, Blueprint
+from flask import abort, jsonify, redirect, render_template, request, send_from_directory, session, url_for, Blueprint
 from werkzeug.utils import secure_filename
 
 from auth import require_admin
 from sqlalchemy.orm import joinedload
 from database import db
 from models import Filament, FilamentUndoLog, Project, WasteFile, WasteRecord, AppSetting
+from routes.inventory_helpers import _UNDO_SESSION_KEY
 from utils import utc_now, safe_commit
 
 
 _DEFAULT_WASTE_REASONS = ['stringing', 'warping', 'bed_adhesion', 'clogging', 'layer_shift', 'spaghetti', 'broken_support', 'other']
 WASTE_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
+
+# Undo TTL for waste-record deletion — matches the filament undo window so
+# the user has a realistic chance to click "Vrátit" before it expires.
+_WASTE_UNDO_TTL_MINUTES = 15
 
 
 def _get_waste_reasons():
@@ -327,15 +332,23 @@ def register(app):
             'created_at': rec.created_at.isoformat() if rec.created_at else None,
             'recorded_by_user_id': rec.recorded_by_user_id,
         })
-        db.session.add(FilamentUndoLog(
+        undo_log = FilamentUndoLog(
             user_id=user.id,
             action_type='delete_waste',
             target_type='waste',
             target_key=undo_data,
             snapshot_data=None,
-            expires_at=utc_now() + timedelta(seconds=14),
-        ))
+            expires_at=utc_now() + timedelta(minutes=_WASTE_UNDO_TTL_MINUTES),
+        )
+        db.session.add(undo_log)
         safe_commit()
+        # Populate the undo toast slot so the toast renders on the next page
+        # load and the /inventory/undo endpoint can consume the snapshot.
+        session[_UNDO_SESSION_KEY] = {
+            'undo_log_id': undo_log.id,
+            'title_key': 'undo_toast_waste_delete_title',
+            'detail': (rec.filament.name if rec.filament else '') or '',
+        }
 
         for f in list(rec.files):
             try:

@@ -102,6 +102,13 @@ def _build_import_file_path(upload_folder, project_id, filename, uploaded_at_tex
     return os.path.join(upload_folder, f'{project_id}_{stamp}_{safe_name}')
 
 
+# Safety limits for backup archives (defence against tar-bomb style
+# decompression abuse): a single member may expand to at most 256 MB and
+# the whole archive to at most 512 MB of decompressed content.
+_MAX_BACKUP_MEMBER_BYTES = 256 * 1024 * 1024
+_MAX_BACKUP_TOTAL_BYTES = 512 * 1024 * 1024
+
+
 def _load_backup_package(uploaded_file):
     raw_bytes = uploaded_file.read()
     if not raw_bytes:
@@ -114,9 +121,15 @@ def _load_backup_package(uploaded_file):
                 raise ValueError('Backup archive is missing manifest.json')
             data = json.loads(manifest_member.read().decode('utf-8'))
             attachments = {}
+            total_bytes = 0
             for member in archive.getmembers():
                 if not member.isfile() or member.name == 'manifest.json':
                     continue
+                if member.size > _MAX_BACKUP_MEMBER_BYTES:
+                    raise ValueError(f'Backup member too large: {member.name}')
+                total_bytes += member.size
+                if total_bytes > _MAX_BACKUP_TOTAL_BYTES:
+                    raise ValueError('Backup archive decompressed size exceeds limit')
                 extracted = archive.extractfile(member)
                 if extracted is not None:
                     attachments[member.name] = extracted.read()

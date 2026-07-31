@@ -215,9 +215,13 @@ def run_migrations(app: Flask) -> None:
         # ── Undo log extension: support waste & maintenance target types ─────
         _safe_alter(app, "ALTER TABLE filament_undo_log ADD COLUMN target_type VARCHAR(20) DEFAULT 'filament'")
         _safe_alter(app, "ALTER TABLE filament_undo_log ADD COLUMN target_key TEXT DEFAULT NULL")
-        # ALTER COLUMN is not supported by SQLite — only run on PostgreSQL
+        # Make snapshot_data nullable so waste/maintenance undo snapshots
+        # (which carry their payload in target_key) can be created without
+        # snapshot content.  ALTER COLUMN is not supported by SQLite — rebuild.
         if _dialect != 'sqlite':
             _safe_alter(app, "ALTER TABLE filament_undo_log ALTER COLUMN snapshot_data DROP NOT NULL")
+        else:
+            _migrate_undo_log_nullable_snapshot(app, _dialect)
         try:
             db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_filament_undo_log_target_type ON filament_undo_log (target_type)"))
             db.session.commit()
@@ -402,6 +406,64 @@ def _migrate_nullable_project_id(app: Flask, dialect: str = 'sqlite') -> None:
         app.logger.error(f"Error migrating project_file nullable project_id: {e}")
 
 
+def _migrate_undo_log_nullable_snapshot(app: Flask, dialect: str = 'sqlite') -> None:
+    """Rebuild filament_undo_log with a nullable snapshot_data column (SQLite).
+
+    PostgreSQL supports ``ALTER COLUMN … DROP NOT NULL``; SQLite cannot alter
+    constraints, so the table is rebuilt in place.  The table only references
+    other tables (user, filament) and is not referenced by anything itself, so
+    the recreation works with FK enforcement enabled.
+    """
+    if dialect != 'sqlite':
+        return
+    try:
+        # Check whether snapshot_data is already nullable.
+        result = db.session.execute(text("PRAGMA table_info(filament_undo_log)"))
+        for row in result:
+            if row[1] == 'snapshot_data' and row[3] == 0:  # notnull=0 → nullable
+                return
+        # Recreate table: create new, copy data, drop old, rename.
+        db.session.execute(text("""
+            CREATE TABLE filament_undo_log_new (
+                id INTEGER NOT NULL,
+                created_at DATETIME NOT NULL,
+                user_id INTEGER,
+                action_type VARCHAR(40) NOT NULL,
+                filament_id INTEGER,
+                snapshot_data TEXT,
+                expires_at DATETIME,
+                is_consumed BOOLEAN NOT NULL DEFAULT 0,
+                consumed_at DATETIME,
+                target_type VARCHAR(20) DEFAULT 'filament',
+                target_key TEXT,
+                PRIMARY KEY (id),
+                FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE,
+                FOREIGN KEY (filament_id) REFERENCES filament (id) ON DELETE CASCADE
+            )
+        """))
+        db.session.execute(text("""
+            INSERT INTO filament_undo_log_new
+                (id, created_at, user_id, action_type, filament_id, snapshot_data,
+                 expires_at, is_consumed, consumed_at, target_type, target_key)
+            SELECT id, created_at, user_id, action_type, filament_id, snapshot_data,
+                   expires_at, is_consumed, consumed_at, target_type, target_key
+            FROM filament_undo_log
+        """))
+        db.session.execute(text("DROP TABLE filament_undo_log"))
+        db.session.execute(text("ALTER TABLE filament_undo_log_new RENAME TO filament_undo_log"))
+        # Restore indexes dropped with the original table
+        db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_filament_undo_log_created_at ON filament_undo_log (created_at)"))
+        db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_filament_undo_log_user_id ON filament_undo_log (user_id)"))
+        db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_filament_undo_log_filament_id ON filament_undo_log (filament_id)"))
+        db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_filament_undo_log_expires_at ON filament_undo_log (expires_at)"))
+        db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_filament_undo_log_target_type ON filament_undo_log (target_type)"))
+        db.session.commit()
+        app.logger.info("Successfully migrated filament_undo_log.snapshot_data to nullable.")
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error migrating filament_undo_log snapshot_data nullable: {e}")
+
+
 def _migrate_waste_record_fk(app: Flask, dialect: str = 'sqlite') -> None:
     """Recreate waste_record table with ondelete=CASCADE on filament_id FK.
 
@@ -419,16 +481,27 @@ def _migrate_waste_record_fk(app: Flask, dialect: str = 'sqlite') -> None:
         return  # PostgreSQL schema already correct from db.create_all()
     try:
         # Check whether the FK already includes ON DELETE CASCADE.
+        # PRAGMA foreign_key_list rows are:
+        #   (id, seq, table, from, to, on_update, on_delete, match)
+        # so row[6] is the ON DELETE action ('NO ACTION' / 'CASCADE' / …).
         result = db.session.execute(text("PRAGMA foreign_key_list(waste_record)"))
         for row in result:
-            if row[3] == 'filament_id' and row[5] is not None:
+            if row[3] == 'filament_id' and row[6] == 'CASCADE':
                 return  # already correct
+    except Exception:
+        db.session.rollback()
+        return
 
-        # Enable FK checks temporarily so the INSERT below validates.
-        db.session.execute(text("PRAGMA foreign_keys=OFF"))
+    # PRAGMA foreign_keys is a NO-OP inside a transaction, and SQLAlchemy
+    # autobegins a transaction on the first execute.  The whole rebuild must
+    # therefore run on a dedicated AUTOCOMMIT connection so the DROP TABLE
+    # statements are not blocked by FK enforcement on the recreated tables.
+    conn = db.engine.connect().execution_options(isolation_level="AUTOCOMMIT")
+    try:
+        conn.execute(text("PRAGMA foreign_keys=OFF"))
 
         # 1. Recreate waste_file first (depends on waste_record)
-        db.session.execute(text("""
+        conn.execute(text("""
             CREATE TABLE waste_file_new (
                 id INTEGER NOT NULL,
                 waste_record_id INTEGER NOT NULL,
@@ -439,12 +512,12 @@ def _migrate_waste_record_fk(app: Flask, dialect: str = 'sqlite') -> None:
                 FOREIGN KEY (waste_record_id) REFERENCES waste_record (id) ON DELETE CASCADE
             )
         """))
-        db.session.execute(text("INSERT INTO waste_file_new SELECT * FROM waste_file"))
-        db.session.execute(text("DROP TABLE waste_file"))
-        db.session.execute(text("ALTER TABLE waste_file_new RENAME TO waste_file"))
+        conn.execute(text("INSERT INTO waste_file_new SELECT * FROM waste_file"))
+        conn.execute(text("DROP TABLE waste_file"))
+        conn.execute(text("ALTER TABLE waste_file_new RENAME TO waste_file"))
 
         # 2. Recreate waste_record with proper FK constraints
-        db.session.execute(text("""
+        conn.execute(text("""
             CREATE TABLE waste_record_new (
                 id INTEGER NOT NULL,
                 filament_id INTEGER NOT NULL,
@@ -460,21 +533,21 @@ def _migrate_waste_record_fk(app: Flask, dialect: str = 'sqlite') -> None:
                 FOREIGN KEY (recorded_by_user_id) REFERENCES user (id) ON DELETE SET NULL
             )
         """))
-        db.session.execute(text("INSERT INTO waste_record_new SELECT * FROM waste_record"))
-        db.session.execute(text("DROP TABLE waste_record"))
-        db.session.execute(text("ALTER TABLE waste_record_new RENAME TO waste_record"))
+        conn.execute(text("INSERT INTO waste_record_new SELECT * FROM waste_record"))
+        conn.execute(text("DROP TABLE waste_record"))
+        conn.execute(text("ALTER TABLE waste_record_new RENAME TO waste_record"))
 
         # Restore indexes that were dropped when the original tables were recreated
-        db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_waste_record_filament_project ON waste_record (filament_id, project_id)"))
-        db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_waste_file_waste_record_id ON waste_file (waste_record_id)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_waste_record_filament_project ON waste_record (filament_id, project_id)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_waste_file_waste_record_id ON waste_file (waste_record_id)"))
 
-        db.session.execute(text("PRAGMA foreign_keys=ON"))
-        db.session.commit()
+        conn.execute(text("PRAGMA foreign_keys=ON"))
         app.logger.info("Successfully migrated waste_record.filament_id FK to ON DELETE CASCADE.")
     except Exception as e:
-        db.session.rollback()
         app.logger.error(f"Error migrating waste_record FK: {e}")
         try:
-            db.session.execute(text("PRAGMA foreign_keys=ON"))
+            conn.execute(text("PRAGMA foreign_keys=ON"))
         except Exception:
             pass
+    finally:
+        conn.close()

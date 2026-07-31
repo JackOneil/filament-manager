@@ -270,7 +270,10 @@ def register(app):
             hours = request.form.get('print_hours', 0, type=int)
             minutes = request.form.get('print_minutes', 0, type=int)
             estimated_print_time = hours * 60 + minutes if hours > 0 or minutes > 0 else 0
-            due_date = datetime.strptime(due_date_str, '%Y-%m-%d') if due_date_str else None
+            try:
+                due_date = datetime.strptime(due_date_str, '%Y-%m-%d') if due_date_str else None
+            except (TypeError, ValueError):
+                due_date = None
             if due_date and due_date.date() < utc_now().date():
                 flash('project_due_date_past', 'warning')
             priority = request.form.get('priority', 'medium')
@@ -452,7 +455,10 @@ def register(app):
             hours = request.form.get('print_hours', 0, type=int)
             minutes = request.form.get('print_minutes', 0, type=int)
             project.estimated_print_time = hours * 60 + minutes if hours > 0 or minutes > 0 else 0
-            project.due_date = datetime.strptime(due_date_str, '%Y-%m-%d') if due_date_str else None
+            try:
+                project.due_date = datetime.strptime(due_date_str, '%Y-%m-%d') if due_date_str else None
+            except (TypeError, ValueError):
+                project.due_date = None
             if project.due_date and project.due_date.date() < utc_now().date():
                 flash('project_due_date_past', 'warning')
             if is_admin(user):

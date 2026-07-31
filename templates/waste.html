@@ -194,7 +194,11 @@ const _WASTE_ADD_URL = {{ url_for('waste_add')|tojson }};
             btn.addEventListener('click', function() {
                 var id = parseInt(this.dataset.wasteDeleteId);
                 if (!confirm(_WASTE_DELETE_CONFIRM)) return;
-                fetch('/waste/' + id + '/_delete', {method:'POST'}).then(fetchRecords);
+                // Full page reload renders the server-side undo toast (the
+                // undo snapshot is stored in the session by the backend).
+                fetch('/waste/' + id + '/_delete', {method:'POST'}).then(function() {
+                    window.location.reload();
+                });
             });
         });
         // File delete

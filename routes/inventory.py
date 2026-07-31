@@ -320,13 +320,23 @@ def register(app):
         filament = db.get_or_404(Filament, id)
         if request.method == 'POST':
             old_weight = filament.weight_remaining
+            # Parse ALL form values first — never mutate the ORM object until
+            # every conversion succeeded. Otherwise a failed parse leaves the
+            # session dirty and the partial change gets committed by the next
+            # request (dirty-session leak across requests).
             try:
-                filament.name = request.form.get('name', filament.name) or filament.name
-                filament.weight_remaining = float(request.form.get('weight_remaining', filament.weight_remaining))
-                filament.price = float(request.form.get('price', filament.price))
-                filament.quantity = int(request.form.get('quantity', filament.quantity))
+                new_name = request.form.get('name', filament.name) or filament.name
+                new_weight = float(request.form.get('weight_remaining', filament.weight_remaining))
+                new_price = float(request.form.get('price', filament.price))
+                new_quantity = int(request.form.get('quantity', filament.quantity))
             except (TypeError, ValueError):
+                db.session.rollback()
                 return redirect(url_for('edit', id=id))
+
+            filament.name = new_name
+            filament.weight_remaining = new_weight
+            filament.price = new_price
+            filament.quantity = new_quantity
             filament.tag_text = format_tags(request.form.get('tag_text', filament.tag_text or ''))
             filament.min_stock_grams = max(request.form.get('min_stock_grams', filament.min_stock_grams, type=float) or 0.0, 0.0)
             filament.max_stock_grams = max(request.form.get('max_stock_grams', filament.max_stock_grams, type=float) or 0.0, 0.0)
@@ -477,7 +487,12 @@ def register(app):
             action_type = snapshot_data.get('action_type') or snapshot_data.get('type')
             
             if action_type == 'remove_spool':
-                filament_id = snapshot_data.get('filament_id')
+                # The snapshot stores the filament under the 'filament' key
+                # (with 'id' inside); fall back to a legacy top-level key.
+                filament_id = (
+                    (snapshot_data.get('filament') or {}).get('id')
+                    or snapshot_data.get('filament_id')
+                )
                 filament = db.session.get(Filament, filament_id)
                 if filament is None:
                     raise ValueError('filament_not_found')

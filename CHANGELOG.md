@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.120.2] — 2026-07-31
+
+### Fixed
+
+- **Smazání projektu s TODO již nespadne s HTTP 500** — `snapshot_project_for_undo()` četl neexistující sloupec `ProjectTodo.position` (`AttributeError`); undo projektu navíc předával `position=` do konstruktoru a ztrácel `due_date`. Snapshot/restore nyní používá pouze reálné sloupce a `due_date` se správně parsuje jako datetime s fallbackem na date. (routes/projects_helpers.py)
+- **Undo „remove spool“ a veškerý inventory undo funguje** — `consume_undo_log()` nevkládal `action_type` do vrácených dat, takže `inventory_undo` nedokázal rozpoznat typ akce a vždy skončil chybou. Typ akce se nyní injektuje z DB řádku undo logu. (utils/__init__.py)
+- **Undo smazání zmetku/údržby oživen** — opraveny tři příčiny: (1) migrace `filament_undo_log.snapshot_data` na nullable nyní běží i na SQLite (rekreace tabulky; dosud jen PostgreSQL); (2) smazání nastavuje session slot `inventory_pending_undo`, takže se zobrazí toast s tlačítkem „Vrátit“ (AJAX smazání zmetku nyní po úspěchu obnoví stránku); (3) TTL undo zvýšeno z 14 sekund na 15 minut, přidány překlady `undo_toast_waste_delete_title` / `undo_toast_maintenance_delete_title`. (migrations.py, routes/waste.py, routes/maintenance.py, templates/waste.html, messages.py)
+- **Migrace FK `waste_record.filament_id` konečně funguje** — kontrola `PRAGMA foreign_key_list` četla sloupec `on_update` (row[5]) místo `on_delete` (row[6]), takže migrace vždy předčasně skončila; navíc `PRAGMA foreign_keys=OFF` je v transakci no-op, proto se celá rekreace přesunula na dedikované AUTOCOMMIT připojení. (migrations.py)
+- **Autorizace citací a projektové kalkulačky** — `delete_quote` / `export_quote` / `calculator_project` nyní vyžadují admina nebo vlastníka projektu (dosud mohl ne-admin mazat/exportovat citace kohokoli, včetně přidělení čísla faktury). (routes/calculator.py)
+- **Ne-admini nemohou nahrávat osiřelé modely** — `model_upload` bez `project_id` je povolen pouze adminům; běžný uživatel dostane chybu a soubor se neuloží. (routes/models.py, messages.py)
+- **Kalkulačka nepadsá s 500 na nečíselné vstupy** — `float()` konverze `weight`/`print_time`/`margin_percent` jsou chráněny. (routes/calculator.py)
+- **Projekt create/edit nepadá s 500 na vadné `due_date`** — `strptime` je ošetřen (konzistentně s todo formuláři). (routes/projects.py)
+- **Žádné částečné uložení při chybné editaci filamentu** — formulářové hodnoty se nejprve celé zvalidují a teprve pak zapíší do ORM objektu; `teardown_db_session` navíc rollbackuje i čistou session s otevřenou transakcí, takže špinavá data nemohou uniknout do dalšího requestu. (routes/inventory.py, app.py)
+- **Storage robustnost** — nečíselné `columns`/`slots_count` už nezpůsobí 500; `storage_reorder_shelves` ignoruje nečíselná ID; zmenšení police **nikdy nemaže** placementy — police se místo toho automaticky rozšíří. (routes/storage.py)
+- **Backup import: oprava transakce a limity dekomprese** — `db.session.begin()` v `/import` selhával na otevřené read-only transakci z předchozího requestu („A transaction is already begun“) — před blokem se transakce korektně ukončí; `_load_backup_package` má nyní limity velikosti členů archivu (256 MB/člen, 512 MB celkem) proti tar-bomb DoS. (routes/backup.py, routes/backup_helpers.py)
+- **Regresní testy** — nový soubor `tests/test_review_fixes.py` (23 testů) pokrývá všechny výše uvedené opravy včetně migrace legacy schémat.
+
 ## [1.120.1] — 2026-07-18
 
 ### Added
