@@ -10,6 +10,7 @@
 > **Bug audit #6:** 2026-07-18 — sixth deep audit: all routes, models, migrations, utils, templates, JS, auth, backup, security. 28 new findings recorded below (BUG-700 through BUG-727).
 > **Bug audit #7:** 2026-07-18 — seventh audit (external agent): cross-verified findings against current codebase, added verified missing findings (BUG-704 through BUG-711).
 > **Bug audit #8:** 2026-07-31 — eighth deep audit (full repository review: models, migrations, routes, templates, JS, backup, auth, storage). 12 findings fixed in v1.120.2 (BUG-728 through BUG-739), 5 new findings remain open (BUG-740 through BUG-744).
+> **Feature/fix delivery #9:** 2026-08-02 — stock restoration on deleted deducted jobs, dynamic breadcrumbs, shared accessible modals, and AJAX retry states delivered in v1.121.0.
 
 ---
 
@@ -20,6 +21,7 @@
 | BUG-728 | Project delete with TODOs crashes with HTTP 500 (`ProjectTodo.position` does not exist) | `routes/projects_helpers.py:653`: `snapshot_project_for_undo()` read `t.position` — the `ProjectTodo` model has no `position` column → `AttributeError` → `project_delete` 500s whenever the project has any todo. `restore_project_from_undo()` also passed `position=` to the constructor and dropped `due_date` (parsed `datetime` ISO string with `date.fromisoformat`). **Fix:** Removed the phantom column from snapshot/restore; `due_date` restored via `datetime.fromisoformat` with `date` fallback. (projects_helpers.py) | 🔴 Critical | S (Small) | Fixed in v1.120.2 |
 | BUG-729 | Inventory undo route broken for ALL action types — `action_type` missing from consumed snapshot | `utils/__init__.py:1213`: `consume_undo_log()` returned the raw `snapshot_data` JSON for filament targets — it never contained `action_type`, so `inventory_undo` (`routes/inventory.py:479`) raised `unsupported_undo_type` and undo of delete/remove-spool always failed. **Fix:** `consume_undo_log()` now injects `action_type`/`target_type`/`target_key` from the DB row into the returned dict. | 🔴 Critical | S (Small) | Fixed in v1.120.2 |
 | BUG-730 | Waste/maintenance undo is dead code (3 independent causes) | (1) `snapshot_data=None` violates legacy SQLite `NOT NULL` — the `DROP NOT NULL` migration only ran on PostgreSQL (BUG-705 claimed fixed, wasn't); (2) no `inventory_pending_undo` session slot was set, so the undo toast never rendered; (3) undo TTL was 14 seconds instead of 15 minutes. **Fix:** SQLite table-recreation migration `_migrate_undo_log_nullable_snapshot()`, session slot + title keys in `waste_delete_ajax`/`maintenance_delete`, TTL raised to 15 min, waste page reloads after AJAX delete so the toast renders, new translation keys added. (migrations.py, routes/waste.py, routes/maintenance.py, templates/waste.html, messages.py) | 🔴 Critical | M (Medium) | Fixed in v1.120.2 |
+| BUG-786 | Deleting a deducted Bambu/Prusa job permanently lost stock | Job deletion removed the job without restoring its actual deduction. **Fix:** Restore net print/return movements (including clamped and multi-material amounts), write a compensating movement, and add a Prusa movement reference with backup support. (routes/bambu.py, routes/prusa.py, models.py, routes/backup.py) | 🔴 Critical | M (Medium) | Fixed in v1.121.0 |
 | BUG-731 | `_migrate_waste_record_fk()` checked the wrong PRAGMA column — migration never ran | `migrations.py`: `PRAGMA foreign_key_list` rows are `(id, seq, table, from, to, on_update, on_delete, match)`; the code tested `row[5]` (on_update, always `'NO ACTION'`) instead of `row[6]` (on_delete) → always early-returned. Additionally `PRAGMA foreign_keys=OFF` is a no-op inside a transaction, so the rebuild would have failed even with the fix. **Fix:** Check `row[6] == 'CASCADE'`; whole rebuild moved to a dedicated AUTOCOMMIT connection with `PRAGMA foreign_keys=OFF`. (migrations.py) | 🔴 Critical | S (Small) | Fixed in v1.120.2 |
 
 
@@ -585,16 +587,16 @@
 
 ## Summary Statistics
 
-### Current State (post v1.120.2 — 2026-07-31)
+### Current State (post v1.121.0 — 2026-08-02)
 
 | Category | Fixed | Remaining |
 |----------|-------|-----------|
-| 🔴 Critical | 22 | 0 |
+| 🔴 Critical | 23 | 0 |
 | 🟠 High | 72 | 1 |
 | 🟡 Medium | 71 | 5 |
 | 🟢 Low | 50 | 13 |
-| 🆕 Features | BL-004-007, BL-012-016 | — |
-| **Total** | **215 fixed** | **19 remaining** |
+| 🆕 Features | BL-004-007, BL-012-019 | — |
+| **Total** | **216 fixed** | **19 remaining** |
 
 > **Bug audit #8 update (v1.120.2):** 31 findings from the eighth deep audit
 > fixed in this release (BUG-741, BUG-744, BUG-745—BUG-774, BUG-782) — stored XSS in
@@ -602,6 +604,15 @@
 > bulk-delete 500, CSRF/SSRF gaps, double stock deductions, backup import
 > integrity, migration/pg-migration data loss, worker backoff and test
 > isolation. 7 new findings recorded as open (BUG-775—BUG-781).
+
+### v1.121.0 — UX and stock integrity delivery
+
+| ID | Change | Version | Date |
+|----|--------|---------|------|
+| BUG-786 | Restore stock when deleting deducted Bambu/Prusa jobs | v1.121.0 | 2026-08-02 |
+| BL-017 | Dynamic translated breadcrumbs | v1.121.0 | 2026-08-02 |
+| BL-018 | Shared accessible modal manager | v1.121.0 | 2026-08-02 |
+| BL-019 | AJAX error states with retry actions | v1.121.0 | 2026-08-02 |
 
 ### v1.119.0 — UI Enhancement Sprint
 - **BL-007** (Implement dark mode / mobile / viz / micro-interaction batch): Closed in v1.119.0. Added 15 new test cases (`tests/test_ui_v119.py`), 4 new assets (`static/css/enhancements.css`, `static/js/enhancements.js`), heatmap data in `routes/stats.py`, animated counters, sparklines, responsive table-to-card transformation, and theme-reactive Chart.js.
@@ -655,5 +666,5 @@
 
 ---
 
-*Last updated: 2026-07-31 (v1.120.2 — 12 review-fix bugs fixed, 80 total fixed, 23 new regression tests)*
+*Last updated: 2026-08-02 (v1.121.0 — stock restoration, breadcrumbs, accessible modals, AJAX retry states)*
 *Canonical architecture: `.kilo/ARCHITECTURE.md`*

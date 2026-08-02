@@ -11,7 +11,7 @@ from app import create_app
 from database import db
 from models import (
     AppSetting, PrusaPrintJob, PrusaPrinter,
-    Brand, Color, Filament, Material, Project,
+    Brand, Color, Filament, Material, MovementHistory, Project,
 )
 from utils import utc_now
 
@@ -284,6 +284,31 @@ class PrusaJobMapTests(_BasePrusaExtTests):
 # ── Job Delete ──────────────────────────────────────────────────────────
 
 class PrusaJobDeleteTests(_BasePrusaExtTests):
+    def test_prusa_job_delete_restores_deducted_stock(self):
+        with self.app.app_context():
+            job = db.session.get(PrusaPrintJob, self.job_id)
+            job.weight_grams = 75.0
+            job.filament_id = self.filament_id
+            db.session.commit()
+
+        self.client.post(f'/prusa/job/{self.job_id}/map?ajax=1', data={
+            'filament_id': str(self.filament_id),
+            'deduct': '1',
+        })
+        with self.app.app_context():
+            self.assertAlmostEqual(db.session.get(Filament, self.filament_id).weight_remaining, 825.0)
+
+        response = self.client.post(f'/prusa/job/{self.job_id}/delete', follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            self.assertAlmostEqual(db.session.get(Filament, self.filament_id).weight_remaining, 900.0)
+            movement = MovementHistory.query.filter_by(
+                action_type='add', filament_id=self.filament_id,
+            ).order_by(MovementHistory.id.desc()).first()
+            self.assertIsNotNone(movement)
+            self.assertAlmostEqual(movement.weight, 75.0)
+            self.assertIn('Prusa Job 0', movement.note)
+
     def test_prusa_job_delete_existing(self):
         response = self.client.post(f'/prusa/job/{self.job_id}/delete',
                                      follow_redirects=False)

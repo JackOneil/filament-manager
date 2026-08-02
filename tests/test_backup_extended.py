@@ -13,7 +13,7 @@ from unittest.mock import patch
 from app import create_app
 from database import db
 from models import (
-    Brand, Color, Filament, Material, Project,
+    Brand, Color, Filament, Material, MovementHistory, PrusaPrintJob, Project,
 )
 from routes.backup import _backup_storage_dir, _is_path_inside, _cleanup_old_backups
 
@@ -122,6 +122,48 @@ class BackupPathSafetyTests(unittest.TestCase):
 # ── Import Dry-run & Conflict Modes ──────────────────────────────────────
 
 class ImportDryRunTests(_BaseBackupExtTests):
+    def test_import_restores_prusa_movement_job_reference(self):
+        started_at = '2026-08-02T10:00:00+00:00'
+        created_at = '2026-08-02T10:30:00+00:00'
+        payload = {
+            'prusa_jobs': [{
+                'printer_name': 'Imported Prusa',
+                'file_name': 'imported.gcode',
+                'display_name': 'Imported job',
+                'status': 'FINISHED',
+                'weight_grams': 25.0,
+                'started_at': started_at,
+                'synced_at': created_at,
+                'deducted': True,
+            }],
+            'movement_history': [{
+                'filament_name': 'Backup Ext PLA',
+                'action_type': 'prusa_print',
+                'weight': 25.0,
+                'cost': 12.5,
+                'currency': 'CZK',
+                'created_at': created_at,
+                'prusa_job_ref': {
+                    'printer_name': 'Imported Prusa',
+                    'file_name': 'imported.gcode',
+                    'started_at': started_at,
+                },
+            }],
+        }
+        response = self.client.post(
+            '/import',
+            data={'file': (encode_backup_payload(payload), 'prusa-reference.json.gz')},
+            content_type='multipart/form-data',
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            job = PrusaPrintJob.query.filter_by(file_name='imported.gcode').first()
+            movement = MovementHistory.query.filter_by(action_type='prusa_print', weight=25.0).first()
+            self.assertIsNotNone(job)
+            self.assertIsNotNone(movement)
+            self.assertEqual(movement.prusa_job_id, job.id)
+
     def test_import_plain_json_legacy_format(self):
         """Legacy plain JSON import (without tar.gz) must still work."""
         payload = {

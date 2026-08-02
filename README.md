@@ -1,6 +1,6 @@
 # Filament Manager 🧵
 
-*Current version: **v1.120.4***
+*Current version: **v1.121.0***
 
 A modern, self-hosted web application for managing 3D printer filament inventory, print projects, and printer integrations — built for makers, small studios, and print farms.
 
@@ -66,6 +66,9 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 - **Settings UX & Backup Safety** — Unified save/confirm/error toasts, printer health summary card, Bambu connection test without saving token, Prusa pre-save connectivity check, and Data-tab backup tooling with full/database-only export, backup metadata, dry-run import compatibility checks, and conflict modes (`skip`/`merge`/`overwrite`).
 - **Onboarding Checklist** — Guided setup checklist after first installation (currency, energy cost, printer connection, first filament) with auto-dismiss.
 - **Toast Notifications** — Non-blocking pop-up notifications with auto-dismiss via Alpine.js.
+- **Accessible Shared Dialogs** — Common modal behavior with focus trapping, Escape handling, scroll locking, ARIA attributes, backdrop closing, and focus restoration.
+- **Resilient AJAX UX** — Filtered lists show translated error states with a retry action instead of leaving skeleton loaders indefinitely.
+- **Dynamic Breadcrumbs** — Context-aware, translated breadcrumbs include inventory, project, model, printer, maintenance, waste, user, and detail pages.
 - **Custom Dictionaries** — Pre-seeded brands, materials, and colors. All freely expandable, renamable, and safely deletable.
 
 ---
@@ -93,10 +96,10 @@ filament/
 ├── app.py                  # App factory, background workers
 ├── database.py             # Shared SQLAlchemy instance + dialect detection
 ├── migrations.py           # Database migrations and seed data
-├── models.py               # All ORM models (~24 tables)
+├── models.py               # All ORM models (~35 tables)
 ├── messages.py             # i18n dictionaries (cs + en)
 ├── auth.py                 # Multi-user auth, RBAC, sessions
-├── utils.py                # Shared helpers (stock logic, encryption, link preview)
+├── utils/                  # Shared helpers, stock logic, encryption, link preview, breadcrumbs
 │
 ├── routes/                 # Flask Blueprints modular routing structure
 │   ├── __init__.py         #   Central registration and fallback url_for builder
@@ -120,6 +123,8 @@ filament/
 │   ├── models.py           #   Central 3D model browser, details, timeline, and thumbnails
 │   ├── auth.py             #   Auth routes (login, register, users)
 │   └── pwa.py              #   PWA manifest and service worker
+├── static/js/modal.js      # Shared accessible modal manager
+├── static/js/ajax.js       # Shared AJAX response/error/retry helpers
 │
 ├── templates/              # Jinja2 HTML templates (~30 files)
 ├── tests/                  # Automated tests (pytest)

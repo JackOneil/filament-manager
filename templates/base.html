@@ -325,31 +325,17 @@
     <div class="flex-1 flex flex-col min-w-0 bg-[var(--ui-bg)] relative z-0">
         <!--Topbar-->
         <header class="h-14 border-b border-[var(--ui-border)] bg-[var(--ui-surface)]/80 backdrop-blur-md flex items-center justify-between px-4 z-30 flex-shrink-0">
-            <div class="flex items-center">
-                <div class="text-sm font-semibold text-gray-500">
-                    <!--Breadcrumbs-->
-                    <span class="text-[var(--ui-text)]">{{ t('title') }}</span>
-                    <i class="fa-solid fa-chevron-right text-[10px] mx-2 opacity-50"></i>
-                    {% if endpoint in ['index'] %}
-                        <span>{{ t('overview') }}</span>
-                    {% elif endpoint in ['filaments_index', 'filament_detail'] %}
-                        <span>{{ t('filaments_nav') }}</span>
-                    {% elif endpoint in ['projects_index', 'project_create', 'project_detail'] %}
-                        <span>{{ t('projects') }}</span>
-                    {% elif endpoint in ['models_index', 'model_detail'] %}
-                        <span>{{ t('models_nav') }}</span>
-                    {% elif endpoint in ['stats'] %}
-                        <span>{{ t('stats_nav') }}</span>
-                    {% elif endpoint in ['settings'] %}
-                        <span>{{ t('settings') }}</span>
-                    {% elif endpoint in ['history'] %}
-                        <span>{{ t('movement_history') }}</span>
-                    {% elif endpoint in ['audit_logs'] %}
-                        <span>{{ t('audit_nav') }}</span>
-                    {% else %}
-                         <span>{{ t('nav_admin_tools') }}</span>
-                    {% endif %}
-                </div>
+            <div class="flex items-center min-w-0">
+                <nav aria-label="{{ t('breadcrumb_label') }}" class="flex items-center min-w-0 text-sm font-semibold text-gray-500">
+                    {% for crumb in breadcrumbs %}
+                        {% if crumb.url and not loop.last %}
+                            <a href="{{ crumb.url }}" class="truncate hover:text-[var(--ui-brand)] transition-colors">{{ crumb.label }}</a>
+                        {% else %}
+                            <span class="text-[var(--ui-text)] truncate {% if loop.last %}max-w-[16rem]{% endif %}"{% if loop.last %} aria-current="page"{% endif %}>{{ crumb.label }}</span>
+                        {% endif %}
+                        {% if not loop.last %}<i class="fa-solid fa-chevron-right text-[10px] mx-2 opacity-50 flex-shrink-0" aria-hidden="true"></i>{% endif %}
+                    {% endfor %}
+                </nav>
             </div>
             
             <div class="flex items-center gap-3">
@@ -459,7 +445,7 @@
            IMPORTANT: Must be kept in sync with translations in messages.py
            (Rule 1). Changes here require corresponding updates in messages.py
            and vice versa. #}
-        window.__i18n = {{
+         window.__i18n = {{
             {
                 'cs': {
                     'reaction_failed': 'Nepodařilo se uložit reakci. Zkuste to prosím znovu.',
@@ -479,8 +465,10 @@
                     'ptr_loading': 'Načítám…',
                     'md_url_prompt_title': 'Vložit URL',
                     'md_url_prompt_cancel': 'Zrušit',
-                    'md_url_prompt_ok': 'Vložit',
-                },
+                     'md_url_prompt_ok': 'Vložit',
+                     'ajax_retry': 'Zkusit znovu',
+                     'ajax_load_error': 'Nepodařilo se načíst data.',
+                 },
                 'en': {
                     'reaction_failed': 'Could not save your reaction. Please try again.',
                     'upload_validating': 'Validating file…',
@@ -499,12 +487,16 @@
                     'ptr_loading': 'Loading…',
                     'md_url_prompt_title': 'Insert URL',
                     'md_url_prompt_cancel': 'Cancel',
-                    'md_url_prompt_ok': 'Insert',
-                },
+                     'md_url_prompt_ok': 'Insert',
+                     'ajax_retry': 'Retry',
+                     'ajax_load_error': 'Failed to load data.',
+                 },
             } | tojson
         }};
     </script>
-    <script src="{{ url_for('static', filename='js/app-shell.js') }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
+     <script src="{{ url_for('static', filename='js/app-shell.js') }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
+     <script src="{{ url_for('static', filename='js/modal.js') }}?v={{ app_version }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
+     <script src="{{ url_for('static', filename='js/ajax.js') }}?v={{ app_version }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
     <script src="{{ url_for('static', filename='js/enhancements.js') }}"{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}></script>
     {% if current_user %}
     {# Command palette static items — sorted by priority (most-used first) #}

@@ -606,6 +606,7 @@ function modelsApp() {
                 const res = await fetch(`{{ url_for('models.api_models_list') }}?${params.toString()}`, {
                     signal: controller.signal
                 });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
 
                 const parser = new DOMParser();
@@ -634,6 +635,8 @@ function modelsApp() {
             } catch (err) {
                 if (err.name !== 'AbortError') {
                     console.error('Fetch models failed:', err);
+                    const target = document.getElementById('models-list-container');
+                    if (target && window.ajaxUi) window.ajaxUi.renderError(target, { onRetry: () => this.fetchContent() });
                 }
             } finally {
                 if (this._abortController === controller) {

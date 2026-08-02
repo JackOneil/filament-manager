@@ -258,6 +258,11 @@ def _build_export_data(app, include_files=True):
                 'filament_ref': _filament_ref(m.filament),
                 'project_name': m.project.name if m.project else None,
                 'bambu_external_id': m.bambu_job.external_id if m.bambu_job else None,
+                'prusa_job_ref': {
+                    'printer_name': m.prusa_job.printer_name,
+                    'file_name': m.prusa_job.file_name,
+                    'started_at': m.prusa_job.started_at.isoformat() if m.prusa_job.started_at else None,
+                } if m.prusa_job else None,
                 'action_type': m.action_type,
                 'weight': m.weight,
                 'cost': m.cost,
@@ -268,6 +273,7 @@ def _build_export_data(app, include_files=True):
                 joinedload(MovementHistory.filament),
                 joinedload(MovementHistory.project),
                 joinedload(MovementHistory.bambu_job),
+                joinedload(MovementHistory.prusa_job),
             ).order_by(MovementHistory.created_at).all()],
 
             # ── Calculator / print history ─────────────────────────────
@@ -722,5 +728,3 @@ def _cleanup_old_backups(backup_dir, keep_count=10, keep_days=0):
             except OSError:
                 pass
     return deleted
-
-

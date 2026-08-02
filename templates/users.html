@@ -249,6 +249,7 @@ function usersApp() {
                 if (this.page > 1) params.append('page', this.page);
 
                 const res = await fetch(`{{ url_for('users_index') }}?${params.toString()}`, { signal });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
 
                 if (data.html) {
@@ -295,6 +296,8 @@ function usersApp() {
             } catch (err) {
                 if (err.name !== 'AbortError') {
                     console.error(err);
+                    const target = document.getElementById('users-table-container');
+                    if (target && window.ajaxUi) window.ajaxUi.renderError(target, { onRetry: () => this.fetchContent() });
                 }
             } finally {
                 this.loading = false;

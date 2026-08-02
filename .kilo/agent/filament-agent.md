@@ -40,6 +40,7 @@ Key rules summary (always verified by compliance scan):
 - **Rule 29** — After implementing features or refactoring, update `.kilo/ARCHITECTURE.md`, `README.md`, and agent files.
 - **Rule 30** — Help system: update `HELP_SECTIONS` for new pages/features/endpoints with tips in both `cs` and `en`.
 - **Rule 31** — Targeted AJAX DOM updates: use `DOMParser` + AbortController + deduplication guard.
+- **Rule 34** — Plain DOM dialogs use `static/js/modal.js`; AJAX failures use `static/js/ajax.js` with translated retry states.
 - **Rule 32** — **BACKLOG UPDATE**: Every bugfix/feature MUST update `.kilo/BACKLOG.md` — change status to `Fixed in vX.Y.Z` for fixed bugs, add new findings with `**Open**` status, update summary statistics.
 
 **After every implementation is complete**, you MUST launch a general-type sub-agent as an independent **code quality auditor**. This auditor will:

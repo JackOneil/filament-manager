@@ -17,15 +17,15 @@ import re
 from datetime import datetime, timezone
 
 import requests
-from flask import render_template, request, redirect, url_for, jsonify, Blueprint
+from flask import render_template, request, redirect, url_for, jsonify, Blueprint, flash
 
 from sqlalchemy.orm import joinedload
 from database import db
 from models import (
     AppSetting, PrusaPrinter, PrusaPrintJob,
-    Filament, Project, PrintHistory, ProjectFilament,
+    Filament, Project, PrintHistory, ProjectFilament, MovementHistory,
 )
-from utils import deduct_filament_stock, encrypt_token, decrypt_token, log_movement, utc_now, format_duration, translate, safe_commit
+from utils import deduct_filament_stock, restore_filament_stock, encrypt_token, decrypt_token, log_movement, utc_now, format_duration, translate, safe_commit, invalidate_kpi_cache
 from utils import validate_printer_host, prusa_request, prusa_test_connection
 
 _LOG = logging.getLogger(__name__)
@@ -342,6 +342,7 @@ def register(app):
                         'prusa_print',
                         actual_amount,
                         project_id=project_id or job.project_id,
+                        prusa_job_id=job.id,
                         note=translate('movement_note_prusalink').format(label=job.display_name or job.file_name or job.id),
                     )
                     db.session.add(PrintHistory(
@@ -389,7 +390,49 @@ def register(app):
     def prusa_job_delete(job_id):
         job = db.session.get(PrusaPrintJob, job_id)
         if job:
+            totals = {}
+            movements = (
+                MovementHistory.query
+                .options(joinedload(MovementHistory.filament))
+                .filter(
+                    MovementHistory.prusa_job_id == job.id,
+                    MovementHistory.action_type.in_(('prusa_print', 'add')),
+                )
+                .all()
+            )
+            for movement in movements:
+                if not movement.filament or movement.weight <= 0:
+                    continue
+                sign = 1.0 if movement.action_type == 'prusa_print' else -1.0
+                entry = totals.setdefault(movement.filament_id, [movement.filament, 0.0])
+                entry[1] += sign * float(movement.weight)
+
+            # Jobs created before prusa_job_id was introduced have no linked
+            # movement.  The nominal weight is the only safe fallback; new
+            # deductions always use the exact post-clamp movement amount.
+            if not totals and job.deducted and job.filament and job.weight_grams and job.weight_grams > 0:
+                totals[job.filament_id] = [job.filament, float(job.weight_grams)]
+
+            restored = 0.0
+            label = job.display_name or job.file_name or str(job.id)
+            for filament, amount in totals.values():
+                if amount <= 0:
+                    continue
+                actual = restore_filament_stock(filament, amount)
+                if actual > 0:
+                    log_movement(
+                        filament,
+                        'add',
+                        actual,
+                        project_id=job.project_id,
+                        prusa_job_id=job.id,
+                        note=translate('movement_note_prusalink_job_delete_restore').format(label=label),
+                    )
+                    restored += actual
             db.session.delete(job)
-            safe_commit()
+            if safe_commit():
+                if restored > 0:
+                    flash(translate('prusa_job_delete_restored').format(grams=f'{restored:g}'), 'success')
+                invalidate_kpi_cache()
         return redirect(url_for('prusa_jobs'))
     app.register_blueprint(bp)

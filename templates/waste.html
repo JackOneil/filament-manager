@@ -74,11 +74,11 @@ const _WASTE_ADD_URL = {{ url_for('waste_add')|tojson }};
 </div>
 
 <!-- Add / Edit Waste Modal -->
-<div id="wasteModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 space-y-5 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+<div id="wasteModal" data-modal aria-hidden="true" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div data-modal-panel class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 space-y-5 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
         <div class="flex items-center justify-between">
-            <h2 class="text-xl font-bold text-gray-800" id="waste-modal-title"></h2>
-            <button id="waste-modal-close" class="text-gray-400 hover:text-gray-700 transition text-xl">
+            <h2 class="text-xl font-bold text-gray-800" id="waste-modal-title" data-modal-title></h2>
+            <button id="waste-modal-close" data-modal-close class="text-gray-400 hover:text-gray-700 transition text-xl">
                 <i class="fa-solid fa-times"></i>
             </button>
         </div>
@@ -171,13 +171,20 @@ const _WASTE_ADD_URL = {{ url_for('waste_add')|tojson }};
         params.set('page', String(currentPage));
 
         fetch('/waste/_records?' + params.toString())
-            .then(function(r) { return r.text(); })
+            .then(function(r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.text();
+            })
             .then(function(html) {
                 wrapper.innerHTML = html;
                 bindRecordActions();
             })
             .catch(function() {
-                wrapper.innerHTML = '<div class="text-center py-10 text-red-400">{{ t('waste_load_error') }}</div>';
+                if (window.ajaxUi) {
+                    window.ajaxUi.renderError(wrapper, { message: {{ t('waste_load_error')|tojson }}, onRetry: fetchRecords });
+                } else {
+                    wrapper.innerHTML = '<div class="text-center py-10 text-red-400">{{ t('waste_load_error') }}</div>';
+                }
             });
     }
 
@@ -329,16 +336,19 @@ const _WASTE_ADD_URL = {{ url_for('waste_add')|tojson }};
         document.getElementById('waste-modal-reason').value = 'other';
         document.getElementById('waste-modal-weight').value = '0';
         document.getElementById('waste-modal-notes').value = '';
-        document.getElementById('wasteModal').classList.remove('hidden');
+            window.modal.open(document.getElementById('wasteModal'), { initialFocus: '#waste-modal-filament-q' });
     });
 
     function openEditModal(id) {
         modalMode = 'edit';
         modalEditId = id;
         document.getElementById('waste-modal-title').textContent = _WASTE_EDIT_TITLE;
-        document.getElementById('wasteModal').classList.remove('hidden');
+        window.modal.open(document.getElementById('wasteModal'), { initialFocus: '#waste-modal-filament-q' });
         fetch('/waste/' + id + '/_data')
-            .then(function(r) { return r.json(); })
+            .then(function(r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
             .then(function(d) {
                 document.getElementById('waste-modal-filament-id').value = d.filament_id || '';
                 document.getElementById('waste-modal-filament-q').value = d.filament_name || '';
@@ -347,6 +357,9 @@ const _WASTE_ADD_URL = {{ url_for('waste_add')|tojson }};
                 document.getElementById('waste-modal-reason').value = d.reason || 'other';
                 document.getElementById('waste-modal-weight').value = d.weight || 0;
                 document.getElementById('waste-modal-notes').value = d.notes || '';
+            })
+            .catch(function() {
+                if (window.showToast) window.showToast('ajax_load_error', 'error');
             });
     }
 
@@ -410,13 +423,13 @@ const _WASTE_ADD_URL = {{ url_for('waste_add')|tojson }};
 
     // ── Modal close / cancel ────────────────────────────────────────────────
     document.getElementById('waste-modal-close').addEventListener('click', function() {
-        document.getElementById('wasteModal').classList.add('hidden');
+        window.modal.close(document.getElementById('wasteModal'));
     });
     document.getElementById('waste-modal-cancel').addEventListener('click', function() {
-        document.getElementById('wasteModal').classList.add('hidden');
+        window.modal.close(document.getElementById('wasteModal'));
     });
     document.getElementById('wasteModal').addEventListener('click', function(e) {
-        if (e.target === this) this.classList.add('hidden');
+        if (e.target === this) window.modal.close(this);
     });
 
     // ── Modal submit ────────────────────────────────────────────────────────
@@ -431,12 +444,18 @@ const _WASTE_ADD_URL = {{ url_for('waste_add')|tojson }};
 
         var url = modalMode === 'add' ? '/waste/_add' : '/waste/' + modalEditId + '/_edit';
         fetch(url, { method: 'POST', body: fd })
-            .then(function(r) { return r.json(); })
+            .then(function(r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
             .then(function(data) {
                 if (data.success) {
-                    document.getElementById('wasteModal').classList.add('hidden');
+                    window.modal.close(document.getElementById('wasteModal'));
                     fetchRecords();
                 }
+            })
+            .catch(function() {
+                if (window.showToast) window.showToast('ajax_load_error', 'error');
             });
     });
 

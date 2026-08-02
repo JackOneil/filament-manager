@@ -59,6 +59,8 @@ def run_migrations(app: Flask) -> None:
         _safe_alter(app, 'ALTER TABLE movement_history ADD COLUMN filament_id INTEGER DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE movement_history ADD COLUMN project_id INTEGER DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE movement_history ADD COLUMN bambu_job_id INTEGER DEFAULT NULL')
+        _safe_alter(app, 'ALTER TABLE movement_history ADD COLUMN prusa_job_id INTEGER DEFAULT NULL')
+        _safe_alter(app, 'CREATE INDEX IF NOT EXISTS ix_movement_history_prusa_job_id ON movement_history (prusa_job_id)')
         _safe_alter(app, 'ALTER TABLE movement_history ADD COLUMN note TEXT DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE project ADD COLUMN owner_user_id INTEGER DEFAULT NULL')
         _safe_alter(app, 'ALTER TABLE project ADD COLUMN owner_name VARCHAR(120) DEFAULT NULL')

@@ -182,6 +182,7 @@ class MovementHistory(db.Model):
     filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='SET NULL'), nullable=True, index=True)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id', ondelete='SET NULL'), nullable=True, index=True)
     bambu_job_id = db.Column(db.Integer, db.ForeignKey('bambu_print_job.id', ondelete='SET NULL'), nullable=True, index=True)
+    prusa_job_id = db.Column(db.Integer, db.ForeignKey('prusa_print_job.id', ondelete='SET NULL'), nullable=True, index=True)
     filament_name = db.Column(db.String(255), nullable=False, index=True)
     action_type = db.Column(db.String(50), nullable=False, index=True)
     weight = db.Column(db.Float, nullable=False)
@@ -192,6 +193,7 @@ class MovementHistory(db.Model):
     filament = db.relationship('Filament', backref=db.backref('movements', lazy=True))
     project = db.relationship('Project', backref=db.backref('movements', lazy=True))
     bambu_job = db.relationship('BambuPrintJob', backref=db.backref('movements', lazy=True))
+    prusa_job = db.relationship('PrusaPrintJob', backref=db.backref('movements', lazy=True))
 
     def __repr__(self):
         return f'<MovementHistory {self.id} {self.action_type!r} {self.weight}g>'

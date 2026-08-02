@@ -237,6 +237,17 @@ function projectsApp() {
             }
             this.fetchContent();
         },
+
+        renderFetchError() {
+            const wrapper = document.getElementById('projects-content');
+            if (!wrapper || !window.ajaxUi) return;
+            const retry = () => this.fetchContent();
+            ['projects-calendar-items', 'project-table-body', ...Object.keys(this.statusPages).map(status => `kanban-items-${status.toLowerCase()}`)]
+                .forEach(id => {
+                    const target = wrapper.querySelector(`#${id}`);
+                    if (target) window.ajaxUi.renderError(target, { onRetry: retry });
+                });
+        },
         
         async fetchContent() {
             // Deduplicate: if a fetch is already in-flight, queue a refetch
@@ -291,6 +302,7 @@ function projectsApp() {
                 if (this.statusPages['REJECTED'] > 1) params.append('kanban_rejected_page', this.statusPages['REJECTED']);
 
                 const res = await fetch(`{{ url_for('projects_index') }}?${params.toString()}`, { signal });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
 
                 if (data.html) {
@@ -375,6 +387,7 @@ function projectsApp() {
             } catch (err) {
                 if (err.name !== 'AbortError') {
                     console.error(err);
+                    this.renderFetchError();
                 }
             } finally {
                 this.loading = false;

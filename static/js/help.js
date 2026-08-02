@@ -49,6 +49,13 @@
                         cs: 'Widget „Nejnižší zásoby" zobrazuje filamenty seřazené podle procenta zbývající hmotnosti (od nejmenší zásoby). U každého filamentu je ikona nákupního košíku, která otevře odkaz na produkt v e-shopu (podle nastavení buď přímý odkaz, vyhledávání podle značky, nebo globální šablona).',
                         en: 'The "Lowest Stock" widget shows filaments sorted by remaining weight percentage (lowest first). Each filament has a shopping cart icon that opens the product link in your shop (either a direct URL, brand-specific search, or global search template, depending on your settings).'
                     }
+                },
+                {
+                    title: { cs: 'Drobečková navigace', en: 'Breadcrumbs' },
+                    text: {
+                        cs: 'Horní navigace nyní zobrazuje aktuální sekci i konkrétní filament, projekt, model nebo uživatele. Kliknutím na předchozí položku se vrátíte do nadřazeného seznamu.',
+                        en: 'The top navigation now shows the current section and the specific filament, project, model, or user. Click a previous item to return to its parent list.'
+                    }
                 }
             ]
         },
@@ -106,6 +113,13 @@
                     text: {
                         cs: 'Klikněte na název filamentu pro detail: kompletní historii pohybů, přiřazené projekty, umístění na polici a rychlé akce (doplnit, použít, přesunout).',
                         en: 'Click the filament name to see the detail page: full movement history, assigned projects, shelf location, and quick actions (refill, use, move).'
+                    }
+                },
+                {
+                    title: { cs: 'Chyby načítání a opakování', en: 'Loading Errors and Retry' },
+                    text: {
+                        cs: 'Pokud se AJAX seznam nepodaří načíst, skeleton se nenechá viset na obrazovce. Zobrazí se chybová karta s tlačítkem „Zkusit znovu“, které zachová aktuální filtry.',
+                        en: 'If an AJAX list cannot be loaded, the skeleton is not left on screen indefinitely. An error card with a "Retry" button appears and preserves the current filters.'
                     }
                 }
             ]
@@ -420,6 +434,13 @@
                         cs: 'Ručně zduplikujte tisk, který nebyl synchronizován (např. opakovaný tisk přímo na tiskárně). Nová kopie má výchozí odpočet vypnutý (deducted=False), abyste mohli filament přiřadit a odečíst ručně.',
                         en: 'Manually duplicate a print that was not synced (e.g. a reprint triggered directly on the printer). The new copy has deduction disabled (deducted=False) so you can assign and deduct filament manually.'
                     }
+                },
+                {
+                    title: { cs: 'Smazání dedukovaného jobu', en: 'Deleting a Deducted Job' },
+                    text: {
+                        cs: 'Při smazání Bambu jobu, ze kterého byl odečten filament, se skutečně odečtené množství automaticky vrátí do skladu. Vrácení se zapíše jako kompenzační pohyb do historie.',
+                        en: 'When deleting a Bambu job that deducted filament, the exact consumed amount is automatically returned to stock. The return is recorded as a compensating movement in history.'
+                    }
                 }
             ]
         },
@@ -442,6 +463,13 @@
                     text: {
                         cs: 'V Nastavení → Tiskárny → PrusaLink zadejte IP adresu a API klíč (najdete ho v menu tiskárny: Nastavení → Síť → PrusaLink). API klíč je šifrovaně uložen v databázi.',
                         en: 'In Settings → Printers → PrusaLink, enter the IP address and API key (found in the printer menu: Settings → Network → PrusaLink). The API key is stored encrypted in the database.'
+                    }
+                },
+                {
+                    title: { cs: 'Vrácení skladu po smazání', en: 'Stock Return on Delete' },
+                    text: {
+                        cs: 'Smazání Prusa jobu po odečtení filamentu automaticky vrátí přesně odečtené množství do skladu a zapíše kompenzační pohyb.',
+                        en: 'Deleting a Prusa job after filament deduction automatically returns the exact consumed amount to stock and records a compensating movement.'
                     }
                 }
             ]

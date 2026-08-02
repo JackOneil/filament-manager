@@ -21,6 +21,7 @@ Key rules (always verified by compliance scan):
 - **Rule 24** — Use `utc_now()` from `utils/__init__.py`, never `datetime.utcnow()`.
 - **Rule 25** — Use `translate()` from `utils/__init__.py` in Python code, `t("key")` in templates.
 - **Rule 32** — **BACKLOG UPDATE**: Every bugfix/feature MUST update `.kilo/BACKLOG.md` — change status to `Fixed in vX.Y.Z`, add new findings, update summary.
+- **Rule 34** — Plain DOM dialogs use `window.modal`; AJAX failures use `window.ajaxUi` and preserve targeted DOM updates.
 
 ## Phase 1 — Understand the Task
 

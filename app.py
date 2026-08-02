@@ -31,7 +31,7 @@ import logging
 import threading
 import time
 from datetime import datetime, timedelta, timezone
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 from flask_wtf.csrf import CSRFProtect
 from flask_compress import Compress
 from sqlalchemy import text
@@ -49,6 +49,7 @@ from models import (
     PrinterMaintenance, FilamentUndoLog, ProjectTemplate, ProjectCommentReaction,
 )  # noqa: F401
 from utils import get_settings, render_markdown, utc_now
+from utils.breadcrumbs import build_breadcrumbs
 
 
 def _is_pending_undo_valid(expires_at):
@@ -67,7 +68,7 @@ from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
 
-APP_VERSION = '1.120.4'
+APP_VERSION = '1.121.0'
 
 csrf = CSRFProtect()
 
@@ -262,6 +263,12 @@ def create_app(test_config=None) -> Flask:
         def t(key):
             return TRANSLATIONS.get(lang, TRANSLATIONS['cs']).get(key, key)
 
+        breadcrumbs = build_breadcrumbs(
+            t=t,
+            endpoint=request.endpoint,
+            view_args=request.view_args,
+        )
+
         # Navigation visibility flags ─────────────────────────────────────────
         printer_access = has_section_access('printers', user=current_user) or is_admin(current_user)
         nav_bambu_enabled = bool(setting and setting.bambu_token and printer_access)
@@ -323,6 +330,7 @@ def create_app(test_config=None) -> Flask:
             ui_mode=ui_mode,
             pending_inventory_undo=pending_inventory_undo,
             pending_project_undo=pending_project_undo,
+            breadcrumbs=breadcrumbs,
             csp_nonce=getattr(g, 'csp_nonce', ''),
         )
 

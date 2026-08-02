@@ -264,10 +264,10 @@
 </div>
 
 {# ── Lightbox modal ── #}
-<div id="bambu-lightbox" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
-    <div class="absolute inset-0 bg-black/80" onclick="closeBambuLightbox()"></div>
-    <div class="relative z-10 flex flex-col items-center max-w-3xl w-full">
-        <button onclick="closeBambuLightbox()" class="absolute -top-12 right-0 text-white hover:text-gray-300 text-3xl transition-colors" aria-label="{{ t('close') }}">
+<div id="bambu-lightbox" data-modal aria-hidden="true" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="absolute inset-0 bg-black/80" data-modal-backdrop onclick="closeBambuLightbox()"></div>
+    <div data-modal-panel class="relative z-10 flex flex-col items-center max-w-3xl w-full">
+        <button id="bambu-lightbox-close" data-modal-close onclick="closeBambuLightbox()" class="absolute -top-12 right-0 text-white hover:text-gray-300 text-3xl transition-colors" aria-label="{{ t('close') }}">
             <i class="fa-solid fa-xmark"></i>
         </button>
         <img id="bambu-lightbox-img" src="" alt="" class="max-h-[80vh] max-w-full rounded-xl shadow-2xl object-contain bg-gray-900">
@@ -276,12 +276,12 @@
 </div>
 
 {# ── Waste from print modal ── #}
-<div id="wasteModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div class="absolute inset-0 bg-black/40" onclick="document.getElementById('wasteModal').classList.add('hidden')"></div>
-    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10">
+<div id="wasteModal" data-modal aria-hidden="true" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/40" data-modal-backdrop></div>
+    <div data-modal-panel class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10">
         <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-triangle-exclamation text-orange-500 mr-2"></i>{{ t('waste_log_modal_title') }}</h2>
-            <button type="button" onclick="document.getElementById('wasteModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="{{ t('close') }}">&times;</button>
+            <h2 class="text-lg font-bold text-gray-800" data-modal-title><i class="fa-solid fa-triangle-exclamation text-orange-500 mr-2"></i>{{ t('waste_log_modal_title') }}</h2>
+            <button type="button" data-modal-close class="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="{{ t('close') }}">&times;</button>
         </div>
         <form id="wasteForm" @submit.prevent="submitWaste($el)" x-data="wasteForm()">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -536,7 +536,7 @@ function wasteForm() {
         selectProj(id, name) { this.projId = id; this.projQ = name; this.projOpen = false; },
         setFilament(id, label) { this.filId = id; this.filQ = label; },
         setProject(id, name) { this.projId = id; this.projQ = name; },
-        closeModal() { document.getElementById('wasteModal').classList.add('hidden'); },
+        closeModal() { window.modal.close(document.getElementById('wasteModal')); },
         async submitWaste(formEl) {
             if (!this.filId || this.saving) return;
             this.saving = true;
@@ -620,7 +620,7 @@ document.addEventListener('click', function(e) {
         comp.notes = btn.dataset.notes || '';
     }
 
-    document.getElementById('wasteModal').classList.remove('hidden');
+    window.modal.open(document.getElementById('wasteModal'));
 });
 
 // ── Project suggestions: match cleaned job title against project names ────────
@@ -1128,15 +1128,12 @@ function openBambuLightbox(url, title) {
     img.src = url;
     img.alt = title || '';
     ttl.textContent = title || '';
-    lb.classList.remove('hidden');
-    document.addEventListener('keydown', _lbEsc);
+    window.modal.open(lb, { initialFocus: '#bambu-lightbox-close' });
 }
 function closeBambuLightbox() {
-    document.getElementById('bambu-lightbox').classList.add('hidden');
+    window.modal.close(document.getElementById('bambu-lightbox'));
     document.getElementById('bambu-lightbox-img').src = '';
-    document.removeEventListener('keydown', _lbEsc);
 }
-function _lbEsc(e) { if (e.key === 'Escape') closeBambuLightbox(); }
 
 // ── Infinite scroll ───────────────────────────────────────────────────────────
 (function () {

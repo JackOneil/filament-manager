@@ -412,13 +412,21 @@
                 if (!content) { clearInterval(refreshInterval); return; }
                 if (indicator) indicator.classList.remove('hidden');
                 fetch('{{ url_for("api_live_printers_partial") }}')
-                    .then(function(r) { return r.ok ? r.json() : null; })
+                    .then(function(r) {
+                        if (!r.ok) throw new Error('HTTP ' + r.status);
+                        return r.json();
+                    })
                     .then(function(data) {
                         if (data && data.html) { content.innerHTML = data.html; }
                         if (indicator) indicator.classList.add('hidden');
                     })
                     .catch(function() {
                         if (indicator) indicator.classList.add('hidden');
+                        if (content && window.ajaxUi) {
+                            window.ajaxUi.renderError(content, {
+                                onRetry: function() { window.location.reload(); }
+                            });
+                        }
                     });
             }, 60000);
         })();

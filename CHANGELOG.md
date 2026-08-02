@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.121.0] — 2026-08-02
+
+### Added
+
+- **Dynamic breadcrumbs** — Shared translated breadcrumbs now cover inventory, projects, models, storage, printers, maintenance, waste, users, account, calculator, history, statistics, settings, and detail pages.
+- **Shared accessible modal manager** — Plain DOM modals now support focus trapping, Escape-to-close, backdrop closing, scroll locking, ARIA dialog attributes, and focus restoration.
+- **AJAX error and retry states** — Inventory, projects, users, models, waste, and live-printer refreshes now replace failed loading states with a translated retry action.
+
+### Fixed
+
+- **Deleting deducted Bambu or Prusa jobs restores stock** — Exact movement totals are returned, including clamped and multi-material deductions; compensating movements preserve the audit trail.
+- **Prusa movement references** — Movement history now stores the originating Prusa job and includes the reference in backup export/import.
+- **Bambu movement total calculation** — Fixed the latent `MovementHistory.amount` reference to use the actual `weight` column.
+
+
 ## [1.120.4] — 2026-08-02
 
 ### Fixed

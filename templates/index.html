@@ -695,16 +695,16 @@
 </div>
 
 <!-- Use Filament Modal Dialog -->
-<div id="useFilamentModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-sm w-full">
-        <h3 class="text-lg font-semibold mb-4 dark:text-white" id="modalTitle">{{ t('subtract_usage') }}</h3>
+<div id="useFilamentModal" data-modal aria-hidden="true" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div data-modal-panel class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-sm w-full">
+        <h3 class="text-lg font-semibold mb-4 dark:text-white" id="modalTitle" data-modal-title>{{ t('subtract_usage') }}</h3>
         <form id="useFilamentForm" method="POST">
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{ t('weight') }} (g)</label>
                 <input type="number" id="useAmount" name="amount" min="1" step="0.1" required class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white" />
             </div>
             <div class="flex gap-3 justify-end">
-                <button type="button" onclick="closeUseFilamentModal()" class="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">{{ t('cancel') }}</button>
+                <button type="button" data-modal-close onclick="closeUseFilamentModal()" class="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">{{ t('cancel') }}</button>
                 <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors">{{ t('subtract_usage') }}</button>
             </div>
         </form>
@@ -712,16 +712,16 @@
 </div>
 
 <!-- Add Spool Modal Dialog -->
-<div id="addSpoolModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-sm w-full">
-        <h3 class="text-lg font-semibold mb-4 dark:text-white" id="addSpoolModalTitle">{{ t('add_spool_modal_title') }}</h3>
+<div id="addSpoolModal" data-modal aria-hidden="true" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div data-modal-panel class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-sm w-full">
+        <h3 class="text-lg font-semibold mb-4 dark:text-white" id="addSpoolModalTitle" data-modal-title>{{ t('add_spool_modal_title') }}</h3>
         <form id="addSpoolForm" method="POST">
             <div class="mb-4">
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2" for="addSpoolQuantity">{{ t('add_spool_quantity') }}</label>
                 <input type="number" id="addSpoolQuantity" name="quantity" min="1" step="1" value="1" required class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white" />
             </div>
             <div class="flex gap-3 justify-end">
-                <button type="button" onclick="closeAddSpoolModal()" class="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">{{ t('cancel') }}</button>
+                <button type="button" data-modal-close onclick="closeAddSpoolModal()" class="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">{{ t('cancel') }}</button>
                 <button type="submit" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors">{{ t('add_spool_submit') }}</button>
             </div>
         </form>
@@ -921,6 +921,7 @@ function inventoryApp() {
 
             try {
                 const resp = await fetch(`{{ url_for('api.api_filaments_list') }}?${params}`, { signal: controller.signal });
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
                 const data = await resp.json();
                 
                 this.currentPage = data.current_page || 1;
@@ -943,6 +944,9 @@ function inventoryApp() {
             } catch (e) {
                 if (e.name !== 'AbortError') {
                     console.error('Fetch error:', e);
+                    if (wrapper && window.ajaxUi) {
+                        window.ajaxUi.renderError(wrapper, { onRetry: () => this.fetchContent(this.currentPage || page) });
+                    }
                 }
             } finally {
                 if (this._fetchController === controller) {
@@ -1083,12 +1087,11 @@ function openUseFilamentModal(filamentId, filamentName, maxWeight) {
     document.getElementById('useAmount').max = maxWeight;
     document.getElementById('useAmount').value = '';
     document.getElementById('useFilamentForm').action = '{{ url_for('inventory.use_filament', id=0) }}'.replace('/0', '/' + filamentId);
-    document.getElementById('useFilamentModal').classList.remove('hidden');
-    document.getElementById('useAmount').focus();
+    window.modal.open(document.getElementById('useFilamentModal'), { initialFocus: '#useAmount' });
 }
 
 function closeUseFilamentModal() {
-    document.getElementById('useFilamentModal').classList.add('hidden');
+    window.modal.close(document.getElementById('useFilamentModal'));
 }
 
 // =============================================
@@ -1098,12 +1101,11 @@ function openAddSpoolModal(filamentId, filamentName) {
     document.getElementById('addSpoolModalTitle').textContent = '{{ t("add_spool_modal_title") }} - ' + filamentName;
     document.getElementById('addSpoolQuantity').value = '1';
     document.getElementById('addSpoolForm').action = '/add_spool/' + filamentId;
-    document.getElementById('addSpoolModal').classList.remove('hidden');
-    document.getElementById('addSpoolQuantity').focus();
+    window.modal.open(document.getElementById('addSpoolModal'), { initialFocus: '#addSpoolQuantity' });
 }
 
 function closeAddSpoolModal() {
-    document.getElementById('addSpoolModal').classList.add('hidden');
+    window.modal.close(document.getElementById('addSpoolModal'));
 }
 
 // ── Open reorder shop search ──────────────────────────────────────────────────

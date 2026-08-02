@@ -759,35 +759,7 @@ def register(app):
 
                 db.session.flush()
 
-                # ── 8. Movement history ────────────────────────────────
-                for m in data.get('movement_history', []):
-                    ts = datetime.fromisoformat(m['created_at']) if m.get('created_at') else utc_now()
-                    exists = MovementHistory.query.filter_by(
-                        filament_name=m.get('filament_name'),
-                        action_type=m.get('action_type'),
-                        created_at=ts,
-                    ).first()
-                    if exists:
-                        continue
-
-                    filament = _resolve_filament_ref(m.get('filament_ref'), m.get('filament_name'))
-                    project = Project.query.filter_by(name=m.get('project_name')).first() if m.get('project_name') else None
-                    bambu_job = BambuPrintJob.query.filter_by(external_id=m.get('bambu_external_id')).first() if m.get('bambu_external_id') else None
-
-                    db.session.add(MovementHistory(
-                        filament_id=filament.id if filament else None,
-                        project_id=project.id if project else None,
-                        bambu_job_id=bambu_job.id if bambu_job else None,
-                        filament_name=m.get('filament_name'),
-                        action_type=m.get('action_type'),
-                        weight=m.get('weight', 0),
-                        cost=m.get('cost', 0),
-                        currency=m.get('currency', 'CZK'),
-                        created_at=ts,
-                        note=m.get('note'),
-                    ))
-
-                # ── 9. Storage shelves and placements ─────────────────
+                # ── 8. Storage shelves and placements ─────────────────
                 for shelf_data in data.get('storage_shelves', []):
                     shelf_name = shelf_data.get('name')
                     if not shelf_name or StorageShelf.query.filter_by(name=shelf_name).first():
@@ -881,7 +853,52 @@ def register(app):
                         synced_at=datetime.fromisoformat(j['synced_at']) if j.get('synced_at') else utc_now(),
                         deducted=j.get('deducted', False),
                         filament_id=fil.id if fil else None,
-                        project_id=proj.id if proj else None,
+                         project_id=proj.id if proj else None,
+                     ))
+
+                db.session.flush()
+
+                # ── 12. Movement history ────────────────────────────────
+                # Import after both Bambu and Prusa jobs exist so movement
+                # references can be resolved on a fresh database.
+                for m in data.get('movement_history', []):
+                    ts = datetime.fromisoformat(m['created_at']) if m.get('created_at') else utc_now()
+                    exists = MovementHistory.query.filter_by(
+                        filament_name=m.get('filament_name'),
+                        action_type=m.get('action_type'),
+                        created_at=ts,
+                    ).first()
+                    if exists:
+                        continue
+
+                    filament = _resolve_filament_ref(m.get('filament_ref'), m.get('filament_name'))
+                    project = Project.query.filter_by(name=m.get('project_name')).first() if m.get('project_name') else None
+                    bambu_job = BambuPrintJob.query.filter_by(external_id=m.get('bambu_external_id')).first() if m.get('bambu_external_id') else None
+                    prusa_ref = m.get('prusa_job_ref') or {}
+                    prusa_job = None
+                    if prusa_ref:
+                        prusa_job_query = PrusaPrintJob.query.filter_by(
+                            printer_name=prusa_ref.get('printer_name'),
+                            file_name=prusa_ref.get('file_name'),
+                        )
+                        if prusa_ref.get('started_at'):
+                            prusa_job_query = prusa_job_query.filter(
+                                PrusaPrintJob.started_at == datetime.fromisoformat(prusa_ref['started_at'])
+                            )
+                        prusa_job = prusa_job_query.first()
+
+                    db.session.add(MovementHistory(
+                        filament_id=filament.id if filament else None,
+                        project_id=project.id if project else None,
+                        bambu_job_id=bambu_job.id if bambu_job else None,
+                        prusa_job_id=prusa_job.id if prusa_job else None,
+                        filament_name=m.get('filament_name'),
+                        action_type=m.get('action_type'),
+                        weight=m.get('weight', 0),
+                        cost=m.get('cost', 0),
+                        currency=m.get('currency', 'CZK'),
+                        created_at=ts,
+                        note=m.get('note'),
                     ))
 
                 for notification_data in data.get('notifications', []):

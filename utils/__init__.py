@@ -1012,7 +1012,7 @@ def top_tags(items, attr_name='tag_text', limit=10):
     return counter.most_common(limit)
 
 
-def log_movement(filament, action_type, weight, project_id=None, bambu_job_id=None, note=None):
+def log_movement(filament, action_type, weight, project_id=None, bambu_job_id=None, prusa_job_id=None, note=None):
     """Record a filament weight movement with cost calculation.
 
     .. warning::
@@ -1040,6 +1040,7 @@ def log_movement(filament, action_type, weight, project_id=None, bambu_job_id=No
         filament_id=filament.id if getattr(filament, 'id', None) else None,
         project_id=project_id,
         bambu_job_id=bambu_job_id,
+        prusa_job_id=prusa_job_id,
         filament_name=filament_name,
         action_type=action_type,
         weight=weight,
@@ -1118,6 +1119,65 @@ def deduct_filament_stock(filament, requested_weight):
         if expected_quantity < filament.quantity:
             filament.quantity = expected_quantity
     return actual_amount
+
+
+def restore_filament_stock(filament, requested_weight):
+    """Restore stock atomically and keep weight/quantity consistent.
+
+    This is the inverse of :func:`deduct_filament_stock` and is intentionally
+    kept as a separate helper so deletion, undo, and integration cleanup all
+    use the same quantity calculation.  The caller must create any movement
+    row and commit the surrounding transaction.
+    """
+    if not filament or requested_weight <= 0:
+        return 0.0
+
+    filament_id = getattr(filament, 'id', None)
+    if not filament_id:
+        old_weight = float(filament.weight_remaining or 0.0)
+        filament.weight_remaining = old_weight + requested_weight
+        if filament.weight_total > 0:
+            filament.quantity = max(
+                filament.quantity,
+                math.ceil(filament.weight_remaining / filament.weight_total),
+            )
+        return float(requested_weight)
+
+    for _attempt in range(5):
+        old_weight = float(filament.weight_remaining or 0.0)
+        new_weight = old_weight + requested_weight
+        result = db.session.execute(
+            text(
+                "UPDATE filament SET weight_remaining = :new "
+                "WHERE id = :fid AND weight_remaining = :old"
+            ),
+            {'new': new_weight, 'fid': filament_id, 'old': old_weight},
+        )
+        if result.rowcount == 1:
+            filament.weight_remaining = new_weight
+            if filament.weight_total > 0:
+                expected_quantity = math.ceil(new_weight / filament.weight_total)
+                if expected_quantity > filament.quantity:
+                    filament.quantity = expected_quantity
+            return float(requested_weight)
+
+        row = db.session.execute(
+            text("SELECT weight_remaining FROM filament WHERE id = :fid"),
+            {'fid': filament_id},
+        ).fetchone()
+        if row is None:
+            return 0.0
+        filament.weight_remaining = float(row[0])
+
+    # The row is still restored even under sustained contention.  The outer
+    # transaction remains atomic and the next request will see the new value.
+    old_weight = float(filament.weight_remaining or 0.0)
+    filament.weight_remaining = old_weight + requested_weight
+    if filament.weight_total > 0:
+        expected_quantity = math.ceil(filament.weight_remaining / filament.weight_total)
+        if expected_quantity > filament.quantity:
+            filament.quantity = expected_quantity
+    return float(requested_weight)
 
 
 # ---------------------------------------------------------------------------

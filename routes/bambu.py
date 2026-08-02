@@ -22,7 +22,7 @@ from models import (
 )
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import joinedload
-from utils import bambu_api_base, clean_bambu_title, deduct_filament_stock, decrypt_token, get_settings, log_movement, safe_commit, utc_now, try_auto_map_filament, invalidate_kpi_cache, format_duration, normalize_hex, translate
+from utils import bambu_api_base, clean_bambu_title, deduct_filament_stock, restore_filament_stock, decrypt_token, get_settings, log_movement, safe_commit, utc_now, try_auto_map_filament, invalidate_kpi_cache, format_duration, normalize_hex, translate
 
 
 from routes.bambu_helpers import (
@@ -50,25 +50,82 @@ from routes.bambu_helpers import (
 def register(app):
     bp = Blueprint('bambu', __name__)
 
-    def _job_deducted_total(job_ref, filament_name):
+    def _job_deducted_total(job_ref, filament_name, filament_id=None):
         """Sum of grams actually deducted (post-clamp) for a job/filament.
 
         Movement rows record the real deducted amount — restoring this exact
         sum (instead of the nominal job weight) keeps stock math consistent
         when a deduction was clamped by low stock.
         """
+        movement_filter = (
+            MovementHistory.filament_id == filament_id
+            if filament_id is not None
+            else MovementHistory.filament_name == filament_name
+        )
         total = (
             db.session.query(
-                db.func.coalesce(db.func.sum(MovementHistory.amount), 0.0)
+                db.func.coalesce(db.func.sum(MovementHistory.weight), 0.0)
             )
             .filter(
                 MovementHistory.bambu_job_id == job_ref.id,
                 MovementHistory.action_type == 'bambu_print',
-                MovementHistory.filament_name == filament_name,
+                movement_filter,
             )
             .scalar()
         )
         return float(total or 0.0)
+
+    def _restore_deducted_job_stock(job):
+        """Restore the net stock consumed by a Bambu job before deletion.
+
+        Remapping creates a compensating ``add`` movement, so the restore is
+        based on the net of print and return movements rather than the nominal
+        job weight.  This also handles multi-material jobs and clamped stock.
+        """
+        totals = {}
+        movements = (
+            MovementHistory.query
+            .options(joinedload(MovementHistory.filament))
+            .filter(
+                MovementHistory.bambu_job_id == job.id,
+                MovementHistory.action_type.in_(('bambu_print', 'add')),
+            )
+            .all()
+        )
+        for movement in movements:
+            if not movement.filament or movement.weight <= 0:
+                continue
+            sign = 1.0 if movement.action_type == 'bambu_print' else -1.0
+            entry = totals.setdefault(movement.filament_id, [movement.filament, 0.0])
+            entry[1] += sign * float(movement.weight)
+
+        # Older databases did not always retain movement links.  Use slot
+        # facts as a conservative fallback, never mixing slot and job weight.
+        if not totals:
+            for slot in job.materials:
+                if slot.deducted and slot.filament and slot.weight_grams and slot.weight_grams > 0:
+                    entry = totals.setdefault(slot.filament_id, [slot.filament, 0.0])
+                    entry[1] += float(slot.weight_grams)
+        if not totals and job.deducted and job.filament and job.weight_grams and job.weight_grams > 0:
+            totals[job.filament_id] = [job.filament, float(job.weight_grams)]
+
+        restored = 0.0
+        label = job.external_id or job.model_name or str(job.id)
+        for filament, amount in totals.values():
+            if amount <= 0:
+                continue
+            actual = restore_filament_stock(filament, amount)
+            if actual > 0:
+                log_movement(
+                    filament,
+                    'add',
+                    actual,
+                    project_id=job.project_id,
+                    bambu_job_id=job.id,
+                    note=translate('movement_note_bambu_job_delete_restore').format(label=label),
+                )
+                restored += actual
+        return restored
 
     # Make format_duration available in all templates from this route module
     app.jinja_env.globals['format_duration'] = format_duration
@@ -460,7 +517,7 @@ def register(app):
             old_filament = db.session.get(Filament, old_filament_id)
             new_filament = db.session.get(Filament, filament_id)
             if old_filament:
-                restore_amount = _job_deducted_total(job, old_filament.name)
+                restore_amount = _job_deducted_total(job, old_filament.name, old_filament.id)
                 if restore_amount <= 0:
                     restore_amount = job.weight_grams
                 old_filament.weight_remaining = old_filament.weight_remaining + restore_amount
@@ -601,7 +658,7 @@ def register(app):
                     # Restore the amount that was actually deducted (recorded
                     # in movements) — a clamped deduction must not inflate
                     # the old filament back to the full nominal slot weight.
-                    restore_amount = _job_deducted_total(job, old_filament.name)
+                    restore_amount = _job_deducted_total(job, old_filament.name, old_filament.id)
                     if restore_amount <= 0:
                         restore_amount = weight
                     else:
@@ -706,8 +763,12 @@ def register(app):
         job = db.session.get(BambuPrintJob, job_id)
         if not job:
             return jsonify({'ok': False, 'error': translate('error_job_not_found')}), 404
+        restored = _restore_deducted_job_stock(job)
         db.session.delete(job)
-        safe_commit()
+        if safe_commit():
+            if restored > 0:
+                flash(translate('bambu_job_delete_restored').format(grams=f'{restored:g}'), 'success')
+            invalidate_kpi_cache()
         return redirect(url_for('bambu_jobs'))
 
     @bp.route('/bambu/job/<int:job_id>/create_project', methods=['POST'])

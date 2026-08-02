@@ -363,12 +363,12 @@
 </div>
 
 {# ── Waste from print modal ── #}
-<div id="wasteModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div class="absolute inset-0 bg-black/40" onclick="document.getElementById('wasteModal').classList.add('hidden')"></div>
-    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10">
+<div id="wasteModal" data-modal aria-hidden="true" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/40" data-modal-backdrop></div>
+    <div data-modal-panel class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10">
         <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-triangle-exclamation text-orange-500 mr-2"></i>{{ t('waste_log_modal_title') }}</h2>
-            <button type="button" onclick="document.getElementById('wasteModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="{{ t('close') }}">&times;</button>
+            <h2 class="text-lg font-bold text-gray-800" data-modal-title><i class="fa-solid fa-triangle-exclamation text-orange-500 mr-2"></i>{{ t('waste_log_modal_title') }}</h2>
+            <button type="button" data-modal-close class="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="{{ t('close') }}">&times;</button>
         </div>
         <form method="POST" action="{{ url_for('waste_add') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -421,7 +421,7 @@
                 </div>
             </div>
             <div class="flex justify-end gap-3 mt-6">
-                <button type="button" onclick="document.getElementById('wasteModal').classList.add('hidden')"
+                <button type="button" data-modal-close
                     class="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
                     {{ t('cancel') }}
                 </button>
@@ -444,12 +444,12 @@ document.addEventListener('click', function(e) {
     document.getElementById('wasteWeightInput').value = btn.dataset.weight || '';
     document.getElementById('wasteProjectSelect').value = btn.dataset.projectId || '';
     document.getElementById('wasteNotesInput').value = btn.dataset.notes || '';
-    document.getElementById('wasteModal').classList.remove('hidden');
+    window.modal.open(document.getElementById('wasteModal'));
 });
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         var m = document.getElementById('wasteModal');
-        if (m) m.classList.add('hidden');
+        if (m) window.modal.close(m);
     }
 });
 // ── Data: embedded once at page render ───────────────────────────────────────

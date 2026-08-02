@@ -11,7 +11,7 @@ from app import create_app
 from database import db
 from models import (
     AppSetting, BambuPrintJob, BambuJobMaterial, BambuPrinter,
-    Brand, Color, Filament, Material, PrintHistory, Project, ProjectFilament,
+    Brand, Color, Filament, Material, MovementHistory, PrintHistory, Project, ProjectFilament,
 )
 from utils import utc_now
 
@@ -127,6 +127,63 @@ class BambuJobPageTests(_BaseBambuExtTests):
 # ── Bambu Job Management ────────────────────────────────────────────────
 
 class BambuJobManagementTests(_BaseBambuExtTests):
+    def test_job_delete_restores_exact_deducted_stock(self):
+        with self.app.app_context():
+            job = BambuPrintJob(
+                external_id='RESTORE-JOB',
+                model_name='Restore Test',
+                printer_name='P1P',
+                status='FINISH',
+                weight_grams=125.0,
+                filament_id=self.filament_id,
+            )
+            db.session.add(job)
+            db.session.commit()
+            job_id = job.id
+
+        self.client.post(f'/bambu/job/{job_id}/map', data={
+            'filament_id': str(self.filament_id),
+            'deduct': '1',
+        }, follow_redirects=False)
+        with self.app.app_context():
+            self.assertAlmostEqual(db.session.get(Filament, self.filament_id).weight_remaining, 775.0)
+
+        response = self.client.post(f'/bambu/job/{job_id}/delete', follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            self.assertAlmostEqual(db.session.get(Filament, self.filament_id).weight_remaining, 900.0)
+            self.assertIsNone(db.session.get(BambuPrintJob, job_id))
+            movement = MovementHistory.query.filter_by(
+                action_type='add', filament_id=self.filament_id,
+            ).order_by(MovementHistory.id.desc()).first()
+            self.assertIsNotNone(movement)
+            self.assertAlmostEqual(movement.weight, 125.0)
+            self.assertIn('RESTORE-JOB', movement.note)
+
+    def test_job_delete_restores_clamped_amount_not_nominal_weight(self):
+        with self.app.app_context():
+            filament = db.session.get(Filament, self.filament_id)
+            filament.weight_remaining = 30.0
+            filament.quantity = 1
+            job = BambuPrintJob(
+                external_id='CLAMPED-RESTORE-JOB',
+                model_name='Clamped Restore Test',
+                printer_name='P1P',
+                status='FINISH',
+                weight_grams=125.0,
+            )
+            db.session.add(job)
+            db.session.commit()
+            job_id = job.id
+
+        self.client.post(f'/bambu/job/{job_id}/map', data={
+            'filament_id': str(self.filament_id),
+            'deduct': '1',
+        }, follow_redirects=False)
+        self.client.post(f'/bambu/job/{job_id}/delete', follow_redirects=False)
+        with self.app.app_context():
+            self.assertAlmostEqual(db.session.get(Filament, self.filament_id).weight_remaining, 30.0)
+
     def test_job_delete_removes_job(self):
         response = self.client.post(f'/bambu/job/{self.job_id}/delete',
                                      follow_redirects=False)

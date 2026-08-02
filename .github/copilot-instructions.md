@@ -44,6 +44,7 @@ models.py               # All ORM models (~35 tables): Brand, Color, Material, F
                         #   Notification, AuditLog, PrinterMaintenance, WasteRecord, WasteFile,
                         #   FilamentUndoLog, PrinterMaintenance, WasteRecord, WasteFile,
                         #   FilamentUndoLog
+                        #   MovementHistory links to both BambuPrintJob and PrusaPrintJob
 auth.py                 # Multi-user auth, RBAC, session management, invite system
 messages.py             # i18n translations (cs + en), 1765 keys per language
 utils/                   # Shared helpers package (was utils.py in 1.105.x and earlier)
@@ -55,7 +56,8 @@ utils/                   # Shared helpers package (was utils.py in 1.105.x and e
                         #   Pre-compiled regexes, escape-first pipeline, only
                         #   http/https/mailto URL schemes permitted in links.
                         #   Public API: render_markdown(), toggle_markdown_checkbox(),
-                        #   markdown_extract_checkboxes().
+                         #   markdown_extract_checkboxes().
+  breadcrumbs.py         # Translated, entity-aware application-shell breadcrumbs
 routes/
   __init__.py           # register_all(app) — calls all register() functions
   inventory.py          # /, /filaments, /filament/<id>, /add, /edit, /use, /delete, bulk operations
@@ -75,6 +77,8 @@ routes/
   auth.py               # /login, /logout, /register, /activate, /account, /users/*,
                         #   /audit — auth, users, notifications, audit log routes
   pwa.py                # /manifest.json, /sw.js — Progressive Web App support
+static/js/modal.js       # Shared accessible plain-DOM modal manager
+static/js/ajax.js        # Shared AJAX error/retry helper
 templates/
   base.html             # Shared layout (nav, toast, Alpine, local Tailwind/CSS assets, CSRF injection)
   overview.html         # Admin overview (Action Center, live printers, lowest stock, 9-widget dashboard)
@@ -508,6 +512,14 @@ This is already applied to `projects_index.html` and overrides any stale localSt
 - Page-transition / stagger animations use the `[data-animate]` + `[data-stagger="N"]` attribute pattern — pure CSS, no JS animation loops.
 - Buttons opt into ripple effect via `data-enh-ripple`. Sparklines via `data-enh-sparkline="1,2,3,..."`. Heatmaps via `data-enh-heatmap='{...JSON...}'`.
 - Theme reactivity is driven by a `MutationObserver` on `<html>` class — never set theme colours directly from JS, always read from CSS custom properties.
+
+### Rule 34 — Shared modal and AJAX UX
+- Use `window.modal.open()` / `window.modal.close()` for plain DOM dialogs. Do
+  not add page-specific focus-trap, Escape, or scroll-lock implementations.
+- Use `window.ajaxUi.assertOk()` before parsing AJAX responses and
+  `window.ajaxUi.renderError()` for retryable failures. Never show an error for
+  an intentional `AbortError`, and preserve targeted DOM updates on Rule 31
+  pages.
 
 ### Rule 29 — Architecture Documentation Updates
 - **After implementing new features, refactoring, or structural changes, always update architecture documentation:**

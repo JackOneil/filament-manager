@@ -42,6 +42,7 @@ models.py               # All ORM models (~35 tables): Brand, Color, Material, F
                         #   BambuJobMaterial, PrusaPrinter, PrusaPrintJob, User, UserInvite,
                         #   Notification, AuditLog, PrinterMaintenance, WasteRecord, WasteFile,
                         #   FilamentUndoLog
+                        #   MovementHistory links to both BambuPrintJob and PrusaPrintJob
 auth.py                 # Multi-user auth, RBAC, session management, invite system
 messages.py             # i18n translations (cs + en), 1765 keys per language
 utils/                   # Shared helpers package (was utils.py in 1.105.x and earlier)
@@ -49,6 +50,7 @@ utils/                   # Shared helpers package (was utils.py in 1.105.x and e
                         #   render_markdown(), escape_like(), encrypt/decrypt_token(),
                         #   stock status logic, action center builder
   markdown.py            # Standalone Markdown → HTML renderer
+  breadcrumbs.py         # Translated, entity-aware breadcrumbs for the application shell
 time_utils.py           # Custom UtcDateTime SQLAlchemy type for timezone-aware datetimes
 
 static/
@@ -65,7 +67,9 @@ static/
     mobile-ux.js         # Pull-to-refresh, swipe gestures, collapsable topbar
     enhancements.js      # v1.119.0+ — window.enh API: registerChart/retheme,
                         #   animateCounter, initSparklines, initHeatmaps, ripple
-                        #   effect, mobile long-press row actions, theme watcher
+                         #   effect, mobile long-press row actions, theme watcher
+    modal.js              # Shared accessible plain-DOM modal manager
+    ajax.js               # Shared AJAX response/error/retry UI helper
 routes/
   __init__.py           # register_all(app) — calls all register() functions
   inventory.py          # /, /filaments, /filament/<id>, /add, /edit, /use, /delete, bulk operations
@@ -213,7 +217,19 @@ Widget shells and search inputs remain stable — no flicker
 - `DOMParser.parseFromString()` works on an in-memory document, never touches live DOM until extraction
 - `.outerHTML` swap preserves the container element (for pagination wrappers); `.innerHTML` swap replaces only contents (for items lists)
 
-### 3.4 Background Workers
+`static/js/ajax.js` provides the shared non-2xx handling pattern. A failed
+request replaces the affected dynamic container with a translated error state
+and a retry button; intentional `AbortError` filter cancellations are not
+shown as user-facing errors.
+
+### 3.4 Shared modal behavior
+
+Plain DOM modals use `static/js/modal.js`. Opening a modal sets dialog ARIA
+attributes, traps focus, locks the scrollable `<main>` element, and remembers
+the previously focused control. Escape and backdrop clicks close the topmost
+modal and restore focus. Alpine-owned overlays remain controlled by Alpine.
+
+### 3.5 Background Workers
 
 Four daemon threads start in `create_app()`:
 
@@ -224,7 +240,7 @@ Four daemon threads start in `create_app()`:
 | `auto-backup-worker` | 60s (check only)           | Scheduled backup to `data/backup/` directory  |
 | `model-thumbnail-worker` | 60s (check only) | Background regeneration of missing model thumbnails |
 
-### 3.5 DB Schema Migration Strategy
+### 3.6 DB Schema Migration Strategy
 
 - **No Alembic.** Migrations are handled via `_safe_alter()` in `migrations.py`.
 - Every new column requires a `_safe_alter(app, 'ALTER TABLE ...')` line in `run_migrations()` inside `migrations.py`.
@@ -480,6 +496,14 @@ The `/export` and `/import` functions in `routes/backup.py` must cover the **ent
 - Page-transition / stagger animations use the `[data-animate]` + `[data-stagger="N"]` attribute pattern — pure CSS, no JS animation loops.
 - Buttons opt into ripple effect via `data-enh-ripple`. Sparklines via `data-enh-sparkline="1,2,3,..."`. Heatmaps via `data-enh-heatmap='{...JSON...}'`.
 - Theme reactivity is driven by a `MutationObserver` on `<html>` class — never set theme colours directly from JS, always read from CSS custom properties.
+
+### Rule 34 — Shared modal and AJAX UX
+- Use `window.modal.open()` / `window.modal.close()` for plain DOM dialogs. Do
+  not add page-specific focus-trap, Escape, or scroll-lock implementations.
+- Use `window.ajaxUi.assertOk()` before parsing AJAX responses and
+  `window.ajaxUi.renderError()` for retryable failures. Never show an error for
+  an intentional `AbortError`, and preserve targeted DOM updates on Rule 31
+  pages.
 
 ### Rule 32 — Backlog Tracking (`.kilo/BACKLOG.md`)
 - **MANDATORY**: Every time a bug is fixed or a feature is implemented, the `.kilo/BACKLOG.md` file **MUST** be updated.
