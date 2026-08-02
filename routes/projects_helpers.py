@@ -679,7 +679,7 @@ def snapshot_project_for_undo(project):
         'comments': [
             {
                 'body': c.body,
-                'author_user_id': c.author_user_id,
+                'user_id': c.user_id,
                 'created_at': c.created_at.isoformat() if c.created_at else None,
             }
             for c in project.comments
@@ -703,12 +703,11 @@ def snapshot_project_for_undo(project):
         ],
         'print_items': [
             {
-                'label': pi.label,
-                'print_time_seconds': pi.print_time_seconds,
-                'weight_grams': pi.weight_grams,
-                'quantity': pi.quantity,
-                'filament_id': pi.filament_id,
-                'status': pi.status,
+                'name': pi.name,
+                'quantity_total': pi.quantity_total,
+                'quantity_done': pi.quantity_done,
+                'notes': pi.notes,
+                'sort_order': pi.sort_order,
             }
             for pi in project.print_items
         ],
@@ -801,7 +800,7 @@ def restore_project_from_undo(snapshot_id):
         new_comment = ProjectComment(
             project_id=new_project.id,
             body=c['body'],
-            author_user_id=c.get('author_user_id'),
+            user_id=c.get('user_id'),
         )
         if c.get('created_at'):
             try:
@@ -830,12 +829,11 @@ def restore_project_from_undo(snapshot_id):
     for pi in payload.get('print_items', []):
         db.session.add(ProjectPrintItem(
             project_id=new_project.id,
-            label=pi.get('label', ''),
-            print_time_seconds=pi.get('print_time_seconds'),
-            weight_grams=pi.get('weight_grams'),
-            quantity=pi.get('quantity') or 1,
-            filament_id=pi.get('filament_id'),
-            status=pi.get('status') or 'pending',
+            name=pi.get('name') or 'Print item',
+            quantity_total=pi.get('quantity_total') or 1,
+            quantity_done=pi.get('quantity_done') or 0,
+            notes=pi.get('notes'),
+            sort_order=pi.get('sort_order') or 0,
         ))
 
     safe_commit()

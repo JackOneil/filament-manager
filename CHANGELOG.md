@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.120.4] — 2026-08-02
+
+### Fixed
+
+- **Project undo restored print items and comments correctly** — the snapshot/restore written in v1.120.3 used non-existent fields (`ProjectPrintItem.label/print_time_seconds/weight_grams/...` and `ProjectComment.author_user_id`), so undoing a deleted project with print items or comments crashed with `TypeError`/`AttributeError`. The snapshot now uses the real model fields (`name`, `quantity_total`, `quantity_done`, `notes`, `sort_order`, `user_id`). (routes/projects_helpers.py)
+- **`quote_issue_invoice` endpoint was blocked by the auth guard** — the new POST endpoint from v1.120.3 was missing from `auth.SECTION_BY_ENDPOINT`, so every "issue invoice" request returned 403 (unmapped endpoints default to deny). (auth.py)
+- **`add_brand` now stores the validated `shop_url`** — the add form dropped the URL while `edit_brand` validated it; both paths now use `normalize_shop_url()` (javascript:/data: rejected). (routes/settings.py)
+- **Regression tests** — new `tests/test_e2e_regressions.py` (5 tests) covering the three fixes above; the E2E sweep that found them (80 scenarios across auth, inventory, waste, projects, calculator, storage, backup, settings, Prusa SSRF and Bambu deduction guards) runs against a live test database outside the pytest suite. (tests/)
+
 ## [1.120.3] — 2026-07-31
 
 ### Fixed

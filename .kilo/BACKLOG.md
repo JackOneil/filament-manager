@@ -90,6 +90,9 @@
 | BUG-773 | Undo: snapshot consumed before the restore | `utils/__init__.py`: `consume_undo_log` set `is_consumed=True` before the restore ran — a failed restore permanently lost the undo. **Fix:** `consume_undo_log` is read-only; the new `mark_undo_consumed()` runs only after success (all `inventory_undo` branches). | 🟠 High | S (Small) | Fixed in v1.120.2 |
 | BUG-774 | `pytest.ini` — `-n auto` in addopts fails without xdist | The suite fails at collection when pytest-xdist is missing. **Fix:** `-n auto` moved to the explicit invocation; addopts only `-v --tb=short`. | 🟡 Medium | XS (Trivial) | Fixed in v1.120.2 |
 | BUG-782 | Alpine `SyntaxError: Unexpected token '}'` on the calculator/projects/models pages | `|tojson` returns Markup — Jinja does not escape it, so in a double-quoted HTML attribute a bare `"` from user data terminates the attribute early and Alpine compiles a truncated expression (`!filamentSearch || ` + stray `}`). Caused by the BUG-746 fix (attributes with `|tojson` must use single-quoted delimiters — the BUG-706 convention). **Fix:** `calculator.html`, `_projects_layout.html`, `_models_cards.html`, `_models_rows.html`, `models_detail.html`, `models_share.html` switched to single-quoted attributes; regression test `tests/test_alpine_expressions.py` (6 tests) renders the pages with hostile data and validates expression completeness. | 🔴 Critical | S (Small) | Fixed in v1.120.2 |
+| BUG-783 | Project undo crashes on print items/comments (non-existent snapshot fields from v1.120.3) | `routes/projects_helpers.py` snapshot/restore used `ProjectPrintItem.label` etc. and `ProjectComment.author_user_id` → TypeError/AttributeError on undo. **Fix:** snapshot uses the real model fields (`name`, `quantity_total`, `quantity_done`, `notes`, `sort_order`, `user_id`); regression test `tests/test_e2e_regressions.py`. | 🟠 High | S (Small) | Fixed in v1.120.4 |
+| BUG-784 | `quote_issue_invoice` unmapped endpoint → every POST 403 | The endpoint added in v1.120.3 was missing from `auth.SECTION_BY_ENDPOINT`; unmapped endpoints abort(403). **Fix:** mapped to `SECTION_CALCULATOR`; regression test asserts the mapping and the end-to-end issue flow. | 🔴 Critical | XS (Trivial) | Fixed in v1.120.4 |
+| BUG-785 | `add_brand` drops `shop_url` | The brand-add form never stored the URL while `edit_brand` validated it (H4 gap). **Fix:** `normalize_shop_url()` in the add path too; regression tests for valid and javascript: URLs. | 🟡 Medium | XS (Trivial) | Fixed in v1.120.4 |
 
 
 
@@ -559,6 +562,9 @@
 | BUG-773 | Undo consume-before-restore | v1.120.2 | 2026-07-31 |
 | BUG-774 | pytest.ini -n auto without xdist | v1.120.2 | 2026-07-31 |
 | BUG-782 | Alpine tojson quote delimiters (SyntaxError on 3 pages) | v1.120.2 | 2026-07-31 |
+| BUG-783 | Project undo crash on print items/comments | v1.120.4 | 2026-08-02 |
+| BUG-784 | quote_issue_invoice unmapped endpoint (403) | v1.120.4 | 2026-08-02 |
+| BUG-785 | add_brand drops shop_url | v1.120.4 | 2026-08-02 |
 | BUG-740 | Auto-backup Monday (0 or 1) | v1.120.3 | 2026-07-31 |
 | BUG-742 | 5 missing translation keys | v1.120.3 | 2026-07-31 |
 | BUG-566 | Hardcoded fetch() paths → url_for | v1.120.3 | 2026-07-31 |

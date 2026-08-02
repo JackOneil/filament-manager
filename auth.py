@@ -72,6 +72,7 @@ SECTION_BY_ENDPOINT = {
     'filament_toggle_reorder_snooze': SECTION_FILAMENTS,
     'api_search': SECTION_OVERVIEW,
     'calculator': SECTION_CALCULATOR,
+    'quote_issue_invoice': SECTION_CALCULATOR,
     'calculator_project': SECTION_CALCULATOR,
     'delete_history': SECTION_CALCULATOR,
     'delete_quote': SECTION_PROJECTS,

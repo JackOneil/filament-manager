@@ -100,7 +100,11 @@ def register(app):
                         raise ValueError('settings_brand_required')
                     if Brand.query.filter_by(name=brand_name).first():
                         raise ValueError('settings_brand_exists')
-                    db.session.add(Brand(name=brand_name))
+                    # shop_url validated the same way as in edit_brand (H4)
+                    db.session.add(Brand(
+                        name=brand_name,
+                        shop_url=normalize_shop_url(request.form.get('shop_url')),
+                    ))
                     app.logger.debug("Added brand: %s", brand_name)
 
                 elif action == 'color':
