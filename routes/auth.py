@@ -62,9 +62,16 @@ def _check_login_rate_limit(ip_addr: str) -> bool:
         else:
             _login_attempts[ip_addr] = []
         _login_attempts[ip_addr].append(now)
-        # Periodic cleanup of stale IP entries (probabilistic, ~1% chance per call)
+        # Periodic cleanup: prune stale IP entries instead of wiping the whole
+        # table — clearing on >1000 IPs let an attacker reset the limiter by
+        # flooding with unique IPs.
         if len(_login_attempts) > 1000:
-            _login_attempts.clear()
+            stale = [
+                ip for ip, ts_list in _login_attempts.items()
+                if not any(now - ts < _LOGIN_ATTEMPT_WINDOW for ts in ts_list)
+            ]
+            for ip in stale:
+                del _login_attempts[ip]
         return True
 
 
@@ -94,7 +101,7 @@ def _build_users_query(q, role, status, sort_by, sort_direction):
     if q:
         from utils import escape_like
         pattern = f'%{escape_like(q)}%'
-        users_query = users_query.filter(or_(User.name.ilike(pattern), User.email.ilike(pattern)))
+        users_query = users_query.filter(or_(User.name.ilike(pattern, escape='\\'), User.email.ilike(pattern, escape='\\')))
     if role in {'admin', 'user'}:
         users_query = users_query.filter(User.role == role)
     if status == 'active':
@@ -231,7 +238,14 @@ def register(app):
                 flash('auth_invite_invalid', 'error')
                 return redirect(url_for('activate_invite', code=code))
             name = request.form.get('name', '').strip()
-            email = request.form.get('email', '').strip().lower() or (invite.email or '').strip().lower()
+            email = request.form.get('email', '').strip().lower()
+            if not email and invite.email:
+                email = invite.email.strip().lower()
+            if invite.email and email != invite.email.strip().lower():
+                # The invitation was addressed to a specific address — do not
+                # let a holder of the invite code claim it with another email.
+                flash('auth_invite_email_mismatch', 'error')
+                return render_template('auth_activate.html', invite=invite)
             password = request.form.get('password', '')
             pwd_valid, pwd_error = validate_password_strength(password)
             if not name or not email or not pwd_valid:
@@ -716,11 +730,11 @@ def register(app):
             from utils import escape_like
             pattern = f'%{escape_like(q)}%'
             logs_query = logs_query.filter(or_(
-                AuditLog.user_email.ilike(pattern),
-                AuditLog.user_name.ilike(pattern),
-                AuditLog.endpoint.ilike(pattern),
-                AuditLog.path.ilike(pattern),
-                AuditLog.object_id.ilike(pattern),
+                AuditLog.user_email.ilike(pattern, escape='\\'),
+                AuditLog.user_name.ilike(pattern, escape='\\'),
+                AuditLog.endpoint.ilike(pattern, escape='\\'),
+                AuditLog.path.ilike(pattern, escape='\\'),
+                AuditLog.object_id.ilike(pattern, escape='\\'),
             ))
         if action_filter:
             logs_query = logs_query.filter(AuditLog.action == action_filter)

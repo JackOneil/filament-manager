@@ -239,12 +239,21 @@ def register(app):
         if shelf and filament and slot_index and 1 <= slot_index <= shelf.slots_count:
             existing = StoragePlacement.query.filter_by(shelf_id=shelf.id, slot_index=slot_index).first()
             if not existing:
-                db.session.add(StoragePlacement(
-                    shelf_id=shelf.id,
-                    filament_id=filament.id,
-                    slot_index=slot_index,
-                    orientation='standing',
-                ))
+                # A filament may only live in ONE slot — if it is already
+                # placed elsewhere, MOVE the placement instead of creating a
+                # duplicate (enforced by the unique index on
+                # storage_placement.filament_id).
+                current = StoragePlacement.query.filter_by(filament_id=filament.id).first()
+                if current and (current.shelf_id != shelf.id or current.slot_index != slot_index):
+                    current.shelf_id = shelf.id
+                    current.slot_index = slot_index
+                else:
+                    db.session.add(StoragePlacement(
+                        shelf_id=shelf.id,
+                        filament_id=filament.id,
+                        slot_index=slot_index,
+                        orientation='standing',
+                    ))
                 safe_commit()
         return redirect(url_for('storage'))
 

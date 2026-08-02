@@ -271,8 +271,8 @@
             </div>
             <div class="text-xs text-gray-500">{{ t('project_comment_markdown_hint') }}
                 {% if users_for_mentions %}
-                · <span class="text-gray-400">@{{ t('project_comment_mention_hint') if 'project_comment_mention_hint' in [] else 'mention' }}:
-                {% for u in users_for_mentions %}<span class="font-medium">@{{ u.name }}</span>{% if not loop.last %}, {% endif %}{% endfor %}</span>
+                · <span class="text-gray-400">@{{ t('project_comment_mention_hint') }}:</span>
+                {% for u in users_for_mentions %}<span class="font-medium">@{{ u.name }}</span>{% if not loop.last %}, {% endif %}{% endfor %}
                 {% endif %}
             </div>
             <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-semibold transition">{{ t('project_add_comment') }}</button>
@@ -413,7 +413,7 @@ function commentReactions(commentId, initialReactions) {
             const fd = new FormData();
             fd.append('emoji', emoji);
             if (csrf) fd.append('csrf_token', csrf);
-            fetch(`/projects/{{ project.id }}/comments/${this.commentId}/react`, {
+            fetch('{{ url_for('projects.project_comment_react', id=project.id, cid=0) }}'.replace('/0/react', '/' + this.commentId + '/react'), {
                 method: 'POST',
                 headers: { 'X-CSRFToken': csrf },
                 body: fd,

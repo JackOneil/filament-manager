@@ -924,4 +924,23 @@
             }
         };
     };
+
+    /**
+     * Programmatic opener used by the first-login tour's final step.
+     * Opens the Alpine help panel (sets open=true on the helpApp component)
+     * and falls back to a 'help:open' custom event if the panel is absent.
+     */
+    window.openHelp = function () {
+        var panel = document.querySelector('[x-data="helpApp()"]');
+        var data = (panel && window.Alpine) ? window.Alpine.$data(panel) : null;
+        if (data && typeof data.open !== 'undefined') {
+            data.open = true;
+            setTimeout(function () {
+                var search = document.getElementById('help-search');
+                if (search) search.focus();
+            }, 60);
+            return;
+        }
+        document.dispatchEvent(new CustomEvent('help:open'));
+    };
 })();

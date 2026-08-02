@@ -17,7 +17,12 @@ TRANSLATIONS = {
         'next_page': 'Další',
         'overview': 'Přehled',
         'overview_desc': 'Jednoduchý denní přehled skladu, projektů a tiskáren bez rušivého seznamu filamentů.',
-        'overview_command_center_title': 'Velitelské centrum',
+
+        'stats_purchase_dataset': 'Nákupy',
+        'stats_usage_dataset': 'Spotřeba',
+        'stats_project_dataset': 'Projekty',
+        'selected_filaments_count_prefix': 'Vybraných filamentů: ',
+        'automap_confirmed': 'Automatické mapování potvrzeno',        'overview_command_center_title': 'Velitelské centrum',
         'overview_command_center_heading': 'Co dnes opravdu potřebuje pozornost',
         'overview_command_center_desc': 'Jedno místo pro urgentní zásahy, dnešní termíny a projekty, které hýbou provozem.',
         'overview_command_center_urgent': 'Hoří teď',
@@ -29,7 +34,8 @@ TRANSLATIONS = {
         'overview_command_center_focus_projects': 'Na co se soustředit dál',
         'inventory_nav': 'Sklad',
         'inventory_invalid_reference': 'Neplatná reference na značku, materiál nebo barvu.',
-        'filaments_nav': 'Filamenty',
+
+        'inventory_csv_too_many_rows': 'CSV import obsahuje příliš mnoho řádků (max. 5000).',        'filaments_nav': 'Filamenty',
         'filaments_desc': 'Filtry, uložené pohledy a kompletní seznam filamentů na jednom místě.',
         'printers_nav': 'Tiskárny',
         'analytics_nav': 'Analytika',
@@ -576,7 +582,8 @@ TRANSLATIONS = {
         'download_image': 'Stáhnout obrázek',
         'close_viewer': 'Zavřít',
         'project_file_type_not_allowed': 'Nepodporovaný typ souboru. Povolené jsou obrázky a běžné 3D tiskové formáty jako 3MF, STL, OBJ, STEP nebo G-code.',
-        'project_status_invalid': 'Neplatný stav projektu',
+
+        'project_file_too_large': 'Soubor je příliš velký.',        'project_status_invalid': 'Neplatný stav projektu',
         'project_link_invalid': 'Odkaz míří na nepovolenou nebo neveřejnou adresu.',
         # ── Project extended features
         'project_priority': 'Priorita',
@@ -919,7 +926,8 @@ TRANSLATIONS = {
         'auth_password_too_long': 'Heslo může mít maximálně 256 znaků.',
         'auth_email_exists': 'Účet s tímto e-mailem už existuje.',
         'auth_invite_invalid': 'Pozvánka je neplatná nebo už byla použitá.',
-        'auth_account_disabled': 'Tento účet je deaktivovaný.',
+
+        'auth_invite_email_mismatch': 'E-mail nesouhlasí s adresou uvedenou v pozvánce.',        'auth_account_disabled': 'Tento účet je deaktivovaný.',
         'users_nav': 'Uživatelé',
         'users_desc': 'Správa administrátorů, uživatelů, pozvánek a jejich práv.',
         'users_invite_title': 'Pozvánky',
@@ -1709,7 +1717,8 @@ TRANSLATIONS = {
         'settings_unknown_action': 'Neznámá akce nastavení.',
         'backup_import_incompatible': 'Záloha není kompatibilní s touto verzí aplikace.',
         'backup_dry_run_ok': 'Dry-run kontrola byla úspěšná. Ověřeno záznamů: {total}.',
-        'backup_import_success': 'Import zálohy byl dokončen.',
+
+        'backup_dry_run_invalid': 'Backup je neúplný nebo nekompatibilní: {detail}.',        'backup_import_success': 'Import zálohy byl dokončen.',
         'backup_import_failed': 'Import zálohy selhal.',
         # ── History filters ───────────────────────────────────────────────────
         'history_search_placeholder': 'Hledat filament nebo poznámku…',
@@ -1812,9 +1821,15 @@ TRANSLATIONS = {
         'next_page': 'Next',
         'overview': 'Overview',
         'overview_desc': 'A simple daily view of stock, projects, and printers without the distracting filament list.',
-        'inventory_nav': 'Inventory',
+
+        'stats_purchase_dataset': 'Purchases',
+        'stats_usage_dataset': 'Usage',
+        'stats_project_dataset': 'Projects',
+        'selected_filaments_count_prefix': 'Selected filaments: ',
+        'automap_confirmed': 'Automatic mapping confirmed',        'inventory_nav': 'Inventory',
         'inventory_invalid_reference': 'Invalid brand, material or color reference.',
-        'filaments_nav': 'Filaments',
+
+        'inventory_csv_too_many_rows': 'CSV import contains too many rows (max 5000).',        'filaments_nav': 'Filaments',
         'filaments_desc': 'Filters, saved views, and the full filament list in one focused place.',
         'printers_nav': 'Printers',
         'analytics_nav': 'Analytics',
@@ -2371,7 +2386,8 @@ TRANSLATIONS = {
         'download_image': 'Download image',
         'close_viewer': 'Close',
         'project_file_type_not_allowed': 'Unsupported file type. Allowed uploads are images and common 3D printing formats such as 3MF, STL, OBJ, STEP, or G-code.',
-        'project_status_invalid': 'Invalid project status',
+
+        'project_file_too_large': 'The file is too large.',        'project_status_invalid': 'Invalid project status',
         'project_link_invalid': 'The link points to a disallowed or non-public address.',
         # ── Project extended features
         'project_priority': 'Priority',
@@ -2714,7 +2730,8 @@ TRANSLATIONS = {
         'auth_password_too_long': 'Password may be at most 256 characters.',
         'auth_email_exists': 'An account with this email already exists.',
         'auth_invite_invalid': 'The invite is invalid or has already been used.',
-        'auth_account_disabled': 'This account is disabled.',
+
+        'auth_invite_email_mismatch': 'The email does not match the address on the invitation.',        'auth_account_disabled': 'This account is disabled.',
         'users_nav': 'Users',
         'users_desc': 'Manage administrators, users, invites, and their permissions.',
         'users_invite_title': 'Invites',
@@ -3504,7 +3521,8 @@ TRANSLATIONS = {
         'settings_unknown_action': 'Unknown settings action.',
         'backup_import_incompatible': 'Backup is not compatible with this app version.',
         'backup_dry_run_ok': 'Dry-run check completed successfully. Records verified: {total}.',
-        'backup_import_success': 'Backup import completed.',
+
+        'backup_dry_run_invalid': 'Backup is incomplete or incompatible: {detail}.',        'backup_import_success': 'Backup import completed.',
         'backup_import_failed': 'Backup import failed.',
         # ── History filters ───────────────────────────────────────────────────
         'history_search_placeholder': 'Search filament or note…',

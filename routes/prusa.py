@@ -138,6 +138,11 @@ def do_poll(printer: PrusaPrinter) -> dict:
         if progress is not None and existing.progress != progress:
             existing.progress = progress
             changed = True
+        # The weight is only available once the print finished — backfill it
+        # so the job can be deducted/mapped with a meaningful amount.
+        if weight_grams and not existing.weight_grams:
+            existing.weight_grams = weight_grams
+            changed = True
         existing.synced_at = utc_now()
         existing.raw_payload = raw_payload
         if changed:

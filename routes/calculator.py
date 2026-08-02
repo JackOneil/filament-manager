@@ -246,7 +246,9 @@ def register(app):
 
                     if action == 'save_quote' and project_id:
                         project = db.session.get(Project, project_id)
-                        if project:
+                        from auth import get_current_user, is_admin
+                        user = get_current_user()
+                        if project and (is_admin(user) or (project.owner_user_id == (user.id if user else -1))):
                             saved_quote = ProjectQuote(
                                 project_id=project.id,
                                 filament_id=filament.id,
@@ -388,14 +390,9 @@ def register(app):
             abort(403)
         settings = AppSetting.query.first()
 
-        # Auto-assign a sequential invoice number on first view
-        if not quote.invoice_number:
-            prefix = (settings.invoice_prefix or 'FV') if settings else 'FV'
-            counter = ((settings.invoice_counter or 0) + 1) if settings else 1
-            quote.invoice_number = f'{prefix}-{utc_now().year}{counter:04d}'
-            if settings:
-                settings.invoice_counter = counter
-            safe_commit()
+        # NOTE: the invoice number is NEVER assigned on GET — an image/iframe
+        # could burn invoice numbers via GET. Use the POST endpoint
+        # quote_issue_invoice to claim a number.
 
         # Provide the next suggested number for display (not yet claimed)
         prefix = (settings.invoice_prefix or 'FV') if settings else 'FV'
@@ -408,4 +405,22 @@ def register(app):
             settings=settings,
             suggested_invoice_number=suggested_invoice_number,
         )
+
+    @bp.route('/calculator/quote/<int:id>/issue', methods=['POST'])
+    def quote_issue_invoice(id):
+        """Claim an invoice number for a quote and show the export view."""
+        quote = db.get_or_404(ProjectQuote, id)
+        if not _quote_access_allowed(quote):
+            abort(403)
+        settings = AppSetting.query.first()
+
+        if not quote.invoice_number:
+            prefix = (settings.invoice_prefix or 'FV') if settings else 'FV'
+            counter = ((settings.invoice_counter or 0) + 1) if settings else 1
+            quote.invoice_number = f'{prefix}-{utc_now().year}{counter:04d}'
+            if settings:
+                settings.invoice_counter = counter
+            safe_commit()
+
+        return redirect(url_for('export_quote', id=id))
     app.register_blueprint(bp)

@@ -4,7 +4,7 @@ import shutil
 import tempfile
 import threading
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from flask import abort, current_app, flash, jsonify, redirect, render_template, request, send_from_directory, url_for, Blueprint
@@ -68,7 +68,7 @@ def _project_detail_redirect(project_id, tab='overview', **extra_params):
 
 
 def _job_timestamp(job):
-    return job.started_at or job.finished_at or getattr(job, 'synced_at', None) or datetime.min
+    return job.started_at or job.finished_at or getattr(job, 'synced_at', None) or datetime.min.replace(tzinfo=timezone.utc)
 
 
 def _job_cost_parts(job, setting, bambu_powers=None, prusa_powers=None):
@@ -225,7 +225,7 @@ def _build_project_job_feed(project, setting, show_bambu_jobs, show_prusa_jobs, 
                 'unmapped': (job.project_id is None or job.filament_id is None),
             })
 
-    items.sort(key=lambda item: item['timestamp'] or datetime.min, reverse=True)
+    items.sort(key=lambda item: item['timestamp'] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
     return items
 
 
@@ -415,7 +415,7 @@ def _build_project_next_actions(project, project_metrics, show_bambu_jobs, show_
 
 def _build_project_activity_events(project):
     activity_events = []
-    for quote in sorted(project.quotes, key=lambda item: item.created_at or datetime.min, reverse=True):
+    for quote in sorted(project.quotes, key=lambda item: item.created_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True):
         activity_events.append({
             'created_at': quote.created_at,
             'label': translate('activity_quote_saved').format(price=f'{quote.final_price:.2f}', currency=quote.currency),
@@ -423,7 +423,7 @@ def _build_project_activity_events(project):
             'meta': f'{quote.filament_name} · {quote.weight} g',
             'kind': 'quote',
         })
-    for project_file in sorted(project.files, key=lambda item: item.uploaded_at or datetime.min, reverse=True):
+    for project_file in sorted(project.files, key=lambda item: item.uploaded_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True):
         activity_events.append({
             'created_at': project_file.uploaded_at,
             'label': translate('activity_file_uploaded').format(filename=project_file.filename),
@@ -431,7 +431,7 @@ def _build_project_activity_events(project):
             'meta': _get_extension(project_file.filename).upper() or 'FILE',
             'kind': 'file',
         })
-    for comment in sorted(project.comments, key=lambda item: item.created_at or datetime.min, reverse=True):
+    for comment in sorted(project.comments, key=lambda item: item.created_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True):
         activity_events.append({
             'created_at': comment.updated_at or comment.created_at,
             'label': translate('activity_comment').format(body=(comment.body or '')[:60]),
@@ -439,7 +439,7 @@ def _build_project_activity_events(project):
             'meta': comment.user.name if comment.user else '-',
             'kind': 'comment',
         })
-    for todo in sorted(project.todos, key=lambda item: item.created_at or datetime.min, reverse=True):
+    for todo in sorted(project.todos, key=lambda item: item.created_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True):
         activity_events.append({
             'created_at': todo.completed_at or todo.created_at,
             'label': translate('activity_todo').format(body=todo.body),
@@ -447,14 +447,14 @@ def _build_project_activity_events(project):
             'meta': 'done' if todo.is_done else 'open',
             'kind': 'todo',
         })
-    activity_events.sort(key=lambda item: item['created_at'] or datetime.min, reverse=True)
+    activity_events.sort(key=lambda item: item['created_at'] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
     return activity_events
 
 
 def _build_project_comments(project):
     user = get_current_user()
     project_comments = []
-    for comment in sorted(project.comments, key=lambda item: item.created_at or datetime.min, reverse=True):
+    for comment in sorted(project.comments, key=lambda item: item.created_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True):
         # Build reaction summary: {emoji: {count, user_reacted}}
         reaction_summary = {}
         for reaction in comment.reactions:
@@ -491,6 +491,18 @@ def _paginate_jobs(job_feed, page, per_page=8):
         prev_num=page - 1 if page > 1 else 1,
         next_num=page + 1 if page < jobs_pages else jobs_pages,
     )
+
+
+def _is_path_inside(path, directory):
+    """True when *path* resolves inside *directory* (symlink-safe)."""
+    if not path or not directory:
+        return False
+    try:
+        real_path = os.path.realpath(path)
+        real_dir = os.path.realpath(directory)
+        return os.path.commonpath([real_path, real_dir]) == real_dir
+    except (OSError, ValueError):
+        return False
 
 
 def _schedule_link_preview_refresh(flask_app, link_id, url, max_attempts=3, retry_delay=12):
@@ -664,6 +676,42 @@ def snapshot_project_for_undo(project):
             }
             for l in project.links
         ],
+        'comments': [
+            {
+                'body': c.body,
+                'author_user_id': c.author_user_id,
+                'created_at': c.created_at.isoformat() if c.created_at else None,
+            }
+            for c in project.comments
+        ],
+        'quotes': [
+            {
+                'filament_id': q.filament_id,
+                'filament_name': q.filament_name,
+                'weight': q.weight,
+                'print_time': q.print_time,
+                'material_cost': q.material_cost,
+                'electricity_cost': q.electricity_cost,
+                'base_cost': q.base_cost,
+                'margin_percent': q.margin_percent,
+                'margin_amount': q.margin_amount,
+                'final_price': q.final_price,
+                'currency': q.currency,
+                'invoice_number': q.invoice_number,
+            }
+            for q in project.quotes
+        ],
+        'print_items': [
+            {
+                'label': pi.label,
+                'print_time_seconds': pi.print_time_seconds,
+                'weight_grams': pi.weight_grams,
+                'quantity': pi.quantity,
+                'filament_id': pi.filament_id,
+                'status': pi.status,
+            }
+            for pi in project.print_items
+        ],
     }
     path = _project_undo_path(snapshot_id)
     with open(path, 'w', encoding='utf-8') as f:
@@ -747,6 +795,49 @@ def restore_project_from_undo(snapshot_id):
             domain=l.get('domain'),
         ))
 
+    for c in payload.get('comments', []):
+        if not c.get('body'):
+            continue
+        new_comment = ProjectComment(
+            project_id=new_project.id,
+            body=c['body'],
+            author_user_id=c.get('author_user_id'),
+        )
+        if c.get('created_at'):
+            try:
+                new_comment.created_at = datetime.fromisoformat(c['created_at'])
+            except (TypeError, ValueError):
+                pass
+        db.session.add(new_comment)
+
+    for q in payload.get('quotes', []):
+        db.session.add(ProjectQuote(
+            project_id=new_project.id,
+            filament_id=q.get('filament_id'),
+            filament_name=q.get('filament_name'),
+            weight=q.get('weight'),
+            print_time=q.get('print_time'),
+            material_cost=q.get('material_cost'),
+            electricity_cost=q.get('electricity_cost'),
+            base_cost=q.get('base_cost'),
+            margin_percent=q.get('margin_percent'),
+            margin_amount=q.get('margin_amount'),
+            final_price=q.get('final_price'),
+            currency=q.get('currency'),
+            invoice_number=q.get('invoice_number'),
+        ))
+
+    for pi in payload.get('print_items', []):
+        db.session.add(ProjectPrintItem(
+            project_id=new_project.id,
+            label=pi.get('label', ''),
+            print_time_seconds=pi.get('print_time_seconds'),
+            weight_grams=pi.get('weight_grams'),
+            quantity=pi.get('quantity') or 1,
+            filament_id=pi.get('filament_id'),
+            status=pi.get('status') or 'pending',
+        ))
+
     safe_commit()
     return new_project
 
@@ -807,10 +898,17 @@ def restore_file_from_undo(snapshot_id):
 
     # Content path = sidecar path with .json stripped
     content_path = sidecar_path[:-5]
+    # The sidecar is written by the server itself, but it lives in a shared
+    # /tmp directory — confine any stored filepath to the upload folder so a
+    # tampered sidecar cannot make the restore write outside it.
+    upload_folder = current_app.config.get('PROJECT_UPLOAD_FOLDER') or ''
+    stored_filepath = sidecar.get('filepath') or ''
+    if not stored_filepath or not _is_path_inside(stored_filepath, upload_folder):
+        stored_filepath = ''
     project_file = ProjectFile(
         project_id=sidecar.get('project_id'),
         filename=sidecar.get('filename') or 'restored',
-        filepath=sidecar.get('filepath') or '',
+        filepath=stored_filepath,
         version=sidecar.get('version') or 1,
         parent_file_id=sidecar.get('parent_file_id'),
         version_note=sidecar.get('version_note'),

@@ -24,7 +24,9 @@ Structure:
     pwa.py             — /manifest.json, /sw.js  (PWA support)
 """
 import os
+import sys
 import json
+import hashlib
 import logging
 import threading
 import time
@@ -65,9 +67,15 @@ from routes import register_all
 from messages import TRANSLATIONS
 from migrations import run_migrations
 
-APP_VERSION = '1.120.2'
+APP_VERSION = '1.120.3'
 
 csrf = CSRFProtect()
+
+
+def _env_flag(name: str) -> bool:
+    """Parse a boolean environment variable: truthy 1/true/yes/on (case-insensitive)."""
+    value = (os.environ.get(name) or '').strip().lower()
+    return value in {'1', 'true', 'yes', 'on'}
 
 
 def create_app(test_config=None) -> Flask:
@@ -99,7 +107,7 @@ def create_app(test_config=None) -> Flask:
             app.logger.warning('SECRET_KEY env var not set and key file unwritable — sessions will not persist across restarts.')
     app.secret_key = secret_key
     # Only trust X-Forwarded-* headers when explicitly running behind a reverse proxy.
-    if os.environ.get('BEHIND_PROXY'):
+    if _env_flag('BEHIND_PROXY'):
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
     # Database URI: honour DATABASE_URL env var (PostgreSQL / external SQLite).
@@ -120,7 +128,7 @@ def create_app(test_config=None) -> Flask:
     # Set BEHIND_PROXY=1 when running behind a TLS-terminating reverse proxy
     # (e.g. nginx, Traefik) that handles HTTPS and forwards plain HTTP to the app.
     # Without this flag, session cookies may be exposed over unencrypted connections.
-    _behind_proxy = bool(os.environ.get('BEHIND_PROXY'))
+    _behind_proxy = _env_flag('BEHIND_PROXY')
     app.config['SESSION_COOKIE_SECURE'] = _behind_proxy
     if not _behind_proxy:
         app.logger.warning(
@@ -233,7 +241,7 @@ def create_app(test_config=None) -> Flask:
         """Derive a deterministic HSL hue (0-360) from a string."""
         if not value:
             return 'hsl(200, 60%, 50%)'
-        h = hash(str(value)) % 360
+        h = int(hashlib.md5(str(value).encode('utf-8')).hexdigest()[:8], 16) % 360
         return f'hsl({h}, 60%, 50%)'
 
     @app.context_processor
@@ -677,7 +685,8 @@ def _start_auto_backup_worker(app: Flask) -> None:
 
                     freq = getattr(setting, 'backup_auto_frequency', 'weekly') or 'weekly'
                     time_str = getattr(setting, 'backup_auto_time', '03:00') or '03:00'
-                    day_val = getattr(setting, 'backup_auto_day', 1) or 1
+                    day_val = getattr(setting, 'backup_auto_day', None)
+                    day_val = 1 if day_val is None else int(day_val)
                     include_files = bool(getattr(setting, 'backup_auto_include_files', True))
 
                     tz_name = getattr(setting, 'app_timezone', 'Europe/Prague') or 'Europe/Prague'
@@ -840,8 +849,14 @@ def _start_model_thumbnail_worker(app: Flask) -> None:
     thread.start()
 
 
-# WSGI entry point (Gunicorn) and dev server
-app = create_app()
+# WSGI entry point (Gunicorn) and dev server.
+# The module-level app is only created for real server runs — when the test
+# suite imports this module (python -m pytest), create_app() would otherwise
+# run migrations against the production database and start worker threads.
+if not any('pytest' in arg for arg in sys.argv):
+    app = create_app()
+else:
+    app = None  # tests create their own app instances via create_app({...})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

@@ -247,6 +247,24 @@ def register(app):
 
             if dry_run:
                 total = len(data.get('filaments', [])) + len(data.get('projects', [])) + len(data.get('users', []))
+                # Structural validation — dry-run must actually detect
+                # incomplete/incompatible backups, not just count rows.
+                problems = []
+                for section in ('filaments', 'projects', 'users', 'brands', 'colors', 'materials'):
+                    value = data.get(section, [])
+                    if not isinstance(value, list):
+                        problems.append(section)
+                for filament in data.get('filaments', []):
+                    if not isinstance(filament, dict) or not filament.get('name'):
+                        problems.append('filament-row')
+                        break
+                for project in data.get('projects', []):
+                    if not isinstance(project, dict) or not project.get('name'):
+                        problems.append('project-row')
+                        break
+                if problems:
+                    flash(translate('backup_dry_run_invalid').format(detail=', '.join(sorted(set(problems)))), 'error')
+                    return redirect(url_for('settings') + '?tab=data')
                 flash(translate('backup_dry_run_ok').format(total=total), 'success')
                 return redirect(url_for('settings') + '?tab=data')
 

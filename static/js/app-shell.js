@@ -164,20 +164,22 @@ function appShell() {
     if (!meta) return;
     var csrfToken = meta.getAttribute('content');
 
+    function injectCsrfIntoForm(form) {
+        if (
+            form.method &&
+            form.method.toLowerCase() === 'post' &&
+            !form.querySelector('[name="csrf_token"]')
+        ) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'csrf_token';
+            input.value = csrfToken;
+            form.appendChild(input);
+        }
+    }
+
     function injectCsrfIntoForms() {
-        document.querySelectorAll('form').forEach(function (form) {
-            if (
-                form.method &&
-                form.method.toLowerCase() === 'post' &&
-                !form.querySelector('[name="csrf_token"]')
-            ) {
-                var input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'csrf_token';
-                input.value = csrfToken;
-                form.appendChild(input);
-            }
-        });
+        document.querySelectorAll('form').forEach(injectCsrfIntoForm);
     }
 
     // Inject into forms already in the DOM
@@ -187,9 +189,24 @@ function appShell() {
         injectCsrfIntoForms();
     }
 
-    // Inject into forms added by AJAX (e.g. fetchContent() in inventory)
+    // Inject into forms added by AJAX (e.g. fetchContent() in inventory).
+    // Only the *added* nodes are inspected — scanning the whole document on
+    // every mutation is O(n²) on dynamic pages. `injectCsrfIntoForms()` above
+    // still covers the initial page load.
     function startMutationObserver() {
-        new MutationObserver(injectCsrfIntoForms).observe(
+        function injectIntoAddedNodes(mutations) {
+            mutations.forEach(function (mutation) {
+                mutation.addedNodes.forEach(function (node) {
+                    if (node.nodeType !== 1) return;
+                    if (node.tagName === 'FORM') {
+                        injectCsrfIntoForm(node);
+                    } else {
+                        node.querySelectorAll('form').forEach(injectCsrfIntoForm);
+                    }
+                });
+            });
+        }
+        new MutationObserver(injectIntoAddedNodes).observe(
             document.body,
             { childList: true, subtree: true }
         );
@@ -335,9 +352,26 @@ function appShell() {
                 this.unreadCount = initialUnread || 0;
                 this._lastKnown = this.unreadCount;
                 this._startPolling();
+                this._bindLifecycle();
+            },
+
+            _bindLifecycle() {
+                var self = this;
+                window.addEventListener('pagehide', function () { self.destroy(); });
+                window.addEventListener('pageshow', function () {
+                    if (!document.hidden) self._startPolling();
+                });
+                document.addEventListener('visibilitychange', function () {
+                    if (document.hidden) {
+                        self.destroy();
+                    } else {
+                        self._startPolling();
+                    }
+                });
             },
 
             _startPolling() {
+                if (this._pollTimer) return;
                 this._pollTimer = setInterval(() => this._poll(), this._pollInterval);
             },
 
@@ -349,7 +383,8 @@ function appShell() {
             },
 
             _poll() {
-                fetch('/api/notifications/unread-count', { signal: AbortSignal.timeout(5000) })
+                var url = window.__notifUnreadUrl || '/api/notifications/unread-count';
+                fetch(url, { signal: AbortSignal.timeout(5000) })
                     .then(function (r) { return r.ok ? r.json() : null; })
                     .then(function (data) {
                         if (data && data.count !== undefined) {
@@ -377,7 +412,8 @@ function appShell() {
 
             _fetchNotifications() {
                 this.loading = true;
-                fetch('/api/notifications/recent', { signal: AbortSignal.timeout(5000) })
+                var url = window.__notifRecentUrl || '/api/notifications/recent';
+                fetch(url, { signal: AbortSignal.timeout(5000) })
                     .then(function (r) { return r.ok ? r.json() : null; })
                     .then(function (data) {
                         if (data && data.notifications) {
@@ -412,7 +448,8 @@ function appShell() {
 
             markAllRead() {
                 var self = this;
-                fetch('/api/notifications/mark-all-read', {
+                var url = window.__notifMarkAllUrl || '/api/notifications/mark-all-read';
+                fetch(url, {
                     method: 'POST',
                     signal: AbortSignal.timeout(5000)
                 }).then(function (r) { return r.ok ? r.json() : null; })
@@ -427,7 +464,8 @@ function appShell() {
             },
 
             _markReadAjax(id) {
-                fetch('/api/notifications/' + id + '/mark-read', {
+                var url = window.__notifMarkReadUrl || '/api/notifications/0/mark-read';
+                fetch(url.replace('/0/', '/' + id + '/'), {
                     method: 'POST',
                     signal: AbortSignal.timeout(5000)
                 }).catch(function () { /* silent */ });

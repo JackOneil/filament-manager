@@ -16,7 +16,7 @@ from werkzeug.utils import secure_filename
 from database import db
 from auth import get_current_user, is_admin
 from models import Project, ProjectFile, AppSetting, User, ModelComment, ModelCategory
-from utils import escape_like, parse_tags, utc_now, translate, safe_commit
+from utils import escape_like, get_settings, parse_tags, utc_now, translate, safe_commit
 
 logger = logging.getLogger(__name__)
 
@@ -321,7 +321,7 @@ def api_models_list():
 
     tag_filter = request.args.get('tag', '').strip()
     if tag_filter:
-        query = query.filter(Project.tag_text.ilike(f'%{escape_like(tag_filter)}%'))
+        query = query.filter(Project.tag_text.ilike(f'%{escape_like(tag_filter)}%', escape='\\'))
 
     # Pagination params (parse early for DB-level limit)
     page = request.args.get('page', 1, type=int)
@@ -662,7 +662,12 @@ def model_upload_thumbnail(file_id):
         return jsonify({'error': translate('error_invalid_data')}), 400
         
     import base64
-    raw_data = base64.b64decode(img_data.split(',')[1])
+    try:
+        raw_data = base64.b64decode(img_data.split(',')[1], validate=False)
+    except (TypeError, ValueError):
+        return jsonify({'error': translate('error_invalid_data')}), 400
+    if not raw_data:
+        return jsonify({'error': translate('error_invalid_data')}), 400
     
     upload_folder = current_app.config.get(
         'PROJECT_UPLOAD_FOLDER',
@@ -767,6 +772,7 @@ def model_public_share(token):
         root=root_file,
         latest=latest,
         history=history,
+        lang=(get_settings().lang if get_settings() else 'cs') or 'cs',
     )
 
 

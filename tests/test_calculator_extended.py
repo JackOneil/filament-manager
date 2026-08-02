@@ -6,10 +6,11 @@ import tempfile
 import unittest
 
 from app import create_app
+from auth import hash_password
 from database import db
 from models import (
     AppSetting, BambuJobMaterial, BambuPrintJob, Brand, Color, Filament,
-    Material, PrintHistory, Project, ProjectQuote, ProjectFilament,
+    Material, PrintHistory, Project, ProjectQuote, ProjectFilament, User,
 )
 from database import db
 from utils import utc_now
@@ -43,6 +44,13 @@ class _BaseCalculatorTests(unittest.TestCase):
                 quantity=1,
             )
             self.project = Project(name='Calc Project', client_name='Client')
+            admin = User(
+                email='admin@example.com', name='Admin',
+                password_hash=hash_password('password123'), role='admin',
+            )
+            db.session.add(admin)
+            db.session.flush()
+            self.project.owner_user_id = admin.id
             db.session.add_all([self.filament, self.project])
 
             # Ensure AppSetting exists (migration doesn't commit the seed row)
@@ -247,6 +255,9 @@ class CalculatorRouteQuoteTests(_BaseCalculatorTests):
 
     def test_calculator_save_quote_to_project(self):
         """Save a quote to a project (regression)."""
+        self.client.post(
+            '/login', data={'email': 'admin@example.com', 'password': 'password123'},
+        )
         response = self.client.post('/calculator', data={
             'filament_id': self.filament_id,
             'project_id': self.project_id,

@@ -445,6 +445,13 @@
         window.__helpLang = {{ current_lang | tojson }};
         window.__helpEndpoint = {{ (request.endpoint or '').split('.').pop() | tojson }};
         window.__firstLoginTour = {{ ('1' if request.args.get('welcome') == '1' else '0') | tojson }};
+        {# Notification bell AJAX endpoints — resolved via url_for so they stay
+           correct under sub-path deployments (app-shell.js falls back to the
+           hardcoded paths when these are absent). #}
+        window.__notifUnreadUrl = {{ url_for('auth.api_notifications_unread_count') | tojson }};
+        window.__notifRecentUrl = {{ url_for('auth.api_notifications_recent') | tojson }};
+        window.__notifMarkAllUrl = {{ url_for('auth.api_notification_mark_all_read') | tojson }};
+        window.__notifMarkReadUrl = {{ url_for('auth.api_notification_mark_read', id=0) | tojson }};
         {# Client-side toast i18n: a curated subset of keys used by JS code
            (reactions, upload stepper, etc.). Keep this list small — the
            full dictionary is large and not needed on the client.

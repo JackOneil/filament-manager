@@ -64,7 +64,7 @@ def _apply_inventory_filters(filaments_query):
     if f_color:
         filaments_query = filaments_query.where(Filament.color_id == f_color)
     if f_tag:
-        filaments_query = filaments_query.where(Filament.tag_text.ilike(f'%{escape_like(f_tag)}%'))
+        filaments_query = filaments_query.where(Filament.tag_text.ilike(f'%{escape_like(f_tag)}%', escape='\\'))
 
     return filaments_query, f_brand, f_material, f_color, f_tag
 
@@ -117,7 +117,7 @@ def _inventory_stats(f_brand='', f_material='', f_color='', f_tag=''):
     if f_color:
         agg_query = agg_query.filter(Filament.color_id == f_color)
     if f_tag:
-        agg_query = agg_query.filter(Filament.tag_text.ilike(f'%{escape_like(f_tag)}%'))
+        agg_query = agg_query.filter(Filament.tag_text.ilike(f'%{escape_like(f_tag)}%', escape='\\'))
 
     agg_result = agg_query.first()
     return {

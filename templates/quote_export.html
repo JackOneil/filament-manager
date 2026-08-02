@@ -185,7 +185,7 @@
                             <p class="font-bold text-base"><span x-text="customer.name"></span></p>
                             <p x-show="customer.street" x-text="customer.street"></p>
                             <p x-show="customer.city"><span x-text="customer.zip"></span> <span x-text="customer.city"></span></p>
-                            <p x-show="!customer.street&&!customer.city"class="text-gray-400italic">{{t('quote_export_address_missing')}}</p>
+                            <p x-show="!customer.street&&!customer.city" class="text-gray-400 italic">{{t('quote_export_address_missing')}}</p>
                         </div>
                     </div>
                 </div>

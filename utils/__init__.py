@@ -464,7 +464,7 @@ def collect_sparkline_data(filaments, now=None):
     for fid, date_str, weight in results_id:
         if fid in by_id and date_str:
             try:
-                if isinstance(date_str, datetime.date):
+                if isinstance(date_str, date):
                     dt = date_str
                 else:
                     dt = datetime.strptime(date_str, '%Y-%m-%d').date()
@@ -492,7 +492,7 @@ def collect_sparkline_data(filaments, now=None):
         fid = by_name.get(name)
         if fid in by_id and date_str:
             try:
-                if isinstance(date_str, datetime.date):
+                if isinstance(date_str, date):
                     dt = date_str
                 else:
                     dt = datetime.strptime(date_str, '%Y-%m-%d').date()
@@ -1187,6 +1187,7 @@ def create_undo_snapshot(user_id, action_type, filament, project_filaments=None,
         expires_at=utc_now() + timedelta(minutes=_UNDO_TTL_MINUTES),
         is_consumed=False,
     )
+    purge_expired_undo_logs()
     db.session.add(undo_log)
     safe_commit()
     return undo_log
@@ -1260,6 +1261,7 @@ def create_bulk_undo_snapshot(user_id, entries):
         expires_at=utc_now() + timedelta(minutes=_UNDO_TTL_MINUTES),
         is_consumed=False,
     )
+    purge_expired_undo_logs()
     db.session.add(undo_log)
     safe_commit()
     return undo_log
@@ -1515,18 +1517,35 @@ def _follow_safe_redirects(url, headers, timeout, max_redirects=5):
             headers=headers,
             timeout=timeout,
             allow_redirects=False,
-            stream=False,
+            stream=True,
         )
 
         # Defend against DNS rebinding: validate the actual peer IP
         _validate_peer_ip(response)
 
         if 300 <= response.status_code < 400:
+            # Drain nothing — the redirect body is irrelevant.
+            response.close()
             location = response.headers.get('Location')
             if not location:
                 return response, current_url
             current_url = urljoin(current_url, location)
             continue
+
+        # Cap the response body so a malicious/oversized page cannot exhaust
+        # memory during link-preview metadata extraction (10 MiB is far beyond
+        # any realistic OpenGraph page).
+        _LINK_PREVIEW_MAX_BYTES = 10 * 1024 * 1024
+        chunks = []
+        size = 0
+        for chunk in response.iter_content(chunk_size=65536):
+            chunks.append(chunk)
+            size += len(chunk)
+            if size > _LINK_PREVIEW_MAX_BYTES:
+                response.close()
+                raise ValueError('Response too large')
+        response._content = b''.join(chunks)
+        response.close()
 
         return response, current_url
 

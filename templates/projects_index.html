@@ -155,6 +155,7 @@ function projectsApp() {
         loading: false,
         editingLayout: false,
         _fetchPending: false,
+        _refetchQueued: false,
         _fetchController: null,
         
         clientFocus: false,
@@ -238,9 +239,13 @@ function projectsApp() {
         },
         
         async fetchContent() {
-            // Deduplicate: if a fetch is already in-flight, skip this trigger.
-            // The next model change (via $watch) will pick up the latest filter state.
-            if (this._fetchPending) return;
+            // Deduplicate: if a fetch is already in-flight, queue a refetch
+            // instead of dropping the change — the queued call picks up the
+            // latest filter state as soon as the current fetch completes.
+            if (this._fetchPending) {
+                this._refetchQueued = true;
+                return;
+            }
             this._fetchPending = true;
             this.loading = true;
 
@@ -375,6 +380,10 @@ function projectsApp() {
                 this.loading = false;
                 this._fetchPending = false;
                 this._fetchController = null;
+                if (this._refetchQueued) {
+                    this._refetchQueued = false;
+                    this.fetchContent();
+                }
             }
         }
     }

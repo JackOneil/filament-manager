@@ -372,7 +372,7 @@
 
     <!-- MODAL 1: Edit Metadata -->
     <div x-show="editModalOpen" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs" @keydown.escape.window="editModalOpen = false">
-        <div class="ui-panel w-full max-w-lg shadow-2xl relative" @click.away="editModalOpen = false">
+        <div class="ui-panel w-full max-w-lg shadow-2xl relative" @click.outside="editModalOpen = false">
             <button type="button" @click="editModalOpen = false" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200">
                 <i class="fa-solid fa-xmark text-lg"></i>
             </button>
@@ -483,7 +483,7 @@
 
     <!-- MODAL 2: Upload Version -->
     <div x-show="uploadModalOpen" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs" @keydown.escape.window="uploadModalOpen = false">
-        <div class="ui-panel w-full max-w-lg shadow-2xl relative" @click.away="uploadModalOpen = false">
+        <div class="ui-panel w-full max-w-lg shadow-2xl relative" @click.outside="uploadModalOpen = false">
             <button type="button" @click="uploadModalOpen = false" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200">
                 <i class="fa-solid fa-xmark text-lg"></i>
             </button>
@@ -944,7 +944,7 @@ function modelDetailApp() {
                     formData.append('csrf_token', csrfMeta.content);
                 }
 
-                fetch('/models/version/' + self.activeFileId + '/thumbnail', {
+                fetch('{{ url_for('models.model_upload_thumbnail', file_id=0) }}'.replace('/0', '/' + self.activeFileId), {
                     method: 'POST',
                     body: formData
                 })
@@ -976,7 +976,7 @@ function modelDetailApp() {
                     formData.append('csrf_token', csrfMeta.content);
                 }
 
-                fetch('/models/version/' + self.activeFileId + '/thumbnail', {
+                fetch('{{ url_for('models.model_upload_thumbnail', file_id=0) }}'.replace('/0', '/' + self.activeFileId), {
                     method: 'POST',
                     body: formData
                 });

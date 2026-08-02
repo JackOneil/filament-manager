@@ -5,134 +5,178 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.120.2] — 2026-07-31
+## [1.120.3] — 2026-07-31
 
 ### Fixed
 
-- **Smazání projektu s TODO již nespadne s HTTP 500** — `snapshot_project_for_undo()` četl neexistující sloupec `ProjectTodo.position` (`AttributeError`); undo projektu navíc předával `position=` do konstruktoru a ztrácel `due_date`. Snapshot/restore nyní používá pouze reálné sloupce a `due_date` se správně parsuje jako datetime s fallbackem na date. (routes/projects_helpers.py)
-- **Undo „remove spool“ a veškerý inventory undo funguje** — `consume_undo_log()` nevkládal `action_type` do vrácených dat, takže `inventory_undo` nedokázal rozpoznat typ akce a vždy skončil chybou. Typ akce se nyní injektuje z DB řádku undo logu. (utils/__init__.py)
-- **Undo smazání zmetku/údržby oživen** — opraveny tři příčiny: (1) migrace `filament_undo_log.snapshot_data` na nullable nyní běží i na SQLite (rekreace tabulky; dosud jen PostgreSQL); (2) smazání nastavuje session slot `inventory_pending_undo`, takže se zobrazí toast s tlačítkem „Vrátit“ (AJAX smazání zmetku nyní po úspěchu obnoví stránku); (3) TTL undo zvýšeno z 14 sekund na 15 minut, přidány překlady `undo_toast_waste_delete_title` / `undo_toast_maintenance_delete_title`. (migrations.py, routes/waste.py, routes/maintenance.py, templates/waste.html, messages.py)
-- **Migrace FK `waste_record.filament_id` konečně funguje** — kontrola `PRAGMA foreign_key_list` četla sloupec `on_update` (row[5]) místo `on_delete` (row[6]), takže migrace vždy předčasně skončila; navíc `PRAGMA foreign_keys=OFF` je v transakci no-op, proto se celá rekreace přesunula na dedikované AUTOCOMMIT připojení. (migrations.py)
-- **Autorizace citací a projektové kalkulačky** — `delete_quote` / `export_quote` / `calculator_project` nyní vyžadují admina nebo vlastníka projektu (dosud mohl ne-admin mazat/exportovat citace kohokoli, včetně přidělení čísla faktury). (routes/calculator.py)
-- **Ne-admini nemohou nahrávat osiřelé modely** — `model_upload` bez `project_id` je povolen pouze adminům; běžný uživatel dostane chybu a soubor se neuloží. (routes/models.py, messages.py)
-- **Kalkulačka nepadsá s 500 na nečíselné vstupy** — `float()` konverze `weight`/`print_time`/`margin_percent` jsou chráněny. (routes/calculator.py)
-- **Projekt create/edit nepadá s 500 na vadné `due_date`** — `strptime` je ošetřen (konzistentně s todo formuláři). (routes/projects.py)
-- **Žádné částečné uložení při chybné editaci filamentu** — formulářové hodnoty se nejprve celé zvalidují a teprve pak zapíší do ORM objektu; `teardown_db_session` navíc rollbackuje i čistou session s otevřenou transakcí, takže špinavá data nemohou uniknout do dalšího requestu. (routes/inventory.py, app.py)
-- **Storage robustnost** — nečíselné `columns`/`slots_count` už nezpůsobí 500; `storage_reorder_shelves` ignoruje nečíselná ID; zmenšení police **nikdy nemaže** placementy — police se místo toho automaticky rozšíří. (routes/storage.py)
-- **Backup import: oprava transakce a limity dekomprese** — `db.session.begin()` v `/import` selhával na otevřené read-only transakci z předchozího requestu („A transaction is already begun“) — před blokem se transakce korektně ukončí; `_load_backup_package` má nyní limity velikosti členů archivu (256 MB/člen, 512 MB celkem) proti tar-bomb DoS. (routes/backup.py, routes/backup_helpers.py)
-- **Regresní testy** — nový soubor `tests/test_review_fixes.py` (23 testů) pokrývá všechny výše uvedené opravy včetně migrace legacy schémat.
+- **ESCAPE clause added to fulltext search** — `escape_like()` now actually works: every `.ilike()` call passes `escape='\\'` (SQLAlchemy would otherwise not emit the ESCAPE clause and searches for `%`/`_` returned empty results) across inventory, projects, history, users and audit. (routes/api.py, projects.py, history.py, inventory_helpers.py, auth.py, models.py)
+- **Sparkline data no longer silently empty** — `isinstance(date_str, datetime.date)` always raised `TypeError` (`datetime.date` on the class is a bound method) and 7-day charts were quietly empty; fixed to `isinstance(date_str, date)`. (utils/__init__.py)
+- **`export_quote` no longer assigns invoice numbers on GET** — the mutating GET (and the `invoice_counter` race) replaced by a POST endpoint `quote_issue_invoice`; export only renders. (routes/calculator.py, templates/calculator.html, project_detail.html)
+- **IDOR: comment reactions and project templates** — `project_comment_react` now checks project access (403 for non-owners/admins); templates are filtered to the user's own for non-admins (`_visible_project_templates`), reading/creating from a foreign template returns 404. (routes/projects.py)
+- **Project status state machine** — `project_advance_status` no longer wraps REJECTED/CANCELLED/FAILED back to NEW (off-by-one via `flow.index`). (routes/projects.py)
+- **Timezone-aware sort sentinels** — `datetime.max`/`datetime.min` in TODO, job and quote sort keys are now aware (`replace(tzinfo=timezone.utc)`) — no TypeError on PostgreSQL. (routes/projects.py, projects_helpers.py)
+- **Invite activation requires the invited email** — a code holder cannot activate the account with a different address than the invitation was sent to. (routes/auth.py, messages.py)
+- **Link preview body size cap** — `_follow_safe_redirects` reads the response as a stream with a 10 MiB cap (memory-DoS guard); tests updated to streamed mocks. (utils/__init__.py, tests/test_utils.py)
+- **Project undo restores comments, quotes and print items** — snapshot/restore extended (files stay excluded — they remain on disk). (routes/projects_helpers.py)
+- **File undo: `filepath` confined to the upload folder** — a tampered sidecar in `/tmp` cannot make the restore write outside it. (routes/projects_helpers.py)
+- **Per-file upload size limit** — files larger than `MAX_CONTENT_LENGTH` are rejected even in multi-file uploads (new key `project_file_too_large`). (routes/projects.py, messages.py)
+- **ICS export is RFC 5545 compliant** — `DTSTAMP` added, lines longer than 75 octets are folded, UTC note. (routes/maintenance.py)
+- **Maintenance forms interpret local time in the app timezone** — `_parse_dt_local` normalizes to UTC (no timezone shift when displayed). (routes/maintenance.py)
+- **Stats: aware `since_dt` + heatmap in app timezone** — no 500 on PostgreSQL and the day/hour grid matches the UI. (routes/stats.py)
+- **PrusaLink: `weight_grams` backfilled for existing jobs** — a FINISHED job without a weight is now backfilled (deduction/mapping gets a meaningful amount). (routes/prusa.py)
+- **Unique constraints** — `bambu_printer.device_id`, `prusa_printer.device_id` and `storage_placement.filament_id` (model + migration with dedup and index; legacy DBs without the `device_id` column are skipped safely). A filament may only occupy one slot — assigning it elsewhere moves the placement instead of creating a duplicate. (models.py, migrations.py, routes/storage.py)
+- **Classic calculator: `save_quote` checks project ownership** — non-admins cannot save a quote into a foreign project. (routes/calculator.py)
+- **Negative-value validation** — filament add/edit rejects negative weight/price/quantity. (routes/inventory.py)
+- **CSV import capped at 5000 rows** — a crafted payload cannot bulk-insert unbounded filaments. (routes/inventory.py, messages.py)
+- **Expired undo logs are purged** — `purge_expired_undo_logs()` is called when snapshots are created. (utils/__init__.py)
+- **Login rate limiter no longer resets on flood** — the >1000-IP cleanup deletes only stale entries, not the whole dictionary. (routes/auth.py)
+- **Stable avatar colours** — `hash()` (per-process salted) replaced by `hashlib.md5`. (app.py)
+- **`BEHIND_PROXY` parsed as a boolean** — `0`/`false` are no longer truthy. (app.py)
+- **Module-level `create_app()` no longer runs on pytest import** — tests no longer trigger migrations on the production database or start worker threads. (app.py)
+- **Import dry-run validates structure** — not just a row count; new key `backup_dry_run_invalid`. (routes/backup.py, messages.py)
+- **Model thumbnail uploads** — `base64.b64decode` is guarded (no 500 on malformed payloads). (routes/models.py)
+- **Model share page respects the app language** — `lang` is passed from the route. (routes/models.py, templates/models_share.html)
+- **Auto-backup: Monday (day 0) is no longer Tuesday** — explicit `is None` check. (app.py)
+- **5 missing translations added** — `automap_confirmed`, `selected_filaments_count_prefix`, `stats_project_dataset`, `stats_usage_dataset`, `stats_purchase_dataset` (cs+en). (messages.py)
+- **Backup export without N+1** — `joinedload`/`selectinload` for movements, Bambu/Prusa jobs, waste records and model comments. (routes/backup_helpers.py)
+- **Dependencies** — `Werkzeug>=3.0.6,<4` (CVE-2024-49766/49767), `cryptography>=42.0,<46` (pinned major). (requirements.txt)
+- **Docker HEALTHCHECK** — the image reports its health via `/login`; non-root runtime via a commented `user:` in compose (bind-mount ownership). (Dockerfile, docker-compose.yml)
+- **Lazy logger formatting** — 30 f-string `app.logger.*()` calls in settings.py converted to `%s`. (routes/settings.py)
+- **Waste reasons action in settings** — stores `waste_reasons_json` with JSON validation; tests rewritten against the real endpoint. (routes/settings.py, tests/test_settings_integration.py)
+- **Flaky timing tests** — 2–3 s thresholds raised to 8 s. (tests/test_performance.py)
+
+### Frontend (templates + JS)
+
+- **Alpine `@click.away` → `@click.outside`** (Alpine 3) in 4 places — modals can now be closed by clicking the backdrop. (models_detail, models_index, overview)
+- **AJAX dedup no longer drops search changes** — `_refetchQueued` in projects_index; abort race in models_index resolved. (templates)
+- **Stats `DEFAULT_ORDER` includes `section_heatmap`**; dead CSS class `text-gray-400italic` fixed. (templates/stats.html, quote_export.html)
+- **History shows local time consistently** — `strftime` replaced by `fmt_dt`. (templates/history.html)
+- **Hardcoded fetch URLs replaced with `url_for`** — 10+ places (index, storage, models, projects, settings, base) + notification URLs injected as `window.__notif*Url`. (templates, static/js/app-shell.js)
+- **Bambu `saveJob` gives feedback on failure** (toast `bambu_save_failed`). (templates/bambu.html, messages.py)
+- **DOM XSS in the waste dropdown** — `escapeHtml()` for filament/project names. (templates/waste.html)
+- **Storage print export escapes shelf and filament names.** (templates/storage.html)
+- **Notification polling stops on `pagehide`/hidden tab** and resumes when visible; double-timer guard. (static/js/app-shell.js)
+- **Tour: the last step opens the help panel** — `window.openHelp` implemented. (static/js/help.js, tour.js)
+- **Resize lock released when the mouse is released outside the window** — `blur` fallback. (static/js/dashboard.js)
+- **CSRF MutationObserver injects only into new forms** — no O(n²) rescan. (static/js/app-shell.js)
+- **Mention hint uses the translation.** (templates/_project_overview.html)
+- **3 dead partials deleted** — `_project_materials.html`, `_project_files.html`, `_project_jobs.html`.
+- **`x-cloak` on initially hidden tabs and modals.** (templates/account.html, project_detail.html)
+
+## [1.120.2] — 2026-07-31
 
 ### Security
 
-- **Bulk delete filamentů přestal padat s HTTP 500** — `create_bulk_undo_snapshot()` přistupoval k dictům z `_build_filament_restore_bundle()` jako k ORM objektům (`AttributeError: 'dict' object has no attribute 'id'`); snapshot nyní čte pole z dictů i ORM objektů. (utils/__init__.py, routes/inventory.py)
-- **Stored XSS v kalkulačce a přehledech projektů/modelů opraven** — názvy filamentů, tagy, `client_name` a jména uploaderů byly interpolovány do jednořádkových JS stringů v Alpine atributech (HTML entity se dekódují před vyhodnocením výrazu → spustitelný kód). Vše převedeno na `|tojson`; na veřejné share stránce modelů se navíc již nezobrazuje e-mail uploadera. (templates/calculator.html, _projects_layout.html, _models_cards.html, _models_rows.html, models_detail.html, models_share.html)
-- **Hromadné akce uživatelů opraveny** — `@submit.prevent` na formuláři bulk akcí vždy volal `preventDefault()`, takže aktivace/deaktivace/smazání uživatelů přes UI nikdy neproběhla. (templates/users.html)
-- **Upload fotek zmetků selhával na CSRF 400** — `XMLHttpRequest` neprocházel globálním CSRF auto-injection patchem (pokrývá jen `fetch` a formuláře); hlavička `X-CSRFToken` se nyní posílá explicitně. (templates/waste.html)
-- **SSRF: Bambu cover obrázky se stahují jen z bezpečných URL** — `is_safe_external_url()` se dříve pouze zalogovala a fetch proběhl vždy; nyní se neschválená URL zahodí a redirecty se re-validují na každém hopu (URL je ovlivnitelná craftnutým backup importem). (routes/bambu_helpers.py)
-- **SSRF: PrusaLink host se re-validuje při každém requestu** — `prusa_request()` validuje uložený host před každým voláním a redirecty sleduje jen po re-validaci cíle; import backupu navíc prochází `validate_printer_host()` (craftnutý backup nemůže nasměrovat 60s poller na vnitřní adresy). (utils/__init__.py, routes/backup.py)
-- **Open redirect přes `Referer` uzavřen** — `redirect(request.referrer or ...)` na 10 místech (inventory, projects, settings) nyní prochází `safe_redirect_target()` (povolen jen same-host cíl). (routes/inventory.py, routes/projects.py, routes/settings.py)
-- **`shop_url` a barvy validovány** — `javascript:`/`data:` URL v `shop_url` (filament, brand, CSV import) se odmítají (`normalize_shop_url`); `hex_value` barev prochází `normalize_hex()` (CSS injection přes style atributy). (utils/__init__.py, routes/inventory.py, routes/settings.py)
-- **Bootstrap admin race uzavřen** — dvě souběžné registrace na prázdné DB se serializují zámkem a role admina se přiděluje až po re-checku počtu uživatelů. (routes/auth.py)
-- **Ochrana posledního admina** — demotace/deaktivace posledního aktivního administrátora je odmítnuta (dosud chráněno jen mazání). (routes/auth.py)
-- **Path traversal v importu backupu uzavřen** — `original_name` souborů zmetků prochází `secure_filename()` (craftnutý backup mohl zapsat soubor mimo upload adresář). (routes/backup.py)
-- **Alpine `SyntaxError` na kalkulačce/projektech/modely opraven** — `|tojson` vrací Markup, takže v dvojitě-uvozovkovaných HTML atributech holá `"` z dat (např. název filamentu `PETG 50% "heavy"`) atribut předčasně ukončila a Alpine vyhodnotil oříznutý výraz (`Unexpected token '}'`). Atributy interpolující `|tojson` přepnuty na single-quoted delimitery (konvence z BUG-706) — `calculator.html`, `_projects_layout.html`, `_models_cards.html`, `_models_rows.html`, `models_detail.html`, `models_share.html`, `_filament_context_menu.html`, `quote_export.html`, `filament_db.html`; přidán regresní test `tests/test_alpine_expressions.py` (6 testů), který renderuje stránky s hostilními daty a validuje úplnost Alpine výrazů. (9 šablon, tests/)
-- **`SECRET_KEY` persistován** — bez env var se klíč ukládá do `data/secret_key` (0600), takže session/CSRF tokeny přežijí restart i `docker compose up -d --build`. (app.py)
-- **Undo snapshot se konzumuje až po úspěšném restoru** — `consume_undo_log()` je read-only peek; nové `mark_undo_consumed()` se volá až po úspěšném obnovení, takže selhaný undo lze zopakovat. (utils/__init__.py, routes/inventory.py)
+- **Bulk delete of filaments no longer crashes with HTTP 500** — `create_bulk_undo_snapshot()` accessed dicts from `_build_filament_restore_bundle()` as ORM objects (`AttributeError: 'dict' object has no attribute 'id'`); the snapshot now reads fields from dicts and ORM objects alike. (utils/__init__.py, routes/inventory.py)
+- **Stored XSS in the calculator and project/model views fixed** — filament names, tags, `client_name` and uploader names were interpolated into single-quoted JS strings inside Alpine attributes (HTML entities are decoded before the expression is evaluated → executable code). All converted to `|tojson`; the public model share page no longer exposes the uploader's e-mail. (templates/calculator.html, _projects_layout.html, _models_cards.html, _models_rows.html, models_detail.html, models_share.html)
+- **Bulk user actions fixed** — `@submit.prevent` on the bulk-action form always called `preventDefault()`, so activating/deactivating/deleting users via the UI never ran. (templates/users.html)
+- **Waste photo uploads failed with CSRF 400** — `XMLHttpRequest` bypasses the global CSRF auto-injection patch (it only covers `fetch` and forms); the `X-CSRFToken` header is now sent explicitly. (templates/waste.html)
+- **SSRF: Bambu cover images are only fetched from safe URLs** — `is_safe_external_url()` was only logged while the fetch proceeded regardless; unsafe URLs are now rejected and redirects are re-validated on every hop (the URL is attacker-influencable via crafted backup imports). (routes/bambu_helpers.py)
+- **SSRF: PrusaLink host re-validated on every request** — `prusa_request()` validates the stored host before each call and follows redirects only after re-validating the target; backup import additionally passes `validate_printer_host()` (a crafted backup cannot point the 60 s poller at internal addresses). (utils/__init__.py, routes/backup.py)
+- **Open redirect via `Referer` closed** — `redirect(request.referrer or ...)` at 10 places (inventory, projects, settings) now goes through `safe_redirect_target()` (same-host only). (routes/inventory.py, routes/projects.py, routes/settings.py)
+- **`shop_url` and colours validated** — `javascript:`/`data:` URLs in `shop_url` (filament, brand, CSV import) are rejected (`normalize_shop_url`); colour `hex_value` goes through `normalize_hex()` (CSS injection via style attributes). (utils/__init__.py, routes/inventory.py, routes/settings.py)
+- **Bootstrap admin race closed** — two simultaneous registrations on an empty DB are serialized by a lock and the admin role is assigned only after re-checking the user count. (routes/auth.py)
+- **Last-admin protection** — demoting or deactivating the last active administrator is rejected (previously only deletion was protected). (routes/auth.py)
+- **Path traversal in backup import closed** — `original_name` of waste files goes through `secure_filename()` (a crafted backup could write outside the upload folder). (routes/backup.py)
+- **`SECRET_KEY` persisted** — without the env var the key is stored in `data/secret_key` (0600), so sessions and CSRF tokens survive restarts and `docker compose up -d --build`. (app.py)
+- **Undo snapshot consumed only after a successful restore** — `consume_undo_log()` is a read-only peek; the new `mark_undo_consumed()` runs only after the restore succeeded, so a failed undo can be retried. (utils/__init__.py, routes/inventory.py)
 
 ### Fixed
 
-- **Remove spool odečítal dvakrát** — ruční `quantity -= 1` i `deduct_filament_stock(weight_total)` přepočítávaly quantity; odečet je nyní jediný atomický compare-and-swap UPDATE (quantity i váha). (routes/inventory.py)
-- **Odpad nyní skutečně snižuje zásoby** — vytvoření záznamu odpadu odečte váhu ze zásob s `log_movement('waste')`, smazání/undo váhu vrací, editace řeší deltu i změnu filamentu; action type `waste` a `prusa_print` přidány do filtru historie a překladů. (routes/waste.py, routes/inventory.py, routes/history.py, messages.py)
-- **Bambu: dvojitý odečet u slot dedukce uzavřen** — slot-level dedukce propaguje `job.deducted` po odečtení všech slotů; job-level „map + deduct“ je blokován u multi-material jobů a u jobů s částečně deduktovanými sloty. (routes/bambu.py)
-- **Bambu remap vrací skutečně odečtenou váhu** — restore používá sumu z `MovementHistory` (po clampu) místo nominální váhy jobu; `deducted` se nastavuje jen když dedukce proběhla. (routes/bambu.py)
-- **Odečet zásob je atomický** — `deduct_filament_stock()` používá compare-and-swap UPDATE s bounded retry (žádné ztracené updaty při souběhu 4 gunicorn threadů). (utils/__init__.py)
-- **Backoff workerů reaguje na API chyby** — 401/429/5xx z Bambu/Prusa syncu nyní spouští exponenciální backoff (reset jen při úspěchu), cap 3600 s. (app.py)
-- **Bambu orphan reconcilace nekorumpuje RUNNING joby při výpadku API** — prázdná odpověď se nepovažuje za autoritativní; reconcilace běží jen když API vrátilo tasky. (routes/bambu_helpers.py)
-- **Migrace `project_file` rebuild opravena** — rekreace tabulky obsahuje `category_id` (17 sloupců) s explicitním sloupcovým INSERT a po rebuildu se obnovují indexy (dosud `INSERT SELECT *` selhával na DB s `category_id` a ztrácely se indexy). (migrations.py)
-- **`migrate_to_pg.py` nepřichází o data** — do seznamu migrovaných tabulek doplněny `model_category`, `model_comment`, `project_print_item` (byly tiše vynechány). (migrate_to_pg.py)
-- **Import backupu: AppSetting se vytváří, nejen upravuje** — na čerstvé DB restore nezpůsobí ztrátu konfigurace; `PrinterMaintenance.printer_id` se resolve podle (typ, jméno) místo raw ID. (routes/backup.py)
-- **Export běží jedním průchodem** — `/export` už nevolá `_build_export_data()` dvakrát (poloviční počet DB dotazů). (routes/backup.py)
-- **Poznámky údržby s Markdown se zobrazují** — prázdný `js-maint-note` div (bez konzumenta) nahrazen server-side renderem přes `render_markdown()` (nově dostupný v šablonách). (templates/maintenance.html, app.py)
-- **Task checkboxy v Markdown editoru jdou přepínat** — `preventDefault()` ve vizuálním módu potlačoval nativní toggle; přidán `click` handler s propagací do zdrojové hodnoty. (static/js/markdown-editor.js)
-- **Mobile swipe neunáší horizontální scroll** — gesto se ignoruje, když dotyk začal ve horizontálně scrollovatelném kontejneru (Kanban, široké tabulky). (static/js/mobile-ux.js)
-- **Collapsing topbar oživen** — chybějící CSS pravidlo pro `header.collapsed` (handler existoval, ale nic se nedělo). (static/css/app.css)
-- **Legacy session undo sloty nezpůsobují 500** — porovnání naivního `expires_at` s aware `utc_now()` normalizuje časové pásmo. (app.py)
-- **N+1 na indexu projektů odstraněn** — `selectinload(Project.print_items)` (kanban karty/table dělaly ~116 lazy dotazů na stránku). (routes/projects.py)
-- **`add()` filamentu nepadá s 500 na neexistující značku/materiál/barvu** — chybná reference se ohlásí a vrátí na formulář. (routes/inventory.py)
-- **Testy izolovány od produkčních adresářů** — opraveny patch targety v `test_bambu.py` (thumbnaily se ukládaly do `data/bambu_thumbs/`), `_backup_storage_dir()` respektuje `BACKUP_DIR` config, síťové fetche link preview jsou mockované. (tests/test_bambu.py, tests/test_refactors.py, tests/test_backup_extended.py, tests/test_projects_extended.py)
-- **`pytest.ini` nevyžaduje povinně xdist** — `-n auto` přesunuto z addopts na explicitní volání (suite běží i bez pytest-xdist). (pytest.ini)
+- **Remove-spool deducted twice** — manual `quantity -= 1` plus `deduct_filament_stock(weight_total)` both recomputed quantity; the decrement is now a single atomic compare-and-swap UPDATE (quantity and weight). (routes/inventory.py)
+- **Waste now actually reduces stock** — creating a waste record deducts the weight with `log_movement('waste')`, delete/undo restore it, edits handle the delta and filament changes; the `waste` and `prusa_print` action types added to the history filter and translations. (routes/waste.py, routes/inventory.py, routes/history.py, messages.py)
+- **Bambu: double deduction via slot mapping closed** — slot-level deduction propagates `job.deducted` once all slots are deducted; job-level “map + deduct” is blocked for multi-material jobs and jobs with partially deducted slots. (routes/bambu.py)
+- **Bambu remap restores the actually deducted weight** — the restore uses the `MovementHistory` sum (post-clamp) instead of the nominal job weight; `deducted` is set only when a deduction actually happened. (routes/bambu.py)
+- **Stock deduction is atomic** — `deduct_filament_stock()` uses a compare-and-swap UPDATE with bounded retries (no lost updates under 4 gunicorn threads). (utils/__init__.py)
+- **Worker backoff reacts to API errors** — 401/429/5xx from Bambu/Prusa sync now trigger exponential backoff (reset only on success), capped at 3600 s. (app.py)
+- **Bambu orphan reconciliation no longer corrupts RUNNING jobs during API outages** — an empty response is not treated as authoritative; reconciliation only runs when the API returned tasks. (routes/bambu_helpers.py)
+- **`project_file` rebuild migration fixed** — the table recreation includes `category_id` (17 columns) with an explicit column-list INSERT, and indexes are recreated after the RENAME (previously `INSERT SELECT *` failed on databases that already had `category_id` and all indexes were lost). (migrations.py)
+- **`migrate_to_pg.py` no longer drops data** — `model_category`, `model_comment` and `project_print_item` added to the migrated table list (previously silently skipped). (migrate_to_pg.py)
+- **Backup import: AppSetting created, not just updated** — a fresh database no longer loses the configuration on restore; `PrinterMaintenance.printer_id` is resolved by (type, name) instead of the raw ID. (routes/backup.py)
+- **Export runs in a single pass** — `/export` no longer calls `_build_export_data()` twice (half the DB queries). (routes/backup.py)
+- **Maintenance Markdown notes are displayed** — the empty `js-maint-note` div (no consumer) replaced by a server-side render via `render_markdown()` (now available in templates). (templates/maintenance.html, app.py)
+- **Task checkboxes in the Markdown editor can be toggled** — `preventDefault()` in visual mode suppressed the native toggle; a `click` handler now flips the state and syncs the source value. (static/js/markdown-editor.js)
+- **Mobile swipe no longer hijacks horizontal scroll** — the gesture is ignored when the touch starts inside a horizontally scrollable container (Kanban, wide tables). (static/js/mobile-ux.js)
+- **Collapsing topbar revived** — the missing CSS rule for `header.collapsed` (the handler existed but nothing happened). (static/css/app.css)
+- **Legacy session undo slots no longer cause 500** — comparing naive `expires_at` against aware `utc_now()` now normalizes the timezone. (app.py)
+- **N+1 on the projects index removed** — `selectinload(Project.print_items)` (Kanban cards/table did ~116 lazy queries per page). (routes/projects.py)
+- **`add()` filament no longer 500s on a missing brand/material/colour** — an invalid reference is reported and the form is returned. (routes/inventory.py)
+- **Tests isolated from production directories** — patch targets fixed in `test_bambu.py` (thumbnails were saved into `data/bambu_thumbs/`), `_backup_storage_dir()` honours the `BACKUP_DIR` config, link-preview network fetches are mocked. (tests/test_bambu.py, tests/test_refactors.py, tests/test_backup_extended.py, tests/test_projects_extended.py)
+- **`pytest.ini` no longer requires xdist** — `-n auto` moved from addopts to the explicit invocation (the suite runs without pytest-xdist). (pytest.ini)
+- **Alpine `SyntaxError` on the calculator/projects/models pages fixed** — `|tojson` returns Markup, so in double-quoted HTML attributes a bare `"` from user data (e.g. filament `PETG 50% "heavy"`) terminated the attribute early and Alpine evaluated a truncated expression (`Unexpected token '}'`). Attributes interpolating `|tojson` switched to single-quoted delimiters (the convention from BUG-706) — `calculator.html`, `_projects_layout.html`, `_models_cards.html`, `_models_rows.html`, `models_detail.html`, `models_share.html`, `_filament_context_menu.html`, `quote_export.html`, `filament_db.html`; regression test `tests/test_alpine_expressions.py` (6 tests) renders the pages with hostile data and validates expression completeness. (9 templates, tests/)
 
+## [1.120.1] — 2026-07-18
 ## [1.120.1] — 2026-07-18
 
 ### Added
-- **Tag suggestions v editaci projektu**: Do formuláře pro editaci projektu přidán dynamický seznam existujících štítků (`tag_existing`). Kliknutím na štítek se přidá do vstupního pole. Alpine.js komponenta `tagEditor` zobrazuje pouze štítky, které ještě nejsou v projektu použity. Backend v `routes/projects.py:465` sbírá unikátní existující tagy ze všech projektů a filtruje již použité. (templates/project_edit.html, routes/projects.py, messages.py)
+- **Tag suggestions in project editing**: The project edit form now has a dynamic list of existing tags (`tag_existing`). Clicking a tag adds it to the input field. The Alpine.js `tagEditor` component only shows tags not yet used by the project. The backend in `routes/projects.py:465` collects the unique existing tags from all projects and filters out the ones already used. (templates/project_edit.html, routes/projects.py, messages.py)
 
 ## [1.120.0] — 2026-07-18
 
 ### Changed
-- **Upload limit zvýšen z 64 MB na 256 MB**: `MAX_CONTENT_LENGTH` v `app.py` změněno na 256 MiB. Client-side validace v `uploadStepper` (`project_detail.html`) synchronizována na 256 MB. Týká se nahrávání 3D modelů (STL, 3MF, STEP) i obrázků do projektů.
+- **Upload limit raised from 64 MB to 256 MB**: `MAX_CONTENT_LENGTH` in `app.py` changed to 256 MiB. Client-side validation in `uploadStepper` (`project_detail.html`) synced to 256 MB. Applies to 3D model uploads (STL, 3MF, STEP) and project images.
 
 ## [1.119.15] — 2026-07-18
 
 ### Fixed
 - **BUG-554/576**: Oprava SQLAlchemy filtru `user.id if user else False` → `user.id if user else None` v `routes/models.py`.
-- **BUG-555**: Oprava lambda capture-by-reference v `routes/stats.py:210` — použít default argument binding.
-- **BUG-557**: Oprava maskování výjimek v `routes/inventory.py` — `db.session.rollback()` nyní obalen do vnitřního `try/except`.
-- **BUG-570**: Odstraněn neexistující `LegacyAPIWarning` filter z `pytest.ini`; přidány `pytest` a `pytest-xdist` do `requirements.txt`.
-- **BUG-573**: Přidáno `nullable=False` ke sloupcům `Project.status` a `ProjectTemplate.estimated_print_time` v `models.py`.
-- **BUG-574**: CSS selector injection fix v `static/js/dashboard.js` — 7 `querySelector` volání nyní používá `CSS.escape()`.
-- **BUG-711**: Opraven N+1 dotaz na `ProjectComment.reactions` v `routes/projects.py:336` — přidán `joinedload(ProjectComment.reactions)`.
-- **BUG-567 (částečně)**: Opraven XSS v `x-data` Pattern A (4 instance) — `placeholder: "{{ t(...) }}"` → `placeholder: {{ t(...)|tojson }}`.
+- **BUG-555**: Fixed lambda capture-by-reference in `routes/stats.py:210` — use default argument binding.
+- **BUG-557**: Fixed exception masking in `routes/inventory.py` — `db.session.rollback()` is now wrapped in an inner `try/except`.
+- **BUG-570**: Removed the non-existent `LegacyAPIWarning` filter from `pytest.ini`; added `pytest` and `pytest-xdist` to `requirements.txt`.
+- **BUG-573**: Added `nullable=False` to the `Project.status` and `ProjectTemplate.estimated_print_time` columns in `models.py`.
+- **BUG-574**: CSS selector injection fix in `static/js/dashboard.js` — 7 `querySelector` calls now use `CSS.escape()`.
+- **BUG-711**: Fixed N+1 query on `ProjectComment.reactions` in `routes/projects.py:336` — added `joinedload(ProjectComment.reactions)`.
+- **BUG-567 (partial)**: Fixed XSS in `x-data` Pattern A (4 instances) — `placeholder: "{{ t(...) }}"` → `placeholder: {{ t(...)|tojson }}`.
 
 ### Verified
-- **BUG-556**: False positive — `imported_files_map` v `routes/backup.py` je aktivně používán na řádcích 524 a 531.
-- **BUG-563**: Již opraveno dříve — obě lokace v `routes/stats.py` obsahují všechny 4 action types.
-- **BUG-571**: `.dockerignore` již obsahuje `node_modules/`, `*.log`, `.env`.
+- **BUG-556**: False positive — `imported_files_map` in `routes/backup.py` is actively used on lines 524 and 531.
+- **BUG-563**: Already fixed earlier — both locations in `routes/stats.py` contain all 4 action types.
+- **BUG-571**: `.dockerignore` already contains `node_modules/`, `*.log`, `.env`.
 
 ## [1.119.14] — 2026-07-18
 
 ### Fixed
-- **BUG-562**: Přidáno `ports: 5050:5000` do `docker-compose.yml` — aplikace nyní dostupná na localhost:5050.
-- **BUG-563**: `prusa_print` a `bulk_delete` action types již byly v `routes/stats.py` (opraveno dříve).
-- **BUG-564**: Opraven XSS v `markdown-editor.js:306` — `innerHTML` z `cloneContents()` nyní stripuje HTML tagy před vložením do task item.
-- **BUG-565**: Přidáno `db.session.commit()` do `auth.py:invalidate_all_user_sessions()` — session invalidation již není ztracena.
-- **BUG-706**: XSS oprava — nahrazeno `'{{ var|e }}'` za `{{ var|tojson }}` v 21 onclick kontextech napříč 8 šablonami. HTML atributy přepnuty na single-quotes pro kompatibilitu s `|tojson`.
-- **BUG-707**: SSRF ochrana v `utils/__init__.py:validate_printer_host()` — přidána DNS resoluce s kontrolou loopback/link-local/multicast IP adres.
-- **BUG-708**: Admin self-logout oprava — `routes/auth.py:344` nyní detekuje editaci vlastního profilu a použije `invalidate_all_other_sessions()`.
-- **BUG-709**: Detached ORM object oprava — `routes/prusa.py:174` nyní re-fetchuje `PrusaPrinter` po rollbacku před mutací.
+- **BUG-562**: Added `ports: 5050:5000` to `docker-compose.yml` — the app is now available at localhost:5050.
+- **BUG-563**: `prusa_print` and `bulk_delete` action types were already in `routes/stats.py` (fixed earlier).
+- **BUG-564**: Fixed XSS in `markdown-editor.js:306` — `innerHTML` from `cloneContents()` now strips HTML tags before inserting into the task item.
+- **BUG-565**: Added `db.session.commit()` to `auth.py:invalidate_all_user_sessions()` — the session invalidation is no longer lost.
+- **BUG-706**: XSS fix — replaced `'{{ var|e }}'` with `{{ var|tojson }}` in 21 onclick contexts across 8 templates. HTML attributes switched to single-quotes pro kompatibilitu s `|tojson`.
+- **BUG-707**: SSRF protection in `utils/__init__.py:validate_printer_host()` — added DNS resolution with loopback/link-local/multicast IP checks.
+- **BUG-708**: Admin self-logout fix — `routes/auth.py:344` now detects editing your own profile and uses `invalidate_all_other_sessions()`.
+- **BUG-709**: Detached ORM object fix — `routes/prusa.py:174` now re-fetches `PrusaPrinter` after a rollback before mutating.
 
 ### Known Issue
-- **BUG-561**: `AUTH_REQUIRED_IN_TESTS` nelze jednoduše přidat — 20 testovacích tříd vyžaduje refaktor auth setupu (přihlášení). Označeno jako "needs investigation".
+- **BUG-561**: `AUTH_REQUIRED_IN_TESTS` cannot be added easily — 20 test classes require an auth-setup refactor (login). Marked as "needs investigation".
 
 ## [1.119.13] — 2026-07-18
 
 ### Fixed
-- **BUG-700**: Přidán chybějící `flash` import v `routes/bambu.py` — `NameError` při neplatném datovém filtru na stránce Bambu (line 16).
-- **BUG-701**: Přidán chybějící `translate` import v `routes/auth.py` — `NameError` při mazání uživatele (sebe sama/posledního admina) (line 2).
-- **BUG-702**: Opravena greedy regex `({.*})` na non-greedy `({.*?})` v `utils/__init__.py:1550` — JSON-LD extrakce nyní správně parsuje stránky s více JSON objekty.
-- **BUG-703**: Opraveno ICS escapování čárek z `\:` na `\,` v `routes/maintenance.py:452` — vygenerované iCalendar soubory nyní odpovídají RFC 5545.
-- **BUG-704**: Opravena logika `0 or 10` v `app.py:694` a `routes/backup.py:129` — nastavení `backup_auto_keep_count = 0` (neomezená retence) již není přepsáno na 10. Použit explicitní `None` check.
-- **BUG-705**: Opravena SQLite-nekompatibilní `ALTER COLUMN` syntaxe v `migrations.py:218` — migrace nyní skipne `DROP NOT NULL` na SQLite (nepodporováno). PostgreSQL migrace probíhá normálně.
+- **BUG-700**: Added the missing `flash` import in `routes/bambu.py` — `NameError` on an invalid data filter on the Bambu page (line 16).
+- **BUG-701**: Added the missing `translate` import in `routes/auth.py` — `NameError` when deleting a user (self/last admin) (line 2).
+- **BUG-702**: Fixed greedy regex `({.*})` to non-greedy `({.*?})` in `utils/__init__.py:1550` — JSON-LD extraction now parses pages with multie JSON objekty.
+- **BUG-703**: Fixed ICS comma escaping from `\:` to `\,` in `routes/maintenance.py:452` — generated iCalendar files now comply with RFC 5545.
+- **BUG-704**: Fixed the `0 or 10` logic in `app.py:694` and `routes/backup.py:129` — setting `backup_auto_keep_count = 0` (unlimited retention) is no longer overwritten with 10. An explicit `None` check is used.
+- **BUG-705**: Fixed SQLite-incompatible `ALTER COLUMN` syntax in `migrations.py:218` — the migration now skips `DROP NOT NULL` on SQLite (unsupported there). The PostgreSQL migration runs normally.
 
 ## [1.119.12] — 2026-07-13
 
 ### Added
-- **Bambu waste modal: interactive Project search**: Pole "Projekt" nyní interaktivní fulltext vyhledávač (stejný pattern jako filament).
-- **Waste recording stays on Bambu page**: Po zaznamenání zmetku se již nepřesměrovává na stránku zmetků — formulář odeslán AJAXem, tisk je automaticky namapován na vybraný filament a projekt s odečtením zásob. Job se okamžitě zobrazí jako přiřazený.
-- **Waste propagates filament to print job**: Vybraný filament a projekt se při záznamu zmetku propíše i do Bambu tisku — včetně odečtu (`deduct=1`) a aktualizace UI.
+- **Bambu waste modal: interactive Project search**: The "Project" field is now an interactive fulltext search (same pattern as the filament one).
+- **Waste recording stays on Bambu page**: After recording the waste, the page no longer redirects to the waste page — the form is submitted via AJAX, and the job is automatically mapped to the selected filament and project with a stock deduction. The job is immediately shown as assigned.
+- **Waste propagates filament to print job**: The selected filament and project are propagated to the Bambu job when the waste is recorded — including the deduction (`deduct=1`) and aktualizace UI.
 
 ### Fixed
-- **BUG-603 (2nd re-fix): Color picker portal regression** — přechod na portal pattern (`position: fixed` v `document.body`) způsobil, že kliknutí na barevné políčko bylo přerušeno `mousedown` handlerem, který picker schoval dřív, než se stihl zpracovat `click`. Oprava: `_dashEnsurePickerClose` nyní kontroluje i `.widget-color-picker` jako bezpečnou zónu. (static/js/dashboard.js)
+- **BUG-603 (2nd re-fix): Color picker portal regression** — the switch to the portal pattern (`position: fixed` in `document.body`) caused clicks on the colour swatch to be interrupted by a `mousedown` handler that hid the picker before the `click` could be processed. Fix: `_dashEnsurePickerClose` now also treats `.widget-color-picker` as a safe zone. (static/js/dashboard.js)
 
 ## [1.119.11] — 2026-07-13
 
 ### Fixed
-- **BUG-603 (re-fix): Color picker dropdown hidden behind adjacent widgets**: Původní fix pomocí `z-index: 50` na widgetu nefungoval — `will-change: transform` a `opacity < 1` v editačním režimu vytvářejí nezávislé stacking kontexty, které `z-index` ignorují. **Oprava:** Color picker dropdown nyní používa portal pattern — renderuje se přímo do `document.body` s `position: fixed` a pozicí vypočítanou z `getBoundingClientRect()`. Tím zcela uniká všem stacking kontextům. Přidán `scroll`/`resize` listener pro přepočítání pozice. (static/js/dashboard.js)
+- **BUG-603 (re-fix): Color picker dropdown hidden behind adjacent widgets**: the original `z-index: 50` fix on the widget did not work — `will-change: transform` and `opacity < 1` in edit mode create independent stacking contexts that ignore `z-index`. **Fix:** the color picker dropdown now uses the portal pattern — it renders directly into `document.body` with `position: fixed` and a position computed from `getBoundingClientRect()`, fully escaping all stacking contexts. `scroll`/`resize` listeners recompute the position. (static/js/dashboard.js)
 
 ## [1.119.10] — 2026-07-13
 
 ### Added
-- **Bambu waste modal: interactive filament search + AMS auto-suggestion**: V modálním okně "Zaznamenat zmetek" na stránce Bambu tisků je nyní interaktivní filamentový vyhledávač (plnotextové vyhledávání s barevnými indikátory) namísto nativního `<select>`. Filament je automaticky předvybrán dle barvy a materiálu z AMS dat — stejná logika `_rankFilaments`/`_suggestedFilaments` jako u přiřazování filamentů k tiskům. (templates/bambu.html, templates/_bambu_job_cards.html)
+- **Bambu waste modal: interactive filament search + AMS auto-suggestion**: The "Record waste" modal on the Bambu jobs page now has an interactive filament search (fulltext with colour indicators) instead of a native `<select>`. The filament is automatically preselected by colour and material from the AMS data — the same `_rankFilaments`/`_suggestedFilaments` logic used for assigning filaments to jobs. (templates/bambu.html, templates/_bambu_job_cards.html)
 
 ## [1.119.9] — 2026-07-13
 
@@ -142,17 +186,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.119.8] — 2026-07-13
 
 ### Added
-- **Tag filter on models page**: Nový sloupec "Štítky" s interaktivním dropdown filtrem na stránce modelů — automaticky obsahuje všechny dostupné štítky z projektů. Kliknutím na štítek u modelu se filtrují modely podle daného štítku. Tag badges are now clickable and filter the models list. Added `tag` query parameter to API and Alpine.js component with fulltext search dropdown. (routes/models.py, templates/models_index.html, templates/_models_cards.html, templates/_models_rows.html, templates/models_detail.html, messages.py)
+- **Tag filter on models page**: New "Tags" column with an interactive dropdown filter on the models page — automatically contains all available tags from projects. Clicking a tag badge on a model filters the models list by that tag. Tag badges are now clickable and filter the models list. Added `tag` query parameter to API and Alpine.js component with fulltext search dropdown. (routes/models.py, templates/models_index.html, templates/_models_cards.html, templates/_models_rows.html, templates/models_detail.html, messages.py)
 
 ## [1.119.7] — 2026-07-13
 
 ### Added
-- **Project tags displayed on models**: Modely nahrané přes projekty nyní přejímají a zobrazují štítky svého projektu. Project tags shown on model cards, list rows, and detail page when the model belongs to a project. Uses `ui-badge` style consistent with project detail page. (routes/models.py, templates/_models_cards.html, templates/_models_rows.html, templates/models_detail.html)
+- **Project tags displayed on models**: Models uploaded via projects now inherit and display their project's tags. Project tags shown on model cards, list rows, and detail page when the model belongs to a project. Uses `ui-badge` style consistent with project detail page. (routes/models.py, templates/_models_cards.html, templates/_models_rows.html, templates/models_detail.html)
 
 ## [1.119.6] — 2026-07-04
 
 ### Added
-- Bambu: Ruční duplikování tisku — nová funkce `/bambu/job/<id>/duplicate` (POST) umožňuje vytvořit manuální kopii tisku, který nebyl synchronizován (edge case opakovaného tisku přímo na tiskárně). Nová kopie má `deducted=False` pro nezávislé přiřazení filamentu.
+- Bambu: Manual job duplication — the new `/bambu/job/<id>/duplicate` (POST) endpoint lets you create a manual copy of a job that was not synchronized (edge case of printing repeatedly straight from the printer). The new copy has `deducted=False` for independent filament assignment.
 
 ### Fixed
 - N/A
@@ -185,7 +229,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `User.last_login_at` (🟠 medium) — last login timestamps lost after restore. (routes/backup_helpers.py, routes/backup.py)
   - `AppSetting.link_preview_reader_enabled` (🟠 medium) — Jina AI reader opt-in lost after restore. (routes/backup_helpers.py, routes/backup.py)
   - `BambuPrintJob.raw_payload` and `PrusaPrintJob.raw_payload` (🟠 medium) — raw API payload data lost after restore. (routes/backup_helpers.py, routes/backup.py)
-- **Heatmap legend showing unresolved placeholders (BUG-595)**: The `{{T:less}}` and `{{T:more}}` placeholders in the consumption heatmap legend were never resolved to translated text (`méně`/`více` or `less`/`more`) because the translation replacement ran before `initHeatmaps()` created the legend DOM elements. Fixed by using the i18n helper directly in `initHeatmaps()`. (static/js/enhancements.js)
+- **Heatmap legend showing unresolved placeholders (BUG-595)**: The `{{T:less}}` and `{{T:more}}` placeholders in the consumption heatmap legend were never resolved to translated text (`less`/`more`) because the translation replacement ran before `initHeatmaps()` created the legend DOM elements. Fixed by using the i18n helper directly in `initHeatmaps()`. (static/js/enhancements.js)
 - **Duplicate `material` key in translations**: The `material` i18n key was defined twice in both `cs` and `en` dictionaries. Removed the duplicate from the "Generic single-word labels" section. (messages.py)
 
 ## [1.119.1] - 2026-06-28
@@ -221,7 +265,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Auto-backup & manual backup stuck (BUG-592)**: `run_migrations()` left idle-in-transaction database connections after reading `AppSetting` and `Brand` without committing or rolling back (migrations.py:253–260, 239–251). On PostgreSQL, these open transactions held shared locks on the tables, blocking ALL subsequent `ALTER TABLE` operations (`_safe_alter()`) and any query that needed to read those tables — including the auto-backup worker which calls `AppSetting.query.first()` to read backup settings. This caused the auto-backup to silently stop (last backup: June 6, 2026) and manual backup to hang.
 
   **Fix:** Added explicit `db.session.commit()` (or `db.session.rollback()` when seed data already exists) after every read query in `run_migrations()`. Also added `db.session.rollback()` at the beginning of `_safe_alter()` to release any pending locks before executing DDL — critical for PostgreSQL where idle transactions block exclusive locks. (migrations.py)
-- **Manual backup button submitting wrong form (BUG-592b)**: The "Spustit zálohu teď" button was nested inside the settings `<form>`. Nested forms are invalid HTML — browsers handle them inconsistently, often submitting to the outer form's action instead. This caused the button to save settings (flash: "Nastavení automatického zálohování uloženo.") instead of triggering a backup. **Fix:** Closed the settings form before the button row, moved the "Uložit" button outside the form using the `form="backup-auto-form"` attribute, and kept the trigger button in its own independent `<form>`. (templates/settings.html)
+- **Manual backup button submitting wrong form (BUG-592b)**: The "Run backup now" button was nested inside the settings `<form>`. Nested forms are invalid HTML — browsers handle them inconsistently, often submitting to the outer form's action instead. This caused the button to save settings (flash: "Auto-backup settings saved.") instead of triggering a backup. **Fix:** Closed the settings form before the button row, moved the "Save" button outside the form using the `form="backup-auto-form"` attribute, and kept the trigger button in its own independent `<form>`. (templates/settings.html)
 
 ## [1.118.0] - 2026-06-25
 ### Added
@@ -427,7 +471,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BUG-007**: `test_advance_status_full_flow` now makes actual HTTP requests and asserts final status instead of being vacuous (tests/test_projects_extended.py)
 - **BUG-008**: `test_project_usage_returns_rows` now uses a meaningful assertion that checks project name is in usage rows (tests/test_stats_extended.py)
 - **BUG-009**: `test_delete_filament_cleans_project_references` creates real Project/ProjectFilament records and verifies cleanup (tests/test_inventory_extended.py)
-- **BUG-010**: Tour tooltip close button uses `this._t({cs:'Zavřít',en:'Close'})` instead of hardcoded Czech (static/js/tour.js)
+- **BUG-010**: Tour tooltip close button uses the `_t()` translation helper instead of a hardcoded string (static/js/tour.js)
 - **BUG-011**: `showToast` i18n fallback no longer uses identity-replacement dead code (static/js/app-shell.js)
 - **BUG-012**: Dashboard hardcoded strings `'Color'`, `'Resize'`, `'Rows'` now use `window._dashColorTitle`, `_dashResizeTitle`, `_dashRowsTitle` set from template `t()` calls (static/js/dashboard.js, templates/overview.html, projects_index.html, stats.html)
 - **BUG-013**: Removed duplicate `openReorderShop` function from inventory.js (already defined in app-shell.js) (static/js/inventory.js)
@@ -542,7 +586,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Skeleton loaders** for AJAX-driven lists — `static/css/skeleton.css` with shimmer keyframes, plus `templates/_skeleton_cards.html` and `templates/_skeleton_rows.html` partials. Projects index page now injects skeletons into Kanban columns, calendar items, and the project table during filter-driven refetches. Bambu page replaces its single spinner with three skeleton cards while syncing. (Prusa page renders all jobs server-side, so it does not need skeletons.)
 - **Multi-step upload stepper** in project detail — The legacy `dropZone` / `fileInput` / `uploadForm` JS was replaced with an Alpine `x-data="uploadStepper(...)"` component. Phases: idle → validating → uploading → preview (3D model files only) → done. Real XHR progress events drive the progress bar. 4 step labels in `cs` + `en` (`upload_step_validate` / `upload_step_upload` / `upload_step_preview` / `upload_step_done`).
 - **Undo toast for deleted projects and project files** — `routes/projects_helpers.py` adds `snapshot_project_for_undo()` / `restore_project_from_undo()` / `snapshot_file_for_undo()` / `restore_file_from_undo()`. Snapshots are stored in `/tmp/filament_undo/` and expire after 30 min. New POST endpoint `/projects/undo` consumes the `session['project_pending_undo']` slot atomically. `templates/_toast_undo.html` renders the toast with a countdown, X button, and undo button. 2 new i18n keys: `project_undo_toast_title`, `project_file_undo_toast_title`.
-- **First-login onboarding wizard** — `routes/auth.py` `login()` now appends `?welcome=1` to the redirect (and sets a 1-year `first_login_tour_v1` cookie) the first time a user logs in. `static/js/tour.js` chains four section tours (filaments → projects → settings → stats) and opens the help panel at the end. The help panel gets a new "Spustit úvodního průvodce" button. Escape aborts the entire chain. 1 new i18n key: `tour_full_wizard_btn`.
+- **First-login onboarding wizard** — `routes/auth.py` `login()` now appends `?welcome=1` to the redirect (and sets a 1-year `first_login_tour_v1` cookie) the first time a user logs in. `static/js/tour.js` chains four section tours (filaments → projects → settings → stats) and opens the help panel at the end. The help panel gets a new "Start the tour guide" button. Escape aborts the entire chain. 1 new i18n key: `tour_full_wizard_btn`.
 - **Global client-side toast helper** — `window.showToast(messageKey, category, opts)` in `static/js/app-shell.js` looks up strings in `window.__i18n` and shows them in a right-side stack with fade transitions. Used by the optimistic-reactions revert path and (later) anywhere a one-off status message is needed.
 
 ### Changed
@@ -662,7 +706,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Multi-Format Viewer Optimization (3MF, OBJ, AMF + STL)** — The same server-side mesh decimation that shipped in v1.103.1 for STL is now available for **all mesh formats the browser viewer can load**: STL, 3MF, OBJ, AMF. The interactive 3D viewer always loads a decimated version (default target ~50K triangles) via the existing `/models/version/<id>/optimized` endpoint, dramatically reducing load time for large models regardless of source format. Background worker now sweeps all mesh formats, not just STL.
 - **Indexed-Mesh Decimation Algorithm** — STL stores 3 vertices per triangle (no sharing), but 3MF/OBJ/AMF share vertices via indices. New `_decimate_indexed_mesh()` function in `routes/model_renderer.py` clusters vertices to a 3D grid cell, picks one representative per cell, remaps every triangle's 3 indices, and drops degenerate (zero-area) triangles. Same shape-preservation guarantee as the STL grid-clustering decimation.
 - **Per-Format Diagnostic in the Detail Page UI** — The "Not required for this format" message that was misleading users is replaced. The activation-placeholder badge and the right-side metadata panel now show the **actual format of the latest version** (e.g. `STL`, `3MF`, `STEP`, `GCODE`) alongside the optimization status. The label is rendered as a small chip so users can immediately see whether the latest version is the one they expect, and why the viewer is loading the original vs. optimized file. Non-mesh formats (STEP, GCODE, BGCODE) get a clear "this format cannot be optimized for the 3D viewer — the original file will be loaded as-is" note instead of the old generic message.
-- **New translation keys** (`cs` + `en`): `models_viewer_optimized_format_label` ("Current format" / "Aktuální formát") and `models_viewer_optimized_non_mesh` ("This format ({ext}) cannot be optimized for the 3D viewer — the original file will be loaded as-is." / "Tento formát ({ext}) nelze optimalizovat pro 3D náhled — bude načten originální soubor.").
+- **New translation keys** (`cs` + `en`): `models_viewer_optimized_format_label` ("Current format") and `models_viewer_optimized_non_mesh` ("This format ({ext}) cannot be optimized for the 3D viewer — the original file will be loaded as-is.").
 - **Tests** — 23 new tests in `tests/test_model_renderer.py` covering the new indexed-mesh decimation, OBJ/AMF/3MF parsers, writers, simplifiers, and the format-agnostic dispatcher, plus 1 new integration test in `tests/test_models.py` for the `/optimized` endpoint serving a real 3MF file.
 
 ### Changed
@@ -672,7 +716,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.103.2] - 2026-06-02
 ### Added
 - **Model-Detail Viewer-Optimization Indicators** — The `/models/<id>` page now clearly tells the user which file the 3D viewer will load. Three places are updated:
-  1. **Activation placeholder** above the "Load Preview" button: an amber `fa-clock` badge labelled "Původní soubor / Original file" when no optimized version exists yet, or a green `fa-bolt` badge labelled "Optimized version" when one is cached. For non-STL formats a slate `fa-file` badge labelled "Original file" is shown with the note that no optimization is needed.
+  1. **Activation placeholder** above the "Load Preview" button: an amber `fa-clock` badge labelled "Original file" when no optimized version exists yet, or a green `fa-bolt` badge labelled "Optimized version" when one is cached. For non-STL formats a slate `fa-file` badge labelled "Original file" is shown with the note that no optimization is needed.
   2. **Right metadata panel** — a new "Browser-optimized version" row shows whether the optimized STL is `Available` (with file size) or `Will be generated on first open` (with a `fa-clock` icon). For non-STL formats a `Not required for this format` note is shown.
   3. **Version history Preview buttons** — every history entry whose filename is `.stl` gets a small inline icon next to its Preview button (`fa-bolt` green = optimized available, `fa-clock` amber = not yet generated), so users can see the status of every version at a glance.
   4. **Floating viewer overlay** (active version label in the bottom-left of the 3D viewport) — when the active file is an STL, a small "Optimized version" chip with `fa-bolt` is shown next to the filename. Switching versions in history updates this indicator live.

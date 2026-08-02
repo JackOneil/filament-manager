@@ -1,6 +1,7 @@
 """Statistics dashboard: usage charts, project summaries, and stock forecast."""
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 import colorsys
 import json
 
@@ -180,7 +181,9 @@ def register(app):
             date_to_str = today.isoformat()
 
         label_keys = [day.isoformat() for day in labels]
-        since_dt = datetime.combine(labels[0], datetime.min.time())
+        # Aware UTC midnight: the MovementHistory.created_at column is
+        # timezone-aware (UtcDateTime) — a naive sentinel would raise on PG.
+        since_dt = datetime.combine(labels[0], datetime.min.time()).replace(tzinfo=timezone.utc)
         last_30_dt = utc_now() - timedelta(days=30)
 
         filaments = Filament.query.options(
@@ -222,12 +225,22 @@ def register(app):
             MovementHistory.created_at >= heatmap_since,
             MovementHistory.action_type.in_(('remove', 'bambu_print', 'prusa_print', 'bulk_delete')),
         ).all()
+        # Bucket heatmap by the configured app timezone (not raw UTC) so the
+        # day/hour grid matches what the user sees elsewhere in the UI.
+        _tz_name = 'Europe/Prague'
+        try:
+            _setting = AppSetting.query.first()
+            _tz_name = (_setting.app_timezone or 'Europe/Prague') if _setting else 'Europe/Prague'
+        except Exception:
+            pass
+        _target_tz = ZoneInfo(_tz_name)
         for hrow in heatmap_rows:
             if not hrow.created_at or not hrow.weight:
                 continue
             # Python weekday(): Monday=0..Sunday=6
-            weekday = hrow.created_at.weekday()
-            hour = hrow.created_at.hour
+            _local = hrow.created_at.astimezone(_target_tz)
+            weekday = _local.weekday()
+            hour = _local.hour
             heatmap_matrix[weekday][hour] += float(hrow.weight or 0)
 
         for row in movement_rows:

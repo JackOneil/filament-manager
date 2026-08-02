@@ -40,7 +40,7 @@ def register(app):
         if f_color:
             filaments_query = filaments_query.where(Filament.color_id == f_color)
         if f_tag:
-            filaments_query = filaments_query.where(Filament.tag_text.ilike(f'%{escape_like(f_tag)}%'))
+            filaments_query = filaments_query.where(Filament.tag_text.ilike(f'%{escape_like(f_tag)}%', escape='\\'))
 
         # Quick server-side filters (computed from DB columns, no post-load filtering needed)
         if quick_filter == 'low_stock':
@@ -173,8 +173,8 @@ def register(app):
             joinedload(Filament.brand), joinedload(Filament.material), joinedload(Filament.color)
         ).filter(
             db.or_(
-                Filament.name.ilike(f'%{escape_like(q)}%'),
-                Filament.tag_text.ilike(f'%{escape_like(q)}%')
+                Filament.name.ilike(f'%{escape_like(q)}%', escape='\\'),
+                Filament.tag_text.ilike(f'%{escape_like(q)}%', escape='\\')
             )
         ).limit(10).all()
         
@@ -189,9 +189,9 @@ def register(app):
         # 2. Projects
         proj_query = Project.query.filter(
             db.or_(
-                Project.name.ilike(f'%{escape_like(q)}%'),
-                Project.client_name.ilike(f'%{escape_like(q)}%'),
-                Project.tag_text.ilike(f'%{escape_like(q)}%')
+                Project.name.ilike(f'%{escape_like(q)}%', escape='\\'),
+                Project.client_name.ilike(f'%{escape_like(q)}%', escape='\\'),
+                Project.tag_text.ilike(f'%{escape_like(q)}%', escape='\\')
             )
         )
         if not is_adm and user:
@@ -208,7 +208,7 @@ def register(app):
         # 3. Printers
         if is_adm:
             prusa_query = PrusaPrinter.query.filter(
-                db.or_(PrusaPrinter.name.ilike(f'%{escape_like(q)}%'), PrusaPrinter.printer_model.ilike(f'%{escape_like(q)}%'))
+                db.or_(PrusaPrinter.name.ilike(f'%{escape_like(q)}%', escape='\\'), PrusaPrinter.printer_model.ilike(f'%{escape_like(q)}%', escape='\\'))
             ).limit(5).all()
             for p in prusa_query:
                 results.append({
@@ -219,7 +219,7 @@ def register(app):
                 })
                 
             bambu_query = BambuPrinter.query.filter(
-                db.or_(BambuPrinter.name.ilike(f'%{escape_like(q)}%'), BambuPrinter.printer_model.ilike(f'%{escape_like(q)}%'))
+                db.or_(BambuPrinter.name.ilike(f'%{escape_like(q)}%', escape='\\'), BambuPrinter.printer_model.ilike(f'%{escape_like(q)}%', escape='\\'))
             ).limit(5).all()
             for b in bambu_query:
                 results.append({

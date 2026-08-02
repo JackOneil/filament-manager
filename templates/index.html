@@ -920,7 +920,7 @@ function inventoryApp() {
             }
 
             try {
-                const resp = await fetch(`/api/filaments-list?${params}`, { signal: controller.signal });
+                const resp = await fetch(`{{ url_for('api.api_filaments_list') }}?${params}`, { signal: controller.signal });
                 const data = await resp.json();
                 
                 this.currentPage = data.current_page || 1;
@@ -979,7 +979,7 @@ function inventoryApp() {
             } catch (e) {
                 // Keep going even if storage is unavailable.
             }
-            fetch(`/filaments?view=${mode}`).catch(() => {});
+            fetch(`{{ url_for('inventory.filaments_index') }}?view=${mode}`).catch(() => {});
             this.fetchContent();
         },
 
@@ -1082,7 +1082,7 @@ function openUseFilamentModal(filamentId, filamentName, maxWeight) {
     document.getElementById('modalTitle').textContent = '{{ t("subtract_usage") }} - ' + filamentName;
     document.getElementById('useAmount').max = maxWeight;
     document.getElementById('useAmount').value = '';
-    document.getElementById('useFilamentForm').action = '/use/' + filamentId;
+    document.getElementById('useFilamentForm').action = '{{ url_for('inventory.use_filament', id=0) }}'.replace('/0', '/' + filamentId);
     document.getElementById('useFilamentModal').classList.remove('hidden');
     document.getElementById('useAmount').focus();
 }

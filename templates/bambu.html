@@ -811,7 +811,14 @@ function bambuMap(jobId) {
                     body: fd,
                 });
                 const data = await r.json();
-                if (!data.ok) return;
+                if (!data.ok) {
+                    if (typeof window.showToast === 'function') {
+                        window.showToast('bambu_save_failed', 'error');
+                    } else {
+                        alert('{{ t('bambu_save_failed') }}');
+                    }
+                    return;
+                }
 
                 if (data.filter_counts) {
                     const countAll = document.getElementById('count-all');

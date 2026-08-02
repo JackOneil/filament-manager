@@ -277,9 +277,12 @@ def register(app):
                 price = request.form.get('price', type=float)
                 if brand_id is None or color_id is None or material_id is None or weight_total is None or price is None:
                     return redirect(url_for('add'))
+                if weight_total <= 0 or price < 0 or quantity < 1:
+                    return redirect(url_for('add'))
                 weight_remaining = float(
                     request.form.get('weight_remaining') or weight_total * quantity
                 )
+                weight_remaining = max(0.0, weight_remaining)
             except (TypeError, ValueError):
                 return redirect(url_for('add'))
             min_stock_grams = max(request.form.get('min_stock_grams', 0.0, type=float) or 0.0, 0.0)
@@ -339,9 +342,9 @@ def register(app):
                 return redirect(url_for('edit', id=id))
 
             filament.name = new_name
-            filament.weight_remaining = new_weight
-            filament.price = new_price
-            filament.quantity = new_quantity
+            filament.weight_remaining = max(0.0, new_weight)
+            filament.price = max(0.0, new_price)
+            filament.quantity = max(0, int(new_quantity))
             filament.tag_text = format_tags(request.form.get('tag_text', filament.tag_text or ''))
             filament.min_stock_grams = max(request.form.get('min_stock_grams', filament.min_stock_grams, type=float) or 0.0, 0.0)
             filament.max_stock_grams = max(request.form.get('max_stock_grams', filament.max_stock_grams, type=float) or 0.0, 0.0)
@@ -777,6 +780,12 @@ def register(app):
                 rows = payload.get('rows', [])
             except Exception:
                 app.logger.exception("CSV import: failed to parse payload JSON")
+                return redirect(url_for('filament_import_csv'))
+            # The payload is client-supplied — cap the row count so a crafted
+            # request cannot bulk-insert an unbounded number of filaments.
+            _MAX_CSV_IMPORT_ROWS = 5000
+            if len(rows) > _MAX_CSV_IMPORT_ROWS:
+                flash('inventory_csv_too_many_rows', 'error')
                 return redirect(url_for('filament_import_csv'))
             imported = 0
             for row in rows:

@@ -1005,7 +1005,7 @@ function storageBoard(config) {
             // Persist new order to backend
             const newOrder = Array.from(container.querySelectorAll('.shelf-section[data-shelf-id]'))
                                   .map(el => parseInt(el.dataset.shelfId));
-            await fetch('/storage/shelf/reorder', {
+            await fetch('{{ url_for('storage.storage_reorder_shelves') }}', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ order: newOrder }),
@@ -1074,7 +1074,7 @@ function storageBoard(config) {
             const form = new FormData();
             form.append('shelf_id', shelfId);
             form.append('slot_index', slotIndex);
-            const response = await fetch(`/storage/placement/${placementId}/move`, {
+            const response = await fetch('{{ url_for('storage.storage_move_placement', placement_id=0) }}'.replace('/0', '/' + placementId), {
                 method: 'POST',
                 body: form,
             });
@@ -1165,6 +1165,11 @@ function storageBoard(config) {
         },
         exportPrintLayout() {
             // Collect shelf data from the live DOM so drag-reordered positions are respected
+            function escapeHtml(s) {
+                return String(s).replace(/[&<>"']/g, function (c) {
+                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+                });
+            }
             const tilePx = this.tilePx;
             const sections = Array.from(document.querySelectorAll('#shelves-container .shelf-section'));
 
@@ -1172,11 +1177,11 @@ function storageBoard(config) {
             sections.forEach(function(section) {
                 const shelfId = section.dataset.shelfId;
                 const nameEl = section.querySelector('h2');
-                const shelfName = nameEl ? nameEl.textContent.trim() : ('Shelf ' + shelfId);
+                const shelfName = escapeHtml(nameEl ? nameEl.textContent.trim() : ('Shelf ' + shelfId));
 
                 // Collect badge text (occupancy)
                 const badgeEl = section.querySelector('.shelf-section span.inline-flex');
-                const badge = badgeEl ? badgeEl.textContent.trim() : '';
+                const badge = escapeHtml(badgeEl ? badgeEl.textContent.trim() : '');
 
                 // Collect all grid slots (grid view DOM is always rendered, only visibility toggled)
                 const gridWrap = section.querySelector('[x-show="viewMode === \'grid\'"]') || section.querySelector('.overflow-x-auto');
@@ -1208,14 +1213,14 @@ function storageBoard(config) {
                         const barColor = pct > 50 ? '#10b981' : pct > 20 ? '#f59e0b' : '#ef4444';
                         slotsHtml += `
                         <div class="slot occupied">
-                            <div class="slot-color-bar" style="background:${color}"></div>
+                            <div class="slot-color-bar" style="background:${escapeHtml(color)}"></div>
                             <div class="slot-body">
-                                <div class="slot-num">#${idx}</div>
-                                <div class="slot-dot" style="background:${color}"></div>
+                                <div class="slot-num">#${escapeHtml(idx)}</div>
+                                <div class="slot-dot" style="background:${escapeHtml(color)}"></div>
                                 <div class="slot-info">
-                                    <div class="slot-brand">${brand.substring(0, 3).toUpperCase()}</div>
-                                    <div class="slot-name">${name}</div>
-                                    <div class="slot-mat">${mat}</div>
+                                    <div class="slot-brand">${escapeHtml(brand.substring(0, 3).toUpperCase())}</div>
+                                    <div class="slot-name">${escapeHtml(name)}</div>
+                                    <div class="slot-mat">${escapeHtml(mat)}</div>
                                 </div>
                                 <div class="slot-footer">
                                     <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${barColor}"></div></div>
@@ -1240,8 +1245,8 @@ function storageBoard(config) {
                 </div>`;
             });
 
-            const appTitle = document.title || 'Filament Manager';
-            const now = new Date().toLocaleDateString();
+            const appTitle = escapeHtml(document.title || 'Filament Manager');
+            const now = escapeHtml(new Date().toLocaleDateString());
 
             const html = `<!DOCTYPE html>
 <html lang="cs">

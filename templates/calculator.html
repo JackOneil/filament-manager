@@ -239,9 +239,12 @@
                     <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-sm font-semibold border border-indigo-200">
                         <i class="fa-solid fa-circle-check"></i> {{ t('quote_saved_to_project') }}: {{ saved_quote.project.name }}
                     </span>
-                    <a href="{{ url_for('export_quote', id=saved_quote.id) }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white text-indigo-700 text-sm font-semibold border border-indigo-200 hover:bg-indigo-50 transition-colors">
-                        <i class="fa-solid fa-file-export"></i> {{ t('quote_export_btn') }}
-                    </a>
+                    <form method="POST" action="{{ url_for('quote_issue_invoice', id=saved_quote.id) }}" target="_blank" class="inline-flex">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white text-indigo-700 text-sm font-semibold border border-indigo-200 hover:bg-indigo-50 transition-colors">
+                            <i class="fa-solid fa-file-export"></i> {{ t('quote_export_btn') }}
+                        </button>
+                    </form>
                 </div>
                 {% endif %}
             </div>

@@ -4,8 +4,9 @@ import tempfile
 import unittest
 
 from app import create_app
+from auth import hash_password
 from database import db
-from models import Brand, Color, Filament, Material, Project, ProjectQuote
+from models import Brand, Color, Filament, Material, Project, ProjectQuote, User
 
 
 class CalculatorQuoteTests(unittest.TestCase):
@@ -35,11 +36,23 @@ class CalculatorQuoteTests(unittest.TestCase):
                 price=500.0,
                 quantity=1,
             )
-            project = Project(name='Customer Box', client_name='Acme')
+            admin = User(
+                email='admin@example.com', name='Admin',
+                password_hash=hash_password('password123'), role='admin',
+            )
+            db.session.add(admin)
+            db.session.flush()
+            project = Project(name='Customer Box', client_name='Acme', owner_user_id=admin.id)
             db.session.add_all([filament, project])
             db.session.commit()
             self.filament_id = filament.id
             self.project_id = project.id
+            self.admin_id = admin.id
+
+        # Quote saving requires an authenticated user (admin or project owner).
+        self.client.post(
+            '/login', data={'email': 'admin@example.com', 'password': 'password123'},
+        )
 
     def tearDown(self):
         shutil.rmtree(self.temp_dir, ignore_errors=True)

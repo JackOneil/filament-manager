@@ -530,25 +530,29 @@ class WasteReasonsTests(_BaseSettingsTests):
 
     def test_save_custom_waste_reasons(self):
         self._login_admin()
-        self.client.post('/settings', data={
-            'action': 'backup_auto_settings',
-            'backup_auto_enabled': '',
+        response = self.client.post('/settings', data={
+            'action': 'waste_reasons',
+            'waste_reasons_json': '["stringing", "failed print"]',
         }, follow_redirects=False)
+        self.assertIn(response.status_code, (200, 302))
 
         with self.app.app_context():
             setting = AppSetting.query.first()
             self.assertIsNotNone(setting)
+            self.assertEqual(setting.waste_reasons_json, '["stringing", "failed print"]')
 
     def test_invalid_waste_reasons_json_is_ignored(self):
         self._login_admin()
         self.client.post('/settings', data={
-            'action': 'backup_auto_settings',
-            'backup_auto_enabled': '',
+            'action': 'waste_reasons',
+            'waste_reasons_json': '{not valid json',
         }, follow_redirects=True)
 
         with self.app.app_context():
             setting = AppSetting.query.first()
             self.assertIsNotNone(setting)
+            # Invalid JSON must not be stored — the previous value survives.
+            self.assertNotEqual(setting.waste_reasons_json, '{not valid json')
 
 
 # ── Auto-Backup Configuration ──────────────────────────────────────────────

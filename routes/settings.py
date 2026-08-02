@@ -1,4 +1,5 @@
 """Settings, dictionary management, integrations, and theme routes."""
+import json
 import logging
 import re
 from datetime import timedelta
@@ -100,7 +101,7 @@ def register(app):
                     if Brand.query.filter_by(name=brand_name).first():
                         raise ValueError('settings_brand_exists')
                     db.session.add(Brand(name=brand_name))
-                    app.logger.debug(f"Added brand: {brand_name}")
+                    app.logger.debug("Added brand: %s", brand_name)
 
                 elif action == 'color':
                     color_name = request.form.get('name', '').strip()
@@ -114,7 +115,7 @@ def register(app):
                     if color_hex and not normalize_hex(color_hex):
                         raise ValueError('settings_color_hex_invalid')
                     db.session.add(Color(name=color_name, hex_value=normalize_hex(color_hex)))
-                    app.logger.debug(f"Added color: {color_name}")
+                    app.logger.debug("Added color: %s", color_name)
 
                 elif action == 'material':
                     material_name = request.form.get('name', '').strip()
@@ -123,28 +124,28 @@ def register(app):
                     if Material.query.filter_by(name=material_name).first():
                         raise ValueError('settings_material_exists')
                     db.session.add(Material(name=material_name))
-                    app.logger.debug(f"Added material: {material_name}")
+                    app.logger.debug("Added material: %s", material_name)
 
                 elif action == 'language':
                     old = setting.lang
                     setting.lang = request.form.get('lang', setting.lang)
-                    app.logger.debug(f"Language changed: {old} -> {setting.lang}")
+                    app.logger.debug("Language changed: %s -> %s", old, setting.lang)
 
                 elif action == 'currency':
                     old = setting.currency
                     setting.currency = request.form.get('currency', setting.currency)
-                    app.logger.debug(f"Currency changed: {old} -> {setting.currency}")
+                    app.logger.debug("Currency changed: %s -> %s", old, setting.currency)
 
                 elif action == 'items_per_page':
                     setting.items_per_page = request.form.get('items_per_page', setting.items_per_page, type=int)
-                    app.logger.debug(f"Items per page changed to: {setting.items_per_page}")
+                    app.logger.debug("Items per page changed to: %s", setting.items_per_page)
 
                 elif action == 'nav_palette':
                     palette = request.form.get('nav_palette', 'teal').strip().lower()
                     if palette not in {'teal', 'slate', 'ocean', 'sunset'}:
                         palette = 'teal'
                     setting.nav_palette = palette
-                    app.logger.debug(f"Navigation palette changed to: {setting.nav_palette}")
+                    app.logger.debug("Navigation palette changed to: %s", setting.nav_palette)
 
                 elif action == 'debug_logging':
                     setting.debug_logging = request.form.get('debug_logging') == 'on'
@@ -156,11 +157,11 @@ def register(app):
 
                 elif action == 'audit_logging':
                     setting.audit_logging_enabled = request.form.get('audit_logging_enabled') == 'on'
-                    app.logger.debug(f"Audit logging {'enabled' if setting.audit_logging_enabled else 'disabled'}.")
+                    app.logger.debug("Audit logging %s.", 'enabled' if setting.audit_logging_enabled else 'disabled')
 
                 elif action == 'link_preview_reader':
                     setting.link_preview_reader_enabled = request.form.get('link_preview_reader_enabled') == 'on'
-                    app.logger.debug(f"Link preview reader {'enabled' if setting.link_preview_reader_enabled else 'disabled'}.")
+                    app.logger.debug("Link preview reader %s.", 'enabled' if setting.link_preview_reader_enabled else 'disabled')
 
                 elif action == 'edit_brand':
                     brand = db.session.get(Brand, request.form.get('id', 0, type=int))
@@ -168,14 +169,14 @@ def register(app):
                         old = brand.name
                         brand.name = request.form.get('name', brand.name).strip() or brand.name
                         brand.shop_url = normalize_shop_url(request.form.get('shop_url'))
-                        app.logger.debug(f"Brand edited: {old} -> {brand.name}")
+                        app.logger.debug("Brand edited: %s -> %s", old, brand.name)
 
                 elif action == 'edit_material':
                     mat = db.session.get(Material, request.form.get('id', 0, type=int))
                     if mat:
                         old = mat.name
                         mat.name = request.form.get('name', mat.name).strip() or mat.name
-                        app.logger.debug(f"Material edited: {old} -> {mat.name}")
+                        app.logger.debug("Material edited: %s -> %s", old, mat.name)
 
                 elif action == 'edit_color':
                     col = db.session.get(Color, request.form.get('id', 0, type=int))
@@ -186,25 +187,25 @@ def register(app):
                             if not normalize_hex(raw_hex):
                                 raise ValueError('settings_color_hex_invalid')
                             col.hex_value = normalize_hex(raw_hex)
-                        app.logger.debug(f"Color edited: {col.name}")
+                        app.logger.debug("Color edited: %s", col.name)
 
                 elif action == 'delete_brand':
                     brand = db.session.get(Brand, request.form.get('id', 0, type=int))
                     if brand and len(brand.filaments) == 0:
                         db.session.delete(brand)
-                        app.logger.debug(f"Brand deleted: {brand.name}")
+                        app.logger.debug("Brand deleted: %s", brand.name)
 
                 elif action == 'delete_material':
                     mat = db.session.get(Material, request.form.get('id', 0, type=int))
                     if mat and len(mat.filaments) == 0:
                         db.session.delete(mat)
-                        app.logger.debug(f"Material deleted: {mat.name}")
+                        app.logger.debug("Material deleted: %s", mat.name)
 
                 elif action == 'delete_color':
                     col = db.session.get(Color, request.form.get('id', 0, type=int))
                     if col and len(col.filaments) == 0:
                         db.session.delete(col)
-                        app.logger.debug(f"Color deleted: {col.name}")
+                        app.logger.debug("Color deleted: %s", col.name)
 
                 elif action == 'model_category':
                     cat_name = request.form.get('name', '').strip()
@@ -214,7 +215,7 @@ def register(app):
                     if ModelCategory.query.filter_by(name=cat_name).first():
                         raise ValueError('model_category_exists')
                     db.session.add(ModelCategory(name=cat_name, color=cat_color))
-                    app.logger.debug(f"Added model category: {cat_name}")
+                    app.logger.debug("Added model category: %s", cat_name)
                     success_key = 'model_category_saved'
 
                 elif action == 'edit_model_category':
@@ -223,14 +224,14 @@ def register(app):
                         old = cat.name
                         cat.name = request.form.get('name', cat.name).strip() or cat.name
                         cat.color = request.form.get('color', '').strip() or None
-                        app.logger.debug(f"Model category edited: {old} -> {cat.name}")
+                        app.logger.debug("Model category edited: %s -> %s", old, cat.name)
                         success_key = 'model_category_saved'
 
                 elif action == 'delete_model_category':
                     cat = db.session.get(ModelCategory, request.form.get('id', 0, type=int))
                     if cat and len(cat.models) == 0:
                         db.session.delete(cat)
-                        app.logger.debug(f"Model category deleted: {cat.name}")
+                        app.logger.debug("Model category deleted: %s", cat.name)
                         success_key = 'model_category_deleted'
 
                 elif action == 'delete_filament_tag':
@@ -242,7 +243,7 @@ def register(app):
                             if new_tags != format_tags(filament.tag_text):
                                 filament.tag_text = new_tags or None
                                 updated_count += 1
-                        app.logger.debug(f"Deleted filament tag '{tag_name}' from {updated_count} filaments")
+                        app.logger.debug("Deleted filament tag '%s' from %s filaments", tag_name, updated_count)
                         success_key = 'settings_tags_removed'
 
                 elif action == 'delete_project_tag':
@@ -254,7 +255,7 @@ def register(app):
                             if new_tags != format_tags(project.tag_text):
                                 project.tag_text = new_tags or None
                                 updated_count += 1
-                        app.logger.debug(f"Deleted project tag '{tag_name}' from {updated_count} projects")
+                        app.logger.debug("Deleted project tag '%s' from %s projects", tag_name, updated_count)
                         success_key = 'settings_tags_removed'
 
                 elif action == 'bambu_cloud_settings':
@@ -298,13 +299,13 @@ def register(app):
                         else:
                             printer.power_draw_watts = None
                         printer.notes = request.form.get('notes', '').strip() or None
-                        app.logger.debug(f"Edited Bambu printer {printer.device_id}: name={printer.name}, pre_job={printer.pre_job_time_minutes}min, power={printer.power_draw_watts}W, notes={printer.notes}")
+                        app.logger.debug("Edited Bambu printer %s: name=%s, pre_job=%smin, power=%sW, notes=%s", printer.device_id, printer.name, printer.pre_job_time_minutes, printer.power_draw_watts, printer.notes)
 
                 elif action == 'delete_bambu_printer':
                     printer = db.session.get(BambuPrinter, request.form.get('id', type=int))
                     if printer:
                         db.session.delete(printer)
-                        app.logger.debug(f'Deleted Bambu printer: {printer.name} ({printer.device_id})')
+                        app.logger.debug("Deleted Bambu printer: %s (%s)", printer.name, printer.device_id)
 
                 elif action == 'printer_energy_settings':
                     try:
@@ -312,7 +313,7 @@ def register(app):
                         setting.printer_power = int(request.form.get('printer_power', setting.printer_power))
                     except (ValueError, TypeError):
                         raise ValueError('settings_invalid_number')
-                    app.logger.debug(f"Printer/energy settings updated: kwh={setting.kwh_price}, power={setting.printer_power}W")
+                    app.logger.debug("Printer/energy settings updated: kwh=%s, power=%sW", setting.kwh_price, setting.printer_power)
 
                 elif action == 'add_prusa_printer':
                     host_raw = request.form.get('host', '').strip()
@@ -346,7 +347,7 @@ def register(app):
                         notes=request.form.get('notes', '').strip() or None,
                         power_draw_watts=power_val,
                     ))
-                    app.logger.debug(f'Added PrusaLink printer: {alias} @ {host}')
+                    app.logger.debug("Added PrusaLink printer: %s @ %s", alias, host)
                     success_key = 'settings_prusa_test_passed_saved'
 
                 elif action == 'edit_prusa_printer':
@@ -371,20 +372,20 @@ def register(app):
                             printer.power_draw_watts = None
                         printer.notes = request.form.get('notes', '').strip() or None
                         printer.enabled = request.form.get('enabled') == 'on'
-                        app.logger.debug(f'Edited PrusaLink printer id={printer.id}')
+                        app.logger.debug("Edited PrusaLink printer id=%s", printer.id)
 
                 elif action == 'delete_prusa_printer':
                     printer = db.session.get(PrusaPrinter, request.form.get('id', type=int))
                     if printer:
                         db.session.delete(printer)
-                        app.logger.debug(f'Deleted PrusaLink printer: {printer.name}')
+                        app.logger.debug("Deleted PrusaLink printer: %s", printer.name)
 
                 elif action == 'reorder_shop_settings':
                     url_raw = request.form.get('reorder_shop_url', '').strip()
                     if not _is_valid_reorder_template(url_raw):
                         raise ValueError('settings_reorder_url_invalid')
                     setting.reorder_shop_url = url_raw or None
-                    app.logger.debug(f'Reorder shop URL updated: {setting.reorder_shop_url}')
+                    app.logger.debug("Reorder shop URL updated: %s", setting.reorder_shop_url)
 
                 elif action == 'app_timezone':
                     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -393,7 +394,7 @@ def register(app):
                         try:
                             ZoneInfo(tz_raw)  # validate the zone name
                             setting.app_timezone = tz_raw
-                            app.logger.debug(f'App timezone set to: {tz_raw}')
+                            app.logger.debug("App timezone set to: %s", tz_raw)
                         except (ZoneInfoNotFoundError, KeyError):
                             raise ValueError('settings_timezone_invalid')
 
@@ -438,11 +439,27 @@ def register(app):
                     except (ValueError, TypeError):
                         setting.backup_auto_keep_days = 0
                     app.logger.debug(
-                        f"Auto-backup settings: enabled={setting.backup_auto_enabled}, "
-                        f"freq={setting.backup_auto_frequency}, time={setting.backup_auto_time}, "
-                        f"day={setting.backup_auto_day}, files={setting.backup_auto_include_files}, "
-                        f"keep_count={setting.backup_auto_keep_count}, keep_days={setting.backup_auto_keep_days}"
+                        "Auto-backup settings: enabled=%s, freq=%s, time=%s, day=%s, files=%s, keep_count=%s, keep_days=%s",
+                        setting.backup_auto_enabled, setting.backup_auto_frequency, setting.backup_auto_time,
+                        setting.backup_auto_day, setting.backup_auto_include_files,
+                        setting.backup_auto_keep_count, setting.backup_auto_keep_days,
                     )
+
+                elif action == 'waste_reasons':
+                    # Customizable waste-reason list (JSON array in AppSetting).
+                    # NOTE: 'json' is a local name in this handler (see the
+                    # settings GET branch) — use an aliased import here.
+                    import json as _json
+                    reasons_raw = request.form.get('waste_reasons_json', '').strip()
+                    try:
+                        parsed = _json.loads(reasons_raw)
+                        if not isinstance(parsed, list) or not all(isinstance(r, str) and r.strip() for r in parsed):
+                            raise ValueError('waste_reasons must be a list of non-empty strings')
+                        setting.waste_reasons_json = _json.dumps(parsed, ensure_ascii=False)
+                        app.logger.debug("Waste reasons updated (%d entries)", len(parsed))
+                    except (ValueError, TypeError) as exc:
+                        # Invalid JSON is ignored — keep the previous value.
+                        app.logger.warning("Invalid waste reasons payload ignored: %s", exc)
                     success_key = 'backup_auto_settings_saved'
 
                 else:
@@ -581,14 +598,14 @@ def register(app):
                 'auto': 'light',
             }.get(user.preferred_theme, 'light')
             safe_commit()
-            app.logger.debug(f"User theme changed to: {user.preferred_theme}")
+            app.logger.debug("User theme changed to: %s", user.preferred_theme)
         else:
             setting = AppSetting.query.first()
             if setting:
                 new_theme = 'light' if setting.theme == 'dark' else 'dark'
                 setting.theme = new_theme
                 safe_commit()
-                app.logger.debug(f"Global theme changed to: {new_theme}")
+                app.logger.debug("Global theme changed to: %s", new_theme)
         return redirect(safe_redirect_target(request.referrer, 'index'))
 
     @bp.route('/onboarding/dismiss', methods=['POST'])

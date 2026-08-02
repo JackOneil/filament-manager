@@ -572,6 +572,9 @@ function createWidgetLayoutManager(config) {
             };
             document.addEventListener('mousemove', onGlobalMouseMove);
             document.addEventListener('mouseup',   onGlobalMouseUp);
+            // Fallback: if the mouse is released outside the window, no mouseup
+            // ever fires — blur ends the drag so the resize lock cannot stick.
+            window.addEventListener('blur', onGlobalMouseUp);
             document.body.classList.add('resize-dragging');
         });
     }
@@ -605,6 +608,7 @@ function createWidgetLayoutManager(config) {
         }
         document.removeEventListener('mousemove', onGlobalMouseMove);
         document.removeEventListener('mouseup',   onGlobalMouseUp);
+        window.removeEventListener('blur', onGlobalMouseUp);
         document.body.classList.remove('resize-dragging');
         resizeState = null;
         saveLayout();

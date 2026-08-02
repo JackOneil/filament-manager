@@ -52,4 +52,11 @@ COPY --from=frontend /build/fonts/files/ static/fonts/files/
 
 EXPOSE 5000
 
+# Healthcheck: lets Docker/orchestrators detect a stuck or unhealthy app.
+# (Non-root runtime is opt-in via docker-compose `user:` — see compose file.
+# The image cannot default to a non-root user because the ./data bind mount
+# is owned by the host user and the app must be able to write to it.)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/login', timeout=5)" || exit 1
+
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "4", "app:app"]

@@ -454,7 +454,10 @@
                             </div>
                             <div class="flex flex-wrap gap-2 items-center">
                                 <div class="text-xl font-bold text-indigo-700">{{ quote.final_price | round(2) }} {{ quote.currency }}</div>
-                                <a href="{{ url_for('export_quote', id=quote.id) }}" class="ui-badge"><i class="fa-solid fa-file-export"></i> {{ t('quote_export_btn') }}</a>
+                                <form method="POST" action="{{ url_for('quote_issue_invoice', id=quote.id) }}" target="_blank" class="inline-flex">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="ui-badge"><i class="fa-solid fa-file-export"></i> {{ t('quote_export_btn') }}</button>
+                                </form>
                                 <form method="POST" action="{{ url_for('delete_quote', id=quote.id) }}">
                                     <button type="submit" class="ui-badge ui-badge-critical"><i class="fa-solid fa-trash"></i> {{ t('delete') }}</button>
                                 </form>
@@ -892,7 +895,7 @@
         </section>
     </div>
 
-    <div x-show="lightboxOpen" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4" @keydown.escape.window="lightboxOpen = false">
+    <div x-show="lightboxOpen" x-cloak style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4" @keydown.escape.window="lightboxOpen = false">
         <button @click="lightboxOpen = false" class="absolute top-4 right-4 text-white hover:text-gray-300 text-3xl transition p-2">
             <i class="fa-solid fa-xmark"></i>
         </button>
@@ -912,7 +915,7 @@
         </div>
     </div>
 
-    <div x-show="modelViewerOpen" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center bg-black/95 sm:p-4" @keydown.escape.window="modelViewerOpen = false; close3DViewer();">
+    <div x-show="modelViewerOpen" x-cloak style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center bg-black/95 sm:p-4" @keydown.escape.window="modelViewerOpen = false; close3DViewer();">
         <button @click="modelViewerOpen = false; close3DViewer();" class="absolute top-4 right-4 z-50 text-white hover:text-gray-300 text-3xl transition p-2 bg-black/50 rounded-full w-12 h-12 flex items-center justify-center border border-white/20 shadow-lg backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-white/50">
             <i class="fa-solid fa-xmark"></i>
         </button>

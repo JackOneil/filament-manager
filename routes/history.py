@@ -54,8 +54,8 @@ def register(app):
             like_pattern = f'%{safe_q}%'
             query = query.filter(
                 db.or_(
-                    MovementHistory.filament_name.ilike(like_pattern),
-                    MovementHistory.note.ilike(like_pattern),
+                    MovementHistory.filament_name.ilike(like_pattern, escape='\\'),
+                    MovementHistory.note.ilike(like_pattern, escape='\\'),
                 )
             )
 

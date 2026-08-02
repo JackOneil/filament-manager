@@ -255,7 +255,7 @@
 
     <!-- Upload Model Modal -->
     <div x-show="uploadModalOpen" style="display: none;" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs" @keydown.escape.window="uploadModalOpen = false" x-cloak>
-        <div class="ui-panel w-full max-w-lg shadow-2xl relative" @click.away="uploadModalOpen = false">
+        <div class="ui-panel w-full max-w-lg shadow-2xl relative" @click.outside="uploadModalOpen = false">
             <button type="button" @click="uploadModalOpen = false" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200">
                 <i class="fa-solid fa-xmark text-lg"></i>
             </button>
@@ -586,7 +586,8 @@ function modelsApp() {
                 }
             }
             this._fetchPending = true;
-            this._abortController = new AbortController();
+            const controller = new AbortController();
+            this._abortController = controller;
 
             try {
                 const params = new URLSearchParams({
@@ -602,8 +603,8 @@ function modelsApp() {
                 if (this.noCategory) params.append('no_category', '1');
                 if (this.tag) params.append('tag', this.tag);
 
-                const res = await fetch(`/api/models-list?${params.toString()}`, {
-                    signal: this._abortController.signal
+                const res = await fetch(`{{ url_for('models.api_models_list') }}?${params.toString()}`, {
+                    signal: controller.signal
                 });
                 const data = await res.json();
 
@@ -635,7 +636,9 @@ function modelsApp() {
                     console.error('Fetch models failed:', err);
                 }
             } finally {
-                this._fetchPending = false;
+                if (this._abortController === controller) {
+                    this._fetchPending = false;
+                }
             }
         },
 

@@ -38,6 +38,9 @@ class StorageRouteTests(unittest.TestCase):
                 password_hash=hash_password('password123'),
                 role='admin',
             )
+            self.brand_id = brand.id
+            self.color_id = color.id
+            self.material_id = material.id
             filament = Filament(
                 name='Storage Test PLA',
                 brand_id=brand.id,
@@ -164,7 +167,8 @@ class StorageRouteTests(unittest.TestCase):
 
     def test_move_placement(self):
         """POST /storage/placement/<id>/move swaps or moves slot assignments."""
-        # Place two filaments
+        # A filament may only occupy ONE slot (unique filament_id) — assigning
+        # it to slot 2 MOVES it there instead of creating a second placement.
         self.client.post('/storage/slot/assign', data={
             'shelf_id': self.shelf_id,
             'filament': f'{self.filament_id} - Storage Test PLA',
@@ -176,18 +180,40 @@ class StorageRouteTests(unittest.TestCase):
             'slot_index': 2,
         })
         with self.app.app_context():
-            p1 = StoragePlacement.query.filter_by(shelf_id=self.shelf_id, slot_index=1).first()
-            p2 = StoragePlacement.query.filter_by(shelf_id=self.shelf_id, slot_index=2).first()
+            placements = StoragePlacement.query.filter_by(shelf_id=self.shelf_id).all()
+            self.assertEqual(len(placements), 1)
+            self.assertEqual(placements[0].slot_index, 2)
+            p1 = placements[0]
+
+        # Now place a SECOND filament so the move can swap two slots.
+        with self.app.app_context():
+            second = Filament(
+                name='Storage Test PLA 2', brand_id=self.brand_id,
+                color_id=self.color_id, material_id=self.material_id,
+                weight_total=1000, weight_remaining=1000, price=500, quantity=1,
+            )
+            db.session.add(second)
+            db.session.commit()
+            second_id = second.id
+        self.client.post('/storage/slot/assign', data={
+            'shelf_id': self.shelf_id,
+            'filament': f'{second_id} - Storage Test PLA 2',
+            'slot_index': 1,
+        })
+        with self.app.app_context():
+            p2 = StoragePlacement.query.filter_by(shelf_id=self.shelf_id, slot_index=1).first()
+            self.assertIsNotNone(p2)
+            self.assertNotEqual(p1.id, p2.id)
 
         self.client.post(f'/storage/placement/{p1.id}/move', data={
             'shelf_id': self.shelf_id,
-            'slot_index': 2,
+            'slot_index': 1,
         })
         with self.app.app_context():
             p1_after = db.session.get(StoragePlacement, p1.id)
             p2_after = db.session.get(StoragePlacement, p2.id)
-            self.assertEqual(p1_after.slot_index, 2)
-            self.assertEqual(p2_after.slot_index, 1)
+            self.assertEqual(p1_after.slot_index, 1)
+            self.assertEqual(p2_after.slot_index, 2)
 
     def test_update_orientation(self):
         """POST /storage/placement/<id>/orientation changes orientation value."""

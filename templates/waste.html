@@ -290,14 +290,20 @@ const _WASTE_ADD_URL = {{ url_for('waste_add')|tojson }};
     });
 
     // ── Filament dropdown render helper ─────────────────────────────────────
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
     function renderFilamentDropdown(container, query, onSelect) {
         var q = (query || '').toLowerCase().trim();
         var items = q ? _WF.filter(function(f) { return f.label.toLowerCase().indexOf(q) !== -1 || f.mat.toLowerCase().indexOf(q) !== -1; }) : _WF;
         var html = '<button type="button" data-filament-id="" class="w-full text-left px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 border-b border-gray-100">{{ t('waste_filter_all_filaments') }}</button>';
         items.forEach(function(f) {
             html += '<button type="button" data-filament-id="' + f.id + '" class="w-full text-left px-3 py-2 text-sm hover:bg-red-50 transition-colors border-b border-gray-50 last:border-0">' +
-                '<span class="font-medium text-gray-800">' + f.label + '</span> ' +
-                '<span class="text-xs text-gray-400 ml-1">' + f.mat + '</span></button>';
+                '<span class="font-medium text-gray-800">' + escapeHtml(f.label) + '</span> ' +
+                '<span class="text-xs text-gray-400 ml-1">' + escapeHtml(f.mat) + '</span></button>';
         });
         container.innerHTML = html;
         container.classList.remove('hidden');
@@ -385,8 +391,8 @@ const _WASTE_ADD_URL = {{ url_for('waste_add')|tojson }};
         }
         items.forEach(function(item) {
             html += '<button type="button" data-id="' + item.id + '" class="w-full text-left px-3 py-2 text-sm hover:bg-red-50 transition-colors border-b border-gray-50 last:border-0">' +
-                '<span class="font-medium text-gray-800">' + (labelField ? item[labelField] : item.name) + '</span>' +
-                (item.mat ? '<span class="text-xs text-gray-400 ml-1">' + item.mat + '</span>' : '') +
+                '<span class="font-medium text-gray-800">' + escapeHtml(labelField ? item[labelField] : item.name) + '</span>' +
+                (item.mat ? '<span class="text-xs text-gray-400 ml-1">' + escapeHtml(item.mat) + '</span>' : '') +
                 '</button>';
         });
         container.innerHTML = html;

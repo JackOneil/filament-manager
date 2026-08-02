@@ -116,7 +116,7 @@
             </form>
 
             <!-- Tab: Security -->
-            <div x-show="activeTab === 'security'" class="space-y-6">
+            <div x-show="activeTab === 'security'" x-cloak class="space-y-6">
                 <!-- Password change -->
                 <form method="POST" class="ui-panel space-y-4">
                     <input type="hidden" name="action" value="password">
@@ -186,7 +186,7 @@
             </div>
 
             <!-- Tab: Appearance -->
-            <form method="POST" x-show="activeTab === 'appearance'" class="ui-panel space-y-4">
+            <form method="POST" x-show="activeTab === 'appearance'" x-cloak class="ui-panel space-y-4">
                 <input type="hidden" name="action" value="preferences">
                 <div class="ui-label">{{ t('account_appearance_heading') }}</div>
                 <div>
@@ -228,7 +228,7 @@
             </form>
 
             <!-- Tab: Notifications -->
-            <form method="POST" x-show="activeTab === 'notifications'" class="ui-panel space-y-4">
+            <form method="POST" x-show="activeTab === 'notifications'" x-cloak class="ui-panel space-y-4">
                 <input type="hidden" name="action" value="profile">
                 <div class="ui-label">{{ t('notifications_prefs_heading') }}</div>
                 <p class="text-xs text-gray-400">{{ t('notifications_prefs_desc') }}</p>

@@ -264,7 +264,11 @@ def _build_export_data(app, include_files=True):
                 'currency': m.currency,
                 'note': m.note,
                 'created_at': m.created_at.isoformat() if m.created_at else None,
-            } for m in MovementHistory.query.order_by(MovementHistory.created_at).all()],
+            } for m in MovementHistory.query.options(
+                joinedload(MovementHistory.filament),
+                joinedload(MovementHistory.project),
+                joinedload(MovementHistory.bambu_job),
+            ).order_by(MovementHistory.created_at).all()],
 
             # ── Calculator / print history ─────────────────────────────
             'print_history': [{
@@ -421,7 +425,9 @@ def _build_export_data(app, include_files=True):
                 'user': _user_ref(mc.user),
                 'body': mc.body,
                 'created_at': mc.created_at.isoformat() if mc.created_at else None,
-            } for mc in ModelComment.query.order_by(ModelComment.created_at).all()],
+            } for mc in ModelComment.query.options(
+                joinedload(ModelComment.author),
+            ).order_by(ModelComment.created_at).all()],
 
             'comment_reactions': [{
                 'project_name': cr.comment.project.name if cr.comment and cr.comment.project else None,
@@ -486,7 +492,11 @@ def _build_export_data(app, include_files=True):
                     'filament_ref': _filament_ref(m.filament),
                     'deducted': m.deducted,
                 } for m in j.materials],
-            } for j in BambuPrintJob.query.order_by(BambuPrintJob.started_at).all()],
+            } for j in BambuPrintJob.query.options(
+                joinedload(BambuPrintJob.filament),
+                joinedload(BambuPrintJob.project),
+                joinedload(BambuPrintJob.materials),
+            ).order_by(BambuPrintJob.started_at).all()],
 
             # ── Storage visualization ────────────────────────────────
             'storage_shelves': [{
@@ -534,7 +544,10 @@ def _build_export_data(app, include_files=True):
                 'filament_name': j.filament.name if j.filament else None,
                 'filament_ref': _filament_ref(j.filament),
                 'project_name': j.project.name if j.project else None,
-            } for j in PrusaPrintJob.query.order_by(PrusaPrintJob.synced_at).all()],
+            } for j in PrusaPrintJob.query.options(
+                joinedload(PrusaPrintJob.filament),
+                joinedload(PrusaPrintJob.project),
+            ).order_by(PrusaPrintJob.synced_at).all()],
 
             # ── Printer maintenance records ───────────────────────────
             'printer_maintenance': [{
@@ -576,7 +589,10 @@ def _build_export_data(app, include_files=True):
                     'filepath': wf.filepath,
                     'uploaded_at': wf.uploaded_at.isoformat() if wf.uploaded_at else None,
                 } for wf in w.files] if include_files else []),
-            } for w in WasteRecord.query.order_by(WasteRecord.created_at).all()],
+            } for w in WasteRecord.query.options(
+                joinedload(WasteRecord.filament),
+                joinedload(WasteRecord.files),
+            ).order_by(WasteRecord.created_at).all()],
 
             # ── Undo log ─────────────────────────────────────────────
             'undo_logs': [{

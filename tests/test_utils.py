@@ -15,15 +15,30 @@ class SafeUrlTests(unittest.TestCase):
         self.assertTrue(is_safe_external_url('https://example.com/page'))
 
 
+def _mock_html_response(text, status_code=200, headers=None, url='https://example.com/page'):
+    """Build a requests.Response-like mock supporting the streamed reads used
+    by _follow_safe_redirects (iter_content) plus the standard attributes."""
+    import types
+    resp = Mock(
+        status_code=status_code,
+        headers=headers or {'Content-Type': 'text/html; charset=utf-8'},
+        text=text,
+        url=url,
+        content=text.encode('utf-8'),
+    )
+    resp.iter_content = Mock(side_effect=lambda chunk_size=65536: [text.encode('utf-8')])
+    resp.close = Mock()
+    resp.raise_for_status = Mock()
+    return resp
+
+
 class LinkPreviewTests(unittest.TestCase):
     @patch('utils.requests.get')
     @patch('utils.socket.getaddrinfo')
     def test_fetch_link_metadata_uses_fallback_meta_and_resolves_relative_image(self, mock_getaddrinfo, mock_get):
         mock_getaddrinfo.return_value = [(None, None, None, None, ('93.184.216.34', 443))]
-        mock_get.return_value = Mock(
-            status_code=200,
-            headers={'Content-Type': 'text/html; charset=utf-8'},
-            text=(
+        mock_get.return_value = _mock_html_response(
+            (
                 '<html><head>'
                 '<title>Example Title</title>'
                 '<meta name="description" content="Example description">'
@@ -59,10 +74,8 @@ class LinkPreviewTests(unittest.TestCase):
     @patch('utils.socket.getaddrinfo')
     def test_fetch_link_metadata_reads_json_ld_preview_data(self, mock_getaddrinfo, mock_get):
         mock_getaddrinfo.return_value = [(None, None, None, None, ('93.184.216.34', 443))]
-        mock_get.return_value = Mock(
-            status_code=200,
-            headers={'Content-Type': 'text/html; charset=utf-8'},
-            text=(
+        mock_get.return_value = _mock_html_response(
+            (
                 '<html><head>'
                 '<script type="application/ld+json">'
                 '{"@context":"https://schema.org","name":"MakerWorld Axolotl",'
@@ -89,21 +102,16 @@ class LinkPreviewTests(unittest.TestCase):
             mock_settings.return_value = Mock(link_preview_reader_enabled=True)
             mock_getaddrinfo.return_value = [(None, None, None, None, ('93.184.216.34', 443))]
             mock_get.side_effect = [
-                Mock(
-                    status_code=403,
-                    headers={'Content-Type': 'text/html; charset=utf-8'},
-                    text='<title>Just a moment...</title>',
-                ),
-                Mock(
-                    status_code=200,
-                    headers={'Content-Type': 'text/plain; charset=utf-8'},
-                    text=(
+                _mock_html_response('<title>Just a moment...</title>', status_code=403),
+                _mock_html_response(
+                    (
                         'Title: Articulated Axolotl (Multicolor) - Free 3D Print Model - MakerWorld\n\n'
                         'URL Source: https://makerworld.com/en/models/989796-articulated-axolotl-multicolor\n\n'
                         'Markdown Content:\n'
                         '![Image 1](https://makerworld.bblmw.com/makerworld/model/sample/design/cover.png)\n\n'
                         'Articulated axolotl multicolor by Molodos'
                     ),
+                    headers={'Content-Type': 'text/plain; charset=utf-8'},
                 ),
             ]
 

@@ -104,7 +104,7 @@
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3"
                      x-data="kpiCards()"
                      x-init="init()"
-                     @click.away="closeAll()">
+                     @click.outside="closeAll()">
                     {# Pass all available metrics as JSON #}
                     <script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
                     const _KPI_TRENDS = {{ overview_focus.kpi_trends | tojson }};

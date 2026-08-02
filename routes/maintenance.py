@@ -1,11 +1,12 @@
 """Printer maintenance routes — service records, nozzle changes, calibration, fault history."""
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from flask import abort, redirect, render_template, request, session, url_for, Response, Blueprint
 
 from database import db
-from models import BambuPrinter, BambuPrintJob, FilamentUndoLog, PrinterMaintenance, PrusaPrinter, PrusaPrintJob
+from models import AppSetting, BambuPrinter, BambuPrintJob, FilamentUndoLog, PrinterMaintenance, PrusaPrinter, PrusaPrintJob
 from routes.inventory_helpers import _UNDO_SESSION_KEY
 from utils import translate, utc_now, safe_commit
 
@@ -20,7 +21,19 @@ _MAINTENANCE_UNDO_TTL_MINUTES = 15
 def _parse_dt_local(value):
     try:
         value = (value or '').strip()
-        return datetime.strptime(value, '%Y-%m-%dT%H:%M') if value else utc_now()
+        if not value:
+            return utc_now()
+        dt = datetime.strptime(value, '%Y-%m-%dT%H:%M')
+        # The form value is a local wall-clock time — interpret it in the
+        # configured app timezone and normalize to UTC for storage, so the
+        # display (fmt_dt) round-trips to the same wall-clock time.
+        tz_name = 'Europe/Prague'
+        try:
+            setting = AppSetting.query.first()
+            tz_name = (setting.app_timezone or 'Europe/Prague') if setting else 'Europe/Prague'
+        except Exception:
+            pass
+        return dt.replace(tzinfo=ZoneInfo(tz_name)).astimezone(timezone.utc)
     except (TypeError, ValueError):
         return utc_now()
 
@@ -470,9 +483,12 @@ def register(app):
             dtstart = _fmt_dt(rec.next_service_at)
             dtend = _fmt_dt(rec.next_service_at + timedelta(hours=1))
             summary = _ics_escape(f"{translate('maintenance_type_' + rec.maintenance_type)} — {rec.printer_name}")
+            # RFC 5545 requires DTSTAMP (creation timestamp, UTC, basic format)
+            dtstamp = utc_now().strftime('%Y%m%dT%H%M%SZ')
             lines.extend([
                 'BEGIN:VEVENT',
                 f'UID:{uid}',
+                f'DTSTAMP:{dtstamp}',
                 f'DTSTART:{dtstart}',
                 f'DTEND:{dtend}',
                 f'SUMMARY:{summary}',
@@ -481,7 +497,19 @@ def register(app):
                 'END:VEVENT',
             ])
         lines.append('END:VCALENDAR')
-        ics_content = '\r\n'.join(lines)
+        # RFC 5545 §3.1: lines longer than 75 octets must be folded with
+        # CRLF + single space. Fold every line defensively.
+        folded = []
+        for line in lines:
+            encoded = line.encode('utf-8')
+            if len(encoded) <= 75:
+                folded.append(line)
+                continue
+            parts = []
+            for i in range(0, len(encoded), 73):
+                parts.append(encoded[i:i + 73].decode('utf-8'))
+            folded.append('\r\n '.join(parts))
+        ics_content = '\r\n'.join(folded)
         return Response(ics_content, mimetype='text/calendar', headers={
             'Content-Disposition': 'attachment; filename=maintenance_calendar.ics'
         })

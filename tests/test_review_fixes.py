@@ -481,9 +481,22 @@ class StorageInputRobustnessTests(_BaseFixesTests):
             shelf = StorageShelf(name='Full Shelf', columns=1, slots_count=3)
             db.session.add(shelf)
             db.session.flush()
+            # One filament per slot — a filament may only occupy ONE slot
+            # (unique constraint on storage_placement.filament_id).
+            from models import Filament as _F
+            fil = db.session.get(_F, self.filament_id)
             for slot in (1, 2, 3):
+                if slot > 1:
+                    fil = _F(
+                        name=f'Shrink Filament {slot}', brand_id=fil.brand_id,
+                        color_id=fil.color_id, material_id=fil.material_id,
+                        weight_total=1000, weight_remaining=1000,
+                        price=500, quantity=1,
+                    )
+                    db.session.add(fil)
+                    db.session.flush()
                 db.session.add(StoragePlacement(
-                    shelf_id=shelf.id, filament_id=self.filament_id,
+                    shelf_id=shelf.id, filament_id=fil.id,
                     slot_index=slot, orientation='standing',
                 ))
             db.session.commit()

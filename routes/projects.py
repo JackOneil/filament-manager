@@ -1,7 +1,7 @@
 import math
 import os
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from types import SimpleNamespace
 
 from flask import abort, current_app, flash, jsonify, redirect, render_template, request, send_from_directory, url_for, Blueprint
@@ -94,17 +94,17 @@ def register(app):
             ft = f'%{escape_like(fulltext_filter)}%'
             base_query = base_query.filter(
                 db.or_(
-                    Project.name.ilike(ft),
-                    Project.client_name.ilike(ft),
-                    Project.tag_text.ilike(ft),
+                    Project.name.ilike(ft, escape='\\'),
+                    Project.client_name.ilike(ft, escape='\\'),
+                    Project.tag_text.ilike(ft, escape='\\'),
                 )
             )
         if client_filter:
-            base_query = base_query.filter(Project.client_name.ilike(f'%{escape_like(client_filter)}%'))
+            base_query = base_query.filter(Project.client_name.ilike(f'%{escape_like(client_filter)}%', escape='\\'))
         if name_filter:
-            base_query = base_query.filter(Project.name.ilike(f'%{escape_like(name_filter)}%'))
+            base_query = base_query.filter(Project.name.ilike(f'%{escape_like(name_filter)}%', escape='\\'))
         if tag_filter:
-            base_query = base_query.filter(Project.tag_text.ilike(f'%{escape_like(tag_filter)}%'))
+            base_query = base_query.filter(Project.tag_text.ilike(f'%{escape_like(tag_filter)}%', escape='\\'))
         if hide_done:
             base_query = base_query.filter(Project.status != 'DONE')
 
@@ -321,7 +321,7 @@ def register(app):
             is_admin_user=is_admin(user),
             default_client_name=user.name if user and not is_admin(user) else '',
             suggestions=suggestions,
-            project_templates=ProjectTemplate.query.order_by(ProjectTemplate.created_at.desc()).all(),
+            project_templates=_visible_project_templates(user),
             prefill_template=None,
         )
 
@@ -391,12 +391,12 @@ def register(app):
         project_comments = _build_project_comments(project)
         project_todos = sorted(
             project.todos,
-            key=lambda item: (item.is_done, item.completed_at or datetime.max, item.created_at or datetime.min),
+            key=lambda item: (item.is_done, item.completed_at or datetime.max.replace(tzinfo=timezone.utc), item.created_at or datetime.min.replace(tzinfo=timezone.utc)),
         )
         todo_done_count = len([todo for todo in project_todos if todo.is_done])
         project_print_items = sorted(
             getattr(project, 'print_items', []) or [],
-            key=lambda item: (item.sort_order, item.created_at or datetime.min),
+            key=lambda item: (item.sort_order, item.created_at or datetime.min.replace(tzinfo=timezone.utc)),
         )
         print_items_total = sum(i.quantity_total for i in project_print_items)
         print_items_done = sum(i.quantity_done for i in project_print_items)
@@ -529,6 +529,15 @@ def register(app):
             original_filename = secure_filename(file.filename)
             if not original_filename:
                 flash('project_file_type_not_allowed', 'error')
+                continue
+            # Per-file size cap: MAX_CONTENT_LENGTH only bounds the whole
+            # request, so a multi-file upload could slip in oversized files.
+            file.seek(0, os.SEEK_END)
+            file_size = file.tell()
+            file.seek(0)
+            max_per_file = app.config.get('MAX_CONTENT_LENGTH', 256 * 1024 * 1024)
+            if file_size > max_per_file:
+                flash('project_file_too_large', 'error')
                 continue
             stored_filename = _build_storage_name(project.id, original_filename)
             filepath = os.path.join(upload_folder, stored_filename)
@@ -875,7 +884,12 @@ def register(app):
         project = _project_or_404(id)
         _require_project_admin()
         flow = ['NEW', 'PENDING_APPROVAL', 'APPROVED', 'PRINTING', 'DONE']
-        current_idx = flow.index(project.status) if project.status in flow else -1
+        if project.status not in flow:
+            # REJECTED / CANCELLED / FAILED have no next step — advancing
+            # must not silently wrap around to NEW.
+            flash(translate('project_advance_status_no_next'), 'info')
+            return redirect(url_for('project_detail', id=id))
+        current_idx = flow.index(project.status)
         if current_idx < len(flow) - 1:
             old_status = project.status
             project.status = flow[current_idx + 1]
@@ -961,10 +975,7 @@ def register(app):
     @bp.route('/projects/templates')
     def project_templates_index():
         user = get_current_user()
-        if is_admin():
-            templates = ProjectTemplate.query.order_by(ProjectTemplate.created_at.desc()).all()
-        else:
-            templates = ProjectTemplate.query.filter_by(created_by_user_id=user.id if user else -1).order_by(ProjectTemplate.created_at.desc()).all()
+        templates = _visible_project_templates(user)
         return render_template('project_templates.html', templates=templates, can_manage_project=is_admin())
 
     @bp.route('/projects/<int:id>/save_as_template', methods=['POST'])
@@ -994,7 +1005,10 @@ def register(app):
 
     @bp.route('/project-templates/<int:tid>/data')
     def project_template_data(tid):
+        user = get_current_user()
         tpl = ProjectTemplate.query.get_or_404(tid)
+        if not is_admin(user) and tpl.created_by_user_id != (user.id if user else -1):
+            abort(404)
         return jsonify(
             name=tpl.name,
             client_name='',
@@ -1006,16 +1020,25 @@ def register(app):
             estimated_print_time=tpl.estimated_print_time or 0,
         )
 
+    def _visible_project_templates(user):
+        """Templates the user may use: admins see all, others only their own."""
+        if is_admin(user):
+            return ProjectTemplate.query.order_by(ProjectTemplate.created_at.desc()).all()
+        uid = user.id if user else -1
+        return ProjectTemplate.query.filter_by(created_by_user_id=uid).order_by(ProjectTemplate.created_at.desc()).all()
+
     @bp.route('/projects/create/from_template/<int:tid>')
     def project_create_from_template(tid):
-        tpl = ProjectTemplate.query.get_or_404(tid)
         user = get_current_user()
+        tpl = ProjectTemplate.query.get_or_404(tid)
+        if not is_admin(user) and tpl.created_by_user_id != (user.id if user else -1):
+            abort(404)
         return render_template(
             'project_create.html',
             is_admin_user=is_admin(user),
             default_client_name=user.name if user and not is_admin(user) else '',
             suggestions=[],
-            project_templates=ProjectTemplate.query.order_by(ProjectTemplate.created_at.desc()).all(),
+            project_templates=_visible_project_templates(user),
             prefill_template=tpl,
         )
 
@@ -1024,6 +1047,11 @@ def register(app):
         user = get_current_user()
         if not user:
             return jsonify({'error': translate('error_unauthorized')}), 401
+        # Access check: the comment must belong to a project the user can
+        # view (owner or admin) — otherwise reactions leak across projects.
+        project = _project_or_404(id)
+        if not (is_admin(user) or project.owner_user_id == (user.id if user else -1)):
+            return jsonify({'error': translate('error_forbidden')}), 403
         comment = ProjectComment.query.filter_by(id=cid, project_id=id).first_or_404()
         emoji = request.form.get('emoji', '').strip()
         ALLOWED_EMOJIS = {'👍', '✅', '🔄', '🎉', '❤️', '😮', '😂', '🚀', '👀', '💯', '🔥', '🙏'}

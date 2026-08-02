@@ -503,7 +503,7 @@ class StoragePlacement(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     shelf_id = db.Column(db.Integer, db.ForeignKey('storage_shelf.id', ondelete='CASCADE'), nullable=False)
-    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='CASCADE'), nullable=False)
+    filament_id = db.Column(db.Integer, db.ForeignKey('filament.id', ondelete='CASCADE'), nullable=False, unique=True)
     slot_index = db.Column(db.Integer, nullable=False)
     orientation = db.Column(db.String(20), nullable=False, default='standing')
 
@@ -514,7 +514,7 @@ class StoragePlacement(db.Model):
 class BambuPrinter(db.Model):
     """Known Bambu Lab printers, auto-discovered from sync or manually added."""
     id = db.Column(db.Integer, primary_key=True)
-    device_id = db.Column(db.String(100), nullable=True)
+    device_id = db.Column(db.String(100), nullable=True, unique=True)
     name = db.Column(db.String(200), nullable=False)
     printer_model = db.Column(db.String(50), nullable=True)
     notes = db.Column(db.Text, nullable=True)
@@ -530,7 +530,7 @@ class BambuPrintJob(db.Model):
     external_id = db.Column(db.String(100), unique=True, nullable=False)
     printer_name = db.Column(db.String(200), nullable=True)
     printer_model = db.Column(db.String(100), nullable=True)
-    device_id = db.Column(db.String(100), nullable=True)
+    device_id = db.Column(db.String(100), nullable=True, unique=True)
     model_name = db.Column(db.String(300), nullable=True)
     status = db.Column(db.String(50), nullable=True, index=True)
     started_at = db.Column(UtcDateTime, nullable=True)

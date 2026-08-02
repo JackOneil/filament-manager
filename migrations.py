@@ -105,6 +105,7 @@ def run_migrations(app: Flask) -> None:
         _safe_alter(app, "ALTER TABLE bambu_printer ADD COLUMN pre_job_time_minutes INTEGER NOT NULL DEFAULT 0")
 
         # PrusaLink integration
+        _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN device_id VARCHAR(100) DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN notes TEXT DEFAULT NULL")
         _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN enabled BOOLEAN NOT NULL DEFAULT 1")
         _safe_alter(app, "ALTER TABLE prusa_printer ADD COLUMN last_sync_at TIMESTAMP DEFAULT NULL")
@@ -239,6 +240,45 @@ def run_migrations(app: Flask) -> None:
 
         # ── Add ondelete=CASCADE to waste_record.filament_id FK ──────────────
         _migrate_waste_record_fk(app, _dialect)
+        # ── Unique constraints: printer device_id + storage placement ────────
+        # Legacy databases may contain duplicates — deduplicate first (keep the
+        # lowest id), then create the unique index.  If dedup fails (e.g. jobs
+        # still reference a duplicate printer), log and skip — the model-level
+        # unique flag still protects freshly created databases.
+        for table in ('bambu_printer', 'prusa_printer'):
+            try:
+                db.session.execute(text(f"""
+                    DELETE FROM {table}
+                    WHERE device_id IS NOT NULL
+                      AND id NOT IN (
+                          SELECT MIN(id) FROM {table}
+                          WHERE device_id IS NOT NULL
+                          GROUP BY device_id
+                      )
+                """))
+                db.session.commit()
+                db.session.execute(text(f"CREATE UNIQUE INDEX IF NOT EXISTS ix_{table}_device_id ON {table} (device_id)"))
+                db.session.commit()
+            except Exception as exc:
+                db.session.rollback()
+                app.logger.warning('Printer device_id dedup/index skipped for %s: %s', table, exc)
+        try:
+            db.session.execute(text("""
+                DELETE FROM storage_placement
+                WHERE filament_id IS NOT NULL
+                  AND id NOT IN (
+                      SELECT MIN(id) FROM storage_placement
+                      WHERE filament_id IS NOT NULL
+                      GROUP BY filament_id
+                  )
+            """))
+            db.session.commit()
+            db.session.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_storage_placement_filament_id ON storage_placement (filament_id)"))
+            db.session.commit()
+        except Exception as exc:
+            db.session.rollback()
+            app.logger.warning('Storage placement dedup/index skipped: %s', exc)
+
 
         # ── Add ondelete=SET NULL to movement_history and bambu_job_material ──
         # NOTE: SQLite cannot ALTER TABLE to add FK constraints. The model
