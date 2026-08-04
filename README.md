@@ -60,7 +60,7 @@ A modern, self-hosted web application for managing 3D printer filament inventory
 - **Progressive Web App** — Install on desktop or mobile device with offline-capable shell.
 - **Interactive Help System** — Floating `?` button on every page opens a slide-out panel with contextual tips for the current section, full-text search across all tips, and a bilingual accordion of all features. Automatically switches language with the app.
 - **Dark Mode** — Full dark theme support with per-user persistence.
-- **Bilingual** — Complete Czech and English translations (700+ keys).
+- **Bilingual** — Complete Czech and English translations (1765+ keys).
 - **Full Backup / Restore** — Compressed `.tar.gz` export with `manifest.json` plus real uploaded project files and waste record photos stored directly in the archive. Import also supports older `.json.gz` and legacy plain JSON backups.
 - **Settings Tabs** — Settings page is organized into six tabs: General, Printers, Integrations, Company, Data, and Dictionaries.
 - **Settings UX & Backup Safety** — Unified save/confirm/error toasts, printer health summary card, Bambu connection test without saving token, Prusa pre-save connectivity check, and Data-tab backup tooling with full/database-only export, backup metadata, dry-run import compatibility checks, and conflict modes (`skip`/`merge`/`overwrite`).
@@ -96,6 +96,7 @@ filament/
 ├── app.py                  # App factory, background workers
 ├── database.py             # Shared SQLAlchemy instance + dialect detection
 ├── migrations.py           # Database migrations and seed data
+├── time_utils.py           # Timezone-aware UTC datetime helpers
 ├── models.py               # All ORM models (~35 tables)
 ├── messages.py             # i18n dictionaries (cs + en)
 ├── auth.py                 # Multi-user auth, RBAC, sessions
@@ -121,12 +122,13 @@ filament/
 │   ├── backup_helpers.py   #   Backup helpers (export/import serialization)
 │   ├── waste.py            #   Waste/scrap tracking
 │   ├── models.py           #   Central 3D model browser, details, timeline, and thumbnails
+│   ├── model_renderer.py   #   STL → PNG thumbnail rendering (pure-Python + Pillow)
 │   ├── auth.py             #   Auth routes (login, register, users)
 │   └── pwa.py              #   PWA manifest and service worker
 ├── static/js/modal.js      # Shared accessible modal manager
 ├── static/js/ajax.js       # Shared AJAX response/error/retry helpers
 │
-├── templates/              # Jinja2 HTML templates (~30 files)
+├── templates/              # Jinja2 HTML templates (~55 files)
 ├── tests/                  # Automated tests (pytest)
 ├── data/                   # Runtime data (DB + uploads, gitignored)
 │
@@ -367,7 +369,7 @@ Private project — see repository settings for access and licensing information
 ## 📚 Further Reading
 
 - [`.kilo/ARCHITECTURE.md`](.kilo/ARCHITECTURE.md) — Canonical architecture documentation (single source of truth for all rules and conventions)
-- [`.github/copilot-instructions.md`](.github/copilot-instructions.md) — Technical manual for AI assistants and developers
+- [`AGENTS.md`](AGENTS.md) — Full-cycle agent instructions (delivery workflow, phases, checklists)
 - [`.kilo/BACKLOG.md`](.kilo/BACKLOG.md) — Implementation backlog with features, bugs, and technical debt
 - [`CHANGELOG.md`](CHANGELOG.md) — Recent version history (Keep a Changelog format)
 - [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md) — Archived changelog entries (v1.100.0 and older)

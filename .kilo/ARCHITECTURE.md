@@ -1,7 +1,7 @@
 # Filament Manager — Architecture & Rules (Single Source of Truth)
 
 > **Canonical architecture documentation.** All agents and developers **MUST** read this file first.
-> Other documentation files (`.github/copilot-instructions.md`, agent files) reference this document as the authoritative source.
+> Other documentation files (`AGENTS.md`, `.kilo/agent/filament-agent.md`, `README.md`) reference this document as the authoritative source.
 
 ---
 
@@ -44,7 +44,7 @@ models.py               # All ORM models (~35 tables): Brand, Color, Material, F
                         #   FilamentUndoLog
                         #   MovementHistory links to both BambuPrintJob and PrusaPrintJob
 auth.py                 # Multi-user auth, RBAC, session management, invite system
-messages.py             # i18n translations (cs + en), 1765 keys per language
+messages.py             # i18n translations (cs + en), 1765+ keys per language
 utils/                   # Shared helpers package (was utils.py in 1.105.x and earlier)
   __init__.py            # re-exports: utc_now(), translate(), get_settings(), log_movement(),
                         #   render_markdown(), escape_like(), encrypt/decrypt_token(),
@@ -55,7 +55,7 @@ time_utils.py           # Custom UtcDateTime SQLAlchemy type for timezone-aware 
 
 static/
   css/
-    app.css              # Core design tokens, dashboard primitives (1184 lines)
+    app.css              # Core design tokens, dashboard primitives (≈1200 lines)
     skeleton.css         # Skeleton shimmer loaders for AJAX
     enhancements.css     # v1.119.0+ — theme tokens for charts, responsive table
                         #   cards, sparkline SVG, heatmap grid, micro-interaction
@@ -70,6 +70,12 @@ static/
                          #   effect, mobile long-press row actions, theme watcher
     modal.js              # Shared accessible plain-DOM modal manager
     ajax.js               # Shared AJAX response/error/retry UI helper
+    help.js               # Interactive help system (HELP_SECTIONS — Rule 30)
+    tour.js               # Guided tour / first-run wizard
+    inventory.js          # Inventory page helpers (extracted from index.html)
+    bambu-filter.js       # Bambu jobs filter pills
+    markdown-editor.js    # Markdown editor for comments/descriptions
+    o3dv.min.js           # Online3DViewer bundle (npm build output, also copied by Dockerfile)
 routes/
   __init__.py           # register_all(app) — calls all register() functions
   inventory.py          # /, /filaments, /filament/<id>, /add, /edit, /use, /delete, bulk operations
@@ -91,6 +97,8 @@ routes/
   backup_helpers.py     # Backup helpers (export/import serialization)
   waste.py              # Waste/scrap tracking with photos and failure reasons
   models.py             # Central 3D model browser, details, timeline, and thumbnails
+  model_renderer.py     # STL → PNG thumbnail rendering (pure-Python 3D math + Pillow),
+                        #   used by the auto-thumbnail background worker and upload handler
   auth.py               # Auth routes (login, register, users)
   pwa.py                # /manifest.json, /sw.js — Progressive Web App support
 templates/
@@ -106,28 +114,27 @@ templates/
   bambu.html            # Bambu Cloud job list with filter pills
   prusa.html            # PrusaLink job list with filter pills
   settings.html         # Full settings + dictionaries + integrations
-  _users_table.html     # Users list table partial (AJAX-targeted DOM update)
-  _filament_cards.html  # Filament card view partial
-  _filament_list_rows.html # Filament list view partial
-  _project_overview.html, _project_materials.html, _project_files.html,
-    _project_jobs.html, _project_activity.html  # Project detail tab partials
-tests/
-  test_auth.py          # Auth flows, sessions, RBAC
-  test_bambu.py         # Bambu sync, deduction, idempotency
-  test_calculator.py    # Calculator, quote creation
-  test_markdown.py      # Markdown renderer: XSS payloads, basic features, checkboxes
-  test_projects.py      # Project CRUD, uploads, link previews
-  test_refactors.py     # Backup path safety, auto-backup scheduling, PWA cache name
-  test_settings.py      # Export/import, full backup restore
-  test_stats.py         # Statistics route
-  test_utils.py         # URL validation, SSRF protection
+  _projects_layout.html # Kanban/table/calendar partial (Rule 31 DOMParser targets)
+  _project_overview.html, _project_todos.html, _project_activity.html  # Project detail tab partials
+  _models_cards.html, _models_rows.html, _bambu_job_cards.html,
+    _live_printers_partial.html, _waste_records.html, _users_table.html,
+    _filament_cards.html, _filament_list_rows.html, _filament_compact.html,
+    _filament_context_menu.html, _skeleton_cards.html, _skeleton_rows.html,
+    _toast_undo.html      # AJAX-targeted partials (56 templates total in templates/)
+tests/                   # ~35 test modules (pytest + pytest-xdist, run with -n auto)
+  test_auth.py, test_bambu.py, test_calculator.py, test_markdown.py, test_projects.py,
+  test_refactors.py, test_settings.py, test_stats.py, test_utils.py,
+  test_inventory.py, test_models.py, test_waste.py, test_maintenance.py
+                        # Core per-module suites
   test_settings_integration.py, test_inventory_extended.py, test_calculator_extended.py,
     test_projects_extended.py, test_stats_extended.py, test_utils_extended.py,
-    test_undo_system.py, test_bambu_extended.py, test_backup_extended.py,
-    test_models_core.py, test_security.py, test_waste_extended.py, test_performance.py
-                        # Extended test coverage (v1.108.0, ~440 new tests)
-  test_storage_history_pwa.py, test_maintenance.py, test_waste.py, test_inventory.py,
-  test_models.py, test_ui_v119.py
+    test_undo_system.py, test_bambu_extended.py, test_prusa_extended.py,
+    test_backup_extended.py, test_models_core.py, test_security.py,
+    test_waste_extended.py, test_performance.py, test_storage_history_pwa.py
+                        # Extended coverage (v1.108.0+, ~440 new tests)
+  test_ui_v119.py, test_ui_improvements.py, test_alpine_expressions.py,
+    test_breadcrumbs.py, test_model_renderer.py, test_e2e_regressions.py,
+    test_review_fixes.py  # UI/regression suites (v1.119.0–v1.121.0)
 data/                   # Runtime data (gitignored)
   filament.db           # SQLite database
   uploads/              # Uploaded project files
@@ -259,11 +266,14 @@ Four daemon threads start in `create_app()`:
 | `Flask-SQLAlchemy` | 3.1.1        | ORM layer over SQLite / PostgreSQL              |
 | `psycopg2-binary`   | ≥2.9         | PostgreSQL driver (optional — only when using PG) |
 | `Flask-WTF`        | 1.2.1        | CSRF protection (auto-injected into forms)                |
-| `Werkzeug`         | 3.0.1        | WSGI utilities, password hashing, ProxyFix                |
+| `Werkzeug`         | ≥3.0.6, <4   | WSGI utilities, password hashing, ProxyFix                |
 | `gunicorn`         | 21.2.0       | Production WSGI server                                    |
 | `requests`         | ≥2.31, <3    | HTTP client for Bambu Cloud, PrusaLink, link previews     |
 | `beautifulsoup4`   | ≥4.12, <5    | HTML parsing for OpenGraph/link preview metadata          |
-| `cryptography`     | ≥42          | Fernet encryption (Bambu token, Prusa API key at rest)    |
+| `cryptography`     | ≥42, <46     | Fernet encryption (Bambu token, Prusa API key at rest)    |
+| `Flask-Compress`   | 1.14         | Response compression (gzip/brotli)                       |
+| `Pillow`           | ≥10, <12     | STL thumbnail rendering (routes/model_renderer.py)        |
+| `pytest` / `pytest-xdist` | ≥8 / ≥3 | Dev/test: parallel test execution (`-n auto`)            |
 
 ### Local Frontend Assets (Docker build)
 
@@ -316,7 +326,7 @@ When modifying this project, always follow these rules:
 - To avoid breaking legacy templates, **the app registers a custom `url_for` build error handler** in `app.py`. When a template calls `url_for("route_name")` without a blueprint prefix (e.g., `url_for("index")` instead of `url_for("inventory.index")`), the handler automatically resolves it to the correct blueprint-prefixed endpoint.
 
 ### Rule 4 — Authentication & Authorization
-- The project has session-based multi-user auth. New endpoints must be mapped in `auth.SECTION_BY_ENDPOINT` to the correct section: `overview`, `filaments`, `projects`, `history`, `storage`, `calculator`, `printers`, `stats`, `settings`, `users`, `maintenance`, `models`, `waste`.
+- The project has session-based multi-user auth. New endpoints must be mapped in `auth.SECTION_BY_ENDPOINT` to one of the sections defined in `auth.py`: `overview`, `filaments`, `projects`, `history`, `storage`, `calculator`, `printers`, `stats`, `settings`, `users`, `notifications`. Feature modules reuse these sections: maintenance endpoints → `printers`, model endpoints → `projects`, waste endpoints → `filaments`. Endpoints mapped to `notifications` (account, notifications, theme toggle) are auto-allowed for every logged-in user.
 - Write operations require `_require_inventory_admin()` or `require_admin` decorator.
 - Project routes must respect ownership for non-admin users.
 
@@ -473,10 +483,9 @@ The `/export` and `/import` functions in `routes/backup.py` must cover the **ent
 ### Rule 29 — Architecture Documentation Updates
 - After implementing new features or refactoring, always update:
   - `.kilo/ARCHITECTURE.md` (this file) — if architecture, rules, or patterns changed
-  - `.kilo/agent/filament-agent.md` — if agent workflow changed
-  - `.github/copilot-instructions.md` — if rules or file structure changed
+  - `.kilo/agent/filament-agent.md` and root `AGENTS.md` (mirrors) — if agent workflow changed
   - `README.md` — if features, project structure, or roadmap changed
-  - `.github/agents/filament-release.agent.md` — if delivery workflow changed
+  - `.kilo/BACKLOG.md` — if a bug was fixed or a feature delivered (Rule 32)
 
 ### Rule 30 — Interactive Help System (`static/js/help.js`)
 - Whenever a new page, feature, or endpoint is added, update `HELP_SECTIONS` in `static/js/help.js`:
@@ -491,7 +500,7 @@ The `/export` and `/import` functions in `routes/backup.py` must cover the **ent
 - Keep widget shells, search inputs, and layout manager instances stable.
 
 ### Rule 33 — UI Enhancements Module (`window.enh` + `static/css/enhancements.css`)
-- All non-essential visual polish lives in `static/css/enhancements.css` + `static/js/enhancements.js`. Never pollute `app.css` (1184 lines) with new utility classes.
+- All non-essential visual polish lives in `static/css/enhancements.css` + `static/js/enhancements.js`. Never pollute `app.css` (≈1200 lines) with new utility classes.
 - Charts MUST register via `window.enh.registerChart(instance)` after creation so theme switching re-themes them automatically. The `window.enh.palette()` helper returns the current light/dark colour tokens.
 - Page-transition / stagger animations use the `[data-animate]` + `[data-stagger="N"]` attribute pattern — pure CSS, no JS animation loops.
 - Buttons opt into ripple effect via `data-enh-ripple`. Sparklines via `data-enh-sparkline="1,2,3,..."`. Heatmaps via `data-enh-heatmap='{...JSON...}'`.
